@@ -1,0 +1,17 @@
+{
+  "zones": [
+    {
+      "name": "Example industrial zone",
+      "reason": "Too noisy",
+      "bounds": {
+        "latMin": 40.700,
+        "latMax": 40.710,
+        "lonMin": -73.980,
+        "lonMax": -73.970
+      }
+    }
+  ],
+  "addresses": [
+    "123 Example St"
+  ]
+}

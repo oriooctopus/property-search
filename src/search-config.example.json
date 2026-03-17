@@ -1,0 +1,10 @@
+{
+  "city": "Brooklyn",
+  "stateCode": "NY",
+  "bedsMin": 2,
+  "bathsMin": 1,
+  "priceMax": 800000,
+  "minPhotos": 3,
+  "maxBeds": 4,
+  "maxSqft": 2000
+}

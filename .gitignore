@@ -1,0 +1,12 @@
+node_modules
+dist
+.browser-state.json
+.env
+.directions-cache.json
+
+# Personal config files (copy from .example versions)
+src/destinations.json
+src/exclusions.json
+src/search-config.json
+src/evaluate-config.json
+src/saved-filters/

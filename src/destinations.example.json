@@ -1,0 +1,28 @@
+[
+  {
+    "name": "Office",
+    "address": "350 5th Ave, New York, NY 10118",
+    "filterMode": "transit",
+    "maxMinutes": 40
+  },
+  {
+    "name": "Gym (Downtown)",
+    "address": "100 Broadway, New York, NY 10005",
+    "filterMode": "transit",
+    "maxMinutes": 35,
+    "filterGroup": "gym"
+  },
+  {
+    "name": "Gym (Midtown)",
+    "address": "200 W 41st St, New York, NY 10036",
+    "filterMode": "transit",
+    "maxMinutes": 35,
+    "filterGroup": "gym"
+  },
+  {
+    "name": "Park",
+    "address": "Prospect Park, Brooklyn, NY 11215",
+    "filterMode": "biking",
+    "maxMinutes": 15
+  }
+]

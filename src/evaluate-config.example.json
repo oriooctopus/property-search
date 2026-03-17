@@ -1,0 +1,14 @@
+{
+  "downPercent": 0.20,
+  "mortgageRate": 0.065,
+  "mortgageYears": 30,
+  "appreciation": 0.05,
+  "stockReturn": 0.085,
+  "propTaxRate": 0.012,
+  "insuranceRate": 0.004,
+  "maintenanceRate": 0.01,
+  "closingBuyRate": 0.03,
+  "closingSellRate": 0.06,
+  "monthlyRent": 3000,
+  "rentInflation": 0.04
+}
