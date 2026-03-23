@@ -316,7 +316,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
   // Supabase returns numeric columns as strings — coerce to numbers
   const validListings = listings
     .map((l) => ({ ...l, lat: Number(l.lat), lon: Number(l.lon) }))
-    .filter((l) => !isNaN(l.lat) && !isNaN(l.lon));
+    .filter((l) => !isNaN(l.lat) && !isNaN(l.lon) && l.lat !== 0 && l.lon !== 0);
 
   const selectedListing = validListings.find((l) => l.id === selectedId);
 
