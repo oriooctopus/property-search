@@ -200,7 +200,7 @@ export default function ListingDetail({
 
           {/* Dates info */}
           <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4 text-xs" style={{ color: '#8b949e' }}>
-            <span>Listed: {listing.list_date ? formatShortDate(listing.list_date) : 'Listing date unknown'}</span>
+            <span>Listed: {formatShortDate(listing.list_date ?? listing.created_at)}</span>
           </div>
 
           {/* Details grid */}

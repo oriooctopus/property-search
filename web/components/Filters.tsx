@@ -6,7 +6,7 @@ import { FilterChip, PillButton, TagButton, PrimaryButton, TextButton } from '@/
 export type SearchTag = 'all' | 'fulton' | 'ltrain' | 'manhattan' | 'brooklyn';
 export type SortField = 'pricePerBed' | 'price' | 'beds' | 'listDate';
 
-export type MaxListingAge = '1w' | '1m' | '3m' | null;
+export type MaxListingAge = '1w' | '2w' | '1m' | '3m' | '6m' | '1y' | null;
 
 export interface FiltersState {
   maxPricePerBed: number | null;
@@ -251,17 +251,74 @@ function DropdownFooter({
 // Main Filters component
 // ---------------------------------------------------------------------------
 
-const LISTING_AGE_OPTIONS: { value: MaxListingAge; label: string }[] = [
-  { value: null, label: 'Any' },
+const LISTING_AGE_STEPS: { value: MaxListingAge; label: string }[] = [
   { value: '1w', label: '1 Week' },
+  { value: '2w', label: '2 Weeks' },
   { value: '1m', label: '1 Month' },
   { value: '3m', label: '3 Months' },
+  { value: '6m', label: '6 Months' },
+  { value: '1y', label: '1 Year' },
+  { value: null, label: 'Any' },
 ];
 
 function listingAgeLabel(maxAge: MaxListingAge): string {
   if (maxAge === null) return 'Listed within';
-  const opt = LISTING_AGE_OPTIONS.find((o) => o.value === maxAge);
+  const opt = LISTING_AGE_STEPS.find((o) => o.value === maxAge);
   return `Within ${opt?.label ?? maxAge}`;
+}
+
+function listingAgeSliderIndex(maxAge: MaxListingAge): number {
+  const idx = LISTING_AGE_STEPS.findIndex((o) => o.value === maxAge);
+  return idx >= 0 ? idx : LISTING_AGE_STEPS.length - 1; // default to "Any" if not found
+}
+
+function ListingAgeSlider({
+  value,
+  onChange,
+}: {
+  value: MaxListingAge;
+  onChange: (v: MaxListingAge) => void;
+}) {
+  const index = listingAgeSliderIndex(value);
+  const maxIndex = LISTING_AGE_STEPS.length - 1;
+  const pct = (index / maxIndex) * 100;
+  const currentLabel = LISTING_AGE_STEPS[index].label;
+
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-medium" style={{ color: '#8b949e' }}>
+          Listed within
+        </span>
+        <span className="text-sm font-bold" style={{ color: '#e1e4e8' }}>
+          {currentLabel}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={maxIndex}
+        step={1}
+        value={index}
+        onChange={(e) => {
+          const i = Number(e.target.value);
+          onChange(LISTING_AGE_STEPS[i].value);
+        }}
+        className="range-slider w-full"
+        style={{
+          background: `linear-gradient(to right, #58a6ff 0%, #58a6ff ${pct}%, #2d333b ${pct}%, #2d333b 100%)`,
+        }}
+      />
+      <div className="flex justify-between mt-1">
+        <span className="text-[10px]" style={{ color: '#8b949e' }}>
+          1 Week
+        </span>
+        <span className="text-[10px]" style={{ color: '#8b949e' }}>
+          Any
+        </span>
+      </div>
+    </div>
+  );
 }
 
 type ChipId = 'price' | 'bedsBaths' | 'pricePerBed' | 'listingAge';
@@ -277,6 +334,9 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
   const [draftMinBaths, setDraftMinBaths] = useState<number | null>(filters.minBaths);
   const [draftMaxPricePerBed, setDraftMaxPricePerBed] = useState<number | null>(
     filters.maxPricePerBed,
+  );
+  const [draftMaxListingAge, setDraftMaxListingAge] = useState<MaxListingAge>(
+    filters.maxListingAge,
   );
 
   // Sync drafts when filters change externally
@@ -295,6 +355,9 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
   useEffect(() => {
     setDraftMaxPricePerBed(filters.maxPricePerBed);
   }, [filters.maxPricePerBed]);
+  useEffect(() => {
+    setDraftMaxListingAge(filters.maxListingAge);
+  }, [filters.maxListingAge]);
 
   // Reset drafts when a dropdown opens
   useEffect(() => {
@@ -306,6 +369,8 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
       setDraftMinBaths(filters.minBaths);
     } else if (openChip === 'pricePerBed') {
       setDraftMaxPricePerBed(filters.maxPricePerBed);
+    } else if (openChip === 'listingAge') {
+      setDraftMaxListingAge(filters.maxListingAge);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openChip]);
@@ -448,12 +513,17 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
           open={openChip === 'listingAge'}
           onToggle={() => toggleChip('listingAge')}
         >
-          <SectionTitle>Listed within</SectionTitle>
-          <PillGroup
-            options={LISTING_AGE_OPTIONS}
-            value={filters.maxListingAge}
-            onSelect={(v) => {
-              onChange({ ...filters, maxListingAge: v });
+          <ListingAgeSlider
+            value={draftMaxListingAge}
+            onChange={setDraftMaxListingAge}
+          />
+          <DropdownFooter
+            onReset={() => {
+              onChange({ ...filters, maxListingAge: '1m' });
+              setOpenChip(null);
+            }}
+            onDone={() => {
+              onChange({ ...filters, maxListingAge: draftMaxListingAge });
               setOpenChip(null);
             }}
           />

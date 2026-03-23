@@ -1,0 +1,288 @@
+'use client';
+
+import { useCallback, useRef, useState } from 'react';
+import type { FiltersState, MaxListingAge, SearchTag } from '@/components/Filters';
+import type { ChatMessageData, Conversation, ParsedFilter } from '@/lib/chat-types';
+import { getDefaultValue } from '@/components/FilterPills';
+
+// Utility: generate a unique ID
+function uid(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+/** Default filters matching what page.tsx uses */
+const DEFAULT_FILTERS: FiltersState = {
+  searchTag: 'all' as SearchTag,
+  sort: 'pricePerBed',
+  minBeds: null,
+  minBaths: null,
+  minRent: null,
+  maxRent: null,
+  maxPricePerBed: null,
+  maxListingAge: '1m' as MaxListingAge,
+};
+
+interface UseConversationOptions {
+  /** Called whenever filters change so the parent can update the listing view */
+  onFiltersChange: (filters: FiltersState) => void;
+  /** Current total matching listing count (for embedding in assistant messages) */
+  getListingCount: () => number;
+}
+
+export interface UseConversationReturn {
+  conversation: Conversation | null;
+  messages: ChatMessageData[];
+  filters: FiltersState;
+  isLoading: boolean;
+  sendMessage: (text: string) => Promise<void>;
+  removeFilter: (key: keyof FiltersState) => void;
+  reAddFilter: (key: keyof FiltersState, value: FiltersState[keyof FiltersState]) => void;
+  saveConversation: (name: string) => Promise<void>;
+  loadConversation: (id: string) => Promise<void>;
+  newConversation: () => void;
+}
+
+export function useConversation({
+  onFiltersChange,
+  getListingCount,
+}: UseConversationOptions): UseConversationReturn {
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<ChatMessageData[]>([]);
+  const [filters, setFiltersInternal] = useState<FiltersState>(DEFAULT_FILTERS);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Keep a ref for listing count so we don't stale-close over it
+  const getListingCountRef = useRef(getListingCount);
+  getListingCountRef.current = getListingCount;
+
+  const setFilters = useCallback(
+    (next: FiltersState) => {
+      setFiltersInternal(next);
+      onFiltersChange(next);
+    },
+    [onFiltersChange],
+  );
+
+  const addMessage = useCallback((msg: ChatMessageData) => {
+    setMessages((prev) => [...prev, msg]);
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // sendMessage
+  // ---------------------------------------------------------------------------
+  const sendMessage = useCallback(
+    async (text: string) => {
+      const userMsg: ChatMessageData = {
+        id: uid(),
+        role: 'user',
+        content: text,
+        timestamp: Date.now(),
+      };
+      addMessage(userMsg);
+      setIsLoading(true);
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: text,
+            conversationId: conversation?.id ?? null,
+            currentFilters: filters,
+          }),
+        });
+
+        if (!res.ok) {
+          throw new Error(`Chat API returned ${res.status}`);
+        }
+
+        const data = await res.json();
+
+        // Update filters if the API returned new ones
+        if (data.filters) {
+          const newFilters: FiltersState = { ...filters, ...data.filters };
+          setFilters(newFilters);
+        }
+
+        // Use a small delay so the listing count can settle after filter change
+        await new Promise((r) => setTimeout(r, 50));
+
+        const assistantMsg: ChatMessageData = {
+          id: uid(),
+          role: 'assistant',
+          content: data.message ?? 'Here are the matching listings.',
+          parsedFilters: data.parsedFilters ?? [],
+          listingCount: data.listingCount ?? getListingCountRef.current(),
+          timestamp: Date.now(),
+        };
+        addMessage(assistantMsg);
+
+        // Update conversation metadata
+        setConversation((prev) => {
+          const now = Date.now();
+          if (!prev) {
+            return {
+              id: data.conversationId ?? uid(),
+              name: null,
+              messages: [userMsg, assistantMsg],
+              filters: data.filters ? { ...filters, ...data.filters } : filters,
+              isSaved: false,
+              createdAt: now,
+              updatedAt: now,
+            };
+          }
+          return {
+            ...prev,
+            messages: [...prev.messages, userMsg, assistantMsg],
+            filters: data.filters ? { ...filters, ...data.filters } : filters,
+            updatedAt: now,
+          };
+        });
+      } catch (err) {
+        const errorMsg: ChatMessageData = {
+          id: uid(),
+          role: 'system',
+          content: 'Something went wrong. Please try again.',
+          timestamp: Date.now(),
+        };
+        addMessage(errorMsg);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [conversation, filters, addMessage, setFilters],
+  );
+
+  // ---------------------------------------------------------------------------
+  // removeFilter
+  // ---------------------------------------------------------------------------
+  const removeFilter = useCallback(
+    (key: keyof FiltersState) => {
+      const defaultVal = getDefaultValue(key);
+      const newFilters = { ...filters, [key]: defaultVal };
+      setFilters(newFilters);
+
+      // Build a human-readable label for the removed filter
+      const labelMap: Record<keyof FiltersState, string> = {
+        minBeds: 'minimum beds',
+        minBaths: 'minimum baths',
+        minRent: 'minimum rent',
+        maxRent: 'maximum rent',
+        maxPricePerBed: 'max price per bed',
+        searchTag: 'location',
+        sort: 'sort',
+        maxListingAge: 'listing age',
+      };
+
+      const sysMsg: ChatMessageData = {
+        id: uid(),
+        role: 'system',
+        content: `\u2014 Removed '${labelMap[key] ?? key}' filter \u2014`,
+        timestamp: Date.now(),
+      };
+      addMessage(sysMsg);
+    },
+    [filters, setFilters, addMessage],
+  );
+
+  // ---------------------------------------------------------------------------
+  // reAddFilter
+  // ---------------------------------------------------------------------------
+  const reAddFilter = useCallback(
+    (key: keyof FiltersState, value: FiltersState[keyof FiltersState]) => {
+      const newFilters = { ...filters, [key]: value };
+      setFilters(newFilters);
+
+      const labelMap: Record<keyof FiltersState, string> = {
+        minBeds: 'minimum beds',
+        minBaths: 'minimum baths',
+        minRent: 'minimum rent',
+        maxRent: 'maximum rent',
+        maxPricePerBed: 'max price per bed',
+        searchTag: 'location',
+        sort: 'sort',
+        maxListingAge: 'listing age',
+      };
+
+      const sysMsg: ChatMessageData = {
+        id: uid(),
+        role: 'system',
+        content: `\u2014 Re-added '${labelMap[key] ?? key}' filter \u2014`,
+        timestamp: Date.now(),
+      };
+      addMessage(sysMsg);
+    },
+    [filters, setFilters, addMessage],
+  );
+
+  // ---------------------------------------------------------------------------
+  // saveConversation
+  // ---------------------------------------------------------------------------
+  const saveConversation = useCallback(
+    async (name: string) => {
+      if (!conversation) return;
+
+      try {
+        await fetch(`/api/conversations/${conversation.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+
+        setConversation((prev) =>
+          prev ? { ...prev, name, isSaved: true, updatedAt: Date.now() } : prev,
+        );
+      } catch {
+        // Silently fail — we can retry later
+      }
+    },
+    [conversation],
+  );
+
+  // ---------------------------------------------------------------------------
+  // loadConversation
+  // ---------------------------------------------------------------------------
+  const loadConversation = useCallback(
+    async (id: string) => {
+      setIsLoading(true);
+      try {
+        const res = await fetch(`/api/conversations/${id}`);
+        if (!res.ok) throw new Error(`Failed to load conversation: ${res.status}`);
+        const data: Conversation = await res.json();
+
+        setConversation(data);
+        setMessages(data.messages);
+        if (data.filters) {
+          setFilters(data.filters);
+        }
+      } catch {
+        // On failure, just keep current state
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [setFilters],
+  );
+
+  // ---------------------------------------------------------------------------
+  // newConversation
+  // ---------------------------------------------------------------------------
+  const newConversation = useCallback(() => {
+    setConversation(null);
+    setMessages([]);
+    setFilters(DEFAULT_FILTERS);
+  }, [setFilters]);
+
+  return {
+    conversation,
+    messages,
+    filters,
+    isLoading,
+    sendMessage,
+    removeFilter,
+    reAddFilter,
+    saveConversation,
+    loadConversation,
+    newConversation,
+  };
+}

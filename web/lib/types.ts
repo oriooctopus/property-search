@@ -298,6 +298,79 @@ export type Database = {
           },
         ];
       };
+      conversations: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string | null;
+          filters: Record<string, unknown>;
+          is_saved: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name?: string | null;
+          filters?: Record<string, unknown>;
+          is_saved?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string | null;
+          filters?: Record<string, unknown>;
+          is_saved?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "conversations_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      conversation_messages: {
+        Row: {
+          id: number;
+          conversation_id: string;
+          role: string;
+          content: string;
+          parsed_filters: Record<string, unknown> | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          conversation_id: string;
+          role: string;
+          content: string;
+          parsed_filters?: Record<string, unknown> | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          conversation_id?: string;
+          role?: string;
+          content?: string;
+          parsed_filters?: Record<string, unknown> | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "conversation_messages_conversation_id_fkey";
+            columns: ["conversation_id"];
+            isOneToOne: false;
+            referencedRelation: "conversations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
