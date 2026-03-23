@@ -267,26 +267,28 @@ export default function ListingCard({
         </div>
       </div>
 
-      {/* View listing link */}
-      <div className="mt-2 flex items-center justify-end">
+      {/* Who would live here + View listing (combined row) */}
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          {wouldLivePeople.length > 0 ? (
+            <PeopleAvatars people={wouldLivePeople} max={4} size={20} />
+          ) : (
+            <span className="text-[11px]" style={{ color: '#8b949e' }}>
+              Be the first to say you&apos;d live here!
+            </span>
+          )}
+        </div>
         <a
           href={listing.url}
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="text-xs font-medium hover:underline"
+          className="text-xs font-medium hover:underline shrink-0"
           style={{ color: '#58a6ff' }}
         >
           View listing &rarr;
         </a>
       </div>
-
-      {/* Who would live here */}
-      {wouldLivePeople.length > 0 && (
-        <div className="mt-2 pt-2" style={{ borderTop: '1px solid #2d333b' }}>
-          <PeopleAvatars people={wouldLivePeople} max={4} size={24} />
-        </div>
-      )}
       </div>
     </div>
   );

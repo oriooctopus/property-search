@@ -64,6 +64,16 @@ const POPUP_STYLES = `
     background-color: rgba(251, 191, 36, 0.15) !important;
     color: #fcd34d !important;
   }
+  .dark-popup [data-action="open-detail-btn"] {
+    transition: color 150ms, background-color 150ms;
+  }
+  .dark-popup [data-action="open-detail-btn"]:hover {
+    background-color: rgba(88, 166, 255, 0.1) !important;
+    color: #79c0ff !important;
+  }
+  .dark-popup [data-action="open-detail-btn"]:active {
+    background-color: rgba(88, 166, 255, 0.2) !important;
+  }
 `;
 
 function InjectPopupStyles() {
@@ -287,6 +297,16 @@ function buildPopupContent(listing: Listing, isFavorited: boolean, isWouldLive: 
           margin-bottom: 2px;
         ">$${listing.beds > 0 ? Math.round(listing.price / listing.beds).toLocaleString() : '–'}/bed · ${listing.beds} bd / ${listing.baths} ba</div>
         ${actionsHtml}
+        <div data-action="open-detail-btn" data-listing-id="${listing.id}" style="
+          margin-top: 6px;
+          padding: 6px 0;
+          font-size: 11px;
+          font-weight: 600;
+          color: #58a6ff;
+          text-align: center;
+          cursor: pointer;
+          border-top: 1px solid #2d333b;
+        ">View details &rarr;</div>
       </div>
     </div>
   `;
@@ -309,6 +329,10 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
 
   // Track whether each popup was opened by click (persistent) vs hover (auto-close)
   const clickedRef = useRef<Set<number>>(new Set());
+  // Track debounce timers for hover-close so moving to the popup doesn't close it
+  const closeTimerRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  // Track popup elements by listing id so we can detect mouse-over-popup
+  const popupElRef = useRef<Map<number, HTMLElement>>(new Map());
 
   // Keep stable refs for the toggle callbacks so popupopen handlers always see latest
   const onToggleFavoriteRef = useRef(onToggleFavorite);
@@ -325,11 +349,37 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
     listingsMapRef.current = m;
   }, [listings]);
 
-  const handlePopupOpen = useCallback((_listing: Listing) => {
+  const handlePopupOpen = useCallback((listing: Listing) => {
     return (e: L.LeafletEvent) => {
       const popup = (e as unknown as { popup: L.Popup }).popup;
       const container = popup?.getElement?.();
       if (!container) return;
+
+      // Track popup element for hover detection
+      popupElRef.current.set(listing.id, container);
+
+      // When the mouse enters the popup, cancel any pending close timer
+      const onPopupMouseEnter = () => {
+        const timer = closeTimerRef.current.get(listing.id);
+        if (timer) {
+          clearTimeout(timer);
+          closeTimerRef.current.delete(listing.id);
+        }
+      };
+      // When the mouse leaves the popup (and it was a hover-opened popup), close it
+      const onPopupMouseLeave = () => {
+        if (!clickedRef.current.has(listing.id)) {
+          const marker = e.target as L.CircleMarker;
+          const timer = setTimeout(() => {
+            closeTimerRef.current.delete(listing.id);
+            marker.closePopup();
+          }, 200);
+          closeTimerRef.current.set(listing.id, timer);
+        }
+      };
+
+      container.addEventListener('mouseenter', onPopupMouseEnter);
+      container.addEventListener('mouseleave', onPopupMouseLeave);
 
       // React hasn't rendered the dangerouslySetInnerHTML content yet when
       // Leaflet fires popupopen. Defer handler wiring until the next frame
@@ -405,19 +455,47 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
       // Wire up clickable card -> open detail
       const detailCard = container.querySelector('[data-action="open-detail"]') as HTMLElement | null;
       if (detailCard) {
-        detailCard.onclick = (ev) => {
+        const openDetail = (ev: MouseEvent | TouchEvent) => {
           // Don't open detail if clicking buttons inside
           const target = ev.target as HTMLElement;
-          if (target.closest('[data-action="would-live"]') || target.closest('[data-action="favorite"]') || target.closest('[data-action="photo-prev"]') || target.closest('[data-action="photo-next"]')) return;
+          if (target.closest('[data-action="would-live"]') || target.closest('[data-action="favorite"]') || target.closest('[data-action="photo-prev"]') || target.closest('[data-action="photo-next"]') || target.closest('[data-action="open-detail-btn"]')) return;
           const id = Number(detailCard.getAttribute('data-listing-id'));
           const listing = listingsMapRef.current.get(id);
           if (listing) onSelectDetailRef.current(listing);
         };
+        detailCard.onclick = openDetail;
+        // Ensure touch taps work reliably on mobile
+        detailCard.addEventListener('touchend', (ev) => {
+          const target = ev.target as HTMLElement;
+          if (target.closest('[data-action="would-live"]') || target.closest('[data-action="favorite"]') || target.closest('[data-action="photo-prev"]') || target.closest('[data-action="photo-next"]') || target.closest('[data-action="open-detail-btn"]')) return;
+          ev.preventDefault();
+          const id = Number(detailCard.getAttribute('data-listing-id'));
+          const listing = listingsMapRef.current.get(id);
+          if (listing) onSelectDetailRef.current(listing);
+        });
+      }
+
+      // Wire up the explicit "View details" button
+      const detailBtn = container.querySelector('[data-action="open-detail-btn"]') as HTMLElement | null;
+      if (detailBtn) {
+        const openFromBtn = () => {
+          const id = Number(detailBtn.getAttribute('data-listing-id'));
+          const listing = listingsMapRef.current.get(id);
+          if (listing) onSelectDetailRef.current(listing);
+        };
+        detailBtn.onclick = (ev) => { ev.stopPropagation(); openFromBtn(); };
+        detailBtn.addEventListener('touchend', (ev) => { ev.preventDefault(); ev.stopPropagation(); openFromBtn(); });
       }
   }, []);
 
   const handleMouseOver = useCallback((listing: Listing) => {
     return (e: L.LeafletMouseEvent) => {
+      // Cancel any pending close timer for this marker
+      const timer = closeTimerRef.current.get(listing.id);
+      if (timer) {
+        clearTimeout(timer);
+        closeTimerRef.current.delete(listing.id);
+      }
       if (!clickedRef.current.has(listing.id)) {
         e.target.openPopup();
       }
@@ -427,7 +505,15 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
   const handleMouseOut = useCallback((listing: Listing) => {
     return (e: L.LeafletMouseEvent) => {
       if (!clickedRef.current.has(listing.id)) {
-        e.target.closePopup();
+        // Debounce the close so the user can move their mouse to the popup
+        const timer = setTimeout(() => {
+          closeTimerRef.current.delete(listing.id);
+          // Check if the mouse is now over the popup element
+          const popupEl = popupElRef.current.get(listing.id);
+          if (popupEl && popupEl.matches(':hover')) return;
+          e.target.closePopup();
+        }, 250);
+        closeTimerRef.current.set(listing.id, timer);
       }
     };
   }, []);
@@ -443,6 +529,12 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
   const handlePopupClose = useCallback((listing: Listing) => {
     return () => {
       clickedRef.current.delete(listing.id);
+      popupElRef.current.delete(listing.id);
+      const timer = closeTimerRef.current.get(listing.id);
+      if (timer) {
+        clearTimeout(timer);
+        closeTimerRef.current.delete(listing.id);
+      }
     };
   }, []);
 
@@ -475,7 +567,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
             <CircleMarker
               key={listing.id}
               center={[listing.lat, listing.lon]}
-              radius={isSelected ? 16 : 12}
+              radius={isSelected ? 18 : 14}
               pathOptions={{
                 color: isSelected ? '#ffffff' : color,
                 fillColor: color,

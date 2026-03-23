@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Search Mockup A: AI Chat Search</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f1117; color: #e1e4e8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; }
+
+  /* Navbar */
+  .navbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 24px; background: #1c2028; border-bottom: 1px solid #2d333b;
+  }
+  .navbar-brand { font-size: 18px; font-weight: 700; color: #58a6ff; }
+  .navbar-links { display: flex; gap: 20px; }
+  .navbar-links a { color: #8b949e; text-decoration: none; font-size: 14px; transition: color 0.15s; }
+  .navbar-links a:hover { color: #e1e4e8; }
+  .navbar-links a.active { color: #e1e4e8; font-weight: 600; }
+
+  /* Hero section */
+  .hero {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 80px 24px 40px; text-align: center;
+  }
+  .hero h1 {
+    font-size: 32px; font-weight: 700; margin-bottom: 8px;
+    background: linear-gradient(135deg, #58a6ff, #7ee787);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hero p { color: #8b949e; font-size: 16px; margin-bottom: 32px; max-width: 480px; }
+
+  /* Search bar */
+  .search-container {
+    width: 100%; max-width: 680px; position: relative;
+  }
+  .search-bar {
+    width: 100%; padding: 18px 56px 18px 24px;
+    background: #1c2028; border: 1px solid #2d333b; border-radius: 16px;
+    color: #e1e4e8; font-size: 16px; outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .search-bar::placeholder { color: #8b949e; }
+  .search-bar:focus {
+    border-color: #58a6ff;
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+  }
+  .search-btn {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    width: 40px; height: 40px; border-radius: 12px;
+    background: #58a6ff; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+  .search-btn:hover { background: #79b8ff; }
+  .search-btn svg { width: 18px; height: 18px; fill: #0f1117; }
+
+  /* Example chips */
+  .chips {
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+    margin-top: 20px; max-width: 680px;
+  }
+  .chip {
+    padding: 8px 16px; background: #1c2028; border: 1px solid #2d333b;
+    border-radius: 20px; font-size: 13px; color: #8b949e; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .chip:hover { border-color: #58a6ff; color: #58a6ff; background: rgba(88,166,255,0.08); }
+
+  /* Divider */
+  .divider {
+    max-width: 680px; margin: 40px auto 0; border: none;
+    border-top: 1px solid #2d333b;
+  }
+
+  /* Results section */
+  .results {
+    max-width: 780px; margin: 0 auto; padding: 24px;
+  }
+  .results-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .results-header h2 { font-size: 14px; color: #8b949e; font-weight: 500; }
+  .results-header .count { font-size: 13px; color: #58a6ff; }
+
+  /* AI response bubble */
+  .ai-response {
+    background: rgba(88,166,255,0.06); border: 1px solid rgba(88,166,255,0.15);
+    border-radius: 12px; padding: 16px 20px; margin-bottom: 24px;
+    font-size: 14px; line-height: 1.6; color: #e1e4e8;
+  }
+  .ai-response .label {
+    font-size: 11px; font-weight: 700; color: #58a6ff;
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+  }
+
+  /* Listing cards */
+  .listing-card {
+    background: #1c2028; border: 1px solid #2d333b; border-radius: 12px;
+    padding: 20px; margin-bottom: 12px;
+    transition: border-color 0.15s;
+  }
+  .listing-card:hover { border-color: #58a6ff; }
+  .listing-row { display: flex; justify-content: space-between; align-items: flex-start; }
+  .listing-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .listing-address { font-size: 13px; color: #8b949e; margin-bottom: 12px; }
+  .listing-price { font-size: 20px; font-weight: 700; color: #58a6ff; text-align: right; }
+  .listing-price-per { font-size: 12px; color: #7ee787; font-weight: 500; }
+  .listing-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+  .listing-tag {
+    padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;
+    background: rgba(126,231,135,0.1); color: #7ee787;
+  }
+  .listing-tag.transit {
+    background: rgba(88,166,255,0.1); color: #58a6ff;
+  }
+  .listing-tag.time {
+    background: rgba(249,115,22,0.1); color: #f97316;
+  }
+  .listing-meta-row {
+    display: flex; gap: 16px; margin-top: 10px; font-size: 13px; color: #8b949e;
+  }
+
+  /* Mockup label */
+  .mockup-label {
+    position: fixed; bottom: 16px; left: 16px;
+    background: #58a6ff; color: #0f1117; padding: 6px 14px;
+    border-radius: 6px; font-size: 12px; font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-brand">Dwelligence</div>
+  <div class="navbar-links">
+    <a href="#" class="active">Search</a>
+    <a href="#">Favorites</a>
+    <a href="#">Profile</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <h1>Find your next apartment</h1>
+  <p>Search in plain English. Ask for anything — bedrooms, budget, commute time, neighborhoods.</p>
+
+  <div class="search-container">
+    <input class="search-bar" type="text" placeholder="Find me a 5-bedroom near the L train under $2500/bed..." />
+    <button class="search-btn">
+      <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
+
+  <div class="chips">
+    <div class="chip">Near Fulton St</div>
+    <div class="chip">Brooklyn under $2k/bed</div>
+    <div class="chip">7+ beds Manhattan</div>
+    <div class="chip">Under 20 min to Union Square</div>
+    <div class="chip">3-bed with laundry</div>
+    <div class="chip">Cheap near NYU</div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<div class="results">
+  <div class="ai-response">
+    <div class="label">Dwelligence AI</div>
+    I found <strong>12 listings</strong> with 5+ bedrooms near the L train under $2,500/bed.
+    Most are in Bushwick and East Williamsburg. The best value is at 248 Stanhope St at $1,980/bed.
+  </div>
+
+  <div class="results-header">
+    <h2>Results sorted by value</h2>
+    <span class="count">12 listings</span>
+  </div>
+
+  <div class="listing-card">
+    <div class="listing-row">
+      <div>
+        <div class="listing-title">248 Stanhope St</div>
+        <div class="listing-address">Bushwick, Brooklyn</div>
+      </div>
+      <div style="text-align:right">
+        <div class="listing-price">$9,900/mo</div>
+        <div class="listing-price-per">$1,980/bed</div>
+      </div>
+    </div>
+    <div class="listing-tags">
+      <span class="listing-tag">5 bed</span>
+      <span class="listing-tag">2 bath</span>
+      <span class="listing-tag transit">L Train</span>
+      <span class="listing-tag time">8 min walk</span>
+    </div>
+    <div class="listing-meta-row">
+      <span>Listed 3 days ago</span>
+      <span>No fee</span>
+      <span>Available Apr 1</span>
+    </div>
+  </div>
+
+  <div class="listing-card">
+    <div class="listing-row">
+      <div>
+        <div class="listing-title">1087 Flushing Ave</div>
+        <div class="listing-address">East Williamsburg, Brooklyn</div>
+      </div>
+      <div style="text-align:right">
+        <div class="listing-price">$11,250/mo</div>
+        <div class="listing-price-per">$2,250/bed</div>
+      </div>
+    </div>
+    <div class="listing-tags">
+      <span class="listing-tag">5 bed</span>
+      <span class="listing-tag">2 bath</span>
+      <span class="listing-tag transit">L Train</span>
+      <span class="listing-tag time">5 min walk</span>
+    </div>
+    <div class="listing-meta-row">
+      <span>Listed 1 day ago</span>
+      <span>No fee</span>
+      <span>Available May 1</span>
+    </div>
+  </div>
+
+  <div class="listing-card">
+    <div class="listing-row">
+      <div>
+        <div class="listing-title">345 Eldert St</div>
+        <div class="listing-address">Bushwick, Brooklyn</div>
+      </div>
+      <div style="text-align:right">
+        <div class="listing-price">$12,100/mo</div>
+        <div class="listing-price-per">$2,420/bed</div>
+      </div>
+    </div>
+    <div class="listing-tags">
+      <span class="listing-tag">5 bed</span>
+      <span class="listing-tag">3 bath</span>
+      <span class="listing-tag transit">L Train</span>
+      <span class="listing-tag transit">M Train</span>
+      <span class="listing-tag time">12 min walk</span>
+    </div>
+    <div class="listing-meta-row">
+      <span>Listed 5 days ago</span>
+      <span>1 month fee</span>
+      <span>Available Apr 15</span>
+    </div>
+  </div>
+</div>
+
+<div class="mockup-label">A — AI Chat Search</div>
+
+</body>
+</html>

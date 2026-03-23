@@ -20,6 +20,7 @@ interface FiltersProps {
   filters: FiltersState;
   onChange: (filters: FiltersState) => void;
   listingCount?: number;
+  viewToggle?: React.ReactNode;
 }
 
 const SEARCH_TABS: { value: SearchTag; label: string; title: string }[] = [
@@ -36,28 +37,13 @@ const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: 'beds', label: 'BEDS' },
 ];
 
-const MIN_PRICE_OPTIONS = [
-  { value: null, label: 'No min' },
-  { value: 5000, label: '$5,000' },
-  { value: 6000, label: '$6,000' },
-  { value: 7000, label: '$7,000' },
-  { value: 8000, label: '$8,000' },
-  { value: 9000, label: '$9,000' },
-  { value: 10000, label: '$10,000' },
-  { value: 12000, label: '$12,000' },
-  { value: 15000, label: '$15,000' },
-];
+const PRICE_SLIDER_MIN = 0;
+const PRICE_SLIDER_MAX = 25000;
+const PRICE_SLIDER_STEP = 500;
 
-const MAX_PRICE_OPTIONS = [
-  { value: null, label: 'No max' },
-  { value: 8000, label: '$8,000' },
-  { value: 10000, label: '$10,000' },
-  { value: 12000, label: '$12,000' },
-  { value: 15000, label: '$15,000' },
-  { value: 20000, label: '$20,000' },
-  { value: 25000, label: '$25,000' },
-  { value: 30000, label: '$30,000' },
-];
+const PRICE_PER_BED_SLIDER_MIN = 0;
+const PRICE_PER_BED_SLIDER_MAX = 5000;
+const PRICE_PER_BED_SLIDER_STEP = 250;
 
 const BEDROOM_OPTIONS = [
   { value: null, label: 'Any' },
@@ -77,14 +63,63 @@ const BATHROOM_OPTIONS = [
   { value: 4, label: '4+' },
 ];
 
-const PRICE_PER_BED_OPTIONS = [
-  { value: null, label: 'Any' },
-  { value: 1500, label: '$1,500' },
-  { value: 2000, label: '$2,000' },
-  { value: 2500, label: '$2,500' },
-  { value: 3000, label: '$3,000' },
-  { value: 3500, label: '$3,500' },
-];
+function formatSliderPrice(value: number): string {
+  return `$${value.toLocaleString()}`;
+}
+
+function RangeSlider({
+  label,
+  min,
+  max,
+  step,
+  value,
+  onChange,
+}: {
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  const pct = ((value - min) / (max - min)) * 100;
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-medium" style={{ color: '#8b949e' }}>
+          {label}
+        </span>
+        <span className="text-sm font-bold" style={{ color: '#e1e4e8' }}>
+          {value === min && label.toLowerCase().includes('min')
+            ? 'No min'
+            : value === max && label.toLowerCase().includes('max')
+              ? 'No max'
+              : formatSliderPrice(value)}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="range-slider w-full"
+        style={{
+          background: `linear-gradient(to right, #58a6ff 0%, #58a6ff ${pct}%, #2d333b ${pct}%, #2d333b 100%)`,
+        }}
+      />
+      <div className="flex justify-between mt-1">
+        <span className="text-[10px]" style={{ color: '#8b949e' }}>
+          {formatSliderPrice(min)}
+        </span>
+        <span className="text-[10px]" style={{ color: '#8b949e' }}>
+          {formatSliderPrice(max)}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Chip label helpers
@@ -214,7 +249,7 @@ function DropdownFooter({
 
 type ChipId = 'price' | 'bedsBaths' | 'pricePerBed';
 
-export default function Filters({ filters, onChange, listingCount }: FiltersProps) {
+export default function Filters({ filters, onChange, listingCount, viewToggle }: FiltersProps) {
   const [openChip, setOpenChip] = useState<ChipId | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
 
@@ -284,8 +319,9 @@ export default function Filters({ filters, onChange, listingCount }: FiltersProp
       className="px-4 py-3"
       style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}
     >
-      {/* Row 1: Filter chips */}
+      {/* Row 1: Filter chips + view toggle */}
       <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1 min-w-0">
         {/* Price chip */}
         <FilterChip
           label={priceLabel(filters.minRent, filters.maxRent)}
@@ -294,35 +330,22 @@ export default function Filters({ filters, onChange, listingCount }: FiltersProp
           onToggle={() => toggleChip('price')}
         >
           <SectionTitle>Price</SectionTitle>
-          <div className="flex items-center gap-2 mb-3">
-            <select
-              value={draftMinRent === null ? '' : String(draftMinRent)}
-              onChange={(e) =>
-                setDraftMinRent(e.target.value === '' ? null : Number(e.target.value))
-              }
-              className="h-10 flex-1 appearance-none rounded-lg border border-[#2d333b] bg-[#0f1117] px-3 text-sm text-[#e1e4e8] outline-none transition focus:border-[#58a6ff]"
-            >
-              {MIN_PRICE_OPTIONS.map((opt) => (
-                <option key={opt.label} value={opt.value === null ? '' : String(opt.value)}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <span className="text-sm text-[#8b949e]">&ndash;</span>
-            <select
-              value={draftMaxRent === null ? '' : String(draftMaxRent)}
-              onChange={(e) =>
-                setDraftMaxRent(e.target.value === '' ? null : Number(e.target.value))
-              }
-              className="h-10 flex-1 appearance-none rounded-lg border border-[#2d333b] bg-[#0f1117] px-3 text-sm text-[#e1e4e8] outline-none transition focus:border-[#58a6ff]"
-            >
-              {MAX_PRICE_OPTIONS.map((opt) => (
-                <option key={opt.label} value={opt.value === null ? '' : String(opt.value)}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <RangeSlider
+            label="Min Price"
+            min={PRICE_SLIDER_MIN}
+            max={PRICE_SLIDER_MAX}
+            step={PRICE_SLIDER_STEP}
+            value={draftMinRent ?? PRICE_SLIDER_MIN}
+            onChange={(v) => setDraftMinRent(v === PRICE_SLIDER_MIN ? null : v)}
+          />
+          <RangeSlider
+            label="Max Price"
+            min={PRICE_SLIDER_MIN}
+            max={PRICE_SLIDER_MAX}
+            step={PRICE_SLIDER_STEP}
+            value={draftMaxRent ?? PRICE_SLIDER_MAX}
+            onChange={(v) => setDraftMaxRent(v === PRICE_SLIDER_MAX ? null : v)}
+          />
           <p className="text-xs mb-1" style={{ color: '#8b949e' }}>
             Applies to monthly rent
           </p>
@@ -381,10 +404,13 @@ export default function Filters({ filters, onChange, listingCount }: FiltersProp
           onToggle={() => toggleChip('pricePerBed')}
         >
           <SectionTitle>Max $/Bedroom</SectionTitle>
-          <PillGroup
-            options={PRICE_PER_BED_OPTIONS}
-            value={draftMaxPricePerBed}
-            onSelect={setDraftMaxPricePerBed}
+          <RangeSlider
+            label="Max $/Bedroom"
+            min={PRICE_PER_BED_SLIDER_MIN}
+            max={PRICE_PER_BED_SLIDER_MAX}
+            step={PRICE_PER_BED_SLIDER_STEP}
+            value={draftMaxPricePerBed ?? PRICE_PER_BED_SLIDER_MAX}
+            onChange={(v) => setDraftMaxPricePerBed(v === PRICE_PER_BED_SLIDER_MAX ? null : v)}
           />
           <DropdownFooter
             onReset={() => {
@@ -397,16 +423,20 @@ export default function Filters({ filters, onChange, listingCount }: FiltersProp
             }}
           />
         </FilterChip>
+
+        </div>
+        {/* List/Map segmented control (mobile only, right-aligned) */}
+        {viewToggle && <div className="shrink-0">{viewToggle}</div>}
       </div>
 
       {/* Row 2: Search tags + Sort + listing count */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         {/* Search tags */}
-        <div className="flex items-center gap-1.5 flex-1" style={{ overflow: 'visible' }}>
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
           {SEARCH_TABS.map((tab) => {
             const active = filters.searchTag === tab.value;
             return (
-              <div key={tab.value} className="relative group">
+              <div key={tab.value} className="relative group shrink-0">
                 <TagButton
                   active={active}
                   onClick={() => onChange({ ...filters, searchTag: tab.value })}
@@ -450,7 +480,7 @@ export default function Filters({ filters, onChange, listingCount }: FiltersProp
         </div>
 
         {/* Sort dropdown */}
-        <div className="relative ml-auto shrink-0">
+        <div className="relative ml-auto sm:ml-auto shrink-0">
           <TextButton
             variant="muted"
             onClick={() => {

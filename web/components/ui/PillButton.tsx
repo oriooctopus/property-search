@@ -26,8 +26,8 @@ export const PillButton = forwardRef<HTMLButtonElement, PillButtonProps>(
           radiusClasses[position],
           position !== 'first' && '-ml-px',
           active
-            ? 'bg-[#58a6ff] text-[#0f1117] border-[#58a6ff] hover:bg-[#4c8fdf] z-[1]'
-            : 'bg-transparent text-[#8b949e] border-[#2d333b] hover:bg-[#2d333b] hover:text-[#e1e4e8]',
+            ? 'bg-[#58a6ff] text-[#0f1117] border-[#58a6ff] hover:bg-[#6bb4ff] z-[1]'
+            : 'bg-transparent text-[#8b949e] border-[#2d333b] hover:bg-[#58a6ff]/20 hover:text-[#c0d6f5] hover:border-[#58a6ff]/40',
           className,
         )}
         {...rest}

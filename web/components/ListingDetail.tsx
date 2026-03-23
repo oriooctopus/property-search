@@ -293,11 +293,11 @@ export default function ListingDetail({
           )}
 
           {/* Would Live There People */}
-          {wouldLivePeople.length > 0 && (
-            <div className="mt-2">
-              <div className="text-xs font-semibold mb-3" style={{ color: '#8b949e' }}>
-                People who would live here
-              </div>
+          <div className="mt-2">
+            <div className="text-xs font-semibold mb-3" style={{ color: '#8b949e' }}>
+              People who would live here
+            </div>
+            {wouldLivePeople.length > 0 ? (
               <div className="grid grid-cols-2 gap-2">
                 {wouldLivePeople.map((person) => {
                   const letter = (person.display_name ?? person.id).charAt(0).toUpperCase();
@@ -338,8 +338,15 @@ export default function ListingDetail({
                   );
                 })}
               </div>
-            </div>
-          )}
+            ) : (
+              <div
+                className="flex items-center justify-center rounded-lg p-4 text-sm"
+                style={{ backgroundColor: '#0f1117', border: '1px solid #2d333b', color: '#8b949e' }}
+              >
+                No one yet — would you live here?
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

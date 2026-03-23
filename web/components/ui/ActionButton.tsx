@@ -15,9 +15,11 @@ interface ActionButtonProps extends Omit<ComponentPropsWithoutRef<'button'>, 'ch
 }
 
 const HomeIcon = ({ active }: { active: boolean }) => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-    <polyline points="9 22 9 12 15 12 15 22" />
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    {/* House body - filled when active, always stroked */}
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill={active ? 'currentColor' : 'none'} stroke="currentColor" />
+    {/* Door rectangle - drawn on top with contrasting color when active */}
+    <rect x="9" y="12" width="6" height="10" fill={active ? 'rgba(0,0,0,0.35)' : 'none'} stroke="currentColor" rx="0" />
   </svg>
 );
 

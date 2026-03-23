@@ -9,7 +9,7 @@ import Filters, { type FiltersState, type SearchTag, type SortField } from '@/co
 import ListingCard from '@/components/ListingCard';
 import ListingDetail from '@/components/ListingDetail';
 import RadarLoader from '@/components/RadarLoader';
-import { TagButton } from '@/components/ui';
+import { SegmentedControl } from '@/components/ui';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -346,43 +346,31 @@ function HomeInner() {
 
   return (
     <div className="flex flex-col lg:flex-row" style={{ height: 'calc(100vh - 56px)' }}>
-      {/* Mobile view toggle */}
+      {/* Sidebar: filter bar is always visible; listing cards hide on mobile map view */}
       <div
-        className="flex lg:hidden"
-        style={{ borderBottom: '1px solid #2d333b' }}
-      >
-        <TagButton
-          active={mobileView === 'list'}
-          onClick={() => setMobileView('list')}
-          className="flex-1 py-2.5 text-sm text-center rounded-none border-0"
-          style={{
-            borderBottom: mobileView === 'list' ? '2px solid #58a6ff' : '2px solid transparent',
-          }}
-        >
-          List
-        </TagButton>
-        <TagButton
-          active={mobileView === 'map'}
-          onClick={() => setMobileView('map')}
-          className="flex-1 py-2.5 text-sm text-center rounded-none border-0"
-          style={{
-            borderBottom: mobileView === 'map' ? '2px solid #58a6ff' : '2px solid transparent',
-          }}
-        >
-          Map
-        </TagButton>
-      </div>
-
-      {/* Sidebar */}
-      <div
-        className={`w-full lg:w-[480px] shrink-0 flex flex-col ${mobileView === 'map' ? 'hidden lg:flex' : 'flex'}`}
+        className={`w-full lg:w-[480px] shrink-0 flex flex-col ${mobileView === 'map' ? 'max-lg:shrink max-lg:flex-none' : ''}`}
         style={{ borderRight: '1px solid #2d333b' }}
       >
         <div className="relative z-10">
-          <Filters filters={filters} onChange={setFilters} listingCount={filteredListings.length} />
+          <Filters
+            filters={filters}
+            onChange={setFilters}
+            listingCount={filteredListings.length}
+            viewToggle={
+              <SegmentedControl
+                value={mobileView}
+                onChange={(v) => setMobileView(v as 'list' | 'map')}
+                options={[
+                  { value: 'list', label: 'List' },
+                  { value: 'map', label: 'Map' },
+                ]}
+                className="lg:hidden"
+              />
+            }
+          />
         </div>
 
-        <div className="flex-1 overflow-y-auto min-h-0 px-3 py-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
+        <div className={`flex-1 overflow-y-auto min-h-0 px-3 py-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 ${mobileView === 'map' ? 'hidden lg:grid' : ''}`}>
           {filteredListings.map((listing) => (
             <ListingCard
               key={listing.id}
