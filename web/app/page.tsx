@@ -42,7 +42,7 @@ const SEED_LISTINGS: Listing[] = [
 const VALID_VIEWS = new Set(['list', 'map']);
 const VALID_TAGS = new Set<string>(['all', 'fulton', 'ltrain', 'manhattan', 'brooklyn']);
 const VALID_SORTS = new Set<string>(['pricePerBed', 'price', 'beds', 'listDate']);
-const VALID_LISTING_AGES = new Set<string>(['1w', '1m', '3m']);
+const VALID_LISTING_AGES = new Set<string>(['1w', '2w', '1m', '3m', '6m', '1y']);
 
 function parseNumOrNull(v: string | null): number | null {
   if (v == null) return null;
@@ -62,7 +62,7 @@ function readFiltersFromParams(params: URLSearchParams): FiltersState {
     minRent: parseNumOrNull(params.get('minRent')),
     maxRent: parseNumOrNull(params.get('maxRent')),
     maxPricePerBed: parseNumOrNull(params.get('maxPerBed')),
-    maxListingAge: (age && VALID_LISTING_AGES.has(age) ? age : null) as MaxListingAge,
+    maxListingAge: (age === 'any' ? null : age && VALID_LISTING_AGES.has(age) ? age : '1m') as MaxListingAge,
   };
 }
 
@@ -76,7 +76,8 @@ function buildQueryString(view: 'list' | 'map', f: FiltersState): string {
   if (f.minRent != null) p.set('minRent', String(f.minRent));
   if (f.maxRent != null) p.set('maxRent', String(f.maxRent));
   if (f.maxPricePerBed != null) p.set('maxPerBed', String(f.maxPricePerBed));
-  if (f.maxListingAge != null) p.set('maxAge', f.maxListingAge);
+  if (f.maxListingAge === null) p.set('maxAge', 'any');
+  else if (f.maxListingAge !== '1m') p.set('maxAge', f.maxListingAge);
   const qs = p.toString();
   return qs ? `?${qs}` : '/';
 }
@@ -326,8 +327,11 @@ function HomeInner() {
       const now = Date.now();
       const msMap: Record<string, number> = {
         '1w': 7 * 24 * 60 * 60 * 1000,
+        '2w': 14 * 24 * 60 * 60 * 1000,
         '1m': 30 * 24 * 60 * 60 * 1000,
         '3m': 90 * 24 * 60 * 60 * 1000,
+        '6m': 180 * 24 * 60 * 60 * 1000,
+        '1y': 365 * 24 * 60 * 60 * 1000,
       };
       const cutoff = now - (msMap[filters.maxListingAge] ?? 0);
       result = result.filter((l) => {

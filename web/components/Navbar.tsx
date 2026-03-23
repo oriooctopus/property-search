@@ -146,6 +146,13 @@ export default function Navbar() {
             >
               Favorites
             </Link>
+            <Link
+              href="/hidden"
+              className="text-sm transition-colors hover:opacity-80"
+              style={{ color: "#8b949e" }}
+            >
+              Hidden
+            </Link>
             <div className="relative" ref={dropdownRef}>
               {profileLoading ? (
                 <div className="h-8 w-8 rounded-full" style={{ backgroundColor: "#2d333b" }} />
@@ -199,6 +206,13 @@ export default function Navbar() {
           </>
         ) : (
           <>
+            <Link
+              href="/hidden"
+              className="text-sm transition-colors hover:opacity-80"
+              style={{ color: "#8b949e" }}
+            >
+              Hidden
+            </Link>
             <Link
               href="/auth/login"
               className="text-sm transition-colors hover:opacity-80"
