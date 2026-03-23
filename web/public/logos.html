@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dwelligence Logo Options</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, sans-serif; background: #0f1117; color: #e1e4e8; padding: 32px; }
+  h1 { font-size: 24px; margin-bottom: 8px; }
+  p.sub { color: #8b949e; margin-bottom: 32px; }
+  h2 { font-size: 18px; margin: 40px 0 16px; color: #8b949e; text-transform: uppercase; letter-spacing: 2px; font-weight: 400; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 24px; }
+  .card { border: 1px solid #2d333b; border-radius: 12px; overflow: hidden; transition: border-color 0.2s; }
+  .card:hover { border-color: #58a6ff; }
+  .preview { display: flex; align-items: center; justify-content: center; padding: 24px; height: 160px; }
+  .preview.dark { background: #0f1117; }
+  .preview.light { background: #ffffff; }
+  .preview img { max-width: 100%; max-height: 100%; }
+  .card-label { padding: 12px 16px; font-size: 13px; color: #8b949e; border-top: 1px solid #2d333b; background: #1c2028; }
+  .card-label strong { color: #e1e4e8; display: block; margin-bottom: 2px; }
+  .full-row { grid-column: 1 / -1; }
+  .full-preview { display: flex; align-items: center; justify-content: center; padding: 32px; height: 120px; border: 1px solid #2d333b; border-radius: 12px; margin-bottom: 12px; transition: border-color 0.2s; }
+  .full-preview:hover { border-color: #58a6ff; }
+  .full-preview.dark { background: #0f1117; }
+  .full-preview.light { background: #ffffff; }
+  .full-preview img { max-height: 100%; }
+  .full-label { font-size: 13px; color: #8b949e; margin-bottom: 24px; }
+  .section { margin-bottom: 48px; }
+  .toggle-bg { display: flex; gap: 8px; margin-bottom: 24px; }
+  .toggle-bg button { padding: 6px 16px; border-radius: 6px; border: 1px solid #2d333b; background: #1c2028; color: #8b949e; cursor: pointer; font-size: 13px; }
+  .toggle-bg button.active { background: #58a6ff; color: #0f1117; border-color: #58a6ff; }
+</style>
+</head>
+<body>
+
+<h1>Dwelligence Logo Options</h1>
+<p class="sub">Click to toggle background. All logos shown at multiple sizes.</p>
+
+<div class="section">
+  <h2>Radar Screen</h2>
+  <div class="grid" id="screen-grid"></div>
+</div>
+
+<div class="section">
+  <h2>Radar Screen Wordmarks</h2>
+  <div id="screen-wordmarks"></div>
+</div>
+
+<div class="section">
+  <h2>Radar + Person</h2>
+  <div class="grid" id="radar-grid"></div>
+</div>
+
+<div class="section">
+  <h2>Radar Wordmarks</h2>
+  <div id="radar-wordmarks"></div>
+</div>
+
+<div class="section">
+  <h2>Screen 4 Minimal Variants</h2>
+  <div class="grid" id="minimal-grid"></div>
+</div>
+
+<div class="section">
+  <h2>Simple / Minimal</h2>
+  <div class="grid" id="simple-grid"></div>
+</div>
+
+<div class="section">
+  <h2>Simple Wordmarks</h2>
+  <div id="simple-wordmarks"></div>
+</div>
+
+<div class="section">
+  <h2>Original Options (Blue/Color)</h2>
+  <div class="grid" id="original-grid"></div>
+</div>
+
+<div class="section">
+  <h2>Art Deco / Roaring 20s (B&W)</h2>
+  <div class="grid" id="deco-grid"></div>
+</div>
+
+<div class="section">
+  <h2>Art Deco with People</h2>
+  <div class="grid" id="people-grid"></div>
+</div>
+
+<div class="section">
+  <h2>Full Wordmarks</h2>
+  <div id="wordmarks"></div>
+</div>
+
+<script>
+const originals = [
+  { file: 'logo-option-1.svg', name: 'Option 1', desc: 'House + Circuit/Brain' },
+  { file: 'logo-option-2.svg', name: 'Option 2', desc: 'Map Pin + House' },
+  { file: 'logo-option-3.svg', name: 'Option 3', desc: 'Letter D + Roof' },
+];
+
+const decos = [
+  { file: 'logo-deco-1.svg', name: 'Deco 1', desc: 'Art Deco Building' },
+  { file: 'logo-deco-2.svg', name: 'Deco 2', desc: 'Art Deco Keyhole/Door' },
+  { file: 'logo-deco-3.svg', name: 'Deco 3', desc: 'Art Deco Letter D' },
+  { file: 'logo-deco-4.svg', name: 'Deco 4', desc: 'Art Deco Eye/Search' },
+  { file: 'logo-deco-5.svg', name: 'Deco 5', desc: 'Art Deco House + Sunburst' },
+];
+
+const people = [
+  { file: 'logo-deco-6.svg', name: 'Deco 6', desc: 'People Under a Roof' },
+  { file: 'logo-deco-7.svg', name: 'Deco 7', desc: 'Art Deco Doorway with Figures' },
+  { file: 'logo-deco-8.svg', name: 'Deco 8', desc: 'People + Building Skyline' },
+  { file: 'logo-deco-9.svg', name: 'Deco 9', desc: 'Community Circle' },
+  { file: 'logo-deco-10.svg', name: 'Deco 10', desc: 'House Shield with Figures' },
+];
+
+const wordmarks = [
+  { file: 'logo-full.svg', name: 'Original (Blue)', bg: 'dark' },
+  { file: 'logo-deco-full-dark.svg', name: 'Art Deco (Dark BG)', bg: 'dark' },
+  { file: 'logo-deco-full-light.svg', name: 'Art Deco (Light BG)', bg: 'light' },
+  { file: 'logo-deco-people-dark.svg', name: 'People Deco (Dark BG)', bg: 'dark' },
+  { file: 'logo-deco-people-light.svg', name: 'People Deco (Light BG)', bg: 'light' },
+];
+
+function renderIcons(containerId, items) {
+  const container = document.getElementById(containerId);
+  items.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="preview dark" onclick="this.classList.toggle('dark');this.classList.toggle('light')" style="cursor:pointer">
+        <img src="${item.file}" alt="${item.name}" style="width:48px;height:48px">
+      </div>
+      <div class="preview dark" onclick="this.classList.toggle('dark');this.classList.toggle('light')" style="cursor:pointer;height:80px">
+        <img src="${item.file}" alt="${item.name}" style="width:24px;height:24px">
+      </div>
+      <div class="card-label">
+        <strong>${item.name}</strong>
+        ${item.desc}
+      </div>
+    `;
+    // Check if file exists
+    fetch(item.file, { method: 'HEAD' }).then(r => {
+      if (!r.ok) card.style.opacity = '0.3';
+    }).catch(() => { card.style.opacity = '0.3'; });
+    container.appendChild(card);
+  });
+}
+
+function renderWordmarks() {
+  const container = document.getElementById('wordmarks');
+  wordmarks.forEach(item => {
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <div class="full-preview ${item.bg}" onclick="this.classList.toggle('dark');this.classList.toggle('light')" style="cursor:pointer">
+        <img src="${item.file}" alt="${item.name}">
+      </div>
+      <div class="full-label">${item.name} — click to toggle background</div>
+    `;
+    fetch(item.file, { method: 'HEAD' }).then(r => {
+      if (!r.ok) div.style.opacity = '0.3';
+    }).catch(() => { div.style.opacity = '0.3'; });
+    container.appendChild(div);
+  });
+}
+
+const simples = [
+  { file: 'logo-simple-1.svg', name: 'Simple 1', desc: 'House + People (minimal)' },
+  { file: 'logo-simple-2.svg', name: 'Simple 2', desc: 'Keyhole House' },
+  { file: 'logo-simple-3.svg', name: 'Simple 3', desc: 'D with Roof' },
+  { file: 'logo-simple-4.svg', name: 'Simple 4', desc: 'Two People + Roof Line' },
+  { file: 'logo-simple-5.svg', name: 'Simple 5', desc: 'Building Silhouette' },
+];
+
+const simpleWordmarks = [
+  { file: 'logo-simple-full-dark.svg', name: 'Simple (Dark BG)', bg: 'dark' },
+  { file: 'logo-simple-full-light.svg', name: 'Simple (Light BG)', bg: 'light' },
+];
+
+function renderSimpleWordmarks() {
+  const container = document.getElementById('simple-wordmarks');
+  simpleWordmarks.forEach(item => {
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <div class="full-preview ${item.bg}" onclick="this.classList.toggle('dark');this.classList.toggle('light')" style="cursor:pointer">
+        <img src="${item.file}" alt="${item.name}">
+      </div>
+      <div class="full-label">${item.name} — click to toggle background</div>
+    `;
+    fetch(item.file, { method: 'HEAD' }).then(r => {
+      if (!r.ok) div.style.opacity = '0.3';
+    }).catch(() => { div.style.opacity = '0.3'; });
+    container.appendChild(div);
+  });
+}
+
+const radars = [
+  { file: 'logo-radar-1.svg', name: 'Radar 1', desc: 'Classic Radar Sweep + Person' },
+  { file: 'logo-radar-2.svg', name: 'Radar 2', desc: 'Full Circle Radar + Person' },
+  { file: 'logo-radar-3.svg', name: 'Radar 3', desc: 'Radar + Person + House' },
+  { file: 'logo-radar-4.svg', name: 'Radar 4', desc: 'Location Pin Radar' },
+  { file: 'logo-radar-5.svg', name: 'Radar 5', desc: 'Sonar Pulse + Person' },
+];
+
+const radarWordmarks = [
+  { file: 'logo-radar-full-dark.svg', name: 'Radar (Dark BG)', bg: 'dark' },
+  { file: 'logo-radar-full-light.svg', name: 'Radar (Light BG)', bg: 'light' },
+];
+
+function renderRadarWordmarks() {
+  const container = document.getElementById('radar-wordmarks');
+  radarWordmarks.forEach(item => {
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <div class="full-preview ${item.bg}" onclick="this.classList.toggle('dark');this.classList.toggle('light')" style="cursor:pointer">
+        <img src="${item.file}" alt="${item.name}">
+      </div>
+      <div class="full-label">${item.name} — click to toggle background</div>
+    `;
+    fetch(item.file, { method: 'HEAD' }).then(r => {
+      if (!r.ok) div.style.opacity = '0.3';
+    }).catch(() => { div.style.opacity = '0.3'; });
+    container.appendChild(div);
+  });
+}
+
+const screens = [
+  { file: 'logo-screen-1.svg', name: 'Screen 1', desc: 'Classic Radar Screen + Person' },
+  { file: 'logo-screen-2.svg', name: 'Screen 2', desc: 'Radar Screen + Person + House Blip' },
+  { file: 'logo-screen-3.svg', name: 'Screen 3', desc: 'Minimal Radar + Person' },
+  { file: 'logo-screen-4.svg', name: 'Screen 4', desc: 'Rounded Square Radar + Person' },
+];
+
+const screenWordmarks = [
+  { file: 'logo-screen-full-dark.svg', name: 'Screen (Dark BG)', bg: 'dark' },
+  { file: 'logo-screen-full-light.svg', name: 'Screen (Light BG)', bg: 'light' },
+];
+
+function renderScreenWordmarks() {
+  const container = document.getElementById('screen-wordmarks');
+  screenWordmarks.forEach(item => {
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <div class="full-preview ${item.bg}" onclick="this.classList.toggle('dark');this.classList.toggle('light')" style="cursor:pointer">
+        <img src="${item.file}" alt="${item.name}">
+      </div>
+      <div class="full-label">${item.name} — click to toggle background</div>
+    `;
+    fetch(item.file, { method: 'HEAD' }).then(r => {
+      if (!r.ok) div.style.opacity = '0.3';
+    }).catch(() => { div.style.opacity = '0.3'; });
+    container.appendChild(div);
+  });
+}
+
+const minimals = [
+  { file: 'logo-minimal-1.svg', name: 'Minimal 1', desc: 'Rounded square + house silhouette only' },
+  { file: 'logo-minimal-2.svg', name: 'Minimal 2', desc: 'Rounded square + house + radar blip dots' },
+  { file: 'logo-minimal-3.svg', name: 'Minimal 3', desc: 'Two nested rounded squares + house' },
+];
+
+renderIcons('screen-grid', screens);
+renderScreenWordmarks();
+renderIcons('minimal-grid', minimals);
+renderIcons('radar-grid', radars);
+renderRadarWordmarks();
+renderIcons('simple-grid', simples);
+renderSimpleWordmarks();
+renderIcons('original-grid', originals);
+renderIcons('deco-grid', decos);
+renderIcons('people-grid', people);
+renderWordmarks();
+</script>
+</body>
+</html>

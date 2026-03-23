@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- Outer screen border -->
+  <circle cx="24" cy="24" r="21" stroke="#ffffff" stroke-width="2" fill="none"/>
+  <!-- Concentric rings -->
+  <circle cx="24" cy="24" r="15" stroke="#ffffff" stroke-width="1.2" fill="none" opacity="0.6"/>
+  <circle cx="24" cy="24" r="9" stroke="#ffffff" stroke-width="1.2" fill="none" opacity="0.4"/>
+  <!-- House icon at center -->
+  <!-- Roof -->
+  <path d="M24 18 L19 23 L29 23 Z" fill="#ffffff"/>
+  <!-- Body of house -->
+  <rect x="20" y="23" width="8" height="6" fill="#ffffff"/>
+  <!-- Chimney -->
+  <rect x="26.5" y="19" width="1.8" height="4" fill="#ffffff"/>
+</svg>

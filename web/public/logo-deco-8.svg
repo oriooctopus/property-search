@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- Art Deco: People + Building Skyline -->
+
+  <!-- Sunburst/fan rays above skyline -->
+  <line x1="24" y1="14" x2="24" y2="4" stroke="#fff" stroke-width="0.5"/>
+  <line x1="24" y1="14" x2="16" y2="4" stroke="#fff" stroke-width="0.5"/>
+  <line x1="24" y1="14" x2="32" y2="4" stroke="#fff" stroke-width="0.5"/>
+  <line x1="24" y1="14" x2="10" y2="5" stroke="#fff" stroke-width="0.5"/>
+  <line x1="24" y1="14" x2="38" y2="5" stroke="#fff" stroke-width="0.5"/>
+  <line x1="24" y1="14" x2="6" y2="8" stroke="#fff" stroke-width="0.5"/>
+  <line x1="24" y1="14" x2="42" y2="8" stroke="#fff" stroke-width="0.5"/>
+
+  <!-- Outer octagonal frame -->
+  <polygon points="18,4 30,4 44,18 44,30 30,44 18,44 4,30 4,18" fill="none" stroke="#fff" stroke-width="1.5"/>
+  <polygon points="19,6 29,6 42,19 42,29 29,42 19,42 6,29 6,19" fill="none" stroke="#fff" stroke-width="0.5"/>
+
+  <!-- White background -->
+  <rect x="7" y="14" width="34" height="28" fill="#fff"/>
+
+  <!-- Stepped art deco NYC skyline -->
+  <!-- Building 1 (far left) -->
+  <rect x="8" y="20" width="4" height="16" fill="#fff"/>
+  <!-- Building 2 -->
+  <rect x="11" y="18" width="3" height="18" fill="#fff"/>
+  <rect x="11.5" y="16" width="2" height="2" fill="#fff"/>
+  <!-- Building 3 (tall center-left) -->
+  <rect x="13" y="14" width="5" height="22" fill="#fff"/>
+  <rect x="14" y="12" width="3" height="2" fill="#fff"/>
+  <rect x="15" y="10.5" width="1" height="1.5" fill="#fff"/>
+  <!-- Building 4 (center) -->
+  <rect x="17" y="16" width="4" height="20" fill="#fff"/>
+  <!-- Building 5 (center-right) -->
+  <rect x="27" y="16" width="4" height="20" fill="#fff"/>
+  <!-- Building 6 (tall right) -->
+  <rect x="30" y="14" width="5" height="22" fill="#fff"/>
+  <rect x="31" y="12" width="3" height="2" fill="#fff"/>
+  <rect x="32" y="10.5" width="1" height="1.5" fill="#fff"/>
+  <!-- Building 7 -->
+  <rect x="34" y="18" width="3" height="18" fill="#fff"/>
+  <rect x="34.5" y="16" width="2" height="2" fill="#fff"/>
+  <!-- Building 8 (far right) -->
+  <rect x="36" y="20" width="4" height="16" fill="#fff"/>
+
+  <!-- Building windows (small white rectangles) -->
+  <rect x="14" y="16" width="1" height="1.5" fill="#fff"/>
+  <rect x="16" y="16" width="1" height="1.5" fill="#fff"/>
+  <rect x="14" y="19" width="1" height="1.5" fill="#fff"/>
+  <rect x="16" y="19" width="1" height="1.5" fill="#fff"/>
+  <rect x="31" y="16" width="1" height="1.5" fill="#fff"/>
+  <rect x="33" y="16" width="1" height="1.5" fill="#fff"/>
+  <rect x="31" y="19" width="1" height="1.5" fill="#fff"/>
+  <rect x="33" y="19" width="1" height="1.5" fill="#fff"/>
+
+  <!-- Person 1 (left foreground) - white on buildings -->
+  <circle cx="20" cy="28" r="2.5" fill="#fff" stroke="#fff" stroke-width="0.75"/>
+  <polygon points="16.5,31 23.5,31 22.5,37 20,38.5 17.5,37" fill="#fff" stroke="#fff" stroke-width="0.75"/>
+  <rect x="17.8" y="37" width="1.5" height="4" fill="#fff" stroke="#fff" stroke-width="0.5"/>
+  <rect x="20.7" y="37" width="1.5" height="4" fill="#fff" stroke="#fff" stroke-width="0.5"/>
+
+  <!-- Person 2 (right foreground) - white on buildings -->
+  <circle cx="28" cy="28" r="2.5" fill="#fff" stroke="#fff" stroke-width="0.75"/>
+  <polygon points="24.5,31 31.5,31 30.5,37 28,38.5 25.5,37" fill="#fff" stroke="#fff" stroke-width="0.75"/>
+  <rect x="25.8" y="37" width="1.5" height="4" fill="#fff" stroke="#fff" stroke-width="0.5"/>
+  <rect x="28.7" y="37" width="1.5" height="4" fill="#fff" stroke="#fff" stroke-width="0.5"/>
+
+  <!-- Stepped corner accents -->
+  <rect x="7" y="7" width="3" height="1" fill="#fff"/>
+  <rect x="8" y="8" width="1" height="2" fill="#fff"/>
+  <rect x="38" y="7" width="3" height="1" fill="#fff"/>
+  <rect x="39" y="8" width="1" height="2" fill="#fff"/>
+  <rect x="7" y="40" width="3" height="1" fill="#fff"/>
+  <rect x="8" y="38" width="1" height="2" fill="#fff"/>
+  <rect x="38" y="40" width="3" height="1" fill="#fff"/>
+  <rect x="39" y="38" width="1" height="2" fill="#fff"/>
+</svg>

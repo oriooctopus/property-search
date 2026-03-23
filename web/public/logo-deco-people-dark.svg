@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 48" width="240" height="48">
+  <!-- Full wordmark - white on dark (for dark backgrounds) -->
+  <!-- Icon: Art Deco Doorway with Figures (Option 7, white version) -->
+
+  <g>
+    <!-- Radiating lines above arch -->
+    <line x1="24" y1="10" x2="24" y2="4" stroke="#fff" stroke-width="0.5"/>
+    <line x1="24" y1="10" x2="16" y2="4" stroke="#fff" stroke-width="0.4"/>
+    <line x1="24" y1="10" x2="32" y2="4" stroke="#fff" stroke-width="0.4"/>
+    <line x1="24" y1="10" x2="10" y2="5" stroke="#fff" stroke-width="0.4"/>
+    <line x1="24" y1="10" x2="38" y2="5" stroke="#fff" stroke-width="0.4"/>
+    <line x1="24" y1="10" x2="6" y2="7" stroke="#fff" stroke-width="0.4"/>
+    <line x1="24" y1="10" x2="42" y2="7" stroke="#fff" stroke-width="0.4"/>
+    <line x1="24" y1="10" x2="4" y2="10" stroke="#fff" stroke-width="0.4"/>
+    <line x1="24" y1="10" x2="44" y2="10" stroke="#fff" stroke-width="0.4"/>
+
+    <!-- Octagonal frame -->
+    <polygon points="18,5 30,5 43,18 43,30 30,43 18,43 5,30 5,18" fill="none" stroke="#fff" stroke-width="1.5"/>
+
+    <!-- White background for doorway area -->
+    <rect x="10" y="10" width="28" height="34" fill="#fff"/>
+
+    <!-- Art deco arched doorway -->
+    <path d="M12,42 L12,18 Q12,10 24,10 Q36,10 36,18 L36,42" fill="none" stroke="#fff" stroke-width="1.5"/>
+    <path d="M14,42 L14,19 Q14,12 24,12 Q34,12 34,19 L34,42" fill="none" stroke="#fff" stroke-width="0.5"/>
+
+    <!-- Stepped side details (left) -->
+    <rect x="8" y="14" width="3" height="1" fill="#fff"/>
+    <rect x="9" y="16" width="2" height="1" fill="#fff"/>
+    <rect x="10" y="18" width="1" height="1" fill="#fff"/>
+
+    <!-- Stepped side details (right) -->
+    <rect x="37" y="14" width="3" height="1" fill="#fff"/>
+    <rect x="37" y="16" width="2" height="1" fill="#fff"/>
+    <rect x="37" y="18" width="1" height="1" fill="#fff"/>
+
+    <!-- Keystone -->
+    <polygon points="24,10 22,13 26,13" fill="#fff"/>
+
+    <!-- Fanlight -->
+    <line x1="24" y1="14" x2="24" y2="18" stroke="#fff" stroke-width="0.5"/>
+    <line x1="24" y1="14" x2="18" y2="19" stroke="#fff" stroke-width="0.5"/>
+    <line x1="24" y1="14" x2="30" y2="19" stroke="#fff" stroke-width="0.5"/>
+    <path d="M16,20 Q16,14 24,14 Q32,14 32,20" fill="none" stroke="#fff" stroke-width="0.5"/>
+
+    <!-- Person 1 (left) -->
+    <circle cx="20" cy="30" r="2" fill="#fff"/>
+    <polygon points="17,32.5 23,32.5 22,37 20,38.5 18,37" fill="#fff"/>
+    <rect x="18.2" y="37" width="1.2" height="3.5" fill="#fff"/>
+    <rect x="20.6" y="37" width="1.2" height="3.5" fill="#fff"/>
+
+    <!-- Person 2 (right) -->
+    <circle cx="28" cy="30" r="2" fill="#fff"/>
+    <polygon points="25,32.5 31,32.5 30,37 28,38.5 26,37" fill="#fff"/>
+    <rect x="26.2" y="37" width="1.2" height="3.5" fill="#fff"/>
+    <rect x="28.6" y="37" width="1.2" height="3.5" fill="#fff"/>
+
+    <!-- Floor line -->
+    <line x1="12" y1="42" x2="36" y2="42" stroke="#fff" stroke-width="1"/>
+  </g>
+
+  <!-- Text: DWELLIGENCE -->
+  <text x="56" y="32" font-family="Futura, 'Century Gothic', 'Avant Garde', sans-serif" font-size="18" font-weight="bold" fill="#fff" letter-spacing="4">DWELLIGENCE</text>
+
+  <!-- Decorative double underline -->
+  <line x1="56" y1="37" x2="232" y2="37" stroke="#fff" stroke-width="0.75"/>
+  <line x1="56" y1="39" x2="232" y2="39" stroke="#fff" stroke-width="0.3"/>
+
+  <!-- Small deco accents at line ends -->
+  <rect x="56" y="36" width="3" height="1" fill="#fff"/>
+  <rect x="229" y="36" width="3" height="1" fill="#fff"/>
+</svg>

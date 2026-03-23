@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup B: Avatar Row with Hover Names</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f1117;
+    color: #e1e4e8;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    min-height: 100vh;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #e1e4e8;
+  }
+  .subtitle {
+    color: #8b949e;
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+  .card {
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 12px;
+    width: 380px;
+    overflow: hidden;
+  }
+  .photo {
+    width: 100%;
+    height: 220px;
+    background: linear-gradient(135deg, #2d333b 0%, #1c2028 50%, #2d333b 100%);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .photo-icon {
+    color: #8b949e;
+    font-size: 48px;
+    opacity: 0.4;
+  }
+  .photo-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(15, 17, 23, 0.75);
+    backdrop-filter: blur(8px);
+    color: #e1e4e8;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+  .card-body {
+    padding: 16px;
+  }
+  .price {
+    font-size: 22px;
+    font-weight: 700;
+    color: #e1e4e8;
+    margin-bottom: 4px;
+  }
+  .address {
+    font-size: 14px;
+    color: #8b949e;
+    margin-bottom: 8px;
+  }
+  .details {
+    display: flex;
+    gap: 16px;
+    font-size: 13px;
+    color: #8b949e;
+    margin-bottom: 16px;
+  }
+  .details span {
+    color: #e1e4e8;
+    font-weight: 500;
+  }
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .btn-live {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #f0883e;
+    color: #fff;
+    transition: background 0.15s;
+  }
+  .btn-live:hover { background: #d97730; }
+  .btn-fav {
+    padding: 10px 14px;
+    border: 1px solid #2d333b;
+    border-radius: 8px;
+    background: transparent;
+    color: #8b949e;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-fav:hover { border-color: #58a6ff; color: #58a6ff; }
+
+  /* Mockup B: Non-overlapping avatars with hover tooltips */
+  .avatar-section {
+    padding-top: 12px;
+    border-top: 1px solid #2d333b;
+  }
+  .avatar-label {
+    font-size: 13px;
+    color: #8b949e;
+    margin-bottom: 8px;
+  }
+  .avatar-label strong {
+    color: #58a6ff;
+    font-weight: 600;
+  }
+  .avatar-row {
+    display: flex;
+    gap: 6px;
+  }
+  .avatar-wrap {
+    position: relative;
+  }
+  .avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .avatar:hover {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 2px #58a6ff;
+  }
+  .avatar-1 { background: #58a6ff; }
+  .avatar-2 { background: #7ee787; }
+  .avatar-3 { background: #d2a8ff; }
+  .avatar-4 { background: #f0883e; }
+  .avatar-5 { background: #f778ba; }
+
+  .tooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #2d333b;
+    color: #e1e4e8;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+  }
+  .tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #2d333b;
+  }
+  .avatar-wrap:hover .tooltip {
+    opacity: 1;
+  }
+  .hint {
+    font-size: 11px;
+    color: #8b949e;
+    margin-top: 6px;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+  <h1>Mockup B: Avatar Row with Hover Names</h1>
+  <p class="subtitle">Non-overlapping avatars with tooltip names on hover</p>
+
+  <div class="card">
+    <div class="photo">
+      <div class="photo-icon">&#x1f3e0;</div>
+      <div class="photo-badge">3 bed / 2 bath</div>
+    </div>
+    <div class="card-body">
+      <div class="price">$1,250,000</div>
+      <div class="address">742 Evergreen Terrace, Brooklyn, NY 11201</div>
+      <div class="details">
+        <div><span>3</span> beds</div>
+        <div><span>2</span> baths</div>
+        <div><span>1,850</span> sqft</div>
+      </div>
+
+      <div class="actions">
+        <button class="btn-live">I Would Live There</button>
+        <button class="btn-fav">&hearts;</button>
+      </div>
+
+      <div class="avatar-section">
+        <div class="avatar-label"><strong>5</strong> people would live here</div>
+        <div class="avatar-row">
+          <div class="avatar-wrap">
+            <div class="avatar avatar-1">JM</div>
+            <div class="tooltip">Jake Miller</div>
+          </div>
+          <div class="avatar-wrap">
+            <div class="avatar avatar-2">SK</div>
+            <div class="tooltip">Sarah Kim</div>
+          </div>
+          <div class="avatar-wrap">
+            <div class="avatar avatar-3">AL</div>
+            <div class="tooltip">Ana Lopez</div>
+          </div>
+          <div class="avatar-wrap">
+            <div class="avatar avatar-4">RB</div>
+            <div class="tooltip">Ryan Brown</div>
+          </div>
+          <div class="avatar-wrap">
+            <div class="avatar avatar-5">TP</div>
+            <div class="tooltip">Tina Park</div>
+          </div>
+        </div>
+        <div class="hint">Hover an avatar to see their name</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

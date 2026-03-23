@@ -23,9 +23,15 @@ interface SearchConfig {
   bedsMin: number;
   bathsMin: number;
   priceMax: number;
+  priceMin?: number;
   minPhotos: number;
   maxBeds: number;
   maxSqft: number;
+  maxCostPerBed?: number;
+  latMin?: number;
+  latMax?: number;
+  lonMin?: number;
+  lonMax?: number;
 }
 
 const searchConfig = loadJsonFile<SearchConfig>("search-config.json", "search config");
@@ -95,6 +101,8 @@ function qualifiesByDestinations(distances: DistanceResult[]): { passes: boolean
   for (const { dest, dist } of ungrouped) {
     const minutes = dest.filterMode === "biking"
       ? dist.biking.durationMinutes
+      : dest.filterMode === "walking"
+      ? dist.walking.durationMinutes
       : dist.transit.durationMinutes;
     if (minutes > dest.maxMinutes!) {
       return { passes: false, reason: `${dest.name}: ${minutes} min ${dest.filterMode} (max ${dest.maxMinutes})` };
@@ -106,6 +114,8 @@ function qualifiesByDestinations(distances: DistanceResult[]): { passes: boolean
     const anyPass = members.some(({ dest, dist }) => {
       const minutes = dest.filterMode === "biking"
         ? dist.biking.durationMinutes
+        : dest.filterMode === "walking"
+        ? dist.walking.durationMinutes
         : dist.transit.durationMinutes;
       return minutes <= dest.maxMinutes!;
     });
@@ -125,10 +135,13 @@ function qualifiesByDestinations(distances: DistanceResult[]): { passes: boolean
 
 async function main() {
   const isSold = process.argv.includes("--sold");
+  const isRent = process.argv.includes("--rent");
+  const isRentSold = process.argv.includes("--rent-sold");
+  const cityArg = process.argv.find(a => a.startsWith("--city="));
   const maxArg = process.argv.find(a => a.startsWith("--max="));
-  const maxResults = maxArg ? parseInt(maxArg.split("=")[1]) : (isSold ? 2000 : 500);
-  const status = isSold ? "sold" : "for_sale";
-  const label = isSold ? "recently sold" : "for sale";
+  const maxResults = maxArg ? parseInt(maxArg.split("=")[1]) : (isSold || isRentSold ? 2000 : 500);
+  const status = isSold ? "sold" : isRent ? "for_rent" : isRentSold ? "sold" : "for_sale";
+  const label = isSold ? "recently sold" : isRent ? "for rent" : isRentSold ? "recently rented" : "for sale";
 
   // Build filter description respecting OR groups
   const grouped = new Map<string, Destination[]>();
@@ -145,17 +158,20 @@ async function main() {
   const parts: string[] = [];
   for (const members of grouped.values()) {
     const orPart = members
-      .map(d => `≤${d.maxMinutes}min ${d.filterMode === "biking" ? "bike" : "transit"} to ${d.name}`)
+      .map(d => `≤${d.maxMinutes}min ${d.filterMode === "biking" ? "bike" : d.filterMode === "walking" ? "walk" : "transit"} to ${d.name}`)
       .join(" OR ");
     parts.push(members.length > 1 ? `(${orPart})` : orPart);
   }
   for (const d of ungroupedDests) {
-    parts.push(`≤${d.maxMinutes}min ${d.filterMode === "biking" ? "bike" : "transit"} to ${d.name}`);
+    parts.push(`≤${d.maxMinutes}min ${d.filterMode === "biking" ? "bike" : d.filterMode === "walking" ? "walk" : "transit"} to ${d.name}`);
   }
   const filterDesc = parts.join(" AND ");
 
-  const { city, stateCode, bedsMin, bathsMin, priceMax, minPhotos, maxBeds, maxSqft } = searchConfig;
+  const city = cityArg ? cityArg.split("=")[1] : searchConfig.city;
+  const { stateCode, bedsMin, bathsMin, priceMax, minPhotos, maxBeds, maxSqft, maxCostPerBed, latMin, latMax, lonMin, lonMax } = searchConfig;
   console.log(`Searching for ${city} ${bedsMin}BR ${bathsMin}BA+ ${label} under $${(priceMax / 1000).toFixed(0)}K via Realtor.com API...`);
+  if (maxCostPerBed) console.log(`Max cost per bedroom: $${maxCostPerBed.toLocaleString()}`);
+  if (latMin != null && latMax != null) console.log(`Lat bounds: ${latMin} – ${latMax}`);
   console.log(`Filter: ${filterDesc}\n`);
 
   const listings = await searchAllProperties({
@@ -165,16 +181,23 @@ async function main() {
     bedsMin,
     bathsMin: Math.floor(bathsMin), // API only supports whole numbers
     priceMax,
+    priceMin: searchConfig.priceMin,
   }, maxResults);
 
   // Client-side filters
   const withBaths = listings.filter((l) => l.baths >= bathsMin);
   const withPhotos = withBaths.filter((l) => l.photoCount >= minPhotos);
   const withSize = withPhotos.filter((l) => l.beds <= maxBeds && (l.sqft === null || l.sqft <= maxSqft));
+  const withCostPerBed = maxCostPerBed
+    ? withSize.filter((l) => l.price / l.beds <= maxCostPerBed)
+    : withSize;
+  const withLatLon = (latMin != null && latMax != null)
+    ? withCostPerBed.filter((l) => l.lat >= latMin && l.lat <= latMax && (lonMin == null || l.lon >= lonMin) && (lonMax == null || l.lon <= lonMax))
+    : withCostPerBed;
 
   // Apply exclusions
   const excluded: Array<{ listing: ApiListing; reason: string }> = [];
-  const afterExclusions = withSize.filter((l) => {
+  const afterExclusions = withLatLon.filter((l) => {
     const reason = isExcluded(l);
     if (reason) {
       excluded.push({ listing: l, reason });
@@ -195,25 +218,32 @@ async function main() {
   const qualified: Array<{ listing: ApiListing; distances: DistanceResult[] }> = [];
   let distanceRejected = 0;
 
-  for (const listing of deduplicated) {
-    const address = `${listing.address}, ${listing.city}, ${listing.state} ${listing.zip}`;
-    const cached = isDirectionsCached(address, destinations[0].address);
-
-    if (!cached) {
-      process.stdout.write(`  Fetching distances for ${listing.address}...`);
+  if (destinations.length === 0) {
+    // No distance filter — all pass
+    for (const listing of deduplicated) {
+      qualified.push({ listing, distances: [] });
     }
+  } else {
+    for (const listing of deduplicated) {
+      const address = `${listing.address}, ${listing.city}, ${listing.state} ${listing.zip}`;
+      const cached = isDirectionsCached(address, destinations[0].address);
 
-    const distances = await getDistancesForProperty(address, destinations);
-    const { passes } = qualifiesByDestinations(distances);
+      if (!cached) {
+        process.stdout.write(`  Fetching distances for ${listing.address}...`);
+      }
 
-    if (!cached) {
-      process.stdout.write(passes ? " ✓\n" : " ✕\n");
-    }
+      const distances = await getDistancesForProperty(address, destinations);
+      const { passes } = qualifiesByDestinations(distances);
 
-    if (passes) {
-      qualified.push({ listing, distances });
-    } else {
-      distanceRejected++;
+      if (!cached) {
+        process.stdout.write(passes ? " ✓\n" : " ✕\n");
+      }
+
+      if (passes) {
+        qualified.push({ listing, distances });
+      } else {
+        distanceRejected++;
+      }
     }
   }
 
@@ -224,7 +254,7 @@ async function main() {
   });
 
   const cache = getCacheStats();
-  console.log(`\n${listings.length} listings from API, ${withBaths.length} with ${bathsMin}+ baths, ${withPhotos.length} with ${minPhotos}+ photos, ${withSize.length} ≤${maxBeds}BR/≤${maxSqft}sqft`);
+  console.log(`\n${listings.length} listings from API, ${withBaths.length} with ${bathsMin}+ baths, ${withPhotos.length} with ${minPhotos}+ photos, ${withSize.length} size ok, ${withCostPerBed.length} cost/bed ok, ${withLatLon.length} in bounds`);
   console.log(`${excluded.length} excluded, ${distanceRejected} too far, ${qualified.length} qualify. (${cache.size} cached directions)`);
   if (excluded.length > 0) {
     for (const e of excluded) {
@@ -257,8 +287,8 @@ async function main() {
     console.log(formatDistanceResults(distances));
     if (listing.url) console.log(`   ${listing.url}`);
 
-    // Financial evaluation (skip for sold listings)
-    if (!isSold) {
+    // Financial evaluation (skip for sold/rental listings)
+    if (!isSold && !isRent && !isRentSold) {
       for (const years of [2, 5, 10]) {
         printEvaluation(evaluate(listing.price, years));
       }

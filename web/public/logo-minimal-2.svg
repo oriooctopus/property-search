@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- Single rounded square outline -->
+  <rect x="4" y="4" width="40" height="40" rx="8" stroke="#ffffff" stroke-width="2" fill="none"/>
+  <!-- House silhouette -->
+  <path d="M24 16 L16 24 L16 32 L32 32 L32 24 Z" fill="#ffffff"/>
+  <!-- Radar blip dots on edges -->
+  <circle cx="36" cy="10" r="1.5" fill="#ffffff" opacity="0.8"/>
+  <circle cx="10" cy="36" r="1.2" fill="#ffffff" opacity="0.6"/>
+  <circle cx="40" cy="28" r="1" fill="#ffffff" opacity="0.5"/>
+</svg>

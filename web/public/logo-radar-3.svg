@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- Person: circle head + triangle body -->
+  <circle cx="24" cy="21" r="3.5" fill="#fff"/>
+  <polygon points="19,32 24,25 29,32" fill="#fff"/>
+  <!-- Radar arcs -->
+  <path d="M10,34 A16,16 0 0,1 38,34" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M5,40 A22,22 0 0,1 43,40" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Tiny house on outer arc -->
+  <polygon points="40,40 43,37 46,40" fill="#fff"/>
+  <rect x="41" y="37.5" width="4" height="3" fill="#fff"/>
+</svg>

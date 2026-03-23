@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup C: Count Badge on Button</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f1117;
+    color: #e1e4e8;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    min-height: 100vh;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #e1e4e8;
+  }
+  .subtitle {
+    color: #8b949e;
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+  .card {
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 12px;
+    width: 380px;
+    overflow: hidden;
+  }
+  .photo {
+    width: 100%;
+    height: 220px;
+    background: linear-gradient(135deg, #2d333b 0%, #1c2028 50%, #2d333b 100%);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .photo-icon {
+    color: #8b949e;
+    font-size: 48px;
+    opacity: 0.4;
+  }
+  .photo-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(15, 17, 23, 0.75);
+    backdrop-filter: blur(8px);
+    color: #e1e4e8;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+  .card-body {
+    padding: 16px;
+  }
+  .price {
+    font-size: 22px;
+    font-weight: 700;
+    color: #e1e4e8;
+    margin-bottom: 4px;
+  }
+  .address {
+    font-size: 14px;
+    color: #8b949e;
+    margin-bottom: 8px;
+  }
+  .details {
+    display: flex;
+    gap: 16px;
+    font-size: 13px;
+    color: #8b949e;
+    margin-bottom: 16px;
+  }
+  .details span {
+    color: #e1e4e8;
+    font-weight: 500;
+  }
+  .actions {
+    display: flex;
+    gap: 8px;
+  }
+  .btn-live-wrap {
+    flex: 1;
+    position: relative;
+  }
+  .btn-live {
+    width: 100%;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #f0883e;
+    color: #fff;
+    transition: background 0.15s;
+  }
+  .btn-live:hover { background: #d97730; }
+
+  /* Mockup C: Badge on button */
+  .badge {
+    position: absolute;
+    top: -8px;
+    right: -6px;
+    background: #58a6ff;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+    border: 2px solid #1c2028;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+
+  .btn-fav {
+    padding: 10px 14px;
+    border: 1px solid #2d333b;
+    border-radius: 8px;
+    background: transparent;
+    color: #8b949e;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-fav:hover { border-color: #58a6ff; color: #58a6ff; }
+
+  /* See who link + expandable row */
+  .see-who {
+    margin-top: 10px;
+    text-align: center;
+  }
+  .see-who-link {
+    font-size: 13px;
+    color: #58a6ff;
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: inherit;
+    transition: color 0.15s;
+  }
+  .see-who-link:hover { color: #79bbff; }
+
+  .expanded-row {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.3s ease, opacity 0.25s ease, margin-top 0.3s ease;
+    margin-top: 0;
+  }
+  .expanded-row.open {
+    max-height: 80px;
+    opacity: 1;
+    margin-top: 12px;
+  }
+  .expanded-inner {
+    padding-top: 12px;
+    border-top: 1px solid #2d333b;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .avatar-1 { background: #58a6ff; }
+  .avatar-2 { background: #7ee787; }
+  .avatar-3 { background: #d2a8ff; }
+  .avatar-4 { background: #f0883e; }
+  .avatar-5 { background: #f778ba; }
+  .avatar-6 { background: #ffa657; }
+  .avatar-7 { background: #56d4dd; }
+  .name-list {
+    font-size: 12px;
+    color: #8b949e;
+    margin-left: 4px;
+  }
+</style>
+</head>
+<body>
+  <h1>Mockup C: Count Badge on Button</h1>
+  <p class="subtitle">Notification-style badge with expandable avatar row</p>
+
+  <div class="card">
+    <div class="photo">
+      <div class="photo-icon">&#x1f3e0;</div>
+      <div class="photo-badge">3 bed / 2 bath</div>
+    </div>
+    <div class="card-body">
+      <div class="price">$1,250,000</div>
+      <div class="address">742 Evergreen Terrace, Brooklyn, NY 11201</div>
+      <div class="details">
+        <div><span>3</span> beds</div>
+        <div><span>2</span> baths</div>
+        <div><span>1,850</span> sqft</div>
+      </div>
+
+      <div class="actions">
+        <div class="btn-live-wrap">
+          <button class="btn-live">I Would Live There</button>
+          <div class="badge">7</div>
+        </div>
+        <button class="btn-fav">&hearts;</button>
+      </div>
+
+      <div class="see-who">
+        <button class="see-who-link" onclick="toggle()">See who &rarr;</button>
+      </div>
+
+      <div class="expanded-row" id="expandedRow">
+        <div class="expanded-inner">
+          <div class="avatar avatar-1">JM</div>
+          <div class="avatar avatar-2">SK</div>
+          <div class="avatar avatar-3">AL</div>
+          <div class="avatar avatar-4">RB</div>
+          <div class="avatar avatar-5">TP</div>
+          <div class="avatar avatar-6">DW</div>
+          <div class="avatar avatar-7">MH</div>
+          <span class="name-list">Jake, Sarah, Ana +4</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let open = false;
+    function toggle() {
+      open = !open;
+      const row = document.getElementById('expandedRow');
+      const link = document.querySelector('.see-who-link');
+      if (open) {
+        row.classList.add('open');
+        link.innerHTML = 'Hide &larr;';
+      } else {
+        row.classList.remove('open');
+        link.innerHTML = 'See who &rarr;';
+      }
+    }
+  </script>
+</body>
+</html>

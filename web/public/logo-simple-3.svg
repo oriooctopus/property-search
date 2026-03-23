@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- Bold letter D -->
+  <path d="M12 8V40H24C34 40 40 33 40 24C40 15 34 8 24 8H12Z" stroke="#fff" stroke-width="4.5" fill="none" stroke-linejoin="round"/>
+  <!-- Roof line off the top -->
+  <path d="M8 10L24 2L36 8" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

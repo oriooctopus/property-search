@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <!-- House silhouette (pentagon) with keyhole cutout -->
+  <path d="M24 4L44 22V44H4V22Z" fill="#fff" fill-rule="evenodd"/>
+  <!-- Keyhole cutout -->
+  <circle cx="24" cy="26" r="5" fill="#fff"/>
+  <rect x="21.5" y="29" width="5" height="10" fill="#fff"/>
+</svg>

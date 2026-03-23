@@ -6,6 +6,8 @@
   "scripts": {
     "search": "tsx src/search-with-distance.ts",
     "search:sold": "tsx src/search-with-distance.ts --sold",
+    "search:rent": "tsx src/search-with-distance.ts --rent",
+    "search:rent-sold": "tsx src/search-with-distance.ts --rent-sold",
     "evaluate": "tsx src/evaluate.ts"
   },
   "dependencies": {
