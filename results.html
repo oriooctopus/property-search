@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NYC 5+ BR Rental Search Results</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e1e4e8; }
+
+  header { padding: 24px 32px; border-bottom: 1px solid #2d333b; }
+  header h1 { font-size: 22px; font-weight: 600; }
+  header p { color: #8b949e; margin-top: 4px; font-size: 14px; }
+
+  .layout { display: flex; height: calc(100vh - 85px); }
+
+  .sidebar { width: 480px; min-width: 480px; overflow-y: auto; border-right: 1px solid #2d333b; }
+
+  .filters { padding: 16px 20px; border-bottom: 1px solid #2d333b; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .filters label { font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+  .filters select, .filters input { background: #1c2028; border: 1px solid #2d333b; color: #e1e4e8; padding: 6px 10px; border-radius: 6px; font-size: 13px; }
+  .filters input[type="number"] { width: 80px; }
+  .filter-group { display: flex; flex-direction: column; gap: 4px; }
+
+  .search-tabs { display: flex; border-bottom: 1px solid #2d333b; padding: 0 20px; gap: 0; overflow-x: auto; }
+  .search-tab { padding: 10px 16px; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; color: #8b949e; white-space: nowrap; transition: all 0.15s; }
+  .search-tab:hover { color: #e1e4e8; }
+  .search-tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+
+  .listing-count { padding: 12px 20px; font-size: 12px; color: #8b949e; border-bottom: 1px solid #2d333b; }
+
+  .card { padding: 16px 20px; border-bottom: 1px solid #1c2028; cursor: pointer; transition: background 0.15s; }
+  .card:hover { background: #1c2028; }
+  .card.active { background: #1c2028; border-left: 3px solid #58a6ff; }
+
+  .card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+  .card-address { font-size: 15px; font-weight: 600; color: #e1e4e8; }
+  .card-price { font-size: 15px; font-weight: 700; color: #7ee787; white-space: nowrap; }
+
+  .card-area { font-size: 13px; color: #8b949e; margin-top: 2px; }
+
+  .card-details { display: flex; gap: 16px; margin-top: 8px; font-size: 13px; color: #c9d1d9; }
+  .card-detail { display: flex; align-items: center; gap: 4px; }
+
+  .card-transit { margin-top: 8px; font-size: 12px; color: #8b949e; }
+  .card-transit span { color: #c9d1d9; }
+
+  .card-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .tag { font-size: 11px; padding: 2px 8px; border-radius: 12px; background: #1c2028; color: #8b949e; border: 1px solid #2d333b; }
+  .tag.affordable { background: #1a3a2a; color: #7ee787; border-color: #2d5a3a; }
+  .tag.search-tag { background: #1a2a3a; color: #58a6ff; border-color: #2d4a6a; }
+
+  .card-actions { margin-top: 10px; }
+  .card-actions a { font-size: 12px; color: #58a6ff; text-decoration: none; }
+  .card-actions a:hover { text-decoration: underline; }
+
+  .map-container { flex: 1; position: relative; }
+  #map { width: 100%; height: 100%; }
+
+  .legend { position: absolute; bottom: 24px; right: 24px; background: #1c2028; border: 1px solid #2d333b; border-radius: 8px; padding: 12px 16px; z-index: 1000; font-size: 12px; }
+  .legend h4 { margin-bottom: 8px; font-size: 12px; color: #8b949e; text-transform: uppercase; }
+  .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+
+  .popup-content { font-family: -apple-system, sans-serif; }
+  .popup-content h3 { font-size: 14px; margin-bottom: 4px; }
+  .popup-content p { font-size: 12px; color: #555; margin: 2px 0; }
+  .popup-content a { color: #0366d6; font-size: 12px; }
+
+  .per-bed { font-size: 12px; color: #8b949e; }
+
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; height: auto; }
+    .sidebar { width: 100%; min-width: 0; max-height: 50vh; }
+    .map-container { height: 50vh; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>NYC 5+ BR Rental Search</h1>
+  <p>All results from 4 searches — March 2026</p>
+</header>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="filters">
+      <div class="filter-group">
+        <label>Max $/Bedroom</label>
+        <input type="number" id="maxPerBed" value="5000" step="250">
+      </div>
+      <div class="filter-group">
+        <label>Min Beds</label>
+        <select id="minBeds">
+          <option value="5" selected>5+</option>
+          <option value="6">6+</option>
+          <option value="7">7+</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Max Rent</label>
+        <input type="number" id="maxRent" value="100000" step="1000">
+      </div>
+      <div class="filter-group">
+        <label>Sort</label>
+        <select id="sortBy">
+          <option value="pricePerBed">$/Bedroom</option>
+          <option value="price">Total Price</option>
+          <option value="beds">Bedrooms</option>
+        </select>
+      </div>
+    </div>
+    <div class="search-tabs">
+      <div class="search-tab active" data-search="all">All</div>
+      <div class="search-tab" data-search="fulton">Fulton St</div>
+      <div class="search-tab" data-search="ltrain">L Train</div>
+      <div class="search-tab" data-search="manhattan">Manhattan</div>
+      <div class="search-tab" data-search="brooklyn">Brooklyn 14th</div>
+    </div>
+    <div class="listing-count" id="listingCount"></div>
+    <div id="listings"></div>
+  </div>
+  <div class="map-container">
+    <div id="map"></div>
+    <div class="legend">
+      <h4>Search</h4>
+      <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div> Fulton St</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#a78bfa"></div> L Train</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#38bdf8"></div> Manhattan</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div> Brooklyn 14th</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const listings = [
+  // Search 1: Fulton St
+  {
+    id: 1, search: "fulton", address: "165 Attorney St Apt 5C", area: "Lower East Side",
+    price: 9450, beds: 6, baths: 2, sqft: null, transit: "16 min J to Fulton",
+    lat: 40.7195, lon: -73.9845, photos: 6,
+    url: "https://www.realtor.com/rentals/details/165-Attorney-St-Apt-5C_New-York_NY_10002_M94116-63343"
+  },
+  {
+    id: 2, search: "fulton", address: "171 Attorney St Unit 6A", area: "Lower East Side",
+    price: 11000, beds: 7, baths: 2.5, sqft: null, transit: "16 min J to Fulton",
+    lat: 40.7198, lon: -73.9843, photos: 3,
+    url: "https://www.realtor.com/rentals/details/171-Attorney-St-6A_New-York_NY_10002_M99751-50289"
+  },
+  {
+    id: 3, search: "fulton", address: "386 Stuyvesant Ave", area: "Stuyvesant Heights",
+    price: 12500, beds: 6, baths: 3.5, sqft: 3200, transit: "18 min A to Fulton",
+    lat: 40.6838, lon: -73.9298, photos: 24,
+    url: "https://www.realtor.com/rentals/details/386-Stuyvesant-Ave_Brooklyn_NY_11233_M44801-18988"
+  },
+  {
+    id: 4, search: "fulton", address: "50 Macdonough St", area: "Bedford-Stuyvesant",
+    price: 1815, beds: 6, baths: 2, sqft: 1500, transit: "19 min A to Fulton",
+    lat: 40.6836, lon: -73.9490, photos: 11,
+    url: "https://www.realtor.com/rentals/details/50-Macdonough-St_Brooklyn_NY_11216_M98426-16541"
+  },
+  // Search 2: L Train
+  {
+    id: 5, search: "ltrain", address: "240 E 6th St Apt 1", area: "East Village",
+    price: 9995, beds: 5, baths: 2, sqft: null, transit: "~10 min walk to 1st Ave L",
+    lat: 40.7262, lon: -73.9858, photos: 18,
+    url: "https://www.realtor.com/rentals/details/240-E-6th-St-Apt-1_New-York_NY_10003_M95522-46041"
+  },
+  {
+    id: 6, search: "ltrain", address: "202 E 13th St Apt 5D", area: "East Village",
+    price: 14995, beds: 5, baths: 2, sqft: null, transit: "2 min walk to 3rd Ave L",
+    lat: 40.7328, lon: -73.9877, photos: 8,
+    url: "https://www.realtor.com/rentals/details/202-E-13th-St-Apt-5D_New-York_NY_10003_M40080-23633"
+  },
+  {
+    id: 7, search: "ltrain", address: "204 E 13th St Apt 3", area: "East Village",
+    price: 14495, beds: 5, baths: 2, sqft: null, transit: "2 min walk to 3rd Ave L",
+    lat: 40.7327, lon: -73.9878, photos: 4,
+    url: "https://www.realtor.com/rentals/details/204-E-13th-St-Apt-3_New-York_NY_10003_M44944-02266"
+  },
+  {
+    id: 8, search: "ltrain", address: "205 W 13th St Unit 3", area: "Chelsea",
+    price: 14495, beds: 5, baths: 2, sqft: null, transit: "6 min walk to 6th Ave L",
+    lat: 40.7380, lon: -73.9995, photos: 6,
+    url: "https://www.realtor.com/rentals/details/205-W-13th-St-3_New-York_NY_10011_M95181-33744"
+  },
+  {
+    id: 9, search: "ltrain", address: "145 E 16th St Unit De", area: "Gramercy",
+    price: 15650, beds: 5, baths: 4.5, sqft: 1957, transit: "4 min walk to 3rd Ave L",
+    lat: 40.7350, lon: -73.9870, photos: 13,
+    url: "https://www.realtor.com/rentals/details/145-E-16th-St-De_New-York_NY_10003_M94279-26397"
+  },
+  {
+    id: 10, search: "ltrain", address: "146 E 16th St Unit 7D", area: "Gramercy",
+    price: 15600, beds: 5, baths: 5, sqft: null, transit: "4 min walk to 3rd Ave L",
+    lat: 40.7351, lon: -73.9868, photos: 11,
+    url: "https://www.realtor.com/rentals/details/146-E-16th-St-7D_New-York_NY_10003_M94599-32974"
+  },
+  {
+    id: 11, search: "ltrain", address: "110 Bedford St Apt 2C", area: "West Village",
+    price: 17495, beds: 5, baths: 3, sqft: null, transit: "~15 min walk to 8th Ave L",
+    lat: 40.7310, lon: -74.0038, photos: 5,
+    url: "https://www.realtor.com/rentals/details/110-Bedford-St-Apt-2C_New-York_NY_10014_M31229-25123"
+  },
+  {
+    id: 12, search: "ltrain", address: "120 Christopher St Apt 15", area: "West Village",
+    price: 17495, beds: 5, baths: 3, sqft: null, transit: "~15 min walk to 8th Ave L",
+    lat: 40.7335, lon: -74.0040, photos: 9,
+    url: "https://www.realtor.com/rentals/details/120-Christopher-St-Apt-15_New-York_NY_10014_M98682-46891"
+  },
+  {
+    id: 13, search: "ltrain", address: "872 Broadway Unit 3", area: "Union Square",
+    price: 25000, beds: 6, baths: 2, sqft: 2000, transit: "3 min walk to Union Sq L",
+    lat: 40.7378, lon: -73.9908, photos: 20,
+    url: "https://www.realtor.com/rentals/details/872-Broadway-3_New-York_NY_10003_M42835-70274"
+  },
+  {
+    id: 14, search: "ltrain", address: "74 Washington Pl", area: "Greenwich Village",
+    price: 92000, beds: 6, baths: 10, sqft: 9332, transit: "~12 min walk to 8th Ave L",
+    lat: 40.7318, lon: -73.9985, photos: 18,
+    url: "https://www.realtor.com/rentals/details/74-Washington-Pl-None_New-York_NY_10011_M93663-06839"
+  },
+  // Search 3: Manhattan (Park Pl to 38th, ≤$2750/bed)
+  {
+    id: 15, search: "manhattan", address: "53 Park Pl Ph 2", area: "Tribeca",
+    price: 9000, beds: 5, baths: 2, sqft: null, transit: "Tribeca / Park Place",
+    lat: 40.7141, lon: -74.0079, photos: 12,
+    url: "https://www.realtor.com/rentals/details/53-Park-Pl-2_New-York_NY_10007_M90339-21295"
+  },
+  {
+    id: 16, search: "manhattan", address: "50 Murray St Unit 2211", area: "Tribeca",
+    price: 10000, beds: 5, baths: 2, sqft: null, transit: "Tribeca / Murray St",
+    lat: 40.7143, lon: -74.0086, photos: 9,
+    url: "https://www.realtor.com/rentals/details/50-Murray-St-2211_New-York_NY_10007_M93038-48259"
+  },
+  {
+    id: 17, search: "manhattan", address: "53 Park Pl Apt 3E", area: "Tribeca",
+    price: 13500, beds: 5, baths: 3, sqft: null, transit: "Tribeca / Park Place",
+    lat: 40.7141, lon: -74.0079, photos: 20,
+    url: "https://www.realtor.com/rentals/details/53-Park-Pl-Apt-3E_New-York_NY_10007_M39270-97535"
+  },
+  // Search 4: Brooklyn (≤35 min to 14th St)
+  {
+    id: 18, search: "brooklyn", address: "372 Bainbridge St", area: "Stuyvesant Heights",
+    price: 6995, beds: 5, baths: 4, sqft: null, transit: "34 min C to 14th/8th Ave",
+    lat: 40.6808, lon: -73.9270, photos: 16,
+    url: "https://www.realtor.com/rentals/details/372-Bainbridge-St-Unit-Triplex_Brooklyn_NY_11233_M96732-47148"
+  },
+  {
+    id: 19, search: "brooklyn", address: "276 Halsey St #2", area: "Bedford-Stuyvesant",
+    price: 10750, beds: 5, baths: 3.5, sqft: null, transit: "31 min A to 14th/8th Ave",
+    lat: 40.6842, lon: -73.9418, photos: 16,
+    url: "https://www.realtor.com/rentals/details/276-Halsey-St-2_Brooklyn_NY_11216_M93027-20426"
+  },
+  {
+    id: 20, search: "brooklyn", address: "290 Jefferson Ave", area: "Bedford-Stuyvesant",
+    price: 10900, beds: 5, baths: 4, sqft: 3600, transit: "30 min A to 14th/8th Ave",
+    lat: 40.6862, lon: -73.9430, photos: 19,
+    url: "https://www.realtor.com/rentals/details/290-Jefferson-Ave_Brooklyn_NY_11216_M49395-49974"
+  },
+];
+
+// Deduplicate by URL (some listings appear in multiple searches)
+const seen = new Set();
+const deduped = [];
+const searchMap = {};
+for (const l of listings) {
+  if (seen.has(l.url)) {
+    // Add this search tag to existing
+    const existing = deduped.find(d => d.url === l.url);
+    if (existing && !existing.searches.includes(l.search)) {
+      existing.searches.push(l.search);
+    }
+    continue;
+  }
+  seen.add(l.url);
+  l.searches = [l.search];
+  l.pricePerBed = Math.round(l.price / l.beds);
+  deduped.push(l);
+}
+
+// Also add 386 Stuyvesant to brooklyn search since it appeared in both
+const stuyvesant = deduped.find(l => l.address === "386 Stuyvesant Ave");
+if (stuyvesant && !stuyvesant.searches.includes("brooklyn")) {
+  stuyvesant.searches.push("brooklyn");
+}
+
+// Also add cross-search duplicates
+const attorney165 = deduped.find(l => l.address === "165 Attorney St Apt 5C");
+if (attorney165 && !attorney165.searches.includes("manhattan")) attorney165.searches.push("manhattan");
+const attorney171 = deduped.find(l => l.address === "171 Attorney St Unit 6A");
+if (attorney171 && !attorney171.searches.includes("manhattan")) attorney171.searches.push("manhattan");
+const e6th = deduped.find(l => l.address === "240 E 6th St Apt 1");
+if (e6th && !e6th.searches.includes("manhattan")) e6th.searches.push("manhattan");
+
+const searchColors = {
+  fulton: "#f97316",
+  ltrain: "#a78bfa",
+  manhattan: "#38bdf8",
+  brooklyn: "#4ade80"
+};
+
+const searchLabels = {
+  fulton: "Fulton St",
+  ltrain: "L Train",
+  manhattan: "Manhattan",
+  brooklyn: "BK 14th St"
+};
+
+// Map setup
+const map = L.map('map', { zoomControl: true }).setView([40.72, -73.99], 13);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap &copy; CARTO',
+  maxZoom: 19
+}).addTo(map);
+
+let markers = [];
+let activeCard = null;
+
+function getColor(listing) {
+  return searchColors[listing.searches[0]] || "#888";
+}
+
+function createMarker(listing) {
+  const color = getColor(listing);
+  const icon = L.divIcon({
+    className: 'custom-marker',
+    html: `<div style="
+      width: 28px; height: 28px; border-radius: 50%;
+      background: ${color}; border: 3px solid #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    ">${listing.beds}</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14]
+  });
+
+  const marker = L.marker([listing.lat, listing.lon], { icon }).addTo(map);
+  marker.bindPopup(`
+    <div class="popup-content">
+      <h3>${listing.address}</h3>
+      <p><strong>$${listing.price.toLocaleString()}/mo</strong> · $${listing.pricePerBed.toLocaleString()}/bed</p>
+      <p>${listing.beds}BR / ${listing.baths}BA${listing.sqft ? ' · ' + listing.sqft.toLocaleString() + ' sqft' : ''}</p>
+      <p>${listing.area}</p>
+      <p>${listing.transit}</p>
+      <a href="${listing.url}" target="_blank">View on Realtor.com →</a>
+    </div>
+  `);
+  marker.listingId = listing.id;
+  return marker;
+}
+
+function renderListings(filtered) {
+  const container = document.getElementById('listings');
+  const countEl = document.getElementById('listingCount');
+  countEl.textContent = `${filtered.length} listing${filtered.length !== 1 ? 's' : ''}`;
+
+  // Clear markers
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+
+  container.innerHTML = filtered.map(l => `
+    <div class="card" data-id="${l.id}" onclick="selectCard(${l.id})">
+      <div class="card-header">
+        <div>
+          <div class="card-address">${l.address}</div>
+          <div class="card-area">${l.area}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="card-price">$${l.price.toLocaleString()}</div>
+          <div class="per-bed">$${l.pricePerBed.toLocaleString()}/bed</div>
+        </div>
+      </div>
+      <div class="card-details">
+        <div class="card-detail">🛏 ${l.beds} bed</div>
+        <div class="card-detail">🚿 ${l.baths} bath</div>
+        ${l.sqft ? `<div class="card-detail">📐 ${l.sqft.toLocaleString()} sqft</div>` : ''}
+        <div class="card-detail">📷 ${l.photos}</div>
+      </div>
+      <div class="card-transit">🚇 <span>${l.transit}</span></div>
+      <div class="card-tags">
+        ${l.pricePerBed <= 2750 ? '<span class="tag affordable">≤$2,750/bed</span>' : ''}
+        ${l.searches.map(s => `<span class="tag search-tag" style="border-color:${searchColors[s]}55;color:${searchColors[s]}">${searchLabels[s]}</span>`).join('')}
+      </div>
+      <div class="card-actions">
+        <a href="${l.url}" target="_blank">View listing →</a>
+      </div>
+    </div>
+  `).join('');
+
+  // Add markers
+  filtered.forEach(l => {
+    markers.push(createMarker(l));
+  });
+
+  // Fit bounds
+  if (filtered.length > 0) {
+    const group = L.featureGroup(markers);
+    map.fitBounds(group.getBounds().pad(0.1));
+  }
+}
+
+function selectCard(id) {
+  // Highlight card
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+  const card = document.querySelector(`.card[data-id="${id}"]`);
+  if (card) card.classList.add('active');
+
+  // Open popup on map
+  const marker = markers.find(m => m.listingId === id);
+  if (marker) {
+    map.setView(marker.getLatLng(), 15);
+    marker.openPopup();
+  }
+}
+
+function applyFilters() {
+  const maxPerBed = parseInt(document.getElementById('maxPerBed').value) || Infinity;
+  const minBeds = parseInt(document.getElementById('minBeds').value) || 5;
+  const maxRent = parseInt(document.getElementById('maxRent').value) || Infinity;
+  const sortBy = document.getElementById('sortBy').value;
+  const activeSearch = document.querySelector('.search-tab.active')?.dataset.search || 'all';
+
+  let filtered = deduped.filter(l => {
+    if (l.pricePerBed > maxPerBed) return false;
+    if (l.beds < minBeds) return false;
+    if (l.price > maxRent) return false;
+    if (activeSearch !== 'all' && !l.searches.includes(activeSearch)) return false;
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    if (sortBy === 'pricePerBed') return a.pricePerBed - b.pricePerBed;
+    if (sortBy === 'price') return a.price - b.price;
+    if (sortBy === 'beds') return b.beds - a.beds;
+    return 0;
+  });
+
+  renderListings(filtered);
+}
+
+// Event listeners
+document.querySelectorAll('.search-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.search-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    applyFilters();
+  });
+});
+
+document.getElementById('maxPerBed').addEventListener('input', applyFilters);
+document.getElementById('minBeds').addEventListener('change', applyFilters);
+document.getElementById('maxRent').addEventListener('input', applyFilters);
+document.getElementById('sortBy').addEventListener('change', applyFilters);
+
+// Initial render
+applyFilters();
+</script>
+</body>
+</html>

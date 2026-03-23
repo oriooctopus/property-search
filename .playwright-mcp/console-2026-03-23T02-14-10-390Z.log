@@ -1,0 +1,4 @@
+[    8257ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5001/loading-test?_rsc=8l2m6:0
+[    8291ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5001/loading-test?_rsc=8l2m6:0
+[    8303ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5001/loading-test?_rsc=8l2m6:0
+[    8422ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5001/loading-test:0

@@ -1,0 +1,2 @@
+[    1014ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://vlzqdeisrngovqpbtsgi.supabase.co/rest/v1/would_live_there?select=listing_id%2Cuser_id%2Cprofiles%3Auser_id%28id%2Cdisplay_name%2Cavatar_url%2Cbio%29:0
+[    1096ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://vlzqdeisrngovqpbtsgi.supabase.co/rest/v1/would_live_there?select=listing_id%2Cuser_id%2Cprofiles%3Auser_id%28id%2Cdisplay_name%2Cavatar_url%29:0
