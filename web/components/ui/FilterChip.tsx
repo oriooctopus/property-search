@@ -46,7 +46,9 @@ export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
           {...rest}
         >
           {label}
-          <ChevronDown className={cn('transition-transform', open && 'rotate-180')} />
+          {children !== undefined && (
+            <ChevronDown className={cn('transition-transform', open && 'rotate-180')} />
+          )}
         </ButtonBase>
 
         {open && children && (

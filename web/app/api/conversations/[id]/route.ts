@@ -41,11 +41,12 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Fetch conversation (RLS ensures only owner can access)
+  // Fetch conversation (belt-and-suspenders ownership check alongside RLS)
   const { data: conversation, error: convError } = await supabase
     .from("conversations")
     .select("id, name, filters, is_saved, created_at, updated_at")
     .eq("id", id)
+    .eq("user_id", user.id)
     .single();
 
   if (convError || !conversation) {
@@ -104,6 +105,7 @@ export async function PATCH(
     .from("conversations")
     .update(updates)
     .eq("id", id)
+    .eq("user_id", user.id)
     .select("id, name, filters, is_saved, created_at, updated_at")
     .single();
 
@@ -135,7 +137,8 @@ export async function DELETE(
   const { error } = await supabase
     .from("conversations")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", user.id);
 
   if (error) {
     return NextResponse.json(

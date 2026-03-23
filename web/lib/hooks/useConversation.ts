@@ -20,6 +20,7 @@ const DEFAULT_FILTERS: FiltersState = {
   maxRent: null,
   maxPricePerBed: null,
   maxListingAge: '1m' as MaxListingAge,
+  photosFirst: false,
 };
 
 interface UseConversationOptions {
@@ -99,8 +100,8 @@ export function useConversation({
         const data = await res.json();
 
         // Update filters if the API returned new ones
-        if (data.filters) {
-          const newFilters: FiltersState = { ...filters, ...data.filters };
+        if (data.mergedFilters) {
+          const newFilters: FiltersState = { ...filters, ...data.mergedFilters };
           setFilters(newFilters);
         }
 
@@ -110,8 +111,8 @@ export function useConversation({
         const assistantMsg: ChatMessageData = {
           id: uid(),
           role: 'assistant',
-          content: data.message ?? 'Here are the matching listings.',
-          parsedFilters: data.parsedFilters ?? [],
+          content: data.reply ?? 'Here are the matching listings.',
+          parsedFilters: data.extractedCriteria ?? [],
           listingCount: data.listingCount ?? getListingCountRef.current(),
           timestamp: Date.now(),
         };
@@ -125,7 +126,7 @@ export function useConversation({
               id: data.conversationId ?? uid(),
               name: null,
               messages: [userMsg, assistantMsg],
-              filters: data.filters ? { ...filters, ...data.filters } : filters,
+              filters: data.mergedFilters ? { ...filters, ...data.mergedFilters } : filters,
               isSaved: false,
               createdAt: now,
               updatedAt: now,
@@ -134,7 +135,7 @@ export function useConversation({
           return {
             ...prev,
             messages: [...prev.messages, userMsg, assistantMsg],
-            filters: data.filters ? { ...filters, ...data.filters } : filters,
+            filters: data.mergedFilters ? { ...filters, ...data.mergedFilters } : filters,
             updatedAt: now,
           };
         });
@@ -172,6 +173,7 @@ export function useConversation({
         searchTag: 'location',
         sort: 'sort',
         maxListingAge: 'listing age',
+        photosFirst: 'photos first',
       };
 
       const sysMsg: ChatMessageData = {
@@ -202,6 +204,7 @@ export function useConversation({
         searchTag: 'location',
         sort: 'sort',
         maxListingAge: 'listing age',
+        photosFirst: 'photos first',
       };
 
       const sysMsg: ChatMessageData = {
@@ -226,7 +229,7 @@ export function useConversation({
         await fetch(`/api/conversations/${conversation.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name }),
+          body: JSON.stringify({ name, is_saved: true }),
         });
 
         setConversation((prev) =>
@@ -248,12 +251,32 @@ export function useConversation({
       try {
         const res = await fetch(`/api/conversations/${id}`);
         if (!res.ok) throw new Error(`Failed to load conversation: ${res.status}`);
-        const data: Conversation = await res.json();
+        const data = await res.json();
 
-        setConversation(data);
-        setMessages(data.messages);
-        if (data.filters) {
-          setFilters(data.filters);
+        // API returns { conversation: {...}, messages: [...] }
+        const conv = data.conversation;
+        const msgs: ChatMessageData[] = (data.messages ?? []).map((m: { id: string; role: string; content: string; parsed_filters?: ParsedFilter[]; created_at: string }) => ({
+          id: m.id,
+          role: m.role as 'user' | 'assistant' | 'system',
+          content: m.content,
+          parsedFilters: m.parsed_filters ?? [],
+          timestamp: new Date(m.created_at).getTime(),
+        }));
+
+        const conversation: Conversation = {
+          id: conv.id,
+          name: conv.name,
+          messages: msgs,
+          filters: conv.filters ?? DEFAULT_FILTERS,
+          isSaved: conv.is_saved ?? false,
+          createdAt: new Date(conv.created_at).getTime(),
+          updatedAt: new Date(conv.updated_at).getTime(),
+        };
+
+        setConversation(conversation);
+        setMessages(msgs);
+        if (conv.filters) {
+          setFilters(conv.filters as FiltersState);
         }
       } catch {
         // On failure, just keep current state

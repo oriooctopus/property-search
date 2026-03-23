@@ -62,6 +62,8 @@ create table public.listings (
   list_date timestamptz,
   last_update_date timestamptz,
   availability_date timestamptz,
+  source text not null default 'realtor',
+  photo_urls text[] not null default '{}',
   created_at timestamptz not null default now()
 );
 

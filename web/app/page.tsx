@@ -10,6 +10,12 @@ import ListingCard from '@/components/ListingCard';
 import ListingDetail from '@/components/ListingDetail';
 import RadarLoader from '@/components/RadarLoader';
 import { SegmentedControl } from '@/components/ui';
+import ChatPanel from '@/components/ChatPanel';
+import SaveSearchModal from '@/components/SaveSearchModal';
+import AISearchBar from '@/components/AISearchBar';
+import FilterPills from '@/components/FilterPills';
+import { useConversation } from '@/lib/hooks/useConversation';
+import { useConversations } from '@/lib/hooks/useConversations';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -24,16 +30,16 @@ interface PersonWithBio {
 // Seed data fallback (used when DB is empty)
 // ---------------------------------------------------------------------------
 const SEED_LISTINGS: Listing[] = [
-  { id: -1, address: '240 E 6th St Apt 1', area: 'East Village', price: 9995, beds: 5, baths: 2, sqft: null, lat: 40.7262, lon: -73.9858, transit_summary: '~10 min walk to 1st Ave L', photos: 18, photo_urls: [], url: 'https://www.realtor.com/rentals/details/240-E-6th-St-Apt-1_New-York_NY_10003_M95522-46041', search_tag: 'ltrain', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
-  { id: -2, address: '165 Attorney St Apt 5C', area: 'Lower East Side', price: 9450, beds: 6, baths: 2, sqft: null, lat: 40.7195, lon: -73.9845, transit_summary: '16 min J to Fulton', photos: 6, photo_urls: [], url: 'https://www.realtor.com/rentals/details/165-Attorney-St-Apt-5C_New-York_NY_10002_M94116-63343', search_tag: 'fulton', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
-  { id: -3, address: '53 Park Pl Ph 2', area: 'Tribeca', price: 9000, beds: 5, baths: 2, sqft: null, lat: 40.7141, lon: -74.0079, transit_summary: 'Tribeca / Park Place', photos: 12, photo_urls: [], url: 'https://www.realtor.com/rentals/details/53-Park-Pl-2_New-York_NY_10007_M90339-21295', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
-  { id: -4, address: '372 Bainbridge St', area: 'Stuyvesant Heights', price: 6995, beds: 5, baths: 4, sqft: null, lat: 40.6808, lon: -73.927, transit_summary: '34 min C to 14th/8th Ave', photos: 16, photo_urls: [], url: 'https://www.realtor.com/rentals/details/372-Bainbridge-St-Unit-Triplex_Brooklyn_NY_11233_M96732-47148', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
-  { id: -5, address: '171 Attorney St Unit 6A', area: 'Lower East Side', price: 11000, beds: 7, baths: 2.5, sqft: null, lat: 40.7198, lon: -73.9843, transit_summary: '16 min J to Fulton', photos: 3, photo_urls: [], url: 'https://www.realtor.com/rentals/details/171-Attorney-St-6A_New-York_NY_10002_M99751-50289', search_tag: 'fulton', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
-  { id: -6, address: '386 Stuyvesant Ave', area: 'Stuyvesant Heights', price: 12500, beds: 6, baths: 3.5, sqft: 3200, lat: 40.6838, lon: -73.9298, transit_summary: '18 min A to Fulton / 30 min to 14th', photos: 24, photo_urls: [], url: 'https://www.realtor.com/rentals/details/386-Stuyvesant-Ave_Brooklyn_NY_11233_M44801-18988', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
-  { id: -7, address: '50 Murray St Unit 2211', area: 'Tribeca', price: 10000, beds: 5, baths: 2, sqft: null, lat: 40.7143, lon: -74.0086, transit_summary: 'Tribeca / Murray St', photos: 9, photo_urls: [], url: 'https://www.realtor.com/rentals/details/50-Murray-St-2211_New-York_NY_10007_M93038-48259', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
-  { id: -8, address: '290 Jefferson Ave', area: 'Bedford-Stuyvesant', price: 10900, beds: 5, baths: 4, sqft: 3600, lat: 40.6862, lon: -73.943, transit_summary: '30 min A to 14th/8th Ave', photos: 19, photo_urls: [], url: 'https://www.realtor.com/rentals/details/290-Jefferson-Ave_Brooklyn_NY_11216_M49395-49974', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
-  { id: -9, address: '276 Halsey St #2', area: 'Bedford-Stuyvesant', price: 10750, beds: 5, baths: 3.5, sqft: null, lat: 40.6842, lon: -73.9418, transit_summary: '31 min A to 14th/8th Ave', photos: 16, photo_urls: [], url: 'https://www.realtor.com/rentals/details/276-Halsey-St-2_Brooklyn_NY_11216_M93027-20426', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
-  { id: -10, address: '53 Park Pl Apt 3E', area: 'Tribeca', price: 13500, beds: 5, baths: 3, sqft: null, lat: 40.7141, lon: -74.0079, transit_summary: 'Tribeca / Park Place', photos: 20, photo_urls: [], url: 'https://www.realtor.com/rentals/details/53-Park-Pl-Apt-3E_New-York_NY_10007_M39270-97535', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
+  { id: -1, address: '240 E 6th St Apt 1', area: 'East Village', price: 9995, beds: 5, baths: 2, sqft: null, lat: 40.7262, lon: -73.9858, transit_summary: '~10 min walk to 1st Ave L', photos: 18, photo_urls: [], url: 'https://www.realtor.com/rentals/details/240-E-6th-St-Apt-1_New-York_NY_10003_M95522-46041', search_tag: 'ltrain', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
+  { id: -2, address: '165 Attorney St Apt 5C', area: 'Lower East Side', price: 9450, beds: 6, baths: 2, sqft: null, lat: 40.7195, lon: -73.9845, transit_summary: '16 min J to Fulton', photos: 6, photo_urls: [], url: 'https://www.realtor.com/rentals/details/165-Attorney-St-Apt-5C_New-York_NY_10002_M94116-63343', search_tag: 'fulton', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
+  { id: -3, address: '53 Park Pl Ph 2', area: 'Tribeca', price: 9000, beds: 5, baths: 2, sqft: null, lat: 40.7141, lon: -74.0079, transit_summary: 'Tribeca / Park Place', photos: 12, photo_urls: [], url: 'https://www.realtor.com/rentals/details/53-Park-Pl-2_New-York_NY_10007_M90339-21295', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
+  { id: -4, address: '372 Bainbridge St', area: 'Stuyvesant Heights', price: 6995, beds: 5, baths: 4, sqft: null, lat: 40.6808, lon: -73.927, transit_summary: '34 min C to 14th/8th Ave', photos: 16, photo_urls: [], url: 'https://www.realtor.com/rentals/details/372-Bainbridge-St-Unit-Triplex_Brooklyn_NY_11233_M96732-47148', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
+  { id: -5, address: '171 Attorney St Unit 6A', area: 'Lower East Side', price: 11000, beds: 7, baths: 2.5, sqft: null, lat: 40.7198, lon: -73.9843, transit_summary: '16 min J to Fulton', photos: 3, photo_urls: [], url: 'https://www.realtor.com/rentals/details/171-Attorney-St-6A_New-York_NY_10002_M99751-50289', search_tag: 'fulton', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
+  { id: -6, address: '386 Stuyvesant Ave', area: 'Stuyvesant Heights', price: 12500, beds: 6, baths: 3.5, sqft: 3200, lat: 40.6838, lon: -73.9298, transit_summary: '18 min A to Fulton / 30 min to 14th', photos: 24, photo_urls: [], url: 'https://www.realtor.com/rentals/details/386-Stuyvesant-Ave_Brooklyn_NY_11233_M44801-18988', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
+  { id: -7, address: '50 Murray St Unit 2211', area: 'Tribeca', price: 10000, beds: 5, baths: 2, sqft: null, lat: 40.7143, lon: -74.0086, transit_summary: 'Tribeca / Murray St', photos: 9, photo_urls: [], url: 'https://www.realtor.com/rentals/details/50-Murray-St-2211_New-York_NY_10007_M93038-48259', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
+  { id: -8, address: '290 Jefferson Ave', area: 'Bedford-Stuyvesant', price: 10900, beds: 5, baths: 4, sqft: 3600, lat: 40.6862, lon: -73.943, transit_summary: '30 min A to 14th/8th Ave', photos: 19, photo_urls: [], url: 'https://www.realtor.com/rentals/details/290-Jefferson-Ave_Brooklyn_NY_11216_M49395-49974', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
+  { id: -9, address: '276 Halsey St #2', area: 'Bedford-Stuyvesant', price: 10750, beds: 5, baths: 3.5, sqft: null, lat: 40.6842, lon: -73.9418, transit_summary: '31 min A to 14th/8th Ave', photos: 16, photo_urls: [], url: 'https://www.realtor.com/rentals/details/276-Halsey-St-2_Brooklyn_NY_11216_M93027-20426', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
+  { id: -10, address: '53 Park Pl Apt 3E', area: 'Tribeca', price: 13500, beds: 5, baths: 3, sqft: null, lat: 40.7141, lon: -74.0079, transit_summary: 'Tribeca / Park Place', photos: 20, photo_urls: [], url: 'https://www.realtor.com/rentals/details/53-Park-Pl-Apt-3E_New-York_NY_10007_M39270-97535', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -63,11 +69,13 @@ function readFiltersFromParams(params: URLSearchParams): FiltersState {
     maxRent: parseNumOrNull(params.get('maxRent')),
     maxPricePerBed: parseNumOrNull(params.get('maxPerBed')),
     maxListingAge: (age === 'any' ? null : age && VALID_LISTING_AGES.has(age) ? age : '1m') as MaxListingAge,
+    photosFirst: params.get('photosFirst') === '1',
   };
 }
 
-function buildQueryString(view: 'list' | 'map', f: FiltersState): string {
+function buildQueryString(view: 'list' | 'map', f: FiltersState, chatMode?: boolean): string {
   const p = new URLSearchParams();
+  if (chatMode) p.set('chat', '1');
   if (view !== 'list') p.set('view', view);
   if (f.searchTag !== 'all') p.set('tag', f.searchTag);
   if (f.sort !== 'pricePerBed') p.set('sort', f.sort);
@@ -78,6 +86,7 @@ function buildQueryString(view: 'list' | 'map', f: FiltersState): string {
   if (f.maxPricePerBed != null) p.set('maxPerBed', String(f.maxPricePerBed));
   if (f.maxListingAge === null) p.set('maxAge', 'any');
   else if (f.maxListingAge !== '1m') p.set('maxAge', f.maxListingAge);
+  if (f.photosFirst) p.set('photosFirst', '1');
   const qs = p.toString();
   return qs ? `?${qs}` : '/';
 }
@@ -89,6 +98,9 @@ function HomeInner() {
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Feature flag: conversational search mode
+  const chatMode = searchParams.get('chat') === '1';
 
   // Data state
   const [listings, setListings] = useState<Listing[]>([]);
@@ -166,6 +178,40 @@ function HomeInner() {
     readFiltersFromParams(searchParams),
   );
 
+  // -----------------------------------------------------------------------
+  // Chat mode hooks
+  // -----------------------------------------------------------------------
+  const filteredListingsRef = useRef<Listing[]>([]);
+
+  const chat = useConversation({
+    onFiltersChange: useCallback((newFilters: FiltersState) => {
+      setFilters(newFilters);
+    }, []),
+    getListingCount: useCallback(() => filteredListingsRef.current.length, []),
+  });
+
+  const { conversations, invalidate: invalidateConversations } = useConversations();
+
+  const [saveSearchOpen, setSaveSearchOpen] = useState(false);
+  const [lastAIQuery, setLastAIQuery] = useState<string | null>(null);
+  const [chatDrawerOpen, setChatDrawerOpen] = useState(chatMode);
+
+  // Open chat drawer when ?chat=1 is in URL
+  useEffect(() => {
+    if (chatMode) {
+      setChatDrawerOpen(true);
+    }
+  }, [chatMode]);
+
+  // Inline AI search bar handler — sends to chat API and applies filters
+  const handleInlineAISearch = useCallback(
+    async (query: string) => {
+      setLastAIQuery(query);
+      await chat.sendMessage(query);
+    },
+    [chat],
+  );
+
   // Sync state changes to URL via history.replaceState (avoids Next.js
   // navigation overhead and unnecessary re-renders).
   const isFirstRender = useRef(true);
@@ -174,8 +220,8 @@ function HomeInner() {
       isFirstRender.current = false;
       return;
     }
-    window.history.replaceState(null, '', buildQueryString(mobileView, filters));
-  }, [mobileView, filters]);
+    window.history.replaceState(null, '', buildQueryString(mobileView, filters, chatMode));
+  }, [mobileView, filters, chatMode]);
 
   // -----------------------------------------------------------------------
   // Fetch data
@@ -205,9 +251,9 @@ function HomeInner() {
           : SEED_LISTINGS;
       const allListings = rawListings.map((l) => ({
         ...l,
-        lat: Number(l.lat),
-        lon: Number(l.lon),
-        baths: Number(l.baths),
+        lat: l.lat != null ? Number(l.lat) : null,
+        lon: l.lon != null ? Number(l.lon) : null,
+        baths: l.baths != null ? Number(l.baths) : null,
         sqft: l.sqft != null ? Number(l.sqft) : null,
         price: Number(l.price),
         beds: Number(l.beds),
@@ -342,6 +388,11 @@ function HomeInner() {
     }
 
     result.sort((a, b) => {
+      if (filters.photosFirst) {
+        const aHasPhotos = (a.photos ?? 0) > 0 ? 0 : 1;
+        const bHasPhotos = (b.photos ?? 0) > 0 ? 0 : 1;
+        if (aHasPhotos !== bHasPhotos) return aHasPhotos - bHasPhotos;
+      }
       switch (filters.sort) {
         case 'pricePerBed':
           return a.price / a.beds - b.price / b.beds;
@@ -358,6 +409,9 @@ function HomeInner() {
 
     return result;
   }, [listings, filters, hiddenIds]);
+
+  // Keep the ref in sync so the chat hook's getListingCount stays current
+  filteredListingsRef.current = filteredListings;
 
   // -----------------------------------------------------------------------
   // Toggle handlers
@@ -430,122 +484,267 @@ function HomeInner() {
     return <RadarLoader />;
   }
 
+  // -----------------------------------------------------------------------
+  // Shared listing cards renderer
+  // -----------------------------------------------------------------------
+  const listingCards = (
+    <>
+      {filteredListings.map((listing) => (
+        <ListingCard
+          key={listing.id}
+          listing={listing}
+          isSelected={listing.id === selectedId}
+          isFavorited={favoritesSet.has(listing.id)}
+          wouldLiveThere={wouldLiveSet.has(listing.id)}
+          wouldLivePeople={wouldLivePeopleMap[listing.id] ?? []}
+          isHiding={hidingId === listing.id}
+          onClick={() => setSelectedId(listing.id)}
+          onToggleWouldLive={() => handleToggleWouldLive(listing.id)}
+          onToggleFavorite={() => handleToggleFavorite(listing.id)}
+          onExpand={() => setDetailListing(listing)}
+          onHide={() => handleHideListing(listing.id)}
+        />
+      ))}
+
+      {filteredListings.length === 0 && (
+        <div className="text-center py-12 text-sm" style={{ color: '#8b949e' }}>
+          No listings match your filters.
+        </div>
+      )}
+    </>
+  );
+
+  const viewToggle = (
+    <SegmentedControl
+      value={mobileView}
+      onChange={(v) => setMobileView(v as 'list' | 'map')}
+      options={[
+        { value: 'list', label: 'List' },
+        { value: 'map', label: 'Map' },
+      ]}
+      className="lg:hidden"
+    />
+  );
+
+  const mapPanel = (
+    <div className={`flex-1 ${mobileView === 'list' ? 'hidden lg:block' : 'block'}`} style={{ minHeight: 'calc(100vh - 56px - 42px)' }}>
+      <Map
+        listings={filteredListings}
+        selectedId={selectedId}
+        favoritedIds={favoritesSet}
+        wouldLiveIds={wouldLiveSet}
+        onToggleFavorite={handleToggleFavorite}
+        onToggleWouldLive={handleToggleWouldLive}
+        onSelectDetail={(listing) => setDetailListing(listing)}
+        onMarkerClick={(id) => {
+          setSelectedId(id);
+          if (window.innerWidth >= 1024) {
+            setTimeout(() => {
+              const el = document.getElementById(`listing-${id}`);
+              el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+          }
+        }}
+      />
+    </div>
+  );
+
+  const toastEl = toast && (
+    <div
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[1400] flex items-center gap-3 rounded-lg px-4 py-3 shadow-lg"
+      style={{
+        backgroundColor: '#1c2028',
+        border: '1px solid #2d333b',
+        color: '#e1e4e8',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+        animation: 'toast-in 200ms ease-out',
+      }}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b949e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+        <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+        <line x1="1" y1="1" x2="23" y2="23" />
+      </svg>
+      <span className="text-sm">Listing hidden</span>
+      <button
+        onClick={handleUndoHide}
+        className="text-sm font-medium hover:underline cursor-pointer"
+        style={{ color: '#58a6ff', background: 'none', border: 'none', padding: 0 }}
+      >
+        Undo
+      </button>
+    </div>
+  );
+
+  const detailModal = detailListing && (
+    <ListingDetail
+      listing={detailListing}
+      wouldLiveThere={wouldLiveSet.has(detailListing.id)}
+      isFavorited={favoritesSet.has(detailListing.id)}
+      wouldLivePeople={wouldLivePeopleMap[detailListing.id] ?? []}
+      onToggleWouldLive={() => handleToggleWouldLive(detailListing.id)}
+      onToggleFavorite={() => handleToggleFavorite(detailListing.id)}
+      onHide={() => handleHideListing(detailListing.id)}
+      onClose={() => setDetailListing(null)}
+    />
+  );
+
+  // -----------------------------------------------------------------------
+  // Shared: AI-applied filter pills (shown when AI has applied criteria)
+  // -----------------------------------------------------------------------
+  const hasAIFilters = chat.messages.length > 0;
+
+  // -----------------------------------------------------------------------
+  // Chat drawer (slide-out panel from the right)
+  // -----------------------------------------------------------------------
+  const chatDrawer = chatDrawerOpen && (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-[1300] lg:hidden"
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+        onClick={() => setChatDrawerOpen(false)}
+      />
+      {/* Drawer panel */}
+      <div
+        className="fixed inset-y-0 right-0 z-[1400] flex flex-col"
+        style={{
+          width: 'min(420px, 100vw)',
+          backgroundColor: '#0f1117',
+          borderLeft: '1px solid #2d333b',
+          boxShadow: '-8px 0 24px rgba(0,0,0,0.4)',
+        }}
+      >
+        {/* Drawer header */}
+        <div
+          className="flex items-center justify-between px-4 py-3 shrink-0"
+          style={{ borderBottom: '1px solid #2d333b' }}
+        >
+          <h2 className="text-sm font-semibold" style={{ color: '#e1e4e8' }}>
+            AI Search
+          </h2>
+          <button
+            onClick={() => setChatDrawerOpen(false)}
+            className="rounded p-1.5 transition-colors hover:bg-white/5 cursor-pointer"
+            style={{ color: '#8b949e' }}
+            aria-label="Close chat"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+              <path d="M3 3L13 13M13 3L3 13" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Chat sidebar tabs for conversations */}
+        <div className="flex shrink-0 overflow-x-auto gap-1 px-3 py-2" style={{ borderBottom: '1px solid #2d333b' }}>
+          <button
+            onClick={() => chat.newConversation()}
+            className="shrink-0 text-xs px-3 py-1.5 rounded-full transition-colors hover:bg-[#58a6ff]/10 cursor-pointer"
+            style={{
+              color: '#58a6ff',
+              border: '1px solid #2d333b',
+              backgroundColor: 'transparent',
+            }}
+          >
+            + New
+          </button>
+          {conversations.slice(0, 5).map((c) => (
+            <button
+              key={c.id}
+              onClick={() => chat.loadConversation(c.id)}
+              className="shrink-0 text-xs px-3 py-1.5 rounded-full transition-colors cursor-pointer truncate max-w-[120px]"
+              style={{
+                color: chat.conversation?.id === c.id ? '#58a6ff' : '#8b949e',
+                border: `1px solid ${chat.conversation?.id === c.id ? 'rgba(88,166,255,0.3)' : '#2d333b'}`,
+                backgroundColor: chat.conversation?.id === c.id ? 'rgba(88,166,255,0.08)' : 'transparent',
+              }}
+            >
+              {c.name || c.firstMessage?.slice(0, 20) || 'Untitled'}
+            </button>
+          ))}
+        </div>
+
+        {/* Chat panel — full conversation */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <ChatPanel
+            messages={chat.messages}
+            filters={filters}
+            onSendMessage={chat.sendMessage}
+            onRemoveFilter={chat.removeFilter}
+            onReAddFilter={chat.reAddFilter}
+            onSaveSearch={() => setSaveSearchOpen(true)}
+            isLoading={chat.isLoading}
+            listingCount={filteredListings.length}
+            conversationName={chat.conversation?.name}
+          />
+        </div>
+      </div>
+    </>
+  );
+
+  // -----------------------------------------------------------------------
+  // Unified layout: AI search bar + filters + listings + map
+  // Chat drawer slides over from right when opened
+  // -----------------------------------------------------------------------
   return (
     <div className="flex flex-col lg:flex-row" style={{ height: 'calc(100vh - 56px)' }}>
-      {/* Sidebar: filter bar is always visible; listing cards hide on mobile map view */}
+      {/* Sidebar: AI search bar + filters + listing cards */}
       <div
         className={`w-full lg:w-[480px] shrink-0 flex flex-col ${mobileView === 'map' ? 'max-lg:shrink max-lg:flex-none' : ''}`}
         style={{ borderRight: '1px solid #2d333b' }}
       >
+        {/* AI search bar */}
+        <AISearchBar
+          onSearch={handleInlineAISearch}
+          isLoading={chat.isLoading}
+          lastQuery={lastAIQuery}
+        />
+
+        {/* AI-applied filter pills */}
+        {hasAIFilters && (
+          <FilterPills
+            filters={filters}
+            onRemoveFilter={chat.removeFilter}
+          />
+        )}
+
         <div className="relative z-[1100]">
           <Filters
             filters={filters}
             onChange={setFilters}
             listingCount={filteredListings.length}
-            viewToggle={
-              <SegmentedControl
-                value={mobileView}
-                onChange={(v) => setMobileView(v as 'list' | 'map')}
-                options={[
-                  { value: 'list', label: 'List' },
-                  { value: 'map', label: 'Map' },
-                ]}
-                className="lg:hidden"
-              />
-            }
+            viewToggle={viewToggle}
           />
         </div>
 
         <div className={`flex-1 overflow-y-auto min-h-0 px-3 py-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 ${mobileView === 'map' ? 'hidden lg:grid' : ''}`}>
-          {filteredListings.map((listing) => (
-            <ListingCard
-              key={listing.id}
-              listing={listing}
-              isSelected={listing.id === selectedId}
-              isFavorited={favoritesSet.has(listing.id)}
-              wouldLiveThere={wouldLiveSet.has(listing.id)}
-              wouldLivePeople={wouldLivePeopleMap[listing.id] ?? []}
-              isHiding={hidingId === listing.id}
-              onClick={() => setSelectedId(listing.id)}
-              onToggleWouldLive={() => handleToggleWouldLive(listing.id)}
-              onToggleFavorite={() => handleToggleFavorite(listing.id)}
-              onExpand={() => setDetailListing(listing)}
-              onHide={() => handleHideListing(listing.id)}
-            />
-          ))}
-
-          {filteredListings.length === 0 && (
-            <div className="text-center py-12 text-sm" style={{ color: '#8b949e' }}>
-              No listings match your filters.
-            </div>
-          )}
+          {listingCards}
         </div>
       </div>
 
       {/* Map */}
-      <div className={`flex-1 ${mobileView === 'list' ? 'hidden lg:block' : 'block'}`} style={{ minHeight: 'calc(100vh - 56px - 42px)' }}>
-        <Map
-          listings={filteredListings}
-          selectedId={selectedId}
-          favoritedIds={favoritesSet}
-          wouldLiveIds={wouldLiveSet}
-          onToggleFavorite={handleToggleFavorite}
-          onToggleWouldLive={handleToggleWouldLive}
-          onSelectDetail={(listing) => setDetailListing(listing)}
-          onMarkerClick={(id) => {
-            setSelectedId(id);
-            // Only scroll to card on desktop where the list panel is visible alongside the map.
-            // On mobile, let the Leaflet Popup show naturally instead of switching views.
-            if (window.innerWidth >= 1024) {
-              setTimeout(() => {
-                const el = document.getElementById(`listing-${id}`);
-                el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }, 100);
-            }
-          }}
-        />
-      </div>
+      {mapPanel}
 
-      {/* Toast notification for hidden listings */}
-      {toast && (
-        <div
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[1400] flex items-center gap-3 rounded-lg px-4 py-3 shadow-lg"
-          style={{
-            backgroundColor: '#1c2028',
-            border: '1px solid #2d333b',
-            color: '#e1e4e8',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-            animation: 'toast-in 200ms ease-out',
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b949e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-            <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
-            <line x1="1" y1="1" x2="23" y2="23" />
-          </svg>
-          <span className="text-sm">Listing hidden</span>
-          <button
-            onClick={handleUndoHide}
-            className="text-sm font-medium hover:underline cursor-pointer"
-            style={{ color: '#58a6ff', background: 'none', border: 'none', padding: 0 }}
-          >
-            Undo
-          </button>
-        </div>
-      )}
+      {/* Chat drawer (slide-out) */}
+      {chatDrawer}
+
+      {/* Toast */}
+      {toastEl}
 
       {/* Detail modal */}
-      {detailListing && (
-        <ListingDetail
-          listing={detailListing}
-          wouldLiveThere={wouldLiveSet.has(detailListing.id)}
-          isFavorited={favoritesSet.has(detailListing.id)}
-          wouldLivePeople={wouldLivePeopleMap[detailListing.id] ?? []}
-          onToggleWouldLive={() => handleToggleWouldLive(detailListing.id)}
-          onToggleFavorite={() => handleToggleFavorite(detailListing.id)}
-          onHide={() => handleHideListing(detailListing.id)}
-          onClose={() => setDetailListing(null)}
+      {detailModal}
+
+      {/* Save search modal */}
+      {saveSearchOpen && (
+        <SaveSearchModal
+          suggestedName={chat.conversation?.name || chat.messages.find((m) => m.role === 'user')?.content || 'My Search'}
+          onSave={async (name) => {
+            await chat.saveConversation(name);
+            invalidateConversations();
+            setSaveSearchOpen(false);
+          }}
+          onCancel={() => setSaveSearchOpen(false)}
         />
       )}
     </div>
