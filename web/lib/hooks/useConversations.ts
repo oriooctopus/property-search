@@ -8,9 +8,21 @@ const CONVERSATIONS_QUERY_KEY = ['conversations'] as const;
 async function fetchConversations(): Promise<ConversationSummary[]> {
   const res = await fetch('/api/conversations');
   if (!res.ok) {
+    // If unauthorized (not logged in), return empty array instead of throwing
+    if (res.status === 401) return [];
     throw new Error(`Failed to fetch conversations: ${res.status}`);
   }
-  return res.json();
+  const data = await res.json();
+  // The API returns { conversations: [...] } — unwrap the array
+  const raw: Array<Record<string, unknown>> = Array.isArray(data) ? data : (data.conversations ?? []);
+  // Map snake_case API fields to camelCase ConversationSummary
+  return raw.map((c) => ({
+    id: c.id as string,
+    name: (c.name as string | null) ?? null,
+    firstMessage: (c.first_message as string | undefined) ?? '',
+    updatedAt: typeof c.updated_at === 'string' ? new Date(c.updated_at as string).getTime() : (c.updated_at as number ?? Date.now()),
+    isSaved: (c.is_saved as boolean) ?? false,
+  }));
 }
 
 export function useConversations() {

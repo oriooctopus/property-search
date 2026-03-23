@@ -95,6 +95,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (message.length > 5000) {
+    return NextResponse.json(
+      { error: "Message too long (max 5000 characters)" },
+      { status: 400 },
+    );
+  }
+
   // 3. Check for Anthropic API key
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -207,7 +214,14 @@ export async function POST(request: NextRequest) {
     },
   ];
 
-  await supabase.from("conversation_messages").insert(messagesToInsert);
+  const { error: insertError } = await supabase.from("conversation_messages").insert(messagesToInsert);
+
+  if (insertError) {
+    return NextResponse.json(
+      { error: "Failed to save messages", details: insertError.message },
+      { status: 500 },
+    );
+  }
 
   // 9. Merge filters and update conversation
   const mergedFilters = { ...(currentFilters ?? {}), ...parsed.filterUpdates };
@@ -219,13 +233,20 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  await supabase
+  const { error: updateError } = await supabase
     .from("conversations")
     .update({
       filters: mergedFilters,
       updated_at: new Date().toISOString(),
     })
     .eq("id", conversationId);
+
+  if (updateError) {
+    return NextResponse.json(
+      { error: "Failed to update conversation", details: updateError.message },
+      { status: 500 },
+    );
+  }
 
   // 10. Return response
   return NextResponse.json({

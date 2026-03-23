@@ -9,6 +9,13 @@ import PeopleAvatars from './PeopleAvatars';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
+const SOURCE_LABELS: Record<string, string> = {
+  realtor: 'Realtor.com',
+  craigslist: 'Craigslist',
+  renthop: 'RentHop',
+  apartments: 'Apartments.com',
+};
+
 interface Person {
   id: string;
   display_name: string | null;
@@ -250,8 +257,8 @@ export default function ListingCard({
       {/* Details row */}
       <div className="flex items-center gap-3 text-xs mt-2 mb-2" style={{ color: '#8b949e' }}>
         <span>{listing.beds} bd</span>
-        <span>{listing.baths} ba</span>
-        {listing.sqft && <span>{listing.sqft.toLocaleString()} sqft</span>}
+        <span>{listing.baths != null ? listing.baths : '--'} ba</span>
+        {listing.sqft != null && <span>{listing.sqft.toLocaleString()} sqft</span>}
       </div>
 
       {/* Transit */}
@@ -334,6 +341,13 @@ export default function ListingCard({
         </div>
       </div>
 
+      {/* Source indicator */}
+      {listing.source && (
+        <div className="text-[10px] mt-1" style={{ color: '#6e7681' }}>
+          via {SOURCE_LABELS[listing.source] ?? listing.source}
+        </div>
+      )}
+
       {/* Who would live here + View listing (combined row) */}
       <div className="mt-2 flex items-center justify-between gap-2">
         <div className="min-w-0">
@@ -355,7 +369,7 @@ export default function ListingCard({
           className="text-xs font-medium hover:underline shrink-0 cursor-pointer"
           style={{ color: '#58a6ff' }}
         >
-          View listing &rarr;
+          View on {SOURCE_LABELS[listing.source] ?? 'listing'} &rarr;
         </a>
       </div>
       </div>

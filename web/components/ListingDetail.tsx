@@ -22,6 +22,13 @@ const TAG_LABELS: Record<string, string> = {
   brooklyn: 'Brooklyn',
 };
 
+const SOURCE_LABELS: Record<string, string> = {
+  realtor: 'Realtor.com',
+  craigslist: 'Craigslist',
+  renthop: 'RentHop',
+  apartments: 'Apartments.com',
+};
+
 interface Person {
   id: string;
   display_name: string | null;
@@ -218,7 +225,7 @@ export default function ListingDetail({
             </div>
             <div className="text-center">
               <div className="text-lg font-bold" style={{ color: '#e1e4e8' }}>
-                {listing.baths}
+                {listing.baths != null ? listing.baths : '--'}
               </div>
               <div className="text-xs" style={{ color: '#8b949e' }}>
                 Baths
@@ -279,7 +286,12 @@ export default function ListingDetail({
             />
           </div>
 
-          {/* Realtor link + Hide button */}
+          {/* Source + View link + Hide button */}
+          {listing.source && (
+            <div className="text-xs mb-2" style={{ color: '#6e7681' }}>
+              via {SOURCE_LABELS[listing.source] ?? listing.source}
+            </div>
+          )}
           <div className="flex items-center justify-between mb-6">
             <a
               href={listing.url}
@@ -288,7 +300,7 @@ export default function ListingDetail({
               className="inline-flex items-center gap-1 text-sm font-medium hover:underline"
               style={{ color: '#58a6ff' }}
             >
-              View on Realtor.com &rarr;
+              View on {SOURCE_LABELS[listing.source] ?? 'listing site'} &rarr;
             </a>
             <button
               onClick={() => {

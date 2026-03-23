@@ -43,10 +43,10 @@ export type Database = {
           area: string;
           price: number;
           beds: number;
-          baths: number;
+          baths: number | null;
           sqft: number | null;
-          lat: number;
-          lon: number;
+          lat: number | null;
+          lon: number | null;
           transit_summary: string | null;
           photos: number;
           photo_urls: string[];
@@ -55,6 +55,7 @@ export type Database = {
           list_date: string | null;
           last_update_date: string | null;
           availability_date: string | null;
+          source: string;
           created_at: string;
         };
         Insert: {
@@ -75,6 +76,7 @@ export type Database = {
           list_date?: string | null;
           last_update_date?: string | null;
           availability_date?: string | null;
+          source?: string;
           created_at?: string;
         };
         Update: {
@@ -95,6 +97,7 @@ export type Database = {
           list_date?: string | null;
           last_update_date?: string | null;
           availability_date?: string | null;
+          source?: string;
           created_at?: string;
         };
         Relationships: [];

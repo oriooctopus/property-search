@@ -133,7 +133,7 @@ export default function Navbar() {
         ) : user ? (
           <>
             <Link
-              href="/search"
+              href="/?chat=1"
               className="text-sm transition-colors hover:opacity-80"
               style={{ color: "#8b949e" }}
             >

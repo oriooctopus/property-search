@@ -2,8 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-
-const RAPIDAPI_HOST = "realty-in-us.p.rapidapi.com";
+import { unifiedSearch } from "@/lib/sources";
 
 interface SearchBody {
   city: string;
@@ -100,7 +99,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 4. Call Realtor.com API
+  // 4. Call all data sources via unified search
   const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
   if (!RAPIDAPI_KEY) {
     return NextResponse.json(
@@ -109,99 +108,30 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const apiBody: Record<string, unknown> = {
-    limit: 200,
-    offset: 0,
-    city,
-    state_code: stateCode,
-    status: ["for_sale"],
-    sort: { direction: "desc", field: "list_date" },
-  };
-
-  if (bedsMin != null) apiBody.beds = { min: bedsMin };
-  if (bathsMin != null) apiBody.baths = { min: bathsMin };
-  if (priceMax != null || priceMin != null) {
-    const price: Record<string, number> = {};
-    if (priceMin != null) price.min = priceMin;
-    if (priceMax != null) price.max = priceMax;
-    apiBody.list_price = price;
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let apiResults: any[];
-  let total: number;
-
+  let result;
   try {
-    const res = await fetch(`https://${RAPIDAPI_HOST}/properties/v3/list`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-RapidAPI-Key": RAPIDAPI_KEY,
-        "X-RapidAPI-Host": RAPIDAPI_HOST,
-      },
-      body: JSON.stringify(apiBody),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      return NextResponse.json(
-        { error: `Realtor API error: ${res.status}`, details: text },
-        { status: 502 },
-      );
-    }
-
-    const data = await res.json();
-    apiResults = data?.data?.home_search?.results ?? [];
-    total = data?.data?.home_search?.total ?? 0;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (err: any) {
+    result = await unifiedSearch(
+      { city, stateCode, bedsMin, bathsMin, priceMax, priceMin },
+      RAPIDAPI_KEY,
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to fetch from Realtor API", details: err.message },
+      { error: "Failed to fetch listings", details: message },
       { status: 502 },
     );
   }
 
-  // 5. Map to listing format
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const listings = apiResults.map((r: any) => {
-    const loc = r.location?.address ?? {};
-    const desc = r.description ?? {};
-    const coord = loc.coordinate ?? {};
-    const href = r.href
-      ? r.href.startsWith("http")
-        ? r.href
-        : `https://www.realtor.com${r.href}`
-      : "";
-
-    return {
-      address: loc.line ?? "",
-      area: `${loc.city ?? city}, ${loc.state_code ?? stateCode}`,
-      price: r.list_price ?? 0,
-      beds: desc.beds ?? 0,
-      baths: (desc.baths_full ?? 0) + (desc.baths_half ?? 0) * 0.5,
-      sqft: desc.sqft ?? null,
-      lat: coord.lat ?? 0,
-      lon: coord.lon ?? 0,
-      photos: r.photo_count ?? 0,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      photo_urls: (r.photos ?? []).slice(0, 6).map((p: any) => p.href),
-      url: href,
-      search_tag: `search_${city.toLowerCase().replace(/\s+/g, "_")}`,
-      list_date: r.list_date ?? null,
-      last_update_date: r.last_update_date ?? null,
-      availability_date: r.description?.available_date ?? null,
-    };
-  });
+  const { listings, totals, errors: sourceErrors } = result;
 
   // Apply maxCostPerBed filter client-side
   const filtered = maxCostPerBed
     ? listings.filter(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (l: any) => l.beds > 0 && Math.round(l.price / l.beds) <= maxCostPerBed,
+        (l) => l.beds > 0 && Math.round(l.price / l.beds) <= maxCostPerBed,
       )
     : listings;
 
-  // 6. Upsert into listings table using service role client
+  // 5. Upsert into listings table using service role client
   const adminClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
     process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
@@ -211,8 +141,7 @@ export async function POST(request: NextRequest) {
     const { error: upsertError } = await adminClient
       .from("listings")
       .upsert(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        filtered.map((l: any) => ({
+        filtered.map((l) => ({
           address: l.address,
           area: l.area,
           price: l.price,
@@ -228,6 +157,7 @@ export async function POST(request: NextRequest) {
           list_date: l.list_date,
           last_update_date: l.last_update_date,
           availability_date: l.availability_date,
+          source: l.source,
         })),
         { onConflict: "url", ignoreDuplicates: false },
       );
@@ -237,7 +167,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 7. Log the query
+  // 6. Log the query
   await adminClient.from("search_queries").insert({
     user_id: user.id,
     query_params: { city, stateCode, bedsMin, bathsMin, priceMax, priceMin, maxCostPerBed },
@@ -248,7 +178,9 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     listings: filtered,
-    total,
+    total: totals.merged,
+    totals,
+    sourceErrors,
     queryUsage: { used: newUsed, limit, tier: tierId },
   });
 }

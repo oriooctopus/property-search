@@ -167,16 +167,16 @@ export default function ChatPanel({
         )}
       </div>
 
-      {/* Input area */}
+      {/* Input area — always visible at bottom */}
       <div
         className="shrink-0 px-4 py-3"
-        style={{ borderTop: '1px solid #2d333b' }}
+        style={{ borderTop: '1px solid #2d333b', backgroundColor: '#0f1117' }}
       >
         <div
-          className="flex items-center gap-2 rounded-xl px-3 py-2"
+          className="flex items-center gap-2 rounded-xl px-4 py-3"
           style={{
             backgroundColor: '#1c2028',
-            border: '1px solid #2d333b',
+            border: '1px solid #3d444d',
           }}
         >
           <input
@@ -185,17 +185,17 @@ export default function ChatPanel({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Describe your search..."
+            placeholder="Describe your ideal apartment..."
             disabled={isLoading}
-            className="flex-1 bg-transparent text-sm outline-none placeholder:text-[#8b949e]"
-            style={{ color: '#e1e4e8' }}
+            className="flex-1 bg-transparent text-sm outline-none placeholder:text-[#6e7681]"
+            style={{ color: '#e1e4e8', minHeight: '24px' }}
           />
           <button
             onClick={() => handleSubmit()}
             disabled={!input.trim() || isLoading}
             className="shrink-0 rounded-lg p-2 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
             style={{
-              backgroundColor: input.trim() ? '#58a6ff' : 'transparent',
+              backgroundColor: input.trim() ? '#58a6ff' : '#2d333b',
               color: input.trim() ? '#0f1117' : '#8b949e',
             }}
             aria-label="Send message"

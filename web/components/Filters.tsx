@@ -17,6 +17,7 @@ export interface FiltersState {
   sort: SortField;
   searchTag: SearchTag;
   maxListingAge: MaxListingAge;
+  photosFirst: boolean;
 }
 
 interface FiltersProps {
@@ -35,10 +36,10 @@ const SEARCH_TABS: { value: SearchTag; label: string; title: string }[] = [
 ];
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
-  { value: 'pricePerBed', label: 'PRICE/BEDROOM' },
-  { value: 'price', label: 'PRICE' },
-  { value: 'beds', label: 'BEDS' },
-  { value: 'listDate', label: 'LIST DATE' },
+  { value: 'pricePerBed', label: 'Price/Bedroom' },
+  { value: 'price', label: 'Price' },
+  { value: 'beds', label: 'Beds' },
+  { value: 'listDate', label: 'List Date' },
 ];
 
 const PRICE_SLIDER_MIN = 0;
@@ -529,6 +530,14 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
           />
         </FilterChip>
 
+        {/* Photos first toggle chip */}
+        <FilterChip
+          label="Photos first"
+          active={filters.photosFirst}
+          open={false}
+          onToggle={() => onChange({ ...filters, photosFirst: !filters.photosFirst })}
+        />
+
         </div>
         {/* List/Map segmented control (mobile only, right-aligned) */}
         {viewToggle && <div className="shrink-0">{viewToggle}</div>}
@@ -594,7 +603,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
             }}
             className="flex items-center gap-1 text-xs font-medium tracking-wide whitespace-nowrap"
           >
-            SORT BY: {sortLabel}
+            Sort by: {sortLabel}
             <ChevronDown className={`transition-transform ${sortOpen ? 'rotate-180' : ''}`} />
           </TextButton>
 

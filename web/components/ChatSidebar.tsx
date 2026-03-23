@@ -75,7 +75,7 @@ function ConversationItem({
           className="text-sm font-medium truncate"
           style={{ color: isActive ? '#58a6ff' : '#e1e4e8' }}
         >
-          {conversation.name || truncate(conversation.firstMessage, 40)}
+          {conversation.name || (conversation.firstMessage ? truncate(conversation.firstMessage, 40) : 'Untitled search')}
         </span>
       </div>
       <span className="text-[10px] mt-0.5 block" style={{ color: '#8b949e' }}>
