@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hide Mockup B: Hover-Reveal X on Photo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f1117; color: #e1e4e8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; }
+
+  h1 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+  .subtitle { font-size: 14px; color: #8b949e; margin-bottom: 24px; }
+
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; max-width: 1100px; }
+
+  .card {
+    background: #1c2028; border: 1px solid #2d333b; border-radius: 12px;
+    overflow: hidden; transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+  .card.hidden-card { opacity: 0; transform: scale(0.95); }
+
+  .card-photo {
+    width: 100%; height: 180px; background: linear-gradient(135deg, #2d333b 0%, #1c2028 100%);
+    position: relative; display: flex; align-items: center; justify-content: center;
+  }
+  .card-photo .placeholder-text { color: #8b949e; font-size: 13px; }
+  .card-photo .photo-badge {
+    position: absolute; top: 10px; left: 10px;
+    background: rgba(15,17,23,0.85); color: #7ee787; font-size: 11px; font-weight: 600;
+    padding: 3px 8px; border-radius: 4px;
+  }
+  .card-photo .photo-count {
+    position: absolute; bottom: 10px; right: 10px;
+    background: rgba(15,17,23,0.85); color: #e1e4e8; font-size: 11px;
+    padding: 3px 8px; border-radius: 4px;
+  }
+
+  /* Hover X button */
+  .hide-x-btn {
+    position: absolute; top: 10px; right: 10px;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: rgba(15,17,23,0.8); border: 1px solid rgba(255,255,255,0.15);
+    color: #e1e4e8; font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.2s ease, background 0.15s ease;
+    backdrop-filter: blur(4px);
+  }
+  .card:hover .hide-x-btn { opacity: 1; }
+  .hide-x-btn:hover { background: rgba(248,81,73,0.85); border-color: rgba(248,81,73,0.5); }
+
+  /* Force-show for demo */
+  .card.show-hover .hide-x-btn { opacity: 1; }
+
+  .card-body { padding: 14px 16px; }
+  .card-address { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .card-area { font-size: 13px; color: #8b949e; margin-bottom: 10px; }
+  .card-details { display: flex; gap: 16px; font-size: 13px; color: #8b949e; margin-bottom: 10px; }
+  .card-price { font-size: 18px; font-weight: 700; color: #58a6ff; margin-bottom: 12px; }
+  .card-fee { font-size: 12px; color: #8b949e; font-weight: 400; }
+
+  .card-actions {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; border-top: 1px solid #2d333b;
+  }
+  .action-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: transparent; border: 1px solid #2d333b; color: #8b949e;
+    padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .action-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+  .action-btn.favorited { border-color: #f97316; color: #f97316; }
+  .action-btn svg { width: 14px; height: 14px; }
+
+  .view-link {
+    color: #58a6ff; font-size: 13px; text-decoration: none; margin-left: auto;
+  }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #1c2028; border: 1px solid #2d333b; color: #e1e4e8;
+    padding: 12px 20px; border-radius: 8px; font-size: 14px;
+    display: none; align-items: center; gap: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 100;
+  }
+  .toast.visible { display: flex; }
+  .toast .undo-link { color: #58a6ff; cursor: pointer; font-weight: 600; text-decoration: underline; }
+
+  .mockup-label {
+    position: fixed; bottom: 16px; left: 16px;
+    background: #58a6ff; color: #0f1117; padding: 6px 14px;
+    border-radius: 6px; font-size: 12px; font-weight: 700;
+  }
+
+  .annotation {
+    background: #2d333b; border-radius: 8px; padding: 14px 18px;
+    margin-bottom: 24px; max-width: 1100px;
+  }
+  .annotation h3 { font-size: 14px; color: #58a6ff; margin-bottom: 4px; }
+  .annotation p { font-size: 13px; color: #8b949e; line-height: 1.5; }
+
+  .state-label {
+    font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 8px; font-weight: 600;
+  }
+
+  .comparison {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 720px; margin-bottom: 32px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Hide Listing — Option B: Hover-Reveal X on Photo</h1>
+<p class="subtitle">A small X appears on the photo's top-right corner on hover. Minimal and clean.</p>
+
+<div class="annotation">
+  <h3>How it works</h3>
+  <p>The dismiss button is invisible until the user hovers over the card. It appears as a small circular X on the photo. This keeps cards clean when browsing. Below: side-by-side comparison of normal vs hover state, plus interactive cards.</p>
+</div>
+
+<!-- Side by side comparison -->
+<div class="comparison">
+  <div>
+    <div class="state-label">Default (no hover)</div>
+    <div class="card">
+      <div class="card-photo">
+        <span class="placeholder-text">Photo — Strandvägen 42</span>
+        <span class="photo-badge">New</span>
+        <span class="photo-count">1/8</span>
+        <button class="hide-x-btn">&#10005;</button>
+      </div>
+      <div class="card-body">
+        <div class="card-address">Strandvägen 42, 3tr</div>
+        <div class="card-area">Östermalm, Stockholm</div>
+        <div class="card-details"><span>3 rum</span><span>78 m²</span></div>
+        <div class="card-price">5 950 000 kr</div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="state-label">Hovered (X appears)</div>
+    <div class="card show-hover">
+      <div class="card-photo">
+        <span class="placeholder-text">Photo — Strandvägen 42</span>
+        <span class="photo-badge">New</span>
+        <span class="photo-count">1/8</span>
+        <button class="hide-x-btn">&#10005;</button>
+      </div>
+      <div class="card-body">
+        <div class="card-address">Strandvägen 42, 3tr</div>
+        <div class="card-area">Östermalm, Stockholm</div>
+        <div class="card-details"><span>3 rum</span><span>78 m²</span></div>
+        <div class="card-price">5 950 000 kr</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Interactive cards -->
+<h2 style="font-size: 16px; margin-bottom: 16px; color: #8b949e; font-weight: 500;">Interactive — hover and click X to hide</h2>
+<div class="card-grid">
+  <div class="card" id="card1">
+    <div class="card-photo">
+      <span class="placeholder-text">Photo — Birger Jarlsgatan 15</span>
+      <span class="photo-count">1/5</span>
+      <button class="hide-x-btn" onclick="hideCard('card1')">&#10005;</button>
+    </div>
+    <div class="card-body">
+      <div class="card-address">Birger Jarlsgatan 15, 4tr</div>
+      <div class="card-area">Norrmalm, Stockholm</div>
+      <div class="card-details"><span>2 rum</span><span>52 m²</span><span>Built 1935</span></div>
+      <div class="card-price">3 450 000 kr <span class="card-fee">· 3 100 kr/mån</span></div>
+    </div>
+    <div class="card-actions">
+      <button class="action-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        Save
+      </button>
+      <button class="action-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Would live
+      </button>
+      <a href="#" class="view-link">View listing →</a>
+    </div>
+  </div>
+
+  <div class="card" id="card2">
+    <div class="card-photo">
+      <span class="placeholder-text">Photo — Götgatan 88</span>
+      <span class="photo-badge">Price drop</span>
+      <span class="photo-count">1/12</span>
+      <button class="hide-x-btn" onclick="hideCard('card2')">&#10005;</button>
+    </div>
+    <div class="card-body">
+      <div class="card-address">Götgatan 88, 2tr</div>
+      <div class="card-area">Södermalm, Stockholm</div>
+      <div class="card-details"><span>4 rum</span><span>95 m²</span><span>Built 1890</span></div>
+      <div class="card-price">7 200 000 kr <span class="card-fee">· 5 800 kr/mån</span></div>
+    </div>
+    <div class="card-actions">
+      <button class="action-btn favorited">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        Saved
+      </button>
+      <button class="action-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Would live
+      </button>
+      <a href="#" class="view-link">View listing →</a>
+    </div>
+  </div>
+
+  <div class="card" id="card3">
+    <div class="card-photo">
+      <span class="placeholder-text">Photo — Kungsholmsgatan 22</span>
+      <span class="photo-count">1/6</span>
+      <button class="hide-x-btn" onclick="hideCard('card3')">&#10005;</button>
+    </div>
+    <div class="card-body">
+      <div class="card-address">Kungsholmsgatan 22, 5tr</div>
+      <div class="card-area">Kungsholmen, Stockholm</div>
+      <div class="card-details"><span>2 rum</span><span>58 m²</span><span>Built 1948</span></div>
+      <div class="card-price">4 100 000 kr <span class="card-fee">· 3 600 kr/mån</span></div>
+    </div>
+    <div class="card-actions">
+      <button class="action-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        Save
+      </button>
+      <button class="action-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Would live
+      </button>
+      <a href="#" class="view-link">View listing →</a>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span>Listing hidden</span>
+  <span class="undo-link" onclick="undoHide()">Undo</span>
+</div>
+
+<div class="mockup-label">Mockup B — Hover X on Photo</div>
+
+<script>
+let lastHiddenId = null;
+let toastTimer = null;
+
+function hideCard(id) {
+  event.stopPropagation();
+  const card = document.getElementById(id);
+  card.classList.add('hidden-card');
+  lastHiddenId = id;
+  const toast = document.getElementById('toast');
+  toast.classList.add('visible');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { toast.classList.remove('visible'); }, 4000);
+}
+
+function undoHide() {
+  if (lastHiddenId) {
+    document.getElementById(lastHiddenId).classList.remove('hidden-card');
+    document.getElementById('toast').classList.remove('visible');
+    clearTimeout(toastTimer);
+    lastHiddenId = null;
+  }
+}
+</script>
+</body>
+</html>

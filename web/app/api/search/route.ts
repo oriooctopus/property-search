@@ -187,6 +187,9 @@ export async function POST(request: NextRequest) {
       photo_urls: (r.photos ?? []).slice(0, 6).map((p: any) => p.href),
       url: href,
       search_tag: `search_${city.toLowerCase().replace(/\s+/g, "_")}`,
+      list_date: r.list_date ?? null,
+      last_update_date: r.last_update_date ?? null,
+      availability_date: r.description?.available_date ?? null,
     };
   });
 
@@ -222,6 +225,9 @@ export async function POST(request: NextRequest) {
           photo_urls: l.photo_urls,
           url: l.url,
           search_tag: l.search_tag,
+          list_date: l.list_date,
+          last_update_date: l.last_update_date,
+          availability_date: l.availability_date,
         })),
         { onConflict: "url", ignoreDuplicates: false },
       );

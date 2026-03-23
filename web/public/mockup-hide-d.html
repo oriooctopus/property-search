@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hide Mockup D: Three-Dot Menu + Swipe</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f1117; color: #e1e4e8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; }
+
+  h1 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+  .subtitle { font-size: 14px; color: #8b949e; margin-bottom: 24px; }
+
+  .sections { display: flex; gap: 40px; flex-wrap: wrap; max-width: 1200px; }
+  .section { flex: 1; min-width: 320px; }
+  .section-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #e1e4e8; }
+
+  .card {
+    background: #1c2028; border: 1px solid #2d333b; border-radius: 12px;
+    overflow: hidden; position: relative; margin-bottom: 20px;
+  }
+
+  .card-photo {
+    width: 100%; height: 180px; background: linear-gradient(135deg, #2d333b 0%, #1c2028 100%);
+    position: relative; display: flex; align-items: center; justify-content: center;
+  }
+  .card-photo .placeholder-text { color: #8b949e; font-size: 13px; }
+  .card-photo .photo-badge {
+    position: absolute; top: 10px; left: 10px;
+    background: rgba(15,17,23,0.85); color: #7ee787; font-size: 11px; font-weight: 600;
+    padding: 3px 8px; border-radius: 4px;
+  }
+  .card-photo .photo-count {
+    position: absolute; bottom: 10px; right: 10px;
+    background: rgba(15,17,23,0.85); color: #e1e4e8; font-size: 11px;
+    padding: 3px 8px; border-radius: 4px;
+  }
+
+  .card-body { padding: 14px 16px; }
+  .card-address { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .card-area { font-size: 13px; color: #8b949e; margin-bottom: 10px; }
+  .card-details { display: flex; gap: 16px; font-size: 13px; color: #8b949e; margin-bottom: 10px; }
+  .card-price { font-size: 18px; font-weight: 700; color: #58a6ff; }
+  .card-fee { font-size: 12px; color: #8b949e; font-weight: 400; }
+
+  .card-actions {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; border-top: 1px solid #2d333b;
+  }
+  .action-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: transparent; border: 1px solid #2d333b; color: #8b949e;
+    padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .action-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+  .action-btn.favorited { border-color: #f97316; color: #f97316; }
+  .action-btn svg { width: 14px; height: 14px; }
+  .view-link { color: #58a6ff; font-size: 13px; text-decoration: none; margin-left: auto; }
+
+  /* Three-dot menu */
+  .menu-trigger {
+    position: absolute; top: 10px; right: 10px;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(15,17,23,0.8); border: 1px solid rgba(255,255,255,0.15);
+    color: #e1e4e8; font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(4px); z-index: 10;
+    letter-spacing: 1px; line-height: 1;
+  }
+  .menu-trigger:hover { background: rgba(15,17,23,0.95); }
+
+  .dropdown-menu {
+    position: absolute; top: 48px; right: 10px;
+    background: #1c2028; border: 1px solid #2d333b; border-radius: 8px;
+    min-width: 180px; overflow: hidden; z-index: 20;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    display: none;
+  }
+  .dropdown-menu.open { display: block; }
+  .dropdown-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; font-size: 13px; color: #e1e4e8;
+    cursor: pointer; transition: background 0.1s ease;
+    border: none; background: none; width: 100%; text-align: left;
+    font-family: inherit;
+  }
+  .dropdown-item:hover { background: #2d333b; }
+  .dropdown-item.destructive { color: #f85149; }
+  .dropdown-item.destructive:hover { background: rgba(248,81,73,0.1); }
+  .dropdown-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .dropdown-divider { height: 1px; background: #2d333b; margin: 0; }
+
+  /* Mobile swipe demo */
+  .swipe-container {
+    position: relative; overflow: hidden; border-radius: 12px;
+    margin-bottom: 20px; border: 1px solid #2d333b;
+  }
+  .swipe-card {
+    background: #1c2028; position: relative;
+    transition: transform 0.3s ease;
+  }
+  .swipe-card.swiped { transform: translateX(-100px); }
+  .swipe-action {
+    position: absolute; top: 0; right: 0; bottom: 0; width: 100px;
+    background: #f85149; display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 600; font-size: 14px;
+    flex-direction: column; gap: 4px;
+  }
+  .swipe-action svg { width: 20px; height: 20px; }
+
+  .mockup-label {
+    position: fixed; bottom: 16px; left: 16px;
+    background: #58a6ff; color: #0f1117; padding: 6px 14px;
+    border-radius: 6px; font-size: 12px; font-weight: 700;
+  }
+
+  .annotation {
+    background: #2d333b; border-radius: 8px; padding: 14px 18px;
+    margin-bottom: 24px; max-width: 1200px;
+  }
+  .annotation h3 { font-size: 14px; color: #58a6ff; margin-bottom: 4px; }
+  .annotation p { font-size: 13px; color: #8b949e; line-height: 1.5; }
+
+  .state-label {
+    font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 8px; font-weight: 600;
+  }
+
+  .phone-frame {
+    width: 360px; background: #0f1117; border: 2px solid #2d333b; border-radius: 24px;
+    padding: 20px 12px; position: relative;
+  }
+  .phone-frame .notch {
+    width: 120px; height: 6px; background: #2d333b; border-radius: 3px;
+    margin: 0 auto 16px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Hide Listing — Option D: Three-Dot Menu + Swipe</h1>
+<p class="subtitle">Desktop: three-dot menu with options. Mobile: swipe left to reveal "Hide" action.</p>
+
+<div class="annotation">
+  <h3>How it works</h3>
+  <p>On desktop, a three-dot menu (&#x22EF;) in the card's top-right opens a dropdown with "Hide listing" and "Report listing". On mobile, swiping left reveals a red "Hide" panel (like iOS Mail). Both patterns are shown below.</p>
+</div>
+
+<div class="sections">
+  <!-- Desktop: Three-dot menu -->
+  <div class="section">
+    <div class="section-title">Desktop — Three-dot menu</div>
+
+    <!-- Menu closed -->
+    <div class="state-label">Menu closed</div>
+    <div class="card">
+      <div class="card-photo">
+        <span class="placeholder-text">Photo — Strandvägen 42</span>
+        <span class="photo-badge">New</span>
+        <span class="photo-count">1/8</span>
+        <button class="menu-trigger" onclick="toggleMenu(this)">&#x22EF;</button>
+        <div class="dropdown-menu">
+          <button class="dropdown-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            Hide listing
+          </button>
+          <div class="dropdown-divider"></div>
+          <button class="dropdown-item destructive">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Report listing
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-address">Strandvägen 42, 3tr</div>
+        <div class="card-area">Östermalm, Stockholm</div>
+        <div class="card-details"><span>3 rum</span><span>78 m²</span><span>Built 1912</span></div>
+        <div class="card-price">5 950 000 kr <span class="card-fee">· 4 200 kr/mån</span></div>
+      </div>
+      <div class="card-actions">
+        <button class="action-btn favorited">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+          Saved
+        </button>
+        <button class="action-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          Would live
+        </button>
+        <a href="#" class="view-link">View listing →</a>
+      </div>
+    </div>
+
+    <!-- Menu open -->
+    <div class="state-label" style="margin-top: 16px;">Menu open (click &#x22EF; above, or see static state below)</div>
+    <div class="card">
+      <div class="card-photo">
+        <span class="placeholder-text">Photo — Birger Jarlsgatan 15</span>
+        <span class="photo-count">1/5</span>
+        <button class="menu-trigger">&#x22EF;</button>
+        <div class="dropdown-menu open">
+          <button class="dropdown-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            Hide listing
+          </button>
+          <div class="dropdown-divider"></div>
+          <button class="dropdown-item destructive">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Report listing
+          </button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-address">Birger Jarlsgatan 15, 4tr</div>
+        <div class="card-area">Norrmalm, Stockholm</div>
+        <div class="card-details"><span>2 rum</span><span>52 m²</span><span>Built 1935</span></div>
+        <div class="card-price">3 450 000 kr <span class="card-fee">· 3 100 kr/mån</span></div>
+      </div>
+      <div class="card-actions">
+        <button class="action-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          Save
+        </button>
+        <button class="action-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          Would live
+        </button>
+        <a href="#" class="view-link">View listing →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile: Swipe -->
+  <div class="section" style="max-width: 400px;">
+    <div class="section-title">Mobile — Swipe to hide</div>
+
+    <div class="phone-frame">
+      <div class="notch"></div>
+
+      <!-- Not swiped -->
+      <div class="state-label">Default state</div>
+      <div class="swipe-container">
+        <div class="swipe-action">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          Hide
+        </div>
+        <div class="swipe-card" onclick="this.classList.toggle('swiped')">
+          <div class="card-photo" style="height: 140px;">
+            <span class="placeholder-text">Photo — Götgatan 88</span>
+            <span class="photo-badge">Price drop</span>
+          </div>
+          <div class="card-body" style="padding: 10px 14px;">
+            <div class="card-address" style="font-size: 14px;">Götgatan 88, 2tr</div>
+            <div class="card-area">Södermalm</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+              <div class="card-price" style="font-size: 16px;">7 200 000 kr</div>
+              <span style="font-size: 12px; color: #8b949e;">4 rum · 95 m²</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Swiped state -->
+      <div class="state-label" style="margin-top: 12px;">Swiped left (tap card above to toggle)</div>
+      <div class="swipe-container">
+        <div class="swipe-action">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          Hide
+        </div>
+        <div class="swipe-card swiped">
+          <div class="card-photo" style="height: 140px;">
+            <span class="placeholder-text">Photo — Kungsholmsgatan 22</span>
+          </div>
+          <div class="card-body" style="padding: 10px 14px;">
+            <div class="card-address" style="font-size: 14px;">Kungsholmsgatan 22, 5tr</div>
+            <div class="card-area">Kungsholmen</div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
+              <div class="card-price" style="font-size: 16px;">4 100 000 kr</div>
+              <span style="font-size: 12px; color: #8b949e;">2 rum · 58 m²</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p style="font-size: 11px; color: #8b949e; text-align: center; margin-top: 12px;">← Swipe left to reveal hide action</p>
+    </div>
+  </div>
+</div>
+
+<div class="mockup-label">Mockup D — Three-Dot Menu + Swipe</div>
+
+<script>
+function toggleMenu(btn) {
+  const menu = btn.nextElementSibling;
+  // Close all other menus
+  document.querySelectorAll('.dropdown-menu').forEach(m => {
+    if (m !== menu) m.classList.remove('open');
+  });
+  menu.classList.toggle('open');
+}
+
+// Close menu on outside click
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.menu-trigger') && !e.target.closest('.dropdown-menu')) {
+    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+  }
+});
+</script>
+</body>
+</html>

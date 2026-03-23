@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { FilterChip, PillButton, TagButton, PrimaryButton, TextButton } from '@/components/ui';
 
 export type SearchTag = 'all' | 'fulton' | 'ltrain' | 'manhattan' | 'brooklyn';
-export type SortField = 'pricePerBed' | 'price' | 'beds';
+export type SortField = 'pricePerBed' | 'price' | 'beds' | 'listDate';
+
+export type MaxListingAge = '1w' | '1m' | '3m' | null;
 
 export interface FiltersState {
   maxPricePerBed: number | null;
@@ -14,6 +16,7 @@ export interface FiltersState {
   maxRent: number | null;
   sort: SortField;
   searchTag: SearchTag;
+  maxListingAge: MaxListingAge;
 }
 
 interface FiltersProps {
@@ -35,6 +38,7 @@ const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: 'pricePerBed', label: 'PRICE/BEDROOM' },
   { value: 'price', label: 'PRICE' },
   { value: 'beds', label: 'BEDS' },
+  { value: 'listDate', label: 'LIST DATE' },
 ];
 
 const PRICE_SLIDER_MIN = 0;
@@ -185,7 +189,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function PillGroup<T extends number | null>({
+function PillGroup<T extends number | string | null>({
   options,
   value,
   onSelect,
@@ -247,7 +251,20 @@ function DropdownFooter({
 // Main Filters component
 // ---------------------------------------------------------------------------
 
-type ChipId = 'price' | 'bedsBaths' | 'pricePerBed';
+const LISTING_AGE_OPTIONS: { value: MaxListingAge; label: string }[] = [
+  { value: null, label: 'Any' },
+  { value: '1w', label: '1 Week' },
+  { value: '1m', label: '1 Month' },
+  { value: '3m', label: '3 Months' },
+];
+
+function listingAgeLabel(maxAge: MaxListingAge): string {
+  if (maxAge === null) return 'Listed within';
+  const opt = LISTING_AGE_OPTIONS.find((o) => o.value === maxAge);
+  return `Within ${opt?.label ?? maxAge}`;
+}
+
+type ChipId = 'price' | 'bedsBaths' | 'pricePerBed' | 'listingAge';
 
 export default function Filters({ filters, onChange, listingCount, viewToggle }: FiltersProps) {
   const [openChip, setOpenChip] = useState<ChipId | null>(null);
@@ -321,7 +338,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
     >
       {/* Row 1: Filter chips + view toggle */}
       <div className="flex items-center gap-2 mb-3">
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
         {/* Price chip */}
         <FilterChip
           label={priceLabel(filters.minRent, filters.maxRent)}
@@ -424,6 +441,24 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
           />
         </FilterChip>
 
+        {/* Listing age chip */}
+        <FilterChip
+          label={listingAgeLabel(filters.maxListingAge)}
+          active={filters.maxListingAge !== null}
+          open={openChip === 'listingAge'}
+          onToggle={() => toggleChip('listingAge')}
+        >
+          <SectionTitle>Listed within</SectionTitle>
+          <PillGroup
+            options={LISTING_AGE_OPTIONS}
+            value={filters.maxListingAge}
+            onSelect={(v) => {
+              onChange({ ...filters, maxListingAge: v });
+              setOpenChip(null);
+            }}
+          />
+        </FilterChip>
+
         </div>
         {/* List/Map segmented control (mobile only, right-aligned) */}
         {viewToggle && <div className="shrink-0">{viewToggle}</div>}
@@ -432,7 +467,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
       {/* Row 2: Search tags + Sort + listing count */}
       <div className="flex flex-wrap items-center gap-1.5">
         {/* Search tags */}
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {SEARCH_TABS.map((tab) => {
             const active = filters.searchTag === tab.value;
             return (

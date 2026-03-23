@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Database } from '@/lib/types';
 import { ActionButton, IconButton } from '@/components/ui';
+import { formatShortDate } from '@/lib/format-date';
 import DetailMap from './DetailMap';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
@@ -35,6 +36,7 @@ interface ListingDetailProps {
   wouldLivePeople: Person[];
   onToggleWouldLive: () => void;
   onToggleFavorite: () => void;
+  onHide: () => void;
   onClose: () => void;
 }
 
@@ -45,6 +47,7 @@ export default function ListingDetail({
   wouldLivePeople,
   onToggleWouldLive,
   onToggleFavorite,
+  onHide,
   onClose,
 }: ListingDetailProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -74,7 +77,7 @@ export default function ListingDetail({
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[1000] flex items-center justify-center"
+      className="fixed inset-0 z-[1300] flex items-center justify-center"
       style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
@@ -195,6 +198,11 @@ export default function ListingDetail({
             </span>
           </div>
 
+          {/* Dates info */}
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4 text-xs" style={{ color: '#8b949e' }}>
+            <span>Listed: {listing.list_date ? formatShortDate(listing.list_date) : 'Listing date unknown'}</span>
+          </div>
+
           {/* Details grid */}
           <div
             className="grid grid-cols-3 gap-3 rounded-lg p-3 mb-4"
@@ -271,16 +279,34 @@ export default function ListingDetail({
             />
           </div>
 
-          {/* Realtor link */}
-          <a
-            href={listing.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-sm font-medium hover:underline mb-6"
-            style={{ color: '#58a6ff' }}
-          >
-            View on Realtor.com &rarr;
-          </a>
+          {/* Realtor link + Hide button */}
+          <div className="flex items-center justify-between mb-6">
+            <a
+              href={listing.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm font-medium hover:underline"
+              style={{ color: '#58a6ff' }}
+            >
+              View on Realtor.com &rarr;
+            </a>
+            <button
+              onClick={() => {
+                onHide();
+                onClose();
+              }}
+              className="inline-flex items-center gap-1.5 text-xs hover:underline cursor-pointer"
+              style={{ color: '#8b949e', background: 'none', border: 'none', padding: 0 }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+                <line x1="1" y1="1" x2="23" y2="23" />
+              </svg>
+              Hide listing
+            </button>
+          </div>
 
           {/* Location map */}
           {listing.lat != null && listing.lon != null && !isNaN(Number(listing.lat)) && !isNaN(Number(listing.lon)) && (

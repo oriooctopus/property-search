@@ -84,8 +84,8 @@ test.describe("Home page", () => {
     const detailsBtn = page.getByText("Details").first();
     await detailsBtn.click();
 
-    // The modal overlay is a fixed div with z-[1000]
-    const modal = page.locator(".fixed.inset-0.z-\\[1000\\]");
+    // The modal overlay is a fixed div with z-[1300]
+    const modal = page.locator(".fixed.inset-0.z-\\[1300\\]");
     await expect(modal).toBeVisible();
   });
 
@@ -93,7 +93,7 @@ test.describe("Home page", () => {
     const detailsBtn = page.getByText("Details").first();
     await detailsBtn.click();
 
-    const modal = page.locator(".fixed.inset-0.z-\\[1000\\]");
+    const modal = page.locator(".fixed.inset-0.z-\\[1300\\]");
     await expect(modal).toBeVisible();
 
     // Modal should show address (h2), price ($), beds/baths
@@ -114,7 +114,7 @@ test.describe("Home page", () => {
     const detailsBtn = page.getByText("Details").first();
     await detailsBtn.click();
 
-    const modal = page.locator(".fixed.inset-0.z-\\[1000\\]");
+    const modal = page.locator(".fixed.inset-0.z-\\[1300\\]");
     await expect(modal).toBeVisible();
 
     // Close button is the button with an SVG that has x1="18" (the X icon)
@@ -128,7 +128,7 @@ test.describe("Home page", () => {
     const detailsBtn = page.getByText("Details").first();
     await detailsBtn.click();
 
-    const modal = page.locator(".fixed.inset-0.z-\\[1000\\]");
+    const modal = page.locator(".fixed.inset-0.z-\\[1300\\]");
     await expect(modal).toBeVisible();
 
     await page.keyboard.press("Escape");
