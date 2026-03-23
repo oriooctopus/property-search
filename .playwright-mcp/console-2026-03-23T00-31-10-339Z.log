@@ -1,0 +1,19 @@
+[     365ms] [ERROR] Failed to load resource: the server responded with a status of 500 () @ https://web-seven-chi-63.vercel.app/:0
+[     732ms] Error: @supabase/ssr: Your project's URL and API key are required to create a Supabase client!
+
+Check your Supabase project's API settings to find these values
+
+https://supabase.com/dashboard/project/_/settings/api
+    at rk (https://web-seven-chi-63.vercel.app/_next/static/chunks/417-f0731cb79784403a.js:37:54861)
+    at n (https://web-seven-chi-63.vercel.app/_next/static/chunks/app/page-ad0cac066b4722b2.js:1:34552)
+    at c (https://web-seven-chi-63.vercel.app/_next/static/chunks/app/layout-b4d90ec22ed8a2d2.js:1:494)
+    at l9 (https://web-seven-chi-63.vercel.app/_next/static/chunks/4bd1b696-c023c6e3521b1417.js:1:51124)
+    at o_ (https://web-seven-chi-63.vercel.app/_next/static/chunks/4bd1b696-c023c6e3521b1417.js:1:70984)
+    at oq (https://web-seven-chi-63.vercel.app/_next/static/chunks/4bd1b696-c023c6e3521b1417.js:1:81085)
+    at ik (https://web-seven-chi-63.vercel.app/_next/static/chunks/4bd1b696-c023c6e3521b1417.js:1:114676)
+    at https://web-seven-chi-63.vercel.app/_next/static/chunks/4bd1b696-c023c6e3521b1417.js:1:114521
+    at ib (https://web-seven-chi-63.vercel.app/_next/static/chunks/4bd1b696-c023c6e3521b1417.js:1:114529)
+    at iu (https://web-seven-chi-63.vercel.app/_next/static/chunks/4bd1b696-c023c6e3521b1417.js:1:111612)
+[    3763ms] [WARNING] The resource https://web-seven-chi-63.vercel.app/_next/static/media/93f479601ee12b01-s.p.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ https://web-seven-chi-63.vercel.app/:0
+[    3763ms] [WARNING] The resource https://web-seven-chi-63.vercel.app/_next/static/media/4cf2300e9c8272f7-s.p.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ https://web-seven-chi-63.vercel.app/:0
+[    3763ms] [WARNING] The resource https://web-seven-chi-63.vercel.app/_next/static/css/aad908157d51d6f9.css was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally. @ https://web-seven-chi-63.vercel.app/:0

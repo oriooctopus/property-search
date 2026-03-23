@@ -1,0 +1,3 @@
+[     737ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://vlzqdeisrngovqpbtsgi.supabase.co/rest/v1/would_live_there?select=listing_id%2Cuser_id%2Cprofiles%3Auser_id%28id%2Cdisplay_name%2Cavatar_url%2Cbio%29:0
+[     789ms] [ERROR] Failed to load resource: the server responded with a status of 400 () @ https://vlzqdeisrngovqpbtsgi.supabase.co/rest/v1/would_live_there?select=listing_id%2Cuser_id%2Cprofiles%3Auser_id%28id%2Cdisplay_name%2Cavatar_url%29:0
+[   11555ms] [ERROR] WebSocket connection to 'ws://localhost:3002/_next/webpack-hmr' failed:  @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/dev/hot-reloader/app/use-websocket.js:41
