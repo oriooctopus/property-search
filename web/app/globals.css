@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   Z-INDEX SCALE — Dwelligence global stacking order
+   --------------------------------------------------------------------------
+   Leaflet map tiles/markers   : z-auto   (Leaflet manages internally, uses 400+)
+   Map container               : z-0      (no explicit z-index — stays below everything)
+   Filter bar / dropdowns      : z-[1100] (above Leaflet's internal layers)
+   Navbar                      : z-[1200] (above filters so profile dropdown clears them)
+   Modals / detail overlay     : z-[1300] (above everything except toasts)
+   Toast notifications         : z-[1400] (topmost)
+   ========================================================================== */
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -82,4 +93,16 @@ body {
   height: 6px;
   border-radius: 3px;
   background: #2d333b;
+}
+
+/* Toast slide-up animation */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 16px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }

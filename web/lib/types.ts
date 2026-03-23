@@ -52,6 +52,9 @@ export type Database = {
           photo_urls: string[];
           url: string;
           search_tag: string;
+          list_date: string | null;
+          last_update_date: string | null;
+          availability_date: string | null;
           created_at: string;
         };
         Insert: {
@@ -69,6 +72,9 @@ export type Database = {
           photo_urls?: string[];
           url: string;
           search_tag: string;
+          list_date?: string | null;
+          last_update_date?: string | null;
+          availability_date?: string | null;
           created_at?: string;
         };
         Update: {
@@ -86,6 +92,9 @@ export type Database = {
           photo_urls?: string[];
           url?: string;
           search_tag?: string;
+          list_date?: string | null;
+          last_update_date?: string | null;
+          availability_date?: string | null;
           created_at?: string;
         };
         Relationships: [];

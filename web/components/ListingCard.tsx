@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from 'react';
 import type { Database } from '@/lib/types';
 import { TAG_COLORS, TAG_LABELS, TAG_DESCRIPTIONS } from '@/lib/tag-constants';
+import { formatListedDate, formatAvailabilityDate } from '@/lib/format-date';
 import { ActionButton, IconButton } from '@/components/ui';
 import PeopleAvatars from './PeopleAvatars';
 
@@ -20,10 +21,12 @@ interface ListingCardProps {
   isFavorited: boolean;
   wouldLiveThere: boolean;
   wouldLivePeople: Person[];
+  isHiding?: boolean;
   onClick: () => void;
   onToggleWouldLive: () => void;
   onToggleFavorite: () => void;
   onExpand: () => void;
+  onHide: () => void;
 }
 
 export default function ListingCard({
@@ -32,10 +35,12 @@ export default function ListingCard({
   isFavorited,
   wouldLiveThere,
   wouldLivePeople,
+  isHiding,
   onClick,
   onToggleWouldLive,
   onToggleFavorite,
   onExpand,
+  onHide,
 }: ListingCardProps) {
   const pricePerBed = Math.round(listing.price / listing.beds);
   const tagColor = TAG_COLORS[listing.search_tag] ?? '#8b949e';
@@ -78,18 +83,24 @@ export default function ListingCard({
     }
   }, [totalPhotos]);
 
-  const handleCardClick = useCallback(() => {
+  const handleCardClick = useCallback((e: React.MouseEvent) => {
+    // If the click originated from (or inside) an anchor tag, don't open the detail modal
+    const target = e.target as HTMLElement;
+    if (target.closest('a')) return;
     onClick();
     onExpand();
   }, [onClick, onExpand]);
 
   return (
     <div
-      className="rounded-lg cursor-pointer transition-all"
+      className={`rounded-lg cursor-pointer transition-all group ${isHiding ? 'pointer-events-none' : ''}`}
       style={{
         backgroundColor: '#1c2028',
         border: `1px solid ${isSelected ? '#58a6ff' : '#2d333b'}`,
         boxShadow: isSelected ? '0 0 0 1px #58a6ff' : 'none',
+        opacity: isHiding ? 0 : 1,
+        transform: isHiding ? 'scale(0.95)' : 'scale(1)',
+        transition: 'opacity 300ms ease, transform 300ms ease, border-color 150ms ease, box-shadow 150ms ease',
       }}
       onClick={handleCardClick}
     >
@@ -126,6 +137,32 @@ export default function ListingCard({
               />
             ))}
           </div>
+          {/* Hide listing button — appears on hover */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onHide();
+            }}
+            className="absolute top-2 right-2 z-[3] opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex items-center justify-center rounded-full"
+            style={{
+              width: 28,
+              height: 28,
+              backgroundColor: 'rgba(0,0,0,0.6)',
+              color: '#fff',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+            aria-label="Hide listing"
+            title="Hide listing"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+              <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+              <line x1="1" y1="1" x2="23" y2="23" />
+            </svg>
+          </button>
+
           {totalPhotos > 1 && (
             <>
               <IconButton
@@ -198,6 +235,13 @@ export default function ListingCard({
           {listing.transit_summary}
         </div>
       )}
+
+      {/* Date info */}
+      <div className="text-[11px] mb-2" style={{ color: '#8b949e' }}>
+        {listing.list_date
+          ? formatListedDate(listing.list_date)
+          : 'Listing date unknown'}
+      </div>
 
       {/* Tag pill + actions */}
       <div className="flex items-center justify-between mt-2">
@@ -282,8 +326,10 @@ export default function ListingCard({
           href={listing.url}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="text-xs font-medium hover:underline shrink-0"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+          className="text-xs font-medium hover:underline shrink-0 cursor-pointer"
           style={{ color: '#58a6ff' }}
         >
           View listing &rarr;

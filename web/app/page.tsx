@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase-browser';
 import type { Database } from '@/lib/types';
 import Map from '@/components/Map';
-import Filters, { type FiltersState, type SearchTag, type SortField } from '@/components/Filters';
+import Filters, { type FiltersState, type SearchTag, type SortField, type MaxListingAge } from '@/components/Filters';
 import ListingCard from '@/components/ListingCard';
 import ListingDetail from '@/components/ListingDetail';
 import RadarLoader from '@/components/RadarLoader';
@@ -24,16 +24,16 @@ interface PersonWithBio {
 // Seed data fallback (used when DB is empty)
 // ---------------------------------------------------------------------------
 const SEED_LISTINGS: Listing[] = [
-  { id: -1, address: '240 E 6th St Apt 1', area: 'East Village', price: 9995, beds: 5, baths: 2, sqft: null, lat: 40.7262, lon: -73.9858, transit_summary: '~10 min walk to 1st Ave L', photos: 18, photo_urls: [], url: 'https://www.realtor.com/rentals/details/240-E-6th-St-Apt-1_New-York_NY_10003_M95522-46041', search_tag: 'ltrain', created_at: '' },
-  { id: -2, address: '165 Attorney St Apt 5C', area: 'Lower East Side', price: 9450, beds: 6, baths: 2, sqft: null, lat: 40.7195, lon: -73.9845, transit_summary: '16 min J to Fulton', photos: 6, photo_urls: [], url: 'https://www.realtor.com/rentals/details/165-Attorney-St-Apt-5C_New-York_NY_10002_M94116-63343', search_tag: 'fulton', created_at: '' },
-  { id: -3, address: '53 Park Pl Ph 2', area: 'Tribeca', price: 9000, beds: 5, baths: 2, sqft: null, lat: 40.7141, lon: -74.0079, transit_summary: 'Tribeca / Park Place', photos: 12, photo_urls: [], url: 'https://www.realtor.com/rentals/details/53-Park-Pl-2_New-York_NY_10007_M90339-21295', search_tag: 'manhattan', created_at: '' },
-  { id: -4, address: '372 Bainbridge St', area: 'Stuyvesant Heights', price: 6995, beds: 5, baths: 4, sqft: null, lat: 40.6808, lon: -73.927, transit_summary: '34 min C to 14th/8th Ave', photos: 16, photo_urls: [], url: 'https://www.realtor.com/rentals/details/372-Bainbridge-St-Unit-Triplex_Brooklyn_NY_11233_M96732-47148', search_tag: 'brooklyn', created_at: '' },
-  { id: -5, address: '171 Attorney St Unit 6A', area: 'Lower East Side', price: 11000, beds: 7, baths: 2.5, sqft: null, lat: 40.7198, lon: -73.9843, transit_summary: '16 min J to Fulton', photos: 3, photo_urls: [], url: 'https://www.realtor.com/rentals/details/171-Attorney-St-6A_New-York_NY_10002_M99751-50289', search_tag: 'fulton', created_at: '' },
-  { id: -6, address: '386 Stuyvesant Ave', area: 'Stuyvesant Heights', price: 12500, beds: 6, baths: 3.5, sqft: 3200, lat: 40.6838, lon: -73.9298, transit_summary: '18 min A to Fulton / 30 min to 14th', photos: 24, photo_urls: [], url: 'https://www.realtor.com/rentals/details/386-Stuyvesant-Ave_Brooklyn_NY_11233_M44801-18988', search_tag: 'brooklyn', created_at: '' },
-  { id: -7, address: '50 Murray St Unit 2211', area: 'Tribeca', price: 10000, beds: 5, baths: 2, sqft: null, lat: 40.7143, lon: -74.0086, transit_summary: 'Tribeca / Murray St', photos: 9, photo_urls: [], url: 'https://www.realtor.com/rentals/details/50-Murray-St-2211_New-York_NY_10007_M93038-48259', search_tag: 'manhattan', created_at: '' },
-  { id: -8, address: '290 Jefferson Ave', area: 'Bedford-Stuyvesant', price: 10900, beds: 5, baths: 4, sqft: 3600, lat: 40.6862, lon: -73.943, transit_summary: '30 min A to 14th/8th Ave', photos: 19, photo_urls: [], url: 'https://www.realtor.com/rentals/details/290-Jefferson-Ave_Brooklyn_NY_11216_M49395-49974', search_tag: 'brooklyn', created_at: '' },
-  { id: -9, address: '276 Halsey St #2', area: 'Bedford-Stuyvesant', price: 10750, beds: 5, baths: 3.5, sqft: null, lat: 40.6842, lon: -73.9418, transit_summary: '31 min A to 14th/8th Ave', photos: 16, photo_urls: [], url: 'https://www.realtor.com/rentals/details/276-Halsey-St-2_Brooklyn_NY_11216_M93027-20426', search_tag: 'brooklyn', created_at: '' },
-  { id: -10, address: '53 Park Pl Apt 3E', area: 'Tribeca', price: 13500, beds: 5, baths: 3, sqft: null, lat: 40.7141, lon: -74.0079, transit_summary: 'Tribeca / Park Place', photos: 20, photo_urls: [], url: 'https://www.realtor.com/rentals/details/53-Park-Pl-Apt-3E_New-York_NY_10007_M39270-97535', search_tag: 'manhattan', created_at: '' },
+  { id: -1, address: '240 E 6th St Apt 1', area: 'East Village', price: 9995, beds: 5, baths: 2, sqft: null, lat: 40.7262, lon: -73.9858, transit_summary: '~10 min walk to 1st Ave L', photos: 18, photo_urls: [], url: 'https://www.realtor.com/rentals/details/240-E-6th-St-Apt-1_New-York_NY_10003_M95522-46041', search_tag: 'ltrain', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
+  { id: -2, address: '165 Attorney St Apt 5C', area: 'Lower East Side', price: 9450, beds: 6, baths: 2, sqft: null, lat: 40.7195, lon: -73.9845, transit_summary: '16 min J to Fulton', photos: 6, photo_urls: [], url: 'https://www.realtor.com/rentals/details/165-Attorney-St-Apt-5C_New-York_NY_10002_M94116-63343', search_tag: 'fulton', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
+  { id: -3, address: '53 Park Pl Ph 2', area: 'Tribeca', price: 9000, beds: 5, baths: 2, sqft: null, lat: 40.7141, lon: -74.0079, transit_summary: 'Tribeca / Park Place', photos: 12, photo_urls: [], url: 'https://www.realtor.com/rentals/details/53-Park-Pl-2_New-York_NY_10007_M90339-21295', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
+  { id: -4, address: '372 Bainbridge St', area: 'Stuyvesant Heights', price: 6995, beds: 5, baths: 4, sqft: null, lat: 40.6808, lon: -73.927, transit_summary: '34 min C to 14th/8th Ave', photos: 16, photo_urls: [], url: 'https://www.realtor.com/rentals/details/372-Bainbridge-St-Unit-Triplex_Brooklyn_NY_11233_M96732-47148', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
+  { id: -5, address: '171 Attorney St Unit 6A', area: 'Lower East Side', price: 11000, beds: 7, baths: 2.5, sqft: null, lat: 40.7198, lon: -73.9843, transit_summary: '16 min J to Fulton', photos: 3, photo_urls: [], url: 'https://www.realtor.com/rentals/details/171-Attorney-St-6A_New-York_NY_10002_M99751-50289', search_tag: 'fulton', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
+  { id: -6, address: '386 Stuyvesant Ave', area: 'Stuyvesant Heights', price: 12500, beds: 6, baths: 3.5, sqft: 3200, lat: 40.6838, lon: -73.9298, transit_summary: '18 min A to Fulton / 30 min to 14th', photos: 24, photo_urls: [], url: 'https://www.realtor.com/rentals/details/386-Stuyvesant-Ave_Brooklyn_NY_11233_M44801-18988', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
+  { id: -7, address: '50 Murray St Unit 2211', area: 'Tribeca', price: 10000, beds: 5, baths: 2, sqft: null, lat: 40.7143, lon: -74.0086, transit_summary: 'Tribeca / Murray St', photos: 9, photo_urls: [], url: 'https://www.realtor.com/rentals/details/50-Murray-St-2211_New-York_NY_10007_M93038-48259', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
+  { id: -8, address: '290 Jefferson Ave', area: 'Bedford-Stuyvesant', price: 10900, beds: 5, baths: 4, sqft: 3600, lat: 40.6862, lon: -73.943, transit_summary: '30 min A to 14th/8th Ave', photos: 19, photo_urls: [], url: 'https://www.realtor.com/rentals/details/290-Jefferson-Ave_Brooklyn_NY_11216_M49395-49974', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
+  { id: -9, address: '276 Halsey St #2', area: 'Bedford-Stuyvesant', price: 10750, beds: 5, baths: 3.5, sqft: null, lat: 40.6842, lon: -73.9418, transit_summary: '31 min A to 14th/8th Ave', photos: 16, photo_urls: [], url: 'https://www.realtor.com/rentals/details/276-Halsey-St-2_Brooklyn_NY_11216_M93027-20426', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
+  { id: -10, address: '53 Park Pl Apt 3E', area: 'Tribeca', price: 13500, beds: 5, baths: 3, sqft: null, lat: 40.7141, lon: -74.0079, transit_summary: 'Tribeca / Park Place', photos: 20, photo_urls: [], url: 'https://www.realtor.com/rentals/details/53-Park-Pl-Apt-3E_New-York_NY_10007_M39270-97535', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, created_at: '' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -41,7 +41,8 @@ const SEED_LISTINGS: Listing[] = [
 // ---------------------------------------------------------------------------
 const VALID_VIEWS = new Set(['list', 'map']);
 const VALID_TAGS = new Set<string>(['all', 'fulton', 'ltrain', 'manhattan', 'brooklyn']);
-const VALID_SORTS = new Set<string>(['pricePerBed', 'price', 'beds']);
+const VALID_SORTS = new Set<string>(['pricePerBed', 'price', 'beds', 'listDate']);
+const VALID_LISTING_AGES = new Set<string>(['1w', '1m', '3m']);
 
 function parseNumOrNull(v: string | null): number | null {
   if (v == null) return null;
@@ -52,6 +53,7 @@ function parseNumOrNull(v: string | null): number | null {
 function readFiltersFromParams(params: URLSearchParams): FiltersState {
   const tag = params.get('tag');
   const sort = params.get('sort');
+  const age = params.get('maxAge');
   return {
     searchTag: (tag && VALID_TAGS.has(tag) ? tag : 'all') as SearchTag,
     sort: (sort && VALID_SORTS.has(sort) ? sort : 'pricePerBed') as SortField,
@@ -60,6 +62,7 @@ function readFiltersFromParams(params: URLSearchParams): FiltersState {
     minRent: parseNumOrNull(params.get('minRent')),
     maxRent: parseNumOrNull(params.get('maxRent')),
     maxPricePerBed: parseNumOrNull(params.get('maxPerBed')),
+    maxListingAge: (age && VALID_LISTING_AGES.has(age) ? age : null) as MaxListingAge,
   };
 }
 
@@ -73,6 +76,7 @@ function buildQueryString(view: 'list' | 'map', f: FiltersState): string {
   if (f.minRent != null) p.set('minRent', String(f.minRent));
   if (f.maxRent != null) p.set('maxRent', String(f.maxRent));
   if (f.maxPricePerBed != null) p.set('maxPerBed', String(f.maxPricePerBed));
+  if (f.maxListingAge != null) p.set('maxAge', f.maxListingAge);
   const qs = p.toString();
   return qs ? `?${qs}` : '/';
 }
@@ -92,6 +96,63 @@ function HomeInner() {
   const [wouldLiveSet, setWouldLiveSet] = useState<Set<number>>(new Set());
   const [favoritesSet, setFavoritesSet] = useState<Set<number>>(new Set());
   const [wouldLivePeopleMap, setWouldLivePeopleMap] = useState<Record<number, PersonWithBio[]>>({});
+
+  // Hidden listings — persisted in localStorage
+  const [hiddenIds, setHiddenIds] = useState<Set<number>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      const stored = localStorage.getItem('dwelligence_hidden_listings');
+      return stored ? new Set(JSON.parse(stored) as number[]) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+  const [hidingId, setHidingId] = useState<number | null>(null);
+  const [toast, setToast] = useState<{ listingId: number; timer: ReturnType<typeof setTimeout> } | null>(null);
+
+  const persistHidden = useCallback((ids: Set<number>) => {
+    try {
+      localStorage.setItem('dwelligence_hidden_listings', JSON.stringify([...ids]));
+    } catch { /* quota exceeded — silently ignore */ }
+  }, []);
+
+  const handleHideListing = useCallback((listingId: number) => {
+    // Start fade-out animation
+    setHidingId(listingId);
+
+    // Clear any existing toast timer
+    if (toast) clearTimeout(toast.timer);
+
+    // After animation completes, actually hide it
+    setTimeout(() => {
+      setHiddenIds((prev) => {
+        const next = new Set(prev);
+        next.add(listingId);
+        persistHidden(next);
+        return next;
+      });
+      setHidingId(null);
+
+      // Show toast with undo
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 5000);
+      setToast({ listingId, timer });
+    }, 300);
+  }, [toast, persistHidden]);
+
+  const handleUndoHide = useCallback(() => {
+    if (!toast) return;
+    clearTimeout(toast.timer);
+    const restoredId = toast.listingId;
+    setHiddenIds((prev) => {
+      const next = new Set(prev);
+      next.delete(restoredId);
+      persistHidden(next);
+      return next;
+    });
+    setToast(null);
+  }, [toast, persistHidden]);
 
   // UI state — initialised from URL query params
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -238,6 +299,9 @@ function HomeInner() {
   const filteredListings = useMemo(() => {
     let result = [...listings];
 
+    // Filter out hidden listings
+    result = result.filter((l) => !hiddenIds.has(l.id));
+
     // Scam filter: remove per-room listings (price per bedroom below $800)
     result = result.filter((l) => l.beds === 0 || l.price / l.beds >= 800);
 
@@ -257,6 +321,22 @@ function HomeInner() {
       result = result.filter((l) => l.price <= filters.maxRent!);
     }
 
+    // Listing age filter
+    if (filters.maxListingAge !== null) {
+      const now = Date.now();
+      const msMap: Record<string, number> = {
+        '1w': 7 * 24 * 60 * 60 * 1000,
+        '1m': 30 * 24 * 60 * 60 * 1000,
+        '3m': 90 * 24 * 60 * 60 * 1000,
+      };
+      const cutoff = now - (msMap[filters.maxListingAge] ?? 0);
+      result = result.filter((l) => {
+        const dateStr = l.list_date ?? l.created_at;
+        if (!dateStr) return true;
+        return new Date(dateStr).getTime() >= cutoff;
+      });
+    }
+
     result.sort((a, b) => {
       switch (filters.sort) {
         case 'pricePerBed':
@@ -265,13 +345,15 @@ function HomeInner() {
           return a.price - b.price;
         case 'beds':
           return b.beds - a.beds;
+        case 'listDate':
+          return new Date((b.list_date ?? b.created_at) || 0).getTime() - new Date((a.list_date ?? a.created_at) || 0).getTime();
         default:
           return 0;
       }
     });
 
     return result;
-  }, [listings, filters]);
+  }, [listings, filters, hiddenIds]);
 
   // -----------------------------------------------------------------------
   // Toggle handlers
@@ -351,7 +433,7 @@ function HomeInner() {
         className={`w-full lg:w-[480px] shrink-0 flex flex-col ${mobileView === 'map' ? 'max-lg:shrink max-lg:flex-none' : ''}`}
         style={{ borderRight: '1px solid #2d333b' }}
       >
-        <div className="relative z-10">
+        <div className="relative z-[1100]">
           <Filters
             filters={filters}
             onChange={setFilters}
@@ -379,10 +461,12 @@ function HomeInner() {
               isFavorited={favoritesSet.has(listing.id)}
               wouldLiveThere={wouldLiveSet.has(listing.id)}
               wouldLivePeople={wouldLivePeopleMap[listing.id] ?? []}
+              isHiding={hidingId === listing.id}
               onClick={() => setSelectedId(listing.id)}
               onToggleWouldLive={() => handleToggleWouldLive(listing.id)}
               onToggleFavorite={() => handleToggleFavorite(listing.id)}
               onExpand={() => setDetailListing(listing)}
+              onHide={() => handleHideListing(listing.id)}
             />
           ))}
 
@@ -418,6 +502,35 @@ function HomeInner() {
         />
       </div>
 
+      {/* Toast notification for hidden listings */}
+      {toast && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[1400] flex items-center gap-3 rounded-lg px-4 py-3 shadow-lg"
+          style={{
+            backgroundColor: '#1c2028',
+            border: '1px solid #2d333b',
+            color: '#e1e4e8',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            animation: 'toast-in 200ms ease-out',
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b949e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+            <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+            <line x1="1" y1="1" x2="23" y2="23" />
+          </svg>
+          <span className="text-sm">Listing hidden</span>
+          <button
+            onClick={handleUndoHide}
+            className="text-sm font-medium hover:underline cursor-pointer"
+            style={{ color: '#58a6ff', background: 'none', border: 'none', padding: 0 }}
+          >
+            Undo
+          </button>
+        </div>
+      )}
+
       {/* Detail modal */}
       {detailListing && (
         <ListingDetail
@@ -427,6 +540,7 @@ function HomeInner() {
           wouldLivePeople={wouldLivePeopleMap[detailListing.id] ?? []}
           onToggleWouldLive={() => handleToggleWouldLive(detailListing.id)}
           onToggleFavorite={() => handleToggleFavorite(detailListing.id)}
+          onHide={() => handleHideListing(detailListing.id)}
           onClose={() => setDetailListing(null)}
         />
       )}

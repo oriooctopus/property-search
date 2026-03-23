@@ -59,6 +59,9 @@ create table public.listings (
   photos int not null,
   url text not null,
   search_tag text not null,
+  list_date timestamptz,
+  last_update_date timestamptz,
+  availability_date timestamptz,
   created_at timestamptz not null default now()
 );
 

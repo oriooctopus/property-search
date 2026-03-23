@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dwelligence - Search Flow Design Spec</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0a0c10;
+    color: #e1e4e8;
+    overflow-x: hidden;
+  }
+
+  /* Top navigation */
+  .spec-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: #0a0c10ee;
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid #2d333b;
+    padding: 12px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .spec-nav-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #58a6ff;
+  }
+
+  .spec-nav-title span { color: #8b949e; font-weight: 400; }
+
+  .spec-nav-steps {
+    display: flex;
+    gap: 8px;
+  }
+
+  .spec-nav-steps a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #8b949e;
+    text-decoration: none;
+    transition: all 0.15s;
+    font-weight: 500;
+  }
+
+  .spec-nav-steps a:hover {
+    border-color: #58a6ff;
+    color: #58a6ff;
+  }
+
+  .spec-nav-steps a .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    background: #2d333b;
+    color: #e1e4e8;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* Main content */
+  .spec-content {
+    padding-top: 72px;
+    max-width: 1440px;
+    margin: 0 auto;
+  }
+
+  /* Hero section */
+  .spec-hero {
+    padding: 60px 40px 40px;
+    text-align: center;
+    border-bottom: 1px solid #2d333b;
+    margin-bottom: 0;
+  }
+
+  .spec-hero h1 {
+    font-size: 32px;
+    font-weight: 700;
+    color: #e1e4e8;
+    margin-bottom: 8px;
+  }
+
+  .spec-hero h1 em {
+    font-style: normal;
+    color: #58a6ff;
+  }
+
+  .spec-hero p {
+    font-size: 15px;
+    color: #8b949e;
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  .spec-hero .flow-overview {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    margin-top: 28px;
+    align-items: center;
+  }
+
+  .spec-hero .flow-step-dot {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .spec-hero .flow-dot {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #58a6ff;
+  }
+
+  .spec-hero .flow-arrow {
+    color: #2d333b;
+    font-size: 18px;
+    margin: 0 6px;
+  }
+
+  .spec-hero .flow-dot-label {
+    font-size: 10px;
+    color: #484f58;
+    margin-top: 4px;
+    text-align: center;
+  }
+
+  /* Step section */
+  .step-section {
+    padding: 48px 40px;
+    border-bottom: 3px solid #1c2028;
+    position: relative;
+  }
+
+  .step-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #58a6ff, #58a6ff44, transparent);
+  }
+
+  .step-header {
+    margin-bottom: 24px;
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .step-number {
+    flex-shrink: 0;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: #58a6ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 800;
+    color: #fff;
+  }
+
+  .step-info {
+    flex: 1;
+  }
+
+  .step-info h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #e1e4e8;
+    margin-bottom: 6px;
+  }
+
+  .step-info p {
+    font-size: 14px;
+    color: #8b949e;
+    line-height: 1.5;
+  }
+
+  .step-changes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .step-change {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-weight: 500;
+  }
+
+  .step-change.new {
+    background: #7ee78718;
+    color: #7ee787;
+    border: 1px solid #7ee78733;
+  }
+
+  .step-change.modified {
+    background: #f9731618;
+    color: #f97316;
+    border: 1px solid #f9731633;
+  }
+
+  .step-change.context {
+    background: #58a6ff18;
+    color: #58a6ff;
+    border: 1px solid #58a6ff33;
+  }
+
+  /* Mockup frame */
+  .mockup-frame {
+    border: 1px solid #2d333b;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #0f1117;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+
+  .mockup-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    background: #161b22;
+    border-bottom: 1px solid #2d333b;
+  }
+
+  .mockup-toolbar .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #2d333b;
+  }
+
+  .mockup-toolbar .dot:first-child { background: #f8514988; }
+  .mockup-toolbar .dot:nth-child(2) { background: #f9731688; }
+  .mockup-toolbar .dot:nth-child(3) { background: #7ee78788; }
+
+  .mockup-toolbar .tab-label {
+    margin-left: 12px;
+    font-size: 11px;
+    color: #484f58;
+  }
+
+  .mockup-body {
+    height: 700px;
+    overflow: hidden;
+  }
+
+  /* ============================================================ */
+  /* All mockup-internal styles below (scoped to avoid collisions) */
+  /* ============================================================ */
+
+  .mockup-body .layout { display: flex; height: 100%; }
+
+  .mockup-body .chat-panel {
+    width: 380px;
+    min-width: 380px;
+    border-right: 1px solid #2d333b;
+    display: flex;
+    flex-direction: column;
+    background: #0f1117;
+  }
+
+  .mockup-body .chat-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #2d333b;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .mockup-body .chat-header .logo {
+    font-size: 18px;
+    font-weight: 700;
+    color: #58a6ff;
+  }
+
+  .mockup-body .chat-header .logo span { color: #e1e4e8; }
+
+  .mockup-body .filters-bar {
+    padding: 12px 20px;
+    border-bottom: 1px solid #2d333b;
+    min-height: 48px;
+  }
+
+  .mockup-body .filters-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #8b949e;
+    margin-bottom: 6px;
+  }
+
+  .mockup-body .filters-label-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .mockup-body .filters-count {
+    font-size: 10px;
+    color: #58a6ff;
+    background: #58a6ff18;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .mockup-body .filters-empty {
+    font-size: 13px;
+    color: #484f58;
+    font-style: italic;
+  }
+
+  .mockup-body .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .mockup-body .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    background: #58a6ff18;
+    border: 1px solid #58a6ff44;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #58a6ff;
+    font-weight: 500;
+  }
+
+  .mockup-body .pill .remove {
+    cursor: pointer;
+    opacity: 0.6;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .mockup-body .pill-hint {
+    font-size: 11px;
+    color: #484f58;
+    margin-top: 6px;
+  }
+
+  /* Chat messages area */
+  .mockup-body .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .mockup-body .chat-messages.centered {
+    justify-content: center;
+    align-items: center;
+  }
+
+  .mockup-body .welcome {
+    text-align: center;
+    max-width: 300px;
+  }
+
+  .mockup-body .welcome-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #58a6ff22, #58a6ff11);
+    border: 1px solid #58a6ff33;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    margin: 0 auto 16px;
+  }
+
+  .mockup-body .welcome h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .mockup-body .welcome p {
+    font-size: 13px;
+    color: #8b949e;
+    line-height: 1.5;
+    margin-bottom: 20px;
+  }
+
+  .mockup-body .example-prompts {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .mockup-body .example-prompt {
+    padding: 10px 14px;
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 10px;
+    font-size: 13px;
+    color: #8b949e;
+    text-align: left;
+  }
+
+  .mockup-body .example-prompt .arrow {
+    color: #58a6ff;
+    margin-right: 6px;
+  }
+
+  /* Messages */
+  .mockup-body .msg { max-width: 95%; }
+  .mockup-body .msg-user { align-self: flex-end; }
+
+  .mockup-body .msg-user .msg-bubble {
+    background: #58a6ff;
+    color: #fff;
+    border-radius: 14px 14px 4px 14px;
+    padding: 10px 14px;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  .mockup-body .msg-ai { align-self: flex-start; }
+
+  .mockup-body .msg-ai .msg-bubble {
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 14px 14px 14px 4px;
+    padding: 12px 16px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .mockup-body .msg-label {
+    font-size: 11px;
+    color: #8b949e;
+    margin-bottom: 4px;
+    padding: 0 4px;
+  }
+
+  .mockup-body .msg-user .msg-label { text-align: right; }
+
+  .mockup-body .parsed-criteria {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #2d333b;
+  }
+
+  .mockup-body .parsed-criteria-label {
+    font-size: 11px;
+    color: #8b949e;
+    width: 100%;
+    margin-bottom: 2px;
+  }
+
+  .mockup-body .criterion {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    background: #0f1117;
+    border: 1px solid #2d333b;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #e1e4e8;
+    cursor: pointer;
+  }
+
+  .mockup-body .criterion.saved {
+    border-color: #7ee78744;
+    background: #7ee78711;
+    color: #7ee787;
+  }
+
+  .mockup-body .criterion .save-icon { font-size: 13px; opacity: 0.7; }
+
+  /* System message */
+  .mockup-body .msg-system {
+    align-self: center;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .mockup-body .msg-system .sys-line {
+    flex: 1;
+    height: 1px;
+    background: #2d333b;
+  }
+
+  .mockup-body .msg-system .sys-text {
+    font-size: 12px;
+    color: #484f58;
+    white-space: nowrap;
+    font-style: italic;
+  }
+
+  /* Save all button */
+  .mockup-body .save-all-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 7px 14px;
+    background: #7ee78715;
+    border: 1px solid #7ee78733;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #7ee787;
+    font-weight: 500;
+    width: 100%;
+  }
+
+  /* Chat listing card */
+  .mockup-body .chat-listing {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: #0f1117;
+    border: 1px solid #7ee78744;
+    border-radius: 10px;
+  }
+
+  .mockup-body .chat-listing-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #7ee787;
+    margin-bottom: 4px;
+  }
+
+  .mockup-body .chat-listing-addr {
+    font-size: 12px;
+    color: #8b949e;
+    margin-bottom: 4px;
+  }
+
+  .mockup-body .chat-listing-detail {
+    font-size: 12px;
+    color: #e1e4e8;
+  }
+
+  .mockup-body .chat-listing-tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-top: 4px;
+    background: #7ee78718;
+    color: #7ee787;
+  }
+
+  .mockup-body .msg-divider {
+    text-align: center;
+    font-size: 11px;
+    color: #484f58;
+    padding: 4px 0;
+    position: relative;
+  }
+
+  .mockup-body .msg-divider::before,
+  .mockup-body .msg-divider::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 30%;
+    height: 1px;
+    background: #2d333b;
+  }
+
+  .mockup-body .msg-divider::before { left: 0; }
+  .mockup-body .msg-divider::after { right: 0; }
+
+  /* Chat input */
+  .mockup-body .chat-input-area {
+    padding: 16px 20px;
+    border-top: 1px solid #2d333b;
+  }
+
+  .mockup-body .chat-input-wrapper {
+    display: flex;
+    align-items: center;
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 12px;
+    padding: 4px;
+  }
+
+  .mockup-body .chat-input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: #e1e4e8;
+    font-size: 14px;
+    padding: 10px 12px;
+  }
+
+  .mockup-body .chat-input::placeholder { color: #484f58; }
+
+  .mockup-body .send-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: #58a6ff;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  /* Right Panel */
+  .mockup-body .results-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .mockup-body .map-area {
+    height: 50%;
+    background: #161b22;
+    position: relative;
+    border-bottom: 1px solid #2d333b;
+  }
+
+  .mockup-body .map-placeholder {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .mockup-body .map-grid {
+    position: absolute;
+    inset: 0;
+    opacity: 0.15;
+  }
+
+  .mockup-body .map-label {
+    position: absolute;
+    font-size: 11px;
+    color: #8b949e;
+    font-weight: 500;
+  }
+
+  .mockup-body .map-marker {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: #58a6ff;
+    border-radius: 50%;
+    border: 2px solid #58a6ff55;
+    box-shadow: 0 0 10px #58a6ff55;
+  }
+
+  .mockup-body .map-marker.small {
+    width: 10px;
+    height: 10px;
+    border: 2px solid #58a6ff44;
+    box-shadow: 0 0 8px #58a6ff44;
+  }
+
+  .mockup-body .map-marker.faded {
+    background: #2d333b;
+    border-color: transparent;
+    box-shadow: none;
+    opacity: 0.3;
+  }
+
+  .mockup-body .map-marker.highlighted {
+    background: #7ee787;
+    border-color: #7ee78755;
+    box-shadow: 0 0 14px #7ee78755;
+    width: 16px;
+    height: 16px;
+    z-index: 10;
+  }
+
+  .mockup-body .map-marker-label {
+    position: absolute;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1c2028;
+    border: 1px solid #7ee78744;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 10px;
+    color: #7ee787;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+
+  .mockup-body .l-train-line {
+    position: absolute;
+    height: 3px;
+    background: #8b949e44;
+    border-radius: 2px;
+  }
+
+  .mockup-body .l-train-line::before {
+    content: 'L';
+    position: absolute;
+    left: -2px;
+    top: -18px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    background: #8b949e;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mockup-body .l-stop {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    background: #8b949e;
+    border-radius: 50%;
+  }
+
+  .mockup-body .l-stop.highlighted {
+    background: #7ee787;
+    box-shadow: 0 0 8px #7ee78744;
+  }
+
+  .mockup-body .l-stop-label {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    color: #8b949e;
+    white-space: nowrap;
+  }
+
+  .mockup-body .l-stop.highlighted .l-stop-label { color: #7ee787; }
+
+  .mockup-body .map-stats {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: #1c2028dd;
+    border: 1px solid #2d333b;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #8b949e;
+    backdrop-filter: blur(8px);
+  }
+
+  .mockup-body .map-stats strong { color: #e1e4e8; }
+  .mockup-body .map-stats strong.green { color: #7ee787; }
+
+  .mockup-body .manhattan-label {
+    position: absolute;
+    font-size: 13px;
+    color: #58a6ff66;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+
+  .mockup-body .results-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+  }
+
+  .mockup-body .results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 0 12px;
+  }
+
+  .mockup-body .results-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .mockup-body .results-count {
+    font-size: 12px;
+    color: #8b949e;
+  }
+
+  .mockup-body .results-count.green {
+    color: #7ee787;
+    font-weight: 500;
+  }
+
+  .mockup-body .listing-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+  }
+
+  .mockup-body .listing-card {
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 12px;
+    padding: 14px;
+  }
+
+  .mockup-body .listing-card.highlight {
+    border-color: #7ee78744;
+    box-shadow: 0 0 0 1px #7ee78722;
+  }
+
+  .mockup-body .listing-card.dimmed { opacity: 0.45; }
+
+  .mockup-body .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+
+  .mockup-body .card-price {
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .mockup-body .card-price span {
+    font-size: 12px;
+    font-weight: 400;
+    color: #8b949e;
+  }
+
+  .mockup-body .card-per-bed {
+    font-size: 11px;
+    color: #7ee787;
+    margin-top: 2px;
+  }
+
+  .mockup-body .card-beds {
+    font-size: 12px;
+    background: #58a6ff22;
+    color: #58a6ff;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 500;
+  }
+
+  .mockup-body .card-address {
+    font-size: 13px;
+    color: #8b949e;
+    margin-bottom: 6px;
+  }
+
+  .mockup-body .card-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .mockup-body .card-tag {
+    font-size: 11px;
+    color: #8b949e;
+    background: #0f1117;
+    padding: 2px 7px;
+    border-radius: 4px;
+  }
+
+  .mockup-body .card-tag.match {
+    color: #7ee787;
+    background: #7ee78711;
+  }
+
+  .mockup-body .card-tag.laundry {
+    color: #f97316;
+    background: #f9731611;
+    font-weight: 500;
+  }
+
+  .mockup-body .card-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    color: #7ee787;
+    background: #7ee78718;
+    border: 1px solid #7ee78733;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-top: 8px;
+  }
+
+  /* Footer */
+  .spec-footer {
+    padding: 40px;
+    text-align: center;
+    color: #484f58;
+    font-size: 13px;
+    border-top: 1px solid #1c2028;
+  }
+</style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="spec-nav">
+  <div class="spec-nav-title">Dwelligence <span>/ Search Flow Design Spec</span></div>
+  <div class="spec-nav-steps">
+    <a href="#step-1"><span class="num">1</span> Initial State</a>
+    <a href="#step-2"><span class="num">2</span> First Query</a>
+    <a href="#step-3"><span class="num">3</span> Saved Filters</a>
+    <a href="#step-4"><span class="num">4</span> Refined</a>
+  </div>
+</nav>
+
+<div class="spec-content">
+
+  <!-- Hero -->
+  <div class="spec-hero">
+    <h1><em>Conversational Search</em> Flow</h1>
+    <p>A 4-step walkthrough of the AI-powered apartment search experience. Each step shows how the user's natural language queries progressively build up saved filters and narrow results.</p>
+    <div class="flow-overview">
+      <div class="flow-step-dot">
+        <div class="flow-dot">1</div>
+      </div>
+      <span class="flow-arrow">&rarr;</span>
+      <div class="flow-step-dot">
+        <div class="flow-dot">2</div>
+      </div>
+      <span class="flow-arrow">&rarr;</span>
+      <div class="flow-step-dot">
+        <div class="flow-dot">3</div>
+      </div>
+      <span class="flow-arrow">&rarr;</span>
+      <div class="flow-step-dot">
+        <div class="flow-dot">4</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- STEP 1: Initial State -->
+  <!-- ======================================================== -->
+  <div class="step-section" id="step-1">
+    <div class="step-header">
+      <div class="step-number">1</div>
+      <div class="step-info">
+        <h2>Initial State</h2>
+        <p>The user lands on the search page. The chat panel shows a welcome message with example prompts. The map displays all 42 listings across Brooklyn and Queens. No filters are active yet.</p>
+        <div class="step-changes">
+          <span class="step-change context">Empty filter bar</span>
+          <span class="step-change context">Welcome message with example prompts</span>
+          <span class="step-change context">All 42 markers visible on map</span>
+        </div>
+      </div>
+    </div>
+    <div class="mockup-frame">
+      <div class="mockup-toolbar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="tab-label">Step 1 &mdash; Initial State</span>
+      </div>
+      <div class="mockup-body">
+        <div class="layout">
+          <div class="chat-panel">
+            <div class="chat-header"><div class="logo">Dwelligence<span> Search</span></div></div>
+            <div class="filters-bar">
+              <div class="filters-label">Your filters</div>
+              <div class="filters-empty">No filters saved yet</div>
+            </div>
+            <div class="chat-messages centered">
+              <div class="welcome">
+                <div class="welcome-icon">&#x1F50D;</div>
+                <h2>Search with AI</h2>
+                <p>Describe what you're looking for in plain English. Save the criteria you care about as filters.</p>
+                <div class="example-prompts">
+                  <div class="example-prompt"><span class="arrow">&rarr;</span> 5+ bedrooms near the L train</div>
+                  <div class="example-prompt"><span class="arrow">&rarr;</span> Brooklyn under $2k/bed</div>
+                  <div class="example-prompt"><span class="arrow">&rarr;</span> Near Fulton St with laundry</div>
+                </div>
+              </div>
+            </div>
+            <div class="chat-input-area">
+              <div class="chat-input-wrapper">
+                <input class="chat-input" type="text" placeholder="Ask about apartments..." disabled>
+                <button class="send-btn">&uarr;</button>
+              </div>
+            </div>
+          </div>
+          <div class="results-panel">
+            <div class="map-area">
+              <div class="map-placeholder">
+                <svg class="map-grid" width="100%" height="100%">
+                  <defs><pattern id="grid1" width="60" height="60" patternUnits="userSpaceOnUse"><path d="M 60 0 L 0 0 0 60" fill="none" stroke="#2d333b" stroke-width="0.5"/></pattern></defs>
+                  <rect width="100%" height="100%" fill="url(#grid1)"/>
+                  <line x1="0" y1="40%" x2="100%" y2="35%" stroke="#2d333b" stroke-width="2"/>
+                  <line x1="0" y1="60%" x2="100%" y2="55%" stroke="#2d333b" stroke-width="2"/>
+                  <line x1="30%" y1="0" x2="25%" y2="100%" stroke="#2d333b" stroke-width="2"/>
+                  <line x1="60%" y1="0" x2="65%" y2="100%" stroke="#2d333b" stroke-width="1.5"/>
+                  <rect x="0" y="70%" width="40%" height="30%" fill="#58a6ff08" stroke="#58a6ff15" stroke-width="1"/>
+                </svg>
+                <div class="map-label" style="top:10%;left:20%">WILLIAMSBURG</div>
+                <div class="map-label" style="top:30%;left:55%">BUSHWICK</div>
+                <div class="map-label" style="top:55%;left:25%">BED-STUY</div>
+                <div class="map-label" style="top:15%;left:70%">RIDGEWOOD</div>
+                <div class="map-label" style="top:70%;left:60%">CROWN HEIGHTS</div>
+                <div class="map-label" style="top:80%;left:15%;color:#58a6ff44">East River</div>
+                <div class="map-marker small" style="top:18%;left:25%"></div>
+                <div class="map-marker small" style="top:22%;left:30%"></div>
+                <div class="map-marker small" style="top:15%;left:35%"></div>
+                <div class="map-marker small" style="top:28%;left:22%"></div>
+                <div class="map-marker small" style="top:35%;left:50%"></div>
+                <div class="map-marker small" style="top:40%;left:58%"></div>
+                <div class="map-marker small" style="top:38%;left:45%"></div>
+                <div class="map-marker small" style="top:50%;left:30%"></div>
+                <div class="map-marker small" style="top:55%;left:28%"></div>
+                <div class="map-marker small" style="top:48%;left:40%"></div>
+                <div class="map-marker small" style="top:60%;left:55%"></div>
+                <div class="map-marker small" style="top:65%;left:50%"></div>
+                <div class="map-marker small" style="top:45%;left:65%"></div>
+                <div class="map-marker small" style="top:25%;left:60%"></div>
+                <div class="map-marker small" style="top:72%;left:62%"></div>
+                <div class="map-marker small" style="top:20%;left:75%"></div>
+                <div class="map-marker small" style="top:42%;left:72%"></div>
+                <div class="map-stats"><strong>42 listings</strong> across Brooklyn &amp; Queens</div>
+              </div>
+            </div>
+            <div class="results-list">
+              <div class="results-header">
+                <h3>All Listings</h3>
+                <span class="results-count">42 results</span>
+              </div>
+              <div class="listing-cards">
+                <div class="listing-card">
+                  <div class="card-top"><div class="card-price">$12,500 <span>/mo</span></div><div class="card-beds">6 bed</div></div>
+                  <div class="card-address">284 Bedford Ave, Williamsburg</div>
+                  <div class="card-tags"><span class="card-tag">Near L train</span><span class="card-tag">Dishwasher</span></div>
+                </div>
+                <div class="listing-card">
+                  <div class="card-top"><div class="card-price">$4,200 <span>/mo</span></div><div class="card-beds">3 bed</div></div>
+                  <div class="card-address">512 Myrtle Ave, Bed-Stuy</div>
+                  <div class="card-tags"><span class="card-tag">Near G train</span><span class="card-tag">Laundry</span></div>
+                </div>
+                <div class="listing-card">
+                  <div class="card-top"><div class="card-price">$8,900 <span>/mo</span></div><div class="card-beds">5 bed</div></div>
+                  <div class="card-address">73 Wilson Ave, Bushwick</div>
+                  <div class="card-tags"><span class="card-tag">Near L train</span><span class="card-tag">Backyard</span></div>
+                </div>
+                <div class="listing-card">
+                  <div class="card-top"><div class="card-price">$3,800 <span>/mo</span></div><div class="card-beds">2 bed</div></div>
+                  <div class="card-address">891 Fulton St, Crown Heights</div>
+                  <div class="card-tags"><span class="card-tag">Near C train</span><span class="card-tag">Renovated</span></div>
+                </div>
+                <div class="listing-card">
+                  <div class="card-top"><div class="card-price">$11,000 <span>/mo</span></div><div class="card-beds">5 bed</div></div>
+                  <div class="card-address">160 Wyckoff Ave, Ridgewood</div>
+                  <div class="card-tags"><span class="card-tag">Near L train</span><span class="card-tag">In-unit laundry</span></div>
+                </div>
+                <div class="listing-card">
+                  <div class="card-top"><div class="card-price">$5,500 <span>/mo</span></div><div class="card-beds">3 bed</div></div>
+                  <div class="card-address">45 Knickerbocker Ave, Bushwick</div>
+                  <div class="card-tags"><span class="card-tag">Near M train</span><span class="card-tag">Roof access</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- STEP 2: First Query + Results -->
+  <!-- ======================================================== -->
+  <div class="step-section" id="step-2">
+    <div class="step-header">
+      <div class="step-number">2</div>
+      <div class="step-info">
+        <h2>First Query + Results</h2>
+        <p>The user types a natural language query: "Show me 5+ bedrooms near the L train under $2500 per bed." The AI parses this into three criteria and returns 8 matching listings. Each criterion has a save button to pin it as a persistent filter.</p>
+        <div class="step-changes">
+          <span class="step-change new">User message appears</span>
+          <span class="step-change new">AI response with parsed criteria + save buttons</span>
+          <span class="step-change modified">Map zooms to L train corridor, 8 active + faded markers</span>
+          <span class="step-change modified">Results filtered to 8 matches with $/bed pricing</span>
+        </div>
+      </div>
+    </div>
+    <div class="mockup-frame">
+      <div class="mockup-toolbar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="tab-label">Step 2 &mdash; First Query + Results</span>
+      </div>
+      <div class="mockup-body">
+        <div class="layout">
+          <div class="chat-panel">
+            <div class="chat-header"><div class="logo">Dwelligence<span> Search</span></div></div>
+            <div class="filters-bar">
+              <div class="filters-label">Your filters</div>
+              <div class="filters-empty">No filters saved yet</div>
+            </div>
+            <div class="chat-messages">
+              <div class="msg msg-user">
+                <div class="msg-label">You</div>
+                <div class="msg-bubble">Show me 5+ bedrooms near the L train under $2500 per bed</div>
+              </div>
+              <div class="msg msg-ai">
+                <div class="msg-label">Dwelligence</div>
+                <div class="msg-bubble">
+                  Found <strong>8 listings</strong> near L train stops (Bedford Ave to DeKalb Ave) with 5+ bedrooms under $2,500/bed.
+                  <br><br>
+                  Prices range from $1,780 to $2,420 per bed. Most are in Williamsburg and Bushwick.
+                  <div class="parsed-criteria">
+                    <div class="parsed-criteria-label">Parsed criteria &mdash; click to save:</div>
+                    <div class="criterion"><span>5+ beds</span><span class="save-icon">&#x1F4BE;</span></div>
+                    <div class="criterion"><span>Near L train</span><span class="save-icon">&#x1F4BE;</span></div>
+                    <div class="criterion"><span>&lt; $2,500/bed</span><span class="save-icon">&#x1F4BE;</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="chat-input-area">
+              <div class="chat-input-wrapper">
+                <input class="chat-input" type="text" placeholder="Ask a follow-up..." disabled>
+                <button class="send-btn">&uarr;</button>
+              </div>
+            </div>
+          </div>
+          <div class="results-panel">
+            <div class="map-area">
+              <div class="map-placeholder">
+                <svg class="map-grid" width="100%" height="100%">
+                  <defs><pattern id="grid2" width="60" height="60" patternUnits="userSpaceOnUse"><path d="M 60 0 L 0 0 0 60" fill="none" stroke="#2d333b" stroke-width="0.5"/></pattern></defs>
+                  <rect width="100%" height="100%" fill="url(#grid2)"/>
+                </svg>
+                <div class="l-train-line" style="top:35%;left:10%;width:80%">
+                  <div class="l-stop" style="left:10%"><div class="l-stop-label">Bedford Ave</div></div>
+                  <div class="l-stop" style="left:25%"><div class="l-stop-label">Lorimer St</div></div>
+                  <div class="l-stop" style="left:40%"><div class="l-stop-label">Graham Ave</div></div>
+                  <div class="l-stop" style="left:55%"><div class="l-stop-label">Grand St</div></div>
+                  <div class="l-stop" style="left:70%"><div class="l-stop-label">Montrose Ave</div></div>
+                  <div class="l-stop" style="left:85%"><div class="l-stop-label">Morgan Ave</div></div>
+                </div>
+                <div class="map-label" style="top:12%;left:15%">WILLIAMSBURG</div>
+                <div class="map-label" style="top:12%;left:65%">BUSHWICK</div>
+                <div class="map-label" style="top:65%;left:25%">BED-STUY</div>
+                <div class="map-marker" style="top:42%;left:14%"></div>
+                <div class="map-marker" style="top:48%;left:18%"></div>
+                <div class="map-marker" style="top:44%;left:28%"></div>
+                <div class="map-marker" style="top:40%;left:43%"></div>
+                <div class="map-marker" style="top:46%;left:57%"></div>
+                <div class="map-marker" style="top:42%;left:72%"></div>
+                <div class="map-marker" style="top:50%;left:68%"></div>
+                <div class="map-marker" style="top:45%;left:85%"></div>
+                <div class="map-marker faded" style="top:70%;left:30%"></div>
+                <div class="map-marker faded" style="top:75%;left:55%"></div>
+                <div class="map-marker faded" style="top:80%;left:40%"></div>
+                <div class="map-marker faded" style="top:25%;left:50%"></div>
+                <div class="map-stats">Showing <strong class="green">8 of 42</strong> listings near L train</div>
+              </div>
+            </div>
+            <div class="results-list">
+              <div class="results-header">
+                <h3>Filtered Results</h3>
+                <span class="results-count green">8 matches</span>
+              </div>
+              <div class="listing-cards">
+                <div class="listing-card">
+                  <div class="card-top"><div><div class="card-price">$10,900 <span>/mo</span></div><div class="card-per-bed">$2,180/bed</div></div><div class="card-beds">5 bed</div></div>
+                  <div class="card-address">284 Bedford Ave, Williamsburg</div>
+                  <div class="card-tags"><span class="card-tag match">0.2 mi to Bedford Ave L</span><span class="card-tag">Dishwasher</span></div>
+                </div>
+                <div class="listing-card">
+                  <div class="card-top"><div><div class="card-price">$12,100 <span>/mo</span></div><div class="card-per-bed">$2,017/bed</div></div><div class="card-beds">6 bed</div></div>
+                  <div class="card-address">159 Havemeyer St, Williamsburg</div>
+                  <div class="card-tags"><span class="card-tag match">0.3 mi to Lorimer St L</span><span class="card-tag">Roof deck</span></div>
+                </div>
+                <div class="listing-card">
+                  <div class="card-top"><div><div class="card-price">$8,900 <span>/mo</span></div><div class="card-per-bed">$1,780/bed</div></div><div class="card-beds">5 bed</div></div>
+                  <div class="card-address">73 Wilson Ave, Bushwick</div>
+                  <div class="card-tags"><span class="card-tag match">0.1 mi to Morgan Ave L</span><span class="card-tag">Backyard</span></div>
+                </div>
+                <div class="listing-card">
+                  <div class="card-top"><div><div class="card-price">$14,500 <span>/mo</span></div><div class="card-per-bed">$2,417/bed</div></div><div class="card-beds">6 bed</div></div>
+                  <div class="card-address">42 Graham Ave, Williamsburg</div>
+                  <div class="card-tags"><span class="card-tag match">0.1 mi to Graham Ave L</span><span class="card-tag">In-unit laundry</span></div>
+                </div>
+                <div class="listing-card">
+                  <div class="card-top"><div><div class="card-price">$11,200 <span>/mo</span></div><div class="card-per-bed">$2,240/bed</div></div><div class="card-beds">5 bed</div></div>
+                  <div class="card-address">310 Grand St, Williamsburg</div>
+                  <div class="card-tags"><span class="card-tag match">0.2 mi to Grand St L</span><span class="card-tag">Renovated</span></div>
+                </div>
+                <div class="listing-card">
+                  <div class="card-top"><div><div class="card-price">$9,800 <span>/mo</span></div><div class="card-per-bed">$1,960/bed</div></div><div class="card-beds">5 bed</div></div>
+                  <div class="card-address">88 Montrose Ave, Bushwick</div>
+                  <div class="card-tags"><span class="card-tag match">0.1 mi to Montrose Ave L</span><span class="card-tag">Pet friendly</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- STEP 3: Saved Filters + Follow-up -->
+  <!-- ======================================================== -->
+  <div class="step-section" id="step-3">
+    <div class="step-header">
+      <div class="step-number">3</div>
+      <div class="step-info">
+        <h2>Saved Filters + Follow-up</h2>
+        <p>The user saves "5+ beds" and "Near L train" as persistent filters (shown as blue pills in the filter bar). They remove the "$2,500/bed" criterion -- a system message confirms removal. Then they ask a follow-up: "What about closer to Manhattan?" The AI narrows results to Manhattan L stops and shows 3 listings. A "Save all criteria as filters" button lets users bulk-save.</p>
+        <div class="step-changes">
+          <span class="step-change new">Filter pills appear in filter bar</span>
+          <span class="step-change new">System message: "Removed 'Under $2,500/bed' filter"</span>
+          <span class="step-change new">"Save all criteria as filters" button</span>
+          <span class="step-change new">Saved criteria show green checkmarks</span>
+          <span class="step-change modified">Map shifts to show Manhattan + East River</span>
+          <span class="step-change modified">Manhattan L stops highlighted in green</span>
+        </div>
+      </div>
+    </div>
+    <div class="mockup-frame">
+      <div class="mockup-toolbar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="tab-label">Step 3 &mdash; Saved Filters + Follow-up</span>
+      </div>
+      <div class="mockup-body">
+        <div class="layout">
+          <div class="chat-panel">
+            <div class="chat-header"><div class="logo">Dwelligence<span> Search</span></div></div>
+            <div class="filters-bar">
+              <div class="filters-label">Your filters</div>
+              <div class="pills">
+                <div class="pill">5+ beds <span class="remove">&times;</span></div>
+                <div class="pill">Near L train <span class="remove">&times;</span></div>
+              </div>
+            </div>
+            <div class="chat-messages">
+              <div class="msg msg-user">
+                <div class="msg-label">You</div>
+                <div class="msg-bubble">Show me 5+ bedrooms near the L train under $2500 per bed</div>
+              </div>
+              <div class="msg msg-ai">
+                <div class="msg-label">Dwelligence</div>
+                <div class="msg-bubble">
+                  Found <strong>8 listings</strong> near L train stops with 5+ bedrooms under $2,500/bed.
+                  <div class="parsed-criteria">
+                    <div class="parsed-criteria-label">Criteria:</div>
+                    <div class="criterion saved"><span>5+ beds</span><span class="save-icon">&check;</span></div>
+                    <div class="criterion saved"><span>Near L train</span><span class="save-icon">&check;</span></div>
+                    <div class="criterion"><span>&lt; $2,500/bed</span><span class="save-icon">&#x1F4BE;</span></div>
+                  </div>
+                  <div class="save-all-btn">Save all criteria as filters</div>
+                </div>
+              </div>
+              <div class="msg-system">
+                <span class="sys-line"></span>
+                <span class="sys-text">&mdash; Removed 'Under $2,500/bed' filter &mdash;</span>
+                <span class="sys-line"></span>
+              </div>
+              <div class="msg msg-user">
+                <div class="msg-label">You</div>
+                <div class="msg-bubble">What about closer to Manhattan?</div>
+              </div>
+              <div class="msg msg-ai">
+                <div class="msg-label">Dwelligence</div>
+                <div class="msg-bubble">
+                  Narrowing to L train stops in Manhattan (1st Ave, 3rd Ave, Union Square). Found <strong>3 listings</strong> with 5+ beds.
+                  <br><br>
+                  These are pricier &mdash; $2,100 to $2,480/bed &mdash; but you're right on the L with a quick commute.
+                  <div class="parsed-criteria">
+                    <div class="parsed-criteria-label">New criterion:</div>
+                    <div class="criterion"><span>Manhattan L stops</span><span class="save-icon">&#x1F4BE;</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="chat-input-area">
+              <div class="chat-input-wrapper">
+                <input class="chat-input" type="text" placeholder="Ask a follow-up..." disabled>
+                <button class="send-btn">&uarr;</button>
+              </div>
+            </div>
+          </div>
+          <div class="results-panel">
+            <div class="map-area">
+              <div class="map-placeholder">
+                <svg class="map-grid" width="100%" height="100%">
+                  <defs><pattern id="grid3" width="60" height="60" patternUnits="userSpaceOnUse"><path d="M 60 0 L 0 0 0 60" fill="none" stroke="#2d333b" stroke-width="0.5"/></pattern></defs>
+                  <rect width="100%" height="100%" fill="url(#grid3)"/>
+                  <rect x="42%" y="0" width="8%" height="100%" fill="#58a6ff08" stroke="#58a6ff15" stroke-width="1" rx="4"/>
+                </svg>
+                <div class="manhattan-label" style="top:15%;left:15%">MANHATTAN</div>
+                <div class="map-label" style="top:15%;left:65%">WILLIAMSBURG</div>
+                <div class="map-label" style="top:80%;left:38%;color:#58a6ff33;font-size:10px">East River</div>
+                <div class="l-train-line" style="top:40%;left:8%;width:85%">
+                  <div class="l-stop highlighted" style="left:10%"><div class="l-stop-label">Union Sq</div></div>
+                  <div class="l-stop highlighted" style="left:22%"><div class="l-stop-label">3rd Ave</div></div>
+                  <div class="l-stop highlighted" style="left:34%"><div class="l-stop-label">1st Ave</div></div>
+                  <div class="l-stop" style="left:58%"><div class="l-stop-label" style="color:#484f58">Bedford Ave</div></div>
+                  <div class="l-stop" style="left:72%"><div class="l-stop-label" style="color:#484f58">Lorimer St</div></div>
+                  <div class="l-stop" style="left:86%"><div class="l-stop-label" style="color:#484f58">Graham Ave</div></div>
+                </div>
+                <div class="map-marker" style="top:50%;left:12%"></div>
+                <div class="map-marker" style="top:52%;left:25%"></div>
+                <div class="map-marker" style="top:48%;left:35%"></div>
+                <div class="map-marker faded" style="top:45%;left:60%"></div>
+                <div class="map-marker faded" style="top:50%;left:72%"></div>
+                <div class="map-marker faded" style="top:48%;left:88%"></div>
+                <div class="map-marker faded" style="top:55%;left:65%"></div>
+                <div class="map-marker faded" style="top:42%;left:78%"></div>
+                <div class="map-stats">Narrowed to <strong class="green">3 listings</strong> near Manhattan L stops</div>
+              </div>
+            </div>
+            <div class="results-list">
+              <div class="results-header">
+                <h3>Manhattan L Train &mdash; 5+ Beds</h3>
+                <span class="results-count green">3 matches</span>
+              </div>
+              <div class="listing-cards">
+                <div class="listing-card">
+                  <div class="card-top"><div><div class="card-price">$12,400 <span>/mo</span></div><div class="card-per-bed">$2,480/bed</div></div><div class="card-beds">5 bed</div></div>
+                  <div class="card-address">142 E 14th St, Union Square</div>
+                  <div class="card-tags"><span class="card-tag match">0.1 mi to Union Sq L</span><span class="card-tag">Elevator</span><span class="card-tag">Doorman</span></div>
+                </div>
+                <div class="listing-card">
+                  <div class="card-top"><div><div class="card-price">$12,600 <span>/mo</span></div><div class="card-per-bed">$2,100/bed</div></div><div class="card-beds">6 bed</div></div>
+                  <div class="card-address">78 3rd Ave, Gramercy</div>
+                  <div class="card-tags"><span class="card-tag match">0.2 mi to 3rd Ave L</span><span class="card-tag">Renovated</span></div>
+                </div>
+                <div class="listing-card">
+                  <div class="card-top"><div><div class="card-price">$11,750 <span>/mo</span></div><div class="card-per-bed">$2,350/bed</div></div><div class="card-beds">5 bed</div></div>
+                  <div class="card-address">215 Ave A, East Village</div>
+                  <div class="card-tags"><span class="card-tag match">0.2 mi to 1st Ave L</span><span class="card-tag">In-unit laundry</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- STEP 4: Refined with Saved Filters -->
+  <!-- ======================================================== -->
+  <div class="step-section" id="step-4">
+    <div class="step-header">
+      <div class="step-number">4</div>
+      <div class="step-info">
+        <h2>Refined with Saved Filters</h2>
+        <p>Three filters are now active: "5+ beds", "Near L train", and "Manhattan". The user asks "Any of these have in-unit laundry?" The AI identifies 1 match and highlights it on both the map and results list, dimming the non-matching listings. A system message confirms the earlier filter removal, and the "Save all" button remains available in the conversation history.</p>
+        <div class="step-changes">
+          <span class="step-change new">3 active filter pills + "3 active" badge</span>
+          <span class="step-change new">Highlighted listing card (green border + badge)</span>
+          <span class="step-change new">Green map marker with label for matching listing</span>
+          <span class="step-change new">In-chat listing preview card</span>
+          <span class="step-change modified">Non-matching cards dimmed to 45% opacity</span>
+          <span class="step-change context">System message + "Save all" button persist in history</span>
+        </div>
+      </div>
+    </div>
+    <div class="mockup-frame">
+      <div class="mockup-toolbar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="tab-label">Step 4 &mdash; Refined with Saved Filters</span>
+      </div>
+      <div class="mockup-body">
+        <div class="layout">
+          <div class="chat-panel">
+            <div class="chat-header"><div class="logo">Dwelligence<span> Search</span></div></div>
+            <div class="filters-bar">
+              <div class="filters-label filters-label-flex">
+                Your filters
+                <span class="filters-count">3 active</span>
+              </div>
+              <div class="pills">
+                <div class="pill">5+ beds <span class="remove">&times;</span></div>
+                <div class="pill">Near L train <span class="remove">&times;</span></div>
+                <div class="pill">Manhattan <span class="remove">&times;</span></div>
+              </div>
+              <div class="pill-hint">Click &times; to remove a filter and expand results</div>
+            </div>
+            <div class="chat-messages">
+              <div class="msg msg-user">
+                <div class="msg-label">You</div>
+                <div class="msg-bubble">Show me 5+ bedrooms near the L train under $2500 per bed</div>
+              </div>
+              <div class="msg msg-ai">
+                <div class="msg-label">Dwelligence</div>
+                <div class="msg-bubble">
+                  Found <strong>8 listings</strong> near L train stops with 5+ bedrooms under $2,500/bed.
+                  <div class="parsed-criteria">
+                    <div class="criterion saved"><span>5+ beds</span><span class="save-icon">&check;</span></div>
+                    <div class="criterion saved"><span>Near L train</span><span class="save-icon">&check;</span></div>
+                    <div class="criterion"><span>&lt; $2,500/bed</span><span class="save-icon">&#x1F4BE;</span></div>
+                  </div>
+                  <div class="save-all-btn">Save all criteria as filters</div>
+                </div>
+              </div>
+              <div class="msg msg-user">
+                <div class="msg-label">You</div>
+                <div class="msg-bubble">What about closer to Manhattan?</div>
+              </div>
+              <div class="msg msg-ai">
+                <div class="msg-label">Dwelligence</div>
+                <div class="msg-bubble">
+                  Narrowing to Manhattan L stops. Found <strong>3 listings</strong> with 5+ beds.
+                  <div class="parsed-criteria">
+                    <div class="criterion saved"><span>Manhattan L stops</span><span class="save-icon">&check;</span></div>
+                  </div>
+                </div>
+              </div>
+              <div class="msg-system">
+                <span class="sys-line"></span>
+                <span class="sys-text">&mdash; Removed 'Under $2,500/bed' filter &mdash;</span>
+                <span class="sys-line"></span>
+              </div>
+              <div class="msg-divider">continued</div>
+              <div class="msg msg-user">
+                <div class="msg-label">You</div>
+                <div class="msg-bubble">Any of these have in-unit laundry?</div>
+              </div>
+              <div class="msg msg-ai">
+                <div class="msg-label">Dwelligence</div>
+                <div class="msg-bubble">
+                  <strong>1 of the 3 listings</strong> mentions in-unit laundry &mdash; the apartment at 215 Ave A in the East Village, near the 1st Ave L stop.
+                  <br><br>
+                  It's a 5-bed at $2,350/bed. The other two have building laundry only.
+                  <div class="chat-listing">
+                    <div class="chat-listing-title">$11,750/mo &mdash; 5 bed</div>
+                    <div class="chat-listing-addr">215 Ave A, East Village</div>
+                    <div class="chat-listing-detail">0.2 mi to 1st Ave L &middot; Renovated &middot; Pet friendly</div>
+                    <div class="chat-listing-tag">In-unit laundry</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="chat-input-area">
+              <div class="chat-input-wrapper">
+                <input class="chat-input" type="text" placeholder="Ask a follow-up..." disabled>
+                <button class="send-btn">&uarr;</button>
+              </div>
+            </div>
+          </div>
+          <div class="results-panel">
+            <div class="map-area">
+              <div class="map-placeholder">
+                <svg class="map-grid" width="100%" height="100%">
+                  <defs><pattern id="grid4" width="60" height="60" patternUnits="userSpaceOnUse"><path d="M 60 0 L 0 0 0 60" fill="none" stroke="#2d333b" stroke-width="0.5"/></pattern></defs>
+                  <rect width="100%" height="100%" fill="url(#grid4)"/>
+                  <rect x="42%" y="0" width="8%" height="100%" fill="#58a6ff08" stroke="#58a6ff15" stroke-width="1" rx="4"/>
+                </svg>
+                <div class="manhattan-label" style="top:15%;left:15%">MANHATTAN</div>
+                <div class="map-label" style="top:15%;left:65%;color:#484f58">WILLIAMSBURG</div>
+                <div class="map-label" style="top:80%;left:38%;color:#58a6ff22;font-size:10px">East River</div>
+                <div class="l-train-line" style="top:40%;left:8%;width:85%">
+                  <div class="l-stop highlighted" style="left:10%"><div class="l-stop-label">Union Sq</div></div>
+                  <div class="l-stop highlighted" style="left:22%"><div class="l-stop-label">3rd Ave</div></div>
+                  <div class="l-stop highlighted" style="left:34%"><div class="l-stop-label">1st Ave</div></div>
+                  <div class="l-stop" style="left:58%"><div class="l-stop-label" style="color:#484f58">Bedford Ave</div></div>
+                </div>
+                <div class="map-marker highlighted" style="top:47%;left:35%">
+                  <div class="map-marker-label">215 Ave A &mdash; Laundry &#10003;</div>
+                </div>
+                <div class="map-marker faded" style="top:50%;left:12%"></div>
+                <div class="map-marker faded" style="top:52%;left:25%"></div>
+                <div class="map-stats"><strong class="green">1 listing</strong> with in-unit laundry highlighted</div>
+              </div>
+            </div>
+            <div class="results-list">
+              <div class="results-header">
+                <h3>Manhattan L Train &mdash; 5+ Beds &mdash; Laundry</h3>
+                <span class="results-count green">1 match highlighted</span>
+              </div>
+              <div class="listing-cards">
+                <div class="listing-card highlight">
+                  <div class="card-top"><div><div class="card-price">$11,750 <span>/mo</span></div><div class="card-per-bed">$2,350/bed</div></div><div class="card-beds">5 bed</div></div>
+                  <div class="card-address">215 Ave A, East Village</div>
+                  <div class="card-tags">
+                    <span class="card-tag match">0.2 mi to 1st Ave L</span>
+                    <span class="card-tag laundry">In-unit laundry</span>
+                    <span class="card-tag">Pet friendly</span>
+                    <span class="card-tag">Renovated</span>
+                  </div>
+                  <div class="card-badge">Matches laundry query</div>
+                </div>
+                <div class="listing-card dimmed">
+                  <div class="card-top"><div><div class="card-price">$12,400 <span>/mo</span></div><div class="card-per-bed">$2,480/bed</div></div><div class="card-beds">5 bed</div></div>
+                  <div class="card-address">142 E 14th St, Union Square</div>
+                  <div class="card-tags"><span class="card-tag">0.1 mi to Union Sq L</span><span class="card-tag">Building laundry</span><span class="card-tag">Doorman</span></div>
+                </div>
+                <div class="listing-card dimmed">
+                  <div class="card-top"><div><div class="card-price">$12,600 <span>/mo</span></div><div class="card-per-bed">$2,100/bed</div></div><div class="card-beds">6 bed</div></div>
+                  <div class="card-address">78 3rd Ave, Gramercy</div>
+                  <div class="card-tags"><span class="card-tag">0.2 mi to 3rd Ave L</span><span class="card-tag">Building laundry</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="spec-footer">
+    Dwelligence Search Flow Design Spec &mdash; 4 Steps &mdash; Generated 2026-03-23
+  </div>
+
+</div>
+
+<script>
+  // Smooth scroll for nav links
+  document.querySelectorAll('.spec-nav-steps a').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      const target = document.querySelector(a.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+</script>
+</body>
+</html>

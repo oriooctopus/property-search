@@ -58,7 +58,7 @@ export default function Navbar() {
 
   return (
     <nav
-      className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-3"
+      className="fixed top-0 left-0 right-0 z-[1200] flex items-center justify-between px-6 py-3"
       style={{
         backgroundColor: "#0f1117",
         borderBottom: "1px solid #2d333b",

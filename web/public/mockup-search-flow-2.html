@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dwelligence - Conversational Search: First Query + Results</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e1e4e8; height: 100vh; overflow: hidden; }
+
+  .layout { display: flex; height: 100vh; }
+
+  .chat-panel {
+    width: 380px;
+    min-width: 380px;
+    border-right: 1px solid #2d333b;
+    display: flex;
+    flex-direction: column;
+    background: #0f1117;
+  }
+
+  .chat-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #2d333b;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .chat-header .logo {
+    font-size: 18px;
+    font-weight: 700;
+    color: #58a6ff;
+  }
+
+  .chat-header .logo span { color: #e1e4e8; }
+
+  .filters-bar {
+    padding: 12px 20px;
+    border-bottom: 1px solid #2d333b;
+    min-height: 48px;
+  }
+
+  .filters-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #8b949e;
+    margin-bottom: 6px;
+  }
+
+  .filters-empty {
+    font-size: 13px;
+    color: #484f58;
+    font-style: italic;
+  }
+
+  /* Chat messages */
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .msg {
+    max-width: 95%;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg-user {
+    align-self: flex-end;
+  }
+
+  .msg-user .msg-bubble {
+    background: #58a6ff;
+    color: #fff;
+    border-radius: 14px 14px 4px 14px;
+    padding: 10px 14px;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  .msg-ai {
+    align-self: flex-start;
+  }
+
+  .msg-ai .msg-bubble {
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 14px 14px 14px 4px;
+    padding: 12px 16px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #e1e4e8;
+  }
+
+  .msg-label {
+    font-size: 11px;
+    color: #8b949e;
+    margin-bottom: 4px;
+    padding: 0 4px;
+  }
+
+  .msg-user .msg-label { text-align: right; }
+
+  /* Saveable criteria in AI response */
+  .parsed-criteria {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #2d333b;
+  }
+
+  .parsed-criteria-label {
+    font-size: 11px;
+    color: #8b949e;
+    width: 100%;
+    margin-bottom: 2px;
+  }
+
+  .criterion {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    background: #0f1117;
+    border: 1px solid #2d333b;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #e1e4e8;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .criterion:hover {
+    border-color: #58a6ff;
+    background: #58a6ff11;
+  }
+
+  .criterion .save-icon {
+    font-size: 13px;
+    opacity: 0.7;
+  }
+
+  .criterion:hover .save-icon {
+    opacity: 1;
+  }
+
+  /* Chat input */
+  .chat-input-area {
+    padding: 16px 20px;
+    border-top: 1px solid #2d333b;
+  }
+
+  .chat-input-wrapper {
+    display: flex;
+    align-items: center;
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 12px;
+    padding: 4px;
+  }
+
+  .chat-input-wrapper:focus-within { border-color: #58a6ff; }
+
+  .chat-input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: #e1e4e8;
+    font-size: 14px;
+    padding: 10px 12px;
+  }
+
+  .chat-input::placeholder { color: #484f58; }
+
+  .send-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: #58a6ff;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+
+  /* Right Panel */
+  .results-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .map-area {
+    height: 50%;
+    background: #161b22;
+    position: relative;
+    border-bottom: 1px solid #2d333b;
+  }
+
+  .map-placeholder {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .map-grid {
+    position: absolute;
+    inset: 0;
+    opacity: 0.15;
+  }
+
+  .map-label {
+    position: absolute;
+    font-size: 11px;
+    color: #8b949e;
+    font-weight: 500;
+  }
+
+  .map-marker {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: #58a6ff;
+    border-radius: 50%;
+    border: 2px solid #58a6ff55;
+    box-shadow: 0 0 10px #58a6ff55;
+  }
+
+  .map-marker.faded {
+    background: #2d333b;
+    border-color: transparent;
+    box-shadow: none;
+    opacity: 0.3;
+  }
+
+  /* L train line */
+  .l-train-line {
+    position: absolute;
+    top: 30%;
+    left: 5%;
+    width: 90%;
+    height: 3px;
+    background: #8b949e44;
+    border-radius: 2px;
+  }
+
+  .l-train-line::before {
+    content: 'L';
+    position: absolute;
+    left: -2px;
+    top: -18px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    background: #8b949e;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .l-stop {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    background: #8b949e;
+    border-radius: 50%;
+  }
+
+  .l-stop-label {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    color: #8b949e;
+    white-space: nowrap;
+  }
+
+  .map-stats {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: #1c2028dd;
+    border: 1px solid #2d333b;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: #8b949e;
+    backdrop-filter: blur(8px);
+  }
+
+  .map-stats strong { color: #7ee787; }
+
+  .results-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+  }
+
+  .results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 0 12px;
+  }
+
+  .results-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .results-count {
+    font-size: 12px;
+    color: #7ee787;
+    font-weight: 500;
+  }
+
+  .listing-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+  }
+
+  .listing-card {
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 12px;
+    padding: 14px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .listing-card:hover { border-color: #58a6ff44; }
+
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+
+  .card-price {
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .card-price span {
+    font-size: 12px;
+    font-weight: 400;
+    color: #8b949e;
+  }
+
+  .card-per-bed {
+    font-size: 11px;
+    color: #7ee787;
+    margin-top: 2px;
+  }
+
+  .card-beds {
+    font-size: 12px;
+    background: #58a6ff22;
+    color: #58a6ff;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 500;
+  }
+
+  .card-address {
+    font-size: 13px;
+    color: #8b949e;
+    margin-bottom: 6px;
+  }
+
+  .card-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .card-tag {
+    font-size: 11px;
+    color: #8b949e;
+    background: #0f1117;
+    padding: 2px 7px;
+    border-radius: 4px;
+  }
+
+  .card-tag.match {
+    color: #7ee787;
+    background: #7ee78711;
+  }
+
+  .flow-indicator {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-size: 12px;
+    color: #8b949e;
+    z-index: 100;
+  }
+
+  .flow-indicator .step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 11px;
+    margin-right: 4px;
+  }
+
+  .step.done { background: #7ee78733; color: #7ee787; }
+  .step.active { background: #58a6ff; color: #fff; }
+  .step.inactive { background: #2d333b; color: #8b949e; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <div class="chat-panel">
+    <div class="chat-header">
+      <div class="logo">Dwelligence<span> Search</span></div>
+    </div>
+
+    <div class="filters-bar">
+      <div class="filters-label">Your filters</div>
+      <div class="filters-empty">No filters saved yet</div>
+    </div>
+
+    <div class="chat-messages">
+      <div class="msg msg-user">
+        <div class="msg-label">You</div>
+        <div class="msg-bubble">Show me 5+ bedrooms near the L train under $2500 per bed</div>
+      </div>
+
+      <div class="msg msg-ai">
+        <div class="msg-label">Dwelligence</div>
+        <div class="msg-bubble">
+          Found <strong>8 listings</strong> near L train stops (Bedford Ave to DeKalb Ave) with 5+ bedrooms under $2,500/bed.
+          <br><br>
+          Prices range from $1,780 to $2,420 per bed. Most are in Williamsburg and Bushwick.
+
+          <div class="parsed-criteria">
+            <div class="parsed-criteria-label">Parsed criteria — click to save:</div>
+            <div class="criterion"><span>5+ beds</span><span class="save-icon">💾</span></div>
+            <div class="criterion"><span>Near L train</span><span class="save-icon">💾</span></div>
+            <div class="criterion"><span>&lt; $2,500/bed</span><span class="save-icon">💾</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <div class="chat-input-wrapper">
+        <input class="chat-input" type="text" placeholder="Ask a follow-up...">
+        <button class="send-btn">↑</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="results-panel">
+    <div class="map-area">
+      <div class="map-placeholder">
+        <svg class="map-grid" width="100%" height="100%">
+          <defs>
+            <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+              <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#2d333b" stroke-width="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#grid)"/>
+        </svg>
+
+        <!-- L train line -->
+        <div class="l-train-line" style="top:35%;left:10%;width:80%">
+          <div class="l-stop" style="left:10%"><div class="l-stop-label">Bedford Ave</div></div>
+          <div class="l-stop" style="left:25%"><div class="l-stop-label">Lorimer St</div></div>
+          <div class="l-stop" style="left:40%"><div class="l-stop-label">Graham Ave</div></div>
+          <div class="l-stop" style="left:55%"><div class="l-stop-label">Grand St</div></div>
+          <div class="l-stop" style="left:70%"><div class="l-stop-label">Montrose Ave</div></div>
+          <div class="l-stop" style="left:85%"><div class="l-stop-label">Morgan Ave</div></div>
+        </div>
+
+        <div class="map-label" style="top:12%;left:15%">WILLIAMSBURG</div>
+        <div class="map-label" style="top:12%;left:65%">BUSHWICK</div>
+        <div class="map-label" style="top:65%;left:25%">BED-STUY</div>
+
+        <!-- Active markers near L train -->
+        <div class="map-marker" style="top:42%;left:14%"></div>
+        <div class="map-marker" style="top:48%;left:18%"></div>
+        <div class="map-marker" style="top:44%;left:28%"></div>
+        <div class="map-marker" style="top:40%;left:43%"></div>
+        <div class="map-marker" style="top:46%;left:57%"></div>
+        <div class="map-marker" style="top:42%;left:72%"></div>
+        <div class="map-marker" style="top:50%;left:68%"></div>
+        <div class="map-marker" style="top:45%;left:85%"></div>
+
+        <!-- Faded markers (filtered out) -->
+        <div class="map-marker faded" style="top:70%;left:30%"></div>
+        <div class="map-marker faded" style="top:75%;left:55%"></div>
+        <div class="map-marker faded" style="top:80%;left:40%"></div>
+        <div class="map-marker faded" style="top:25%;left:50%"></div>
+
+        <div class="map-stats">Showing <strong>8 of 42</strong> listings near L train</div>
+      </div>
+    </div>
+
+    <div class="results-list">
+      <div class="results-header">
+        <h3>Filtered Results</h3>
+        <span class="results-count">8 matches</span>
+      </div>
+      <div class="listing-cards">
+        <div class="listing-card">
+          <div class="card-top">
+            <div>
+              <div class="card-price">$10,900 <span>/mo</span></div>
+              <div class="card-per-bed">$2,180/bed</div>
+            </div>
+            <div class="card-beds">5 bed</div>
+          </div>
+          <div class="card-address">284 Bedford Ave, Williamsburg</div>
+          <div class="card-tags">
+            <span class="card-tag match">0.2 mi to Bedford Ave L</span>
+            <span class="card-tag">Dishwasher</span>
+          </div>
+        </div>
+        <div class="listing-card">
+          <div class="card-top">
+            <div>
+              <div class="card-price">$12,100 <span>/mo</span></div>
+              <div class="card-per-bed">$2,017/bed</div>
+            </div>
+            <div class="card-beds">6 bed</div>
+          </div>
+          <div class="card-address">159 Havemeyer St, Williamsburg</div>
+          <div class="card-tags">
+            <span class="card-tag match">0.3 mi to Lorimer St L</span>
+            <span class="card-tag">Roof deck</span>
+          </div>
+        </div>
+        <div class="listing-card">
+          <div class="card-top">
+            <div>
+              <div class="card-price">$8,900 <span>/mo</span></div>
+              <div class="card-per-bed">$1,780/bed</div>
+            </div>
+            <div class="card-beds">5 bed</div>
+          </div>
+          <div class="card-address">73 Wilson Ave, Bushwick</div>
+          <div class="card-tags">
+            <span class="card-tag match">0.1 mi to Morgan Ave L</span>
+            <span class="card-tag">Backyard</span>
+          </div>
+        </div>
+        <div class="listing-card">
+          <div class="card-top">
+            <div>
+              <div class="card-price">$14,500 <span>/mo</span></div>
+              <div class="card-per-bed">$2,417/bed</div>
+            </div>
+            <div class="card-beds">6 bed</div>
+          </div>
+          <div class="card-address">42 Graham Ave, Williamsburg</div>
+          <div class="card-tags">
+            <span class="card-tag match">0.1 mi to Graham Ave L</span>
+            <span class="card-tag">In-unit laundry</span>
+          </div>
+        </div>
+        <div class="listing-card">
+          <div class="card-top">
+            <div>
+              <div class="card-price">$11,200 <span>/mo</span></div>
+              <div class="card-per-bed">$2,240/bed</div>
+            </div>
+            <div class="card-beds">5 bed</div>
+          </div>
+          <div class="card-address">310 Grand St, Williamsburg</div>
+          <div class="card-tags">
+            <span class="card-tag match">0.2 mi to Grand St L</span>
+            <span class="card-tag">Renovated</span>
+          </div>
+        </div>
+        <div class="listing-card">
+          <div class="card-top">
+            <div>
+              <div class="card-price">$9,800 <span>/mo</span></div>
+              <div class="card-per-bed">$1,960/bed</div>
+            </div>
+            <div class="card-beds">5 bed</div>
+          </div>
+          <div class="card-address">88 Montrose Ave, Bushwick</div>
+          <div class="card-tags">
+            <span class="card-tag match">0.1 mi to Montrose Ave L</span>
+            <span class="card-tag">Pet friendly</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="flow-indicator">
+  <span class="step done">1</span>
+  <span class="step active">2</span>
+  <span class="step inactive">3</span>
+  <span class="step inactive">4</span>
+  Flow 2: First Query + Results
+</div>
+</body>
+</html>
