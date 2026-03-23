@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!--
+    Letter D with roof peak at top-right.
+    Bold, clean, modern.
+  -->
+
+  <!-- Main D shape with roof integrated -->
+  <path d="
+    M10 6 H18
+    C24 6 29 9 31 14
+    L38 6
+    L33 14
+    C35 17 36 20.5 36 24
+    C36 33 28 42 18 42
+    H10 Z
+  " fill="#58a6ff"/>
+
+  <!-- Inner cutout (counter of the D) -->
+  <path d="
+    M16 13
+    H18
+    C24 13 29 17 29 24
+    C29 31 24 35 18 35
+    H16 Z
+  " fill="white"/>
+</svg>

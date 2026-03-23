@@ -40,7 +40,8 @@ function saveCache() {
 export function isDirectionsCached(origin: string, destination: string): boolean {
   const bikeKey = `${origin}|${destination}|${TravelMode.bicycling}`;
   const transitKey = `${origin}|${destination}|${TravelMode.transit}`;
-  return bikeKey in directionsCache && transitKey in directionsCache;
+  const walkKey = `${origin}|${destination}|${TravelMode.walking}`;
+  return bikeKey in directionsCache && transitKey in directionsCache && walkKey in directionsCache;
 }
 
 export function getCacheStats(): { size: number } {
@@ -52,7 +53,7 @@ export interface Destination {
   address: string;
   lat?: number;
   lon?: number;
-  filterMode?: "biking" | "transit";  // which mode to filter on
+  filterMode?: "biking" | "transit" | "walking";  // which mode to filter on
   maxMinutes?: number;                // max travel time for that mode
   filterGroup?: string;               // destinations in same group use OR logic
 }
@@ -78,6 +79,7 @@ export interface DistanceResult {
   toAddress: string;
   biking: TravelInfo;
   transit: TravelInfo;
+  walking: TravelInfo;
   nearestSubway: NearestSubway | null; // extracted from transit directions
 }
 
@@ -110,7 +112,7 @@ async function getDirections(
 
 function parseTravelInfo(
   response: DirectionsResponse,
-  mode: "bicycling" | "transit"
+  mode: "bicycling" | "transit" | "walking"
 ): TravelInfo {
   const route = response.data.routes[0];
   if (!route) {
@@ -154,6 +156,8 @@ function parseTravelInfo(
     } else {
       summary = `${durationMinutes} min transit`;
     }
+  } else if (mode === "walking") {
+    summary = `${distanceMiles} mi, ${durationMinutes} min walking`;
   } else {
     summary = `${distanceMiles} mi, ${durationMinutes} min biking`;
   }
@@ -206,9 +210,10 @@ export async function getDistances(
   propertyAddress: string,
   destination: Destination
 ): Promise<DistanceResult> {
-  const [bikingResponse, transitResponse] = await Promise.all([
+  const [bikingResponse, transitResponse, walkingResponse] = await Promise.all([
     getDirections(propertyAddress, destination.address, TravelMode.bicycling),
     getDirections(propertyAddress, destination.address, TravelMode.transit),
+    getDirections(propertyAddress, destination.address, TravelMode.walking),
   ]);
 
   return {
@@ -217,6 +222,7 @@ export async function getDistances(
     toAddress: destination.address,
     biking: parseTravelInfo(bikingResponse, "bicycling"),
     transit: parseTravelInfo(transitResponse, "transit"),
+    walking: parseTravelInfo(walkingResponse, "walking"),
     nearestSubway: extractNearestSubway(transitResponse),
   };
 }
@@ -293,6 +299,9 @@ export function formatDistanceResults(results: DistanceResult[]): string {
         ? ` (${r.transit.transfers} transfer${r.transit.transfers !== 1 ? "s" : ""})`
         : "";
     lines.push(`${transitLine}${transferInfo} — ${r.transit.summary}`);
+    lines.push(
+      `    🚶 ${r.walking.distanceMiles} mi, ${r.walking.durationMinutes} min`
+    );
   }
 
   return lines.join("\n");

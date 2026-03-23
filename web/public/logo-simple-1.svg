@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- Roof: thick angled lines -->
+  <path d="M6 28L24 10L42 28" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Two heads -->
+  <circle cx="18" cy="35" r="4" fill="#fff"/>
+  <circle cx="30" cy="35" r="4" fill="#fff"/>
+</svg>

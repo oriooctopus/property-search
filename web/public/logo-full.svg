@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 48" fill="none">
+  <!-- Icon: Map Pin + House (Option 2) -->
+  <g>
+    <!-- Map pin body -->
+    <path d="M24 2C15.72 2 9 8.72 9 17c0 12 15 27 15 27s15-15 15-27c0-8.28-6.72-15-15-15z" fill="#58a6ff"/>
+
+    <!-- White house silhouette inside pin -->
+    <path d="M24 9l-9 8h3v7h12v-7h3L24 9z" fill="white"/>
+
+    <!-- Windows -->
+    <rect x="19" y="15.5" width="3" height="2.5" rx="0.4" fill="#58a6ff"/>
+    <rect x="26" y="15.5" width="3" height="2.5" rx="0.4" fill="#58a6ff"/>
+
+    <!-- Door -->
+    <rect x="22.5" y="19" width="3" height="5" rx="0.4" fill="#58a6ff"/>
+
+    <!-- Green accent at pin point -->
+    <circle cx="24" cy="43" r="2.5" fill="#7ee787"/>
+  </g>
+
+  <!-- Text: "Dwelligence" -->
+  <text x="56" y="32" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="22" font-weight="600" fill="#e1e4e8">
+    <tspan fill="#58a6ff">D</tspan><tspan fill="#e1e4e8">welligence</tspan>
+  </text>
+</svg>

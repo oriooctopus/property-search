@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 48" fill="none">
+  <!-- Icon (logo-screen-1 style) -->
+  <g transform="translate(0,0)">
+    <circle cx="24" cy="24" r="21" stroke="#ffffff" stroke-width="2" fill="none"/>
+    <circle cx="24" cy="24" r="15" stroke="#ffffff" stroke-width="1.2" fill="none" opacity="0.6"/>
+    <circle cx="24" cy="24" r="9" stroke="#ffffff" stroke-width="1.2" fill="none" opacity="0.4"/>
+    <!-- House icon at center -->
+    <path d="M24 18 L19 23 L29 23 Z" fill="#ffffff"/>
+    <rect x="20" y="23" width="8" height="6" fill="#ffffff"/>
+    <rect x="26.5" y="19" width="1.8" height="4" fill="#ffffff"/>
+  </g>
+  <!-- Text -->
+  <text x="56" y="30" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="16" font-weight="600" fill="#ffffff" letter-spacing="0.2em">DWELLIGENCE</text>
+</svg>

@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Toggle Mockup B: Segmented Control</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f1117; color: #e1e4e8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+  .navbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 24px; background: #1c2028; border-bottom: 1px solid #2d333b;
+  }
+  .navbar-brand { font-size: 18px; font-weight: 700; color: #58a6ff; }
+  .navbar-links { display: flex; gap: 20px; }
+  .navbar-links a { color: #8b949e; text-decoration: none; font-size: 14px; }
+  .navbar-links a:hover { color: #e1e4e8; }
+
+  .filter-bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 24px; background: #1c2028; border-bottom: 1px solid #2d333b;
+  }
+  .filter-bar label { font-size: 13px; color: #8b949e; }
+  .filter-bar select {
+    background: #0f1117; color: #e1e4e8; border: 1px solid #2d333b;
+    padding: 5px 10px; border-radius: 6px; font-size: 13px;
+  }
+
+  /* Segmented Control */
+  .segmented-control {
+    display: inline-flex; align-items: stretch;
+    background: #0f1117; border: 1px solid #2d333b; border-radius: 8px;
+    overflow: hidden; margin-left: auto;
+  }
+  .segmented-control button {
+    border: none; background: transparent; color: #8b949e;
+    font-size: 13px; font-weight: 500; padding: 5px 20px;
+    cursor: pointer; transition: all 0.15s ease;
+    position: relative;
+  }
+  .segmented-control button + button {
+    border-left: 1px solid #2d333b;
+  }
+  .segmented-control button.active {
+    background: rgba(88, 166, 255, 0.15); color: #58a6ff; font-weight: 600;
+  }
+  .segmented-control button:not(.active):hover {
+    background: rgba(255,255,255,0.04); color: #e1e4e8;
+  }
+
+  .content { padding: 24px; }
+  .content h2 { font-size: 14px; color: #8b949e; margin-bottom: 16px; font-weight: 500; }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .card {
+    background: #1c2028; border: 1px solid #2d333b; border-radius: 10px;
+    padding: 16px; min-height: 120px;
+  }
+  .card .title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .card .meta { font-size: 13px; color: #8b949e; }
+  .card .price { font-size: 16px; color: #58a6ff; font-weight: 600; margin-top: 10px; }
+
+  .mockup-label {
+    position: fixed; bottom: 16px; left: 16px;
+    background: #58a6ff; color: #0f1117; padding: 6px 14px;
+    border-radius: 6px; font-size: 12px; font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-brand">PropertySearch</div>
+  <div class="navbar-links">
+    <a href="#">Search</a>
+    <a href="#">Favorites</a>
+    <a href="#">Profile</a>
+  </div>
+</nav>
+
+<div class="filter-bar">
+  <label>Area:</label>
+  <select><option>All Stockholm</option></select>
+  <label>Price:</label>
+  <select><option>Any</option></select>
+  <label>Rooms:</label>
+  <select><option>2+</option></select>
+
+  <div class="segmented-control">
+    <button class="active">List</button>
+    <button>Map</button>
+  </div>
+</div>
+
+<div class="content">
+  <h2>24 properties found</h2>
+  <div class="card-grid">
+    <div class="card">
+      <div class="title">Vasastan 3 rok</div>
+      <div class="meta">78 m2 &middot; Avg 4,200 kr/m2</div>
+      <div class="price">3 290 000 kr</div>
+    </div>
+    <div class="card">
+      <div class="title">Sodermalm 2 rok</div>
+      <div class="meta">55 m2 &middot; Avg 4,800 kr/m2</div>
+      <div class="price">2 640 000 kr</div>
+    </div>
+    <div class="card">
+      <div class="title">Kungsholmen 4 rok</div>
+      <div class="meta">102 m2 &middot; Avg 3,900 kr/m2</div>
+      <div class="price">4 100 000 kr</div>
+    </div>
+    <div class="card">
+      <div class="title">Ostermalm 2 rok</div>
+      <div class="meta">48 m2 &middot; Avg 5,100 kr/m2</div>
+      <div class="price">2 450 000 kr</div>
+    </div>
+  </div>
+</div>
+
+<div class="mockup-label">B: Segmented Control (140px)</div>
+
+<script>
+document.querySelectorAll('.segmented-control button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.segmented-control button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- Location pin outline -->
+  <path d="M24,44 C24,44 10,28 10,18 A14,14 0 0,1 38,18 C38,28 24,44 24,44Z" fill="none" stroke="#fff" stroke-width="2.5"/>
+  <!-- Person inside pin -->
+  <circle cx="24" cy="15" r="3.5" fill="#fff"/>
+  <polygon points="19,27 24,20 29,27" fill="#fff"/>
+  <!-- Radar arcs radiating outward -->
+  <path d="M6,18 A4,4 0 0,0 6,12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+  <path d="M2,20 A6,6 0 0,0 2,10" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+  <path d="M42,18 A4,4 0 0,1 42,12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+  <path d="M46,20 A6,6 0 0,1 46,10" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+</svg>
