@@ -31,7 +31,7 @@ function ChevronDown({ className }: { className?: string }) {
 export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
   function FilterChip({ label, active = false, open = false, children, onToggle, className, ...rest }, ref) {
     return (
-      <div className="relative">
+      <div className="relative shrink-0">
         <ButtonBase
           ref={ref}
           onClick={onToggle}
@@ -39,8 +39,8 @@ export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
             'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium whitespace-nowrap',
             'border',
             active
-              ? 'bg-[#58a6ff]/[0.08] text-[#58a6ff] border-[#58a6ff] hover:bg-[#58a6ff]/[0.15]'
-              : 'bg-transparent text-[#8b949e] border-[#2d333b] hover:bg-[#2d333b]/25 hover:text-[#e1e4e8]',
+              ? 'bg-[#58a6ff]/[0.08] text-[#58a6ff] border-[#58a6ff] hover:bg-[#58a6ff]/[0.18]'
+              : 'bg-transparent text-[#8b949e] border-[#2d333b] hover:bg-[#58a6ff]/20 hover:text-[#c0d6f5] hover:border-[#58a6ff]/40',
             className,
           )}
           {...rest}

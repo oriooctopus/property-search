@@ -31,7 +31,7 @@ export default function Navbar() {
     return () => subscription.unsubscribe();
   }, [supabase]);
 
-  const { data: profile } = useProfile(user?.id ?? null);
+  const { data: profile, isLoading: profileLoading } = useProfile(user?.id ?? null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -147,6 +147,9 @@ export default function Navbar() {
               Favorites
             </Link>
             <div className="relative" ref={dropdownRef}>
+              {profileLoading ? (
+                <div className="h-8 w-8 rounded-full" style={{ backgroundColor: "#2d333b" }} />
+              ) : (
               <button
                 onClick={() => setDropdownOpen((prev) => !prev)}
                 className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-opacity hover:opacity-80 cursor-pointer overflow-hidden"
@@ -163,6 +166,7 @@ export default function Navbar() {
                   avatarLetter
                 )}
               </button>
+              )}
               {dropdownOpen && (
                 <div
                   className="absolute right-0 mt-2 w-40 rounded-md py-1 shadow-lg"

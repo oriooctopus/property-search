@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup C: Conversational Sidebar</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f1117; color: #e1e4e8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; height: 100vh; overflow: hidden; }
+
+  /* Navbar */
+  .navbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 24px; background: #1c2028; border-bottom: 1px solid #2d333b;
+    z-index: 100; position: relative;
+  }
+  .navbar-brand { font-size: 18px; font-weight: 700; color: #58a6ff; display: flex; align-items: center; gap: 8px; }
+  .navbar-brand svg { width: 22px; height: 22px; }
+  .navbar-links { display: flex; gap: 20px; align-items: center; }
+  .navbar-links a { color: #8b949e; text-decoration: none; font-size: 14px; transition: color 0.15s; }
+  .navbar-links a:hover { color: #e1e4e8; }
+  .navbar-links a.active { color: #e1e4e8; font-weight: 600; }
+  .avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #58a6ff, #7ee787); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #0f1117; }
+
+  /* Main 3-column layout */
+  .layout {
+    display: flex; height: calc(100vh - 49px);
+  }
+
+  /* Left: Chat panel */
+  .chat-panel {
+    width: 420px; flex-shrink: 0; display: flex; flex-direction: column;
+    border-right: 1px solid #2d333b; background: #161921;
+  }
+  .chat-header {
+    padding: 16px 20px; border-bottom: 1px solid #2d333b;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .chat-header-icon {
+    width: 32px; height: 32px; border-radius: 10px;
+    background: linear-gradient(135deg, #58a6ff, #7ee787);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .chat-header-icon svg { width: 18px; height: 18px; fill: #0f1117; }
+  .chat-header-text h3 { font-size: 14px; font-weight: 600; }
+  .chat-header-text p { font-size: 12px; color: #8b949e; }
+
+  .chat-messages {
+    flex: 1; overflow-y: auto; padding: 20px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+
+  /* Message bubbles */
+  .msg { max-width: 95%; }
+  .msg.user {
+    align-self: flex-end;
+  }
+  .msg.ai {
+    align-self: flex-start;
+  }
+  .msg-bubble {
+    padding: 12px 16px; border-radius: 14px; font-size: 14px; line-height: 1.6;
+  }
+  .msg.user .msg-bubble {
+    background: #58a6ff; color: #0f1117; border-bottom-right-radius: 4px;
+  }
+  .msg.ai .msg-bubble {
+    background: #1c2028; border: 1px solid #2d333b; border-bottom-left-radius: 4px;
+    color: #e1e4e8;
+  }
+  .msg-label {
+    font-size: 11px; color: #8b949e; margin-bottom: 4px; padding: 0 4px;
+  }
+  .msg.user .msg-label { text-align: right; }
+
+  /* AI parsed filters in chat */
+  .ai-filters {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
+  }
+  .ai-filter {
+    padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+  }
+  .ai-filter.transit { background: rgba(88,166,255,0.15); color: #58a6ff; }
+  .ai-filter.beds { background: rgba(126,231,135,0.12); color: #7ee787; }
+  .ai-filter.price { background: rgba(249,115,22,0.12); color: #f97316; }
+
+  /* Results summary in chat */
+  .ai-results-summary {
+    margin-top: 12px; padding: 10px 14px; background: rgba(126,231,135,0.06);
+    border: 1px solid rgba(126,231,135,0.15); border-radius: 10px;
+  }
+  .ai-results-summary .stat-row {
+    display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0;
+  }
+  .ai-results-summary .stat-label { color: #8b949e; }
+  .ai-results-summary .stat-value { color: #7ee787; font-weight: 600; }
+
+  /* Chat input */
+  .chat-input-area {
+    padding: 16px 20px; border-top: 1px solid #2d333b;
+    background: #161921;
+  }
+  .chat-input-wrap {
+    display: flex; gap: 8px; align-items: center;
+  }
+  .chat-input {
+    flex: 1; padding: 12px 16px; background: #1c2028; border: 1px solid #2d333b;
+    border-radius: 12px; color: #e1e4e8; font-size: 14px; outline: none;
+    transition: border-color 0.2s;
+  }
+  .chat-input::placeholder { color: #6e7681; }
+  .chat-input:focus { border-color: #58a6ff; }
+  .send-btn {
+    width: 40px; height: 40px; border-radius: 12px; background: #58a6ff;
+    border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: background 0.15s;
+  }
+  .send-btn:hover { background: #79b8ff; }
+  .send-btn svg { width: 18px; height: 18px; fill: #0f1117; }
+
+  /* Right panel: Map + Listings */
+  .results-panel {
+    flex: 1; display: flex; flex-direction: column; min-width: 0;
+  }
+
+  /* Map area */
+  .map-area {
+    height: 45%; position: relative; border-bottom: 1px solid #2d333b; flex-shrink: 0;
+  }
+  .map-container {
+    width: 100%; height: 100%; background: #1c2028; position: relative; overflow: hidden;
+  }
+  .map-streets {
+    position: absolute; inset: 0; opacity: 0.12;
+    background:
+      linear-gradient(0deg, transparent 49%, #2d333b 49%, #2d333b 51%, transparent 51%) 0 0 / 50px 50px,
+      linear-gradient(90deg, transparent 49%, #2d333b 49%, #2d333b 51%, transparent 51%) 0 0 / 50px 50px;
+  }
+  .map-label {
+    position: absolute; top: 12px; left: 12px; background: rgba(15,17,23,0.85);
+    padding: 6px 12px; border-radius: 8px; font-size: 12px; color: #8b949e;
+    backdrop-filter: blur(8px); border: 1px solid #2d333b;
+  }
+  .map-marker {
+    position: absolute; transform: translate(-50%, -100%); cursor: pointer; transition: transform 0.15s;
+  }
+  .map-marker:hover { transform: translate(-50%, -100%) scale(1.15); z-index: 10; }
+  .marker-price {
+    background: #58a6ff; color: #0f1117; padding: 4px 8px; border-radius: 6px;
+    font-size: 11px; font-weight: 700; white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .marker-price.best { background: #7ee787; }
+  .marker-dot {
+    width: 8px; height: 8px; background: #58a6ff; border-radius: 50%;
+    margin: 0 auto; box-shadow: 0 0 0 3px rgba(88,166,255,0.3);
+  }
+  .marker-dot.best { background: #7ee787; box-shadow: 0 0 0 3px rgba(126,231,135,0.3); }
+  /* Subway line */
+  .subway-line {
+    position: absolute; height: 3px; background: #8b949e; opacity: 0.35;
+    top: 50%; left: 5%; right: 5%; transform: rotate(-3deg);
+  }
+  .station-dot {
+    position: absolute; width: 12px; height: 12px; border-radius: 50%;
+    background: #f97316; border: 2px solid #0f1117; transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 2px rgba(249,115,22,0.3);
+  }
+  .station-label {
+    position: absolute; transform: translate(-50%, 8px);
+    font-size: 10px; color: #f97316; white-space: nowrap; font-weight: 600;
+  }
+
+  /* Listings area */
+  .listings-area {
+    flex: 1; overflow-y: auto; padding: 16px 20px;
+  }
+  .listings-header {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+  }
+  .listings-header h3 { font-size: 14px; font-weight: 600; }
+  .listings-header .count { font-size: 13px; color: #58a6ff; }
+  .listing-card {
+    background: #1c2028; border: 1px solid #2d333b; border-radius: 12px;
+    padding: 14px 18px; margin-bottom: 10px; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .listing-card:hover { border-color: #58a6ff; background: #1e2330; }
+  .listing-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+  .listing-title { font-size: 14px; font-weight: 600; }
+  .listing-address { font-size: 12px; color: #8b949e; margin-top: 2px; }
+  .listing-price { font-size: 17px; font-weight: 700; color: #58a6ff; text-align: right; }
+  .listing-per-bed { font-size: 11px; color: #7ee787; font-weight: 500; margin-top: 2px; }
+  .listing-details { display: flex; gap: 14px; font-size: 12px; color: #8b949e; margin-bottom: 8px; }
+  .listing-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag { padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+  .tag.transit { background: rgba(88,166,255,0.1); color: #58a6ff; }
+  .tag.green { background: rgba(126,231,135,0.1); color: #7ee787; }
+  .tag.time { background: rgba(249,115,22,0.1); color: #f97316; }
+  .tag.purple { background: rgba(168,85,247,0.1); color: #c084fc; }
+
+  .mockup-label {
+    position: fixed; bottom: 16px; right: 16px;
+    background: #58a6ff; color: #0f1117; padding: 6px 14px;
+    border-radius: 6px; font-size: 12px; font-weight: 700; z-index: 200;
+  }
+
+  /* Typing indicator */
+  .typing { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
+  .typing span {
+    width: 6px; height: 6px; border-radius: 50%; background: #8b949e;
+    animation: blink 1.4s infinite both;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: 0.3; } 40% { opacity: 1; } }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    Dwelligence
+  </div>
+  <div class="navbar-links">
+    <a href="#" class="active">Search</a>
+    <a href="#">Favorites</a>
+    <a href="#">Profile</a>
+    <div class="avatar">O</div>
+  </div>
+</nav>
+
+<div class="layout">
+  <!-- Chat sidebar -->
+  <div class="chat-panel">
+    <div class="chat-header">
+      <div class="chat-header-icon"><svg viewBox="0 0 24 24"><path d="M12 2a2 2 0 012 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 017 7h1a1 1 0 110 2h-1.07A7 7 0 0113 22h-2a7 7 0 01-6.93-6H3a1 1 0 110-2h1a7 7 0 017-7h1V5.73A2 2 0 0112 2z"/></svg></div>
+      <div class="chat-header-text">
+        <h3>Dwelligence AI</h3>
+        <p>Describe what you're looking for</p>
+      </div>
+    </div>
+
+    <div class="chat-messages">
+      <!-- Turn 1 -->
+      <div class="msg ai">
+        <div class="msg-label">Dwelligence AI</div>
+        <div class="msg-bubble">
+          Hey! I can help you find apartments in NYC. Tell me what you're looking for -- bedrooms, budget, neighborhood, commute, amenities -- anything goes.
+        </div>
+      </div>
+
+      <div class="msg user">
+        <div class="msg-label">You</div>
+        <div class="msg-bubble">
+          Show me 5+ bedrooms near the L train under $3000 per bed
+        </div>
+      </div>
+
+      <div class="msg ai">
+        <div class="msg-label">Dwelligence AI</div>
+        <div class="msg-bubble">
+          Found <strong>12 listings</strong> near L train stops (Bedford Ave to DeKalb Ave). Showing 5+ bedrooms under $3,000/bed.
+          <div class="ai-filters">
+            <span class="ai-filter transit">L Train</span>
+            <span class="ai-filter beds">5+ Beds</span>
+            <span class="ai-filter price">&lt; $3,000/bed</span>
+          </div>
+          <div class="ai-results-summary">
+            <div class="stat-row">
+              <span class="stat-label">Price range</span>
+              <span class="stat-value">$6,995 - $14,500</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Best per-bed value</span>
+              <span class="stat-value">$1,399/bed</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Avg commute to Union Sq</span>
+              <span class="stat-value">24 min</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Turn 2: Refinement -->
+      <div class="msg user">
+        <div class="msg-label">You</div>
+        <div class="msg-bubble">
+          What about closer to Manhattan? Maybe Williamsburg area
+        </div>
+      </div>
+
+      <div class="msg ai">
+        <div class="msg-label">Dwelligence AI</div>
+        <div class="msg-bubble">
+          Narrowed to <strong>Williamsburg and East Williamsburg</strong>. Found <strong>6 listings</strong> -- these are closer to Manhattan with shorter L train commutes (12-18 min to Union Sq). Prices are higher but still under your $3,000/bed cap.
+          <div class="ai-filters">
+            <span class="ai-filter transit">L Train</span>
+            <span class="ai-filter beds">5+ Beds</span>
+            <span class="ai-filter price">&lt; $3,000/bed</span>
+          </div>
+          <div class="ai-results-summary">
+            <div class="stat-row">
+              <span class="stat-label">Price range</span>
+              <span class="stat-value">$9,500 - $14,500</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Best per-bed value</span>
+              <span class="stat-value">$1,900/bed</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Avg commute to Union Sq</span>
+              <span class="stat-value">15 min</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Turn 3: Another refinement -->
+      <div class="msg user">
+        <div class="msg-label">You</div>
+        <div class="msg-bubble">
+          Any of these have laundry in unit?
+        </div>
+      </div>
+
+      <div class="msg ai">
+        <div class="msg-label">Dwelligence AI</div>
+        <div class="msg-bubble">
+          <strong>3 of the 6</strong> have in-unit laundry. I've highlighted those in the results. The best deal with laundry is <strong>110 Bedford Ave #4</strong> at $2,200/bed.
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <div class="chat-input-wrap">
+        <input class="chat-input" type="text" placeholder="Refine your search..." value="What about with a backyard?" />
+        <button class="send-btn"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Map + Listings -->
+  <div class="results-panel">
+    <div class="map-area">
+      <div class="map-container">
+        <div class="map-streets"></div>
+        <div class="map-label">Williamsburg, Brooklyn</div>
+        <div class="subway-line"></div>
+        <!-- L train stations -->
+        <div class="station-dot" style="top: 50%; left: 20%;"></div>
+        <div class="station-label" style="top: 50%; left: 20%;">Bedford Ave</div>
+        <div class="station-dot" style="top: 49%; left: 40%;"></div>
+        <div class="station-label" style="top: 49%; left: 40%;">Lorimer St</div>
+        <div class="station-dot" style="top: 48%; left: 60%;"></div>
+        <div class="station-label" style="top: 48%; left: 60%;">Graham Ave</div>
+        <div class="station-dot" style="top: 47%; left: 80%;"></div>
+        <div class="station-label" style="top: 47%; left: 80%;">Grand St</div>
+        <!-- Price markers -->
+        <div class="map-marker" style="top: 35%; left: 25%;">
+          <div class="marker-price best">$1,900</div>
+          <div class="marker-dot best"></div>
+        </div>
+        <div class="map-marker" style="top: 30%; left: 18%;">
+          <div class="marker-price">$2,200</div>
+          <div class="marker-dot"></div>
+        </div>
+        <div class="map-marker" style="top: 38%; left: 45%;">
+          <div class="marker-price">$2,400</div>
+          <div class="marker-dot"></div>
+        </div>
+        <div class="map-marker" style="top: 32%; left: 62%;">
+          <div class="marker-price">$2,600</div>
+          <div class="marker-dot"></div>
+        </div>
+        <div class="map-marker" style="top: 40%; left: 75%;">
+          <div class="marker-price">$2,800</div>
+          <div class="marker-dot"></div>
+        </div>
+        <div class="map-marker" style="top: 28%; left: 38%;">
+          <div class="marker-price">$2,900</div>
+          <div class="marker-dot"></div>
+        </div>
+        <div style="position: absolute; bottom: 12px; right: 12px; display: flex; flex-direction: column; gap: 4px;">
+          <button style="width: 32px; height: 32px; background: #1c2028; border: 1px solid #2d333b; border-radius: 6px; color: #8b949e; cursor: pointer; font-size: 16px;">+</button>
+          <button style="width: 32px; height: 32px; background: #1c2028; border: 1px solid #2d333b; border-radius: 6px; color: #8b949e; cursor: pointer; font-size: 16px;">&minus;</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="listings-area">
+      <div class="listings-header">
+        <h3>6 listings in Williamsburg</h3>
+        <span class="count">Sorted by price/bed</span>
+      </div>
+
+      <div class="listing-card">
+        <div class="listing-top">
+          <div>
+            <div class="listing-title">267 S 2nd St #3</div>
+            <div class="listing-address">Williamsburg, Brooklyn</div>
+          </div>
+          <div style="text-align: right">
+            <div class="listing-price">$9,500</div>
+            <div class="listing-per-bed">$1,900/bed</div>
+          </div>
+        </div>
+        <div class="listing-details">
+          <span>5 bed / 2 bath</span>
+          <span>2,100 sqft</span>
+          <span>Available Apr 1</span>
+        </div>
+        <div class="listing-tags">
+          <span class="tag transit">0.2 mi to Bedford Ave (L)</span>
+          <span class="tag green">Best value</span>
+          <span class="tag time">14 min to Union Sq</span>
+        </div>
+      </div>
+
+      <div class="listing-card" style="border-color: rgba(126,231,135,0.3);">
+        <div class="listing-top">
+          <div>
+            <div class="listing-title">110 Bedford Ave #4</div>
+            <div class="listing-address">Williamsburg, Brooklyn</div>
+          </div>
+          <div style="text-align: right">
+            <div class="listing-price">$11,000</div>
+            <div class="listing-per-bed">$2,200/bed</div>
+          </div>
+        </div>
+        <div class="listing-details">
+          <span>5 bed / 2.5 bath</span>
+          <span>2,400 sqft</span>
+          <span>Available May 1</span>
+        </div>
+        <div class="listing-tags">
+          <span class="tag transit">0.1 mi to Bedford Ave (L)</span>
+          <span class="tag green">Laundry in unit</span>
+          <span class="tag purple">Roof access</span>
+        </div>
+      </div>
+
+      <div class="listing-card" style="border-color: rgba(126,231,135,0.3);">
+        <div class="listing-top">
+          <div>
+            <div class="listing-title">59 Montrose Ave #1</div>
+            <div class="listing-address">Williamsburg, Brooklyn</div>
+          </div>
+          <div style="text-align: right">
+            <div class="listing-price">$12,000</div>
+            <div class="listing-per-bed">$2,400/bed</div>
+          </div>
+        </div>
+        <div class="listing-details">
+          <span>5 bed / 2 bath</span>
+          <span>2,200 sqft</span>
+          <span>Available Now</span>
+        </div>
+        <div class="listing-tags">
+          <span class="tag transit">0.1 mi to Montrose Ave (L)</span>
+          <span class="tag green">Laundry in unit</span>
+          <span class="tag time">16 min to Union Sq</span>
+        </div>
+      </div>
+
+      <div class="listing-card">
+        <div class="listing-top">
+          <div>
+            <div class="listing-title">445 Grand St #5A</div>
+            <div class="listing-address">Williamsburg, Brooklyn</div>
+          </div>
+          <div style="text-align: right">
+            <div class="listing-price">$13,000</div>
+            <div class="listing-per-bed">$2,600/bed</div>
+          </div>
+        </div>
+        <div class="listing-details">
+          <span>5 bed / 3 bath</span>
+          <span>2,800 sqft</span>
+          <span>Available Apr 15</span>
+        </div>
+        <div class="listing-tags">
+          <span class="tag transit">0.3 mi to Graham Ave (L)</span>
+          <span class="tag green">Dishwasher</span>
+          <span class="tag time">18 min to Union Sq</span>
+        </div>
+      </div>
+
+      <div class="listing-card" style="border-color: rgba(126,231,135,0.3);">
+        <div class="listing-top">
+          <div>
+            <div class="listing-title">88 Ainslie St #2</div>
+            <div class="listing-address">Williamsburg, Brooklyn</div>
+          </div>
+          <div style="text-align: right">
+            <div class="listing-price">$14,000</div>
+            <div class="listing-per-bed">$2,800/bed</div>
+          </div>
+        </div>
+        <div class="listing-details">
+          <span>5 bed / 3 bath</span>
+          <span>2,900 sqft</span>
+          <span>Available May 1</span>
+        </div>
+        <div class="listing-tags">
+          <span class="tag transit">0.2 mi to Lorimer St (L)</span>
+          <span class="tag green">Laundry in unit</span>
+          <span class="tag purple">Backyard</span>
+        </div>
+      </div>
+
+      <div class="listing-card">
+        <div class="listing-top">
+          <div>
+            <div class="listing-title">195 Metropolitan Ave #3</div>
+            <div class="listing-address">Williamsburg, Brooklyn</div>
+          </div>
+          <div style="text-align: right">
+            <div class="listing-price">$14,500</div>
+            <div class="listing-per-bed">$2,900/bed</div>
+          </div>
+        </div>
+        <div class="listing-details">
+          <span>5 bed / 2.5 bath</span>
+          <span>2,500 sqft</span>
+          <span>Available Now</span>
+        </div>
+        <div class="listing-tags">
+          <span class="tag transit">0.1 mi to Bedford Ave (L)</span>
+          <span class="tag green">Duplex</span>
+          <span class="tag time">12 min to Union Sq</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mockup-label">Mockup C &mdash; Conversational Sidebar</div>
+</body>
+</html>

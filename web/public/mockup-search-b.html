@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Search Mockup B: Smart Search Bar + Filters</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0f1117; color: #e1e4e8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; }
+
+  /* Navbar */
+  .navbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 24px; background: #1c2028; border-bottom: 1px solid #2d333b;
+  }
+  .navbar-brand { font-size: 18px; font-weight: 700; color: #58a6ff; }
+  .navbar-links { display: flex; gap: 20px; }
+  .navbar-links a { color: #8b949e; text-decoration: none; font-size: 14px; transition: color 0.15s; }
+  .navbar-links a:hover { color: #e1e4e8; }
+  .navbar-links a.active { color: #e1e4e8; font-weight: 600; }
+
+  /* Search section */
+  .search-section {
+    padding: 20px 24px; background: #1c2028; border-bottom: 1px solid #2d333b;
+  }
+  .search-row { display: flex; gap: 10px; max-width: 900px; margin: 0 auto; }
+  .search-bar {
+    flex: 1; padding: 14px 20px;
+    background: #0f1117; border: 1px solid #2d333b; border-radius: 10px;
+    color: #e1e4e8; font-size: 15px; outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .search-bar::placeholder { color: #8b949e; }
+  .search-bar:focus {
+    border-color: #58a6ff;
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+  }
+  .search-go {
+    padding: 14px 28px; background: #58a6ff; color: #0f1117;
+    border: none; border-radius: 10px; font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: background 0.15s; white-space: nowrap;
+  }
+  .search-go:hover { background: #79b8ff; }
+
+  /* Parsed filters */
+  .parsed-filters {
+    max-width: 900px; margin: 14px auto 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .parsed-label {
+    font-size: 12px; color: #8b949e; font-weight: 500; text-transform: uppercase;
+    letter-spacing: 0.5px; margin-right: 4px;
+  }
+  .parsed-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 500;
+  }
+  .parsed-pill.beds { background: rgba(126,231,135,0.12); color: #7ee787; }
+  .parsed-pill.transit { background: rgba(88,166,255,0.12); color: #58a6ff; }
+  .parsed-pill.price { background: rgba(249,115,22,0.12); color: #f97316; }
+  .parsed-pill.area { background: rgba(139,148,158,0.15); color: #e1e4e8; }
+  .parsed-pill .remove {
+    width: 16px; height: 16px; border-radius: 50%; background: rgba(255,255,255,0.15);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 10px; line-height: 1;
+  }
+  .parsed-pill .remove:hover { background: rgba(255,255,255,0.3); }
+
+  /* Filter bar */
+  .filter-bar {
+    padding: 12px 24px; border-bottom: 1px solid #2d333b;
+    display: flex; gap: 12px; align-items: center; justify-content: center;
+    flex-wrap: wrap;
+  }
+  .filter-select {
+    background: #1c2028; color: #e1e4e8; border: 1px solid #2d333b;
+    padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%238b949e' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+    padding-right: 30px;
+  }
+  .filter-select.active-filter { border-color: #58a6ff; color: #58a6ff; }
+  .filter-divider { width: 1px; height: 20px; background: #2d333b; }
+  .sort-btn {
+    background: transparent; border: 1px solid #2d333b; color: #8b949e;
+    padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .sort-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+
+  /* Results */
+  .results-container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+  .results-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .results-header h2 { font-size: 14px; color: #8b949e; font-weight: 500; }
+  .results-header .count { font-size: 13px; color: #58a6ff; }
+
+  /* Card grid */
+  .card-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;
+  }
+  .card {
+    background: #1c2028; border: 1px solid #2d333b; border-radius: 12px;
+    overflow: hidden; transition: border-color 0.15s;
+  }
+  .card:hover { border-color: #58a6ff; }
+  .card-img {
+    height: 140px; background: linear-gradient(135deg, #2d333b 0%, #1c2028 100%);
+    display: flex; align-items: center; justify-content: center;
+    color: #8b949e; font-size: 13px; position: relative;
+  }
+  .card-img .badge {
+    position: absolute; top: 10px; left: 10px;
+    background: rgba(126,231,135,0.9); color: #0f1117;
+    padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;
+  }
+  .card-body { padding: 16px; }
+  .card-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .card-address { font-size: 13px; color: #8b949e; margin-bottom: 10px; }
+  .card-price-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .card-price { font-size: 18px; font-weight: 700; color: #58a6ff; }
+  .card-per-bed { font-size: 12px; color: #7ee787; font-weight: 500; }
+  .card-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .card-tag {
+    padding: 3px 8px; border-radius: 5px; font-size: 11px; font-weight: 500;
+    background: rgba(139,148,158,0.1); color: #8b949e;
+  }
+  .card-tag.highlight { background: rgba(88,166,255,0.1); color: #58a6ff; }
+
+  /* Mockup label */
+  .mockup-label {
+    position: fixed; bottom: 16px; left: 16px;
+    background: #58a6ff; color: #0f1117; padding: 6px 14px;
+    border-radius: 6px; font-size: 12px; font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="navbar-brand">Dwelligence</div>
+  <div class="navbar-links">
+    <a href="#" class="active">Search</a>
+    <a href="#">Favorites</a>
+    <a href="#">Profile</a>
+  </div>
+</nav>
+
+<div class="search-section">
+  <div class="search-row">
+    <input class="search-bar" type="text" value="5 bed near L train under $2500/bed" />
+    <button class="search-go">Search</button>
+  </div>
+  <div class="parsed-filters">
+    <span class="parsed-label">Parsed:</span>
+    <span class="parsed-pill beds">5+ Bedrooms <span class="remove">&times;</span></span>
+    <span class="parsed-pill transit">Near L Train <span class="remove">&times;</span></span>
+    <span class="parsed-pill price">Under $2,500/bed <span class="remove">&times;</span></span>
+  </div>
+</div>
+
+<div class="filter-bar">
+  <select class="filter-select active-filter">
+    <option>Beds: 5+</option>
+    <option>Any beds</option>
+    <option>3+</option>
+    <option>4+</option>
+    <option>6+</option>
+    <option>7+</option>
+  </select>
+  <select class="filter-select">
+    <option>Baths: Any</option>
+    <option>1+</option>
+    <option>2+</option>
+    <option>3+</option>
+  </select>
+  <select class="filter-select active-filter">
+    <option>Max: $2,500/bed</option>
+    <option>No max</option>
+    <option>$1,500/bed</option>
+    <option>$2,000/bed</option>
+    <option>$3,000/bed</option>
+  </select>
+  <select class="filter-select active-filter">
+    <option>Transit: L Train</option>
+    <option>Any transit</option>
+    <option>A/C/E</option>
+    <option>1/2/3</option>
+    <option>N/Q/R/W</option>
+  </select>
+  <div class="filter-divider"></div>
+  <button class="sort-btn">Sort: Best Value</button>
+</div>
+
+<div class="results-container">
+  <div class="results-header">
+    <h2>12 results matching your search</h2>
+    <span class="count">Showing all 12</span>
+  </div>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-img">
+        <span>Photo placeholder</span>
+        <span class="badge">Best Value</span>
+      </div>
+      <div class="card-body">
+        <div class="card-title">248 Stanhope St</div>
+        <div class="card-address">Bushwick, Brooklyn</div>
+        <div class="card-price-row">
+          <span class="card-price">$9,900/mo</span>
+          <span class="card-per-bed">$1,980/bed</span>
+        </div>
+        <div class="card-tags">
+          <span class="card-tag">5 bed</span>
+          <span class="card-tag">2 bath</span>
+          <span class="card-tag highlight">L Train — 8 min</span>
+          <span class="card-tag">No fee</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-img"><span>Photo placeholder</span></div>
+      <div class="card-body">
+        <div class="card-title">1087 Flushing Ave</div>
+        <div class="card-address">East Williamsburg, Brooklyn</div>
+        <div class="card-price-row">
+          <span class="card-price">$11,250/mo</span>
+          <span class="card-per-bed">$2,250/bed</span>
+        </div>
+        <div class="card-tags">
+          <span class="card-tag">5 bed</span>
+          <span class="card-tag">2 bath</span>
+          <span class="card-tag highlight">L Train — 5 min</span>
+          <span class="card-tag">No fee</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-img"><span>Photo placeholder</span></div>
+      <div class="card-body">
+        <div class="card-title">345 Eldert St</div>
+        <div class="card-address">Bushwick, Brooklyn</div>
+        <div class="card-price-row">
+          <span class="card-price">$12,100/mo</span>
+          <span class="card-per-bed">$2,420/bed</span>
+        </div>
+        <div class="card-tags">
+          <span class="card-tag">5 bed</span>
+          <span class="card-tag">3 bath</span>
+          <span class="card-tag highlight">L Train — 12 min</span>
+          <span class="card-tag">1 mo fee</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-img"><span>Photo placeholder</span></div>
+      <div class="card-body">
+        <div class="card-title">92 Knickerbocker Ave</div>
+        <div class="card-address">Bushwick, Brooklyn</div>
+        <div class="card-price-row">
+          <span class="card-price">$10,500/mo</span>
+          <span class="card-per-bed">$2,100/bed</span>
+        </div>
+        <div class="card-tags">
+          <span class="card-tag">5 bed</span>
+          <span class="card-tag">2 bath</span>
+          <span class="card-tag highlight">L Train — 6 min</span>
+          <span class="card-tag">No fee</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-img"><span>Photo placeholder</span></div>
+      <div class="card-body">
+        <div class="card-title">501 Bushwick Ave</div>
+        <div class="card-address">Bushwick, Brooklyn</div>
+        <div class="card-price-row">
+          <span class="card-price">$11,750/mo</span>
+          <span class="card-per-bed">$2,350/bed</span>
+        </div>
+        <div class="card-tags">
+          <span class="card-tag">5 bed</span>
+          <span class="card-tag">2 bath</span>
+          <span class="card-tag highlight">L Train — 10 min</span>
+          <span class="card-tag">No fee</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-img"><span>Photo placeholder</span></div>
+      <div class="card-body">
+        <div class="card-title">178 Jefferson St</div>
+        <div class="card-address">East Williamsburg, Brooklyn</div>
+        <div class="card-price-row">
+          <span class="card-price">$12,450/mo</span>
+          <span class="card-per-bed">$2,490/bed</span>
+        </div>
+        <div class="card-tags">
+          <span class="card-tag">5 bed</span>
+          <span class="card-tag">2.5 bath</span>
+          <span class="card-tag highlight">L Train — 3 min</span>
+          <span class="card-tag">Laundry</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mockup-label">B — Smart Search + Filters</div>
+
+</body>
+</html>
