@@ -399,11 +399,11 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
   return (
     <div
       ref={containerRef}
-      className="px-4 py-3"
+      className="px-3 py-2"
       style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}
     >
       {/* Row 1: Filter chips + view toggle */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-2">
         <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
         {/* Price chip */}
         <FilterChip
