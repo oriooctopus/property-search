@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "test": "playwright test",
-    "test:ui": "playwright test --ui"
+    "test:ui": "playwright test --ui",
+    "test:visual": "playwright test tests/visual-regression.spec.ts",
+    "test:visual:update": "playwright test tests/visual-regression.spec.ts --update-snapshots",
+    "predeploy": "npm run test:visual"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
