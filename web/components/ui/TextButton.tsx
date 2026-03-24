@@ -19,7 +19,7 @@ export const TextButton = forwardRef<HTMLButtonElement, TextButtonProps>(
     return (
       <ButtonBase
         ref={ref}
-        className={cn('text-sm font-medium min-h-[44px] flex items-center', variantClasses[variant], className)}
+        className={cn('text-sm font-medium', variantClasses[variant], className)}
         {...rest}
       />
     );

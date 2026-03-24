@@ -134,10 +134,24 @@ export default function Navbar() {
           <>
             <Link
               href="/?chat=1"
-              className="min-h-[44px] flex items-center text-sm transition-colors hover:opacity-80"
+              className="text-sm transition-colors hover:opacity-80"
               style={{ color: "#8b949e" }}
             >
               Search
+            </Link>
+            <Link
+              href="/favorites"
+              className="text-sm transition-colors hover:opacity-80"
+              style={{ color: "#8b949e" }}
+            >
+              Favorites
+            </Link>
+            <Link
+              href="/hidden"
+              className="text-sm transition-colors hover:opacity-80"
+              style={{ color: "#8b949e" }}
+            >
+              Hidden
             </Link>
             <div className="relative" ref={dropdownRef}>
               {profileLoading ? (
@@ -176,29 +190,13 @@ export default function Navbar() {
                   >
                     Profile
                   </Link>
-                  <Link
-                    href="/favorites"
-                    onClick={() => setDropdownOpen(false)}
-                    className="block w-full px-4 py-2 text-left text-sm transition-colors hover:opacity-80"
-                    style={{ color: "#e1e4e8" }}
-                  >
-                    Favorites
-                  </Link>
-                  <Link
-                    href="/hidden"
-                    onClick={() => setDropdownOpen(false)}
-                    className="block w-full px-4 py-2 text-left text-sm transition-colors hover:opacity-80"
-                    style={{ color: "#e1e4e8" }}
-                  >
-                    Hidden
-                  </Link>
                   <button
                     onClick={() => {
                       setDropdownOpen(false);
                       handleLogout();
                     }}
                     className="block w-full px-4 py-2 text-left text-sm transition-colors hover:opacity-80 cursor-pointer"
-                    style={{ color: "#e1e4e8", borderTop: "1px solid #2d333b" }}
+                    style={{ color: "#e1e4e8" }}
                   >
                     Log out
                   </button>
@@ -209,8 +207,15 @@ export default function Navbar() {
         ) : (
           <>
             <Link
+              href="/hidden"
+              className="text-sm transition-colors hover:opacity-80"
+              style={{ color: "#8b949e" }}
+            >
+              Hidden
+            </Link>
+            <Link
               href="/auth/login"
-              className="min-h-[44px] flex items-center text-sm transition-colors hover:opacity-80"
+              className="text-sm transition-colors hover:opacity-80"
               style={{ color: "#8b949e" }}
             >
               Log in

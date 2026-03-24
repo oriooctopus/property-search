@@ -60,7 +60,7 @@ export default function AISearchBar({ onSearch, isLoading, lastQuery, lastError,
   );
 
   return (
-    <div className="px-3 pt-2 pb-1.5" style={{ backgroundColor: '#1c2028' }}>
+    <div className="px-4 pt-3 pb-2" style={{ backgroundColor: '#1c2028' }}>
       <div
         className="flex items-center gap-2 rounded-lg px-3 py-2 transition-colors"
         style={{
@@ -77,15 +77,10 @@ export default function AISearchBar({ onSearch, isLoading, lastQuery, lastError,
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          onFocus={() => {
-            if (!isLoggedIn) {
-              inputRef.current?.blur();
-              router.push('/auth/login');
-            }
-          }}
-          placeholder={isLoggedIn ? 'Search apartments with AI...' : 'Log in to search with AI...'}
-          disabled={isLoading}
+          onFocus={!isLoggedIn ? (e) => { e.target.blur(); router.push('/auth/login'); } : undefined}
+          placeholder={isLoggedIn ? "Search apartments with AI..." : "Log in to search with AI..."}
           readOnly={!isLoggedIn}
+          disabled={isLoading}
           className={`flex-1 bg-transparent text-sm outline-none placeholder:text-[#6e7681] ${!isLoggedIn ? 'cursor-pointer' : ''}`}
           style={{ color: '#e1e4e8', minHeight: '22px' }}
         />
@@ -97,7 +92,7 @@ export default function AISearchBar({ onSearch, isLoading, lastQuery, lastError,
           <button
             onClick={handleSubmit}
             disabled={!input.trim()}
-            className="shrink-0 rounded-md min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed"
+            className="shrink-0 rounded-md p-1.5 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed"
             style={{
               backgroundColor: input.trim() ? '#58a6ff' : 'transparent',
               color: input.trim() ? '#0f1117' : '#8b949e',

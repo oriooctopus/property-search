@@ -399,11 +399,11 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
   return (
     <div
       ref={containerRef}
-      className="px-3 py-2"
+      className="px-4 py-3"
       style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}
     >
       {/* Row 1: Filter chips + view toggle */}
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-2 mb-3">
         <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
         {/* Price chip */}
         <FilterChip
@@ -531,37 +531,12 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
         </FilterChip>
 
         {/* Photos first toggle chip */}
-        <div className="relative group shrink-0">
-          <FilterChip
-            label="Photos first"
-            active={filters.photosFirst}
-            open={false}
-            onToggle={() => onChange({ ...filters, photosFirst: !filters.photosFirst })}
-          />
-          {/* Tooltip */}
-          <div
-            className="pointer-events-none absolute left-0 top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-75 z-50"
-          >
-            <div
-              className="absolute -top-1 w-2 h-2 rotate-45"
-              style={{ left: 12, backgroundColor: '#1c2028', border: '1px solid #2d333b', borderRight: 'none', borderBottom: 'none' }}
-            />
-            <div
-              className="rounded-md px-2.5 py-1.5 text-xs"
-              style={{
-                backgroundColor: '#1c2028',
-                color: '#e1e4e8',
-                border: '1px solid #2d333b',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-                maxWidth: 'min(260px, calc(100vw - 32px))',
-                width: 'max-content',
-                wordWrap: 'break-word',
-              }}
-            >
-              Prioritize listings with photos at the top of results
-            </div>
-          </div>
-        </div>
+        <FilterChip
+          label="Photos first"
+          active={filters.photosFirst}
+          open={false}
+          onToggle={() => onChange({ ...filters, photosFirst: !filters.photosFirst })}
+        />
 
         </div>
         {/* List/Map segmented control (mobile only, right-aligned) */}
@@ -569,7 +544,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
       </div>
 
       {/* Row 2: Search tags + Sort + listing count */}
-      <div className="flex flex-wrap items-center gap-1.5 overflow-x-clip">
+      <div className="flex flex-wrap items-center gap-1.5">
         {/* Search tags */}
         <div className="flex items-center gap-1.5 flex-wrap">
           {SEARCH_TABS.map((tab) => {
