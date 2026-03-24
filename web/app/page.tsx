@@ -175,8 +175,8 @@ function HomeInner() {
   const [mobileView, setMobileView] = useState<'list' | 'map' | 'swipe'>(() => {
     const v = searchParams.get('view');
     if (v && VALID_VIEWS.has(v)) return v as 'list' | 'map' | 'swipe';
-    // Default to swipe on mobile
-    if (typeof window !== 'undefined' && window.innerWidth < 1024) return 'swipe';
+    // Default to swipe on mobile, list on desktop
+    if (typeof window !== 'undefined' && window.innerWidth < 768) return 'swipe';
     return 'list';
   });
   const [filters, setFilters] = useState<FiltersState>(() =>
@@ -583,12 +583,11 @@ function HomeInner() {
         { value: 'swipe', label: 'Swipe' },
         { value: 'map', label: 'Map' },
       ]}
-      className="lg:hidden"
     />
   );
 
   const mapPanel = (
-    <div className={`flex-1 ${mobileView === 'list' ? 'hidden lg:block' : 'block'}`} style={{ minHeight: 'calc(100vh - 56px - 42px)' }}>
+    <div className={`flex-1 ${mobileView === 'map' ? 'block' : mobileView === 'list' ? 'hidden lg:block' : 'hidden'}`} style={{ minHeight: 'calc(100vh - 56px - 42px)' }}>
       <Map
         listings={filteredListings}
         selectedId={selectedId}
@@ -754,8 +753,8 @@ function HomeInner() {
     <div className="flex flex-col lg:flex-row" style={{ height: 'calc(100vh - 56px)' }}>
       {/* Sidebar: AI search bar + filters + listing cards */}
       <div
-        className={`w-full lg:w-[480px] shrink-0 flex flex-col ${mobileView === 'map' ? 'max-lg:shrink max-lg:flex-none' : ''}`}
-        style={{ borderRight: '1px solid #2d333b' }}
+        className={`w-full shrink-0 flex flex-col ${mobileView === 'swipe' ? '' : 'lg:w-[480px]'} ${mobileView === 'map' ? 'max-lg:shrink max-lg:flex-none' : ''}`}
+        style={{ borderRight: mobileView === 'swipe' ? 'none' : '1px solid #2d333b' }}
       >
         {/* AI search bar */}
         <AISearchBar
