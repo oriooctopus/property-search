@@ -112,7 +112,6 @@ export async function fetchStreetEasyListings(
         r.longitude ?? r.lng ?? r.lon ?? r.location?.lng ?? r.geo?.lng ?? 0;
 
       // Photos
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const photoUrls: string[] = (
         r.photos ??
         r.images ??
@@ -120,9 +119,15 @@ export async function fetchStreetEasyListings(
         r.media ??
         []
       )
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .slice(0, 8)
-        .map((p: any) => (typeof p === "string" ? p : p.url ?? p.href ?? p.src ?? ""))
+        .map((p: unknown) => {
+          if (typeof p === "string") return p;
+          if (p && typeof p === "object") {
+            const obj = p as Record<string, unknown>;
+            return String(obj.url ?? obj.href ?? obj.src ?? "");
+          }
+          return "";
+        })
         .filter((u: string) => u.length > 0);
 
       const listingUrl =
