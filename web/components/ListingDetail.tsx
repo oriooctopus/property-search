@@ -60,6 +60,7 @@ export default function ListingDetail({
   const overlayRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [linkCopied, setLinkCopied] = useState(false);
   const photos = listing.photo_urls ?? [];
   const pricePerBed = Math.round(listing.price / listing.beds);
   const tagColor = TAG_COLORS[listing.search_tag] ?? '#8b949e';
@@ -71,6 +72,15 @@ export default function ListingDetail({
       const child = scrollRef.current.children[clamped] as HTMLElement | undefined;
       child?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
     }
+  };
+
+  const handleShareLink = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('listing', String(listing.id));
+    navigator.clipboard.writeText(url.toString()).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
   };
 
   useEffect(() => {
@@ -167,19 +177,49 @@ export default function ListingDetail({
           </div>
         )}
 
-        {/* Close button */}
-        <IconButton
-          variant="overlay"
-          size="md"
-          onClick={onClose}
-          className="absolute top-3 right-3 rounded-md p-1.5"
-          aria-label="Close detail"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </IconButton>
+        {/* Share + Close buttons */}
+        <div className="absolute top-3 right-3 flex items-center gap-1.5">
+          <div className="relative">
+            <IconButton
+              variant="overlay"
+              size="md"
+              onClick={handleShareLink}
+              className="rounded-md p-1.5"
+              aria-label="Copy share link"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+            </IconButton>
+            {linkCopied && (
+              <div
+                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium"
+                style={{
+                  backgroundColor: '#1c2028',
+                  color: '#7ee787',
+                  border: '1px solid #2d333b',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                  animation: 'toast-in 150ms ease-out',
+                }}
+              >
+                Link copied!
+              </div>
+            )}
+          </div>
+          <IconButton
+            variant="overlay"
+            size="md"
+            onClick={onClose}
+            className="rounded-md p-1.5"
+            aria-label="Close detail"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </IconButton>
+        </div>
 
         <div className="p-6 pb-10">
           {/* Header */}

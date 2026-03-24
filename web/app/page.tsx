@@ -73,8 +73,9 @@ function readFiltersFromParams(params: URLSearchParams): FiltersState {
   };
 }
 
-function buildQueryString(view: 'list' | 'map', f: FiltersState, chatMode?: boolean): string {
+function buildQueryString(view: 'list' | 'map', f: FiltersState, chatMode?: boolean, listingId?: number | null): string {
   const p = new URLSearchParams();
+  if (listingId != null) p.set('listing', String(listingId));
   if (chatMode) p.set('chat', '1');
   if (view !== 'list') p.set('view', view);
   if (f.searchTag !== 'all') p.set('tag', f.searchTag);
@@ -222,8 +223,8 @@ function HomeInner() {
       isFirstRender.current = false;
       return;
     }
-    window.history.replaceState(null, '', buildQueryString(mobileView, filters, chatMode));
-  }, [mobileView, filters, chatMode]);
+    window.history.replaceState(null, '', buildQueryString(mobileView, filters, chatMode, detailListing?.id ?? null));
+  }, [mobileView, filters, chatMode, detailListing]);
 
   // -----------------------------------------------------------------------
   // Fetch data
@@ -341,6 +342,55 @@ function HomeInner() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // -----------------------------------------------------------------------
+  // Deep-link: auto-open listing from ?listing=ID on page load
+  // -----------------------------------------------------------------------
+  const deepLinkHandled = useRef(false);
+  useEffect(() => {
+    if (deepLinkHandled.current || loading || listings.length === 0) return;
+    deepLinkHandled.current = true;
+
+    const listingParam = searchParams.get('listing');
+    if (!listingParam) return;
+
+    const listingId = Number(listingParam);
+    if (!Number.isFinite(listingId)) return;
+
+    // First check if the listing is already loaded
+    const found = listings.find((l) => l.id === listingId);
+    if (found) {
+      setSelectedId(found.id);
+      setDetailListing(found);
+      return;
+    }
+
+    // Otherwise fetch it from Supabase
+    (async () => {
+      const { data } = await supabase
+        .from('listings')
+        .select('*')
+        .eq('id', listingId)
+        .single();
+      if (data) {
+        const raw = data as unknown as Listing;
+        const l: Listing = {
+          ...raw,
+          lat: raw.lat != null ? Number(raw.lat) : null,
+          lon: raw.lon != null ? Number(raw.lon) : null,
+          baths: raw.baths != null ? Number(raw.baths) : null,
+          sqft: raw.sqft != null ? Number(raw.sqft) : null,
+          price: Number(raw.price),
+          beds: Number(raw.beds),
+          photos: Number(raw.photos),
+          photo_urls: raw.photo_urls ?? [],
+        };
+        setSelectedId(l.id);
+        setDetailListing(l);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, listings]);
 
   // -----------------------------------------------------------------------
   // Filter + sort
@@ -588,7 +638,9 @@ function HomeInner() {
       onToggleWouldLive={() => handleToggleWouldLive(detailListing.id)}
       onToggleFavorite={() => handleToggleFavorite(detailListing.id)}
       onHide={() => handleHideListing(detailListing.id)}
-      onClose={() => setDetailListing(null)}
+      onClose={() => {
+        setDetailListing(null);
+      }}
     />
   );
 
