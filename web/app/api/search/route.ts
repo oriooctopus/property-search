@@ -158,6 +158,8 @@ export async function POST(request: NextRequest) {
           last_update_date: l.last_update_date,
           availability_date: l.availability_date,
           source: l.source,
+          sources: l.sources ?? [l.source],
+          source_urls: l.source_urls ?? { [l.source]: l.url },
         })),
         { onConflict: "url", ignoreDuplicates: false },
       );
