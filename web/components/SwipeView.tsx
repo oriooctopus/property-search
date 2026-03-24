@@ -27,7 +27,7 @@ interface SwipeViewProps {
   onToggleFavorite: (id: number) => void;
   onToggleWouldLive: (id: number) => void;
   onHideListing: (id: number) => void;
-  onExpandDetail: (listing: any) => void;
+  onExpandDetail: (listing: SwipeListing) => void;
   onSwitchView?: () => void;
 }
 
