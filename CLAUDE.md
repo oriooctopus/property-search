@@ -1,5 +1,17 @@
 # Property Search
 
+## CRITICAL: Visual Regression Check
+
+Any agent modifying files in `web/components/` or `web/app/` that contain JSX:
+1. BEFORE changes: run `npm run test:visual` to capture baseline state
+2. AFTER changes: run `npm run test:visual` again
+3. If any screenshot diff is detected, the Playwright HTML report opens at `web/playwright-report/index.html`
+4. Agents MUST NOT deploy or report UI work as complete until the user has approved the visual diff
+5. If screenshots changed, pause and tell the user: "Visual changes detected — please review the diff at `web/playwright-report/index.html`"
+6. If the user approves, run `npm run test:visual:update` to accept new baselines
+7. If the user rejects, fix the regression before continuing
+8. A feature that works but looks broken is NOT done
+
 ## CRITICAL: Verify All Work
 
 After every implementation agent completes, spawn the `verify` agent before reporting results to the user. Pass it a description of what the task was supposed to accomplish. Do not tell the user something is done until the verifier confirms it.
