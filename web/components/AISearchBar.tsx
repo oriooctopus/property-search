@@ -59,7 +59,7 @@ export default function AISearchBar({ onSearch, isLoading, lastQuery, isLoggedIn
   );
 
   return (
-    <div className="px-4 pt-3 pb-2" style={{ backgroundColor: '#1c2028' }}>
+    <div className="px-3 pt-2 pb-1.5" style={{ backgroundColor: '#1c2028' }}>
       <div
         className="flex items-center gap-2 rounded-lg px-3 py-2 transition-colors"
         style={{
