@@ -14,6 +14,7 @@ import ChatPanel from '@/components/ChatPanel';
 import SaveSearchModal from '@/components/SaveSearchModal';
 import AISearchBar from '@/components/AISearchBar';
 import FilterPills from '@/components/FilterPills';
+import SwipeView from '@/components/SwipeView';
 import { useConversation } from '@/lib/hooks/useConversation';
 import { useConversations } from '@/lib/hooks/useConversations';
 
@@ -45,7 +46,7 @@ const SEED_LISTINGS: Listing[] = [
 // ---------------------------------------------------------------------------
 // Helpers: read / write URL query params
 // ---------------------------------------------------------------------------
-const VALID_VIEWS = new Set(['list', 'map']);
+const VALID_VIEWS = new Set(['list', 'map', 'swipe']);
 const VALID_TAGS = new Set<string>(['all', 'fulton', 'ltrain', 'manhattan', 'brooklyn']);
 const VALID_SORTS = new Set<string>(['pricePerBed', 'price', 'beds', 'listDate']);
 const VALID_LISTING_AGES = new Set<string>(['1w', '2w', '1m', '3m', '6m', '1y']);
@@ -73,7 +74,7 @@ function readFiltersFromParams(params: URLSearchParams): FiltersState {
   };
 }
 
-function buildQueryString(view: 'list' | 'map', f: FiltersState, chatMode?: boolean, listingId?: number | null): string {
+function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatMode?: boolean, listingId?: number | null): string {
   const p = new URLSearchParams();
   if (listingId != null) p.set('listing', String(listingId));
   if (chatMode) p.set('chat', '1');
@@ -171,9 +172,12 @@ function HomeInner() {
   // UI state — initialised from URL query params
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [detailListing, setDetailListing] = useState<Listing | null>(null);
-  const [mobileView, setMobileView] = useState<'list' | 'map'>(() => {
+  const [mobileView, setMobileView] = useState<'list' | 'map' | 'swipe'>(() => {
     const v = searchParams.get('view');
-    return v && VALID_VIEWS.has(v) ? (v as 'list' | 'map') : 'list';
+    if (v && VALID_VIEWS.has(v)) return v as 'list' | 'map' | 'swipe';
+    // Default to swipe on mobile
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) return 'swipe';
+    return 'list';
   });
   const [filters, setFilters] = useState<FiltersState>(() =>
     readFiltersFromParams(searchParams),
@@ -569,9 +573,10 @@ function HomeInner() {
   const viewToggle = (
     <SegmentedControl
       value={mobileView}
-      onChange={(v) => setMobileView(v as 'list' | 'map')}
+      onChange={(v) => setMobileView(v as 'list' | 'map' | 'swipe')}
       options={[
         { value: 'list', label: 'List' },
+        { value: 'swipe', label: 'Swipe' },
         { value: 'map', label: 'Map' },
       ]}
       className="lg:hidden"
@@ -773,9 +778,23 @@ function HomeInner() {
           />
         </div>
 
-        <div className={`flex-1 overflow-y-auto min-h-0 px-3 py-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 ${mobileView === 'map' ? 'hidden lg:grid' : ''}`}>
-          {listingCards}
-        </div>
+        {mobileView === 'swipe' ? (
+          <SwipeView
+            listings={filteredListings}
+            userId={userId}
+            favoritesSet={favoritesSet}
+            wouldLiveSet={wouldLiveSet}
+            onToggleFavorite={handleToggleFavorite}
+            onToggleWouldLive={handleToggleWouldLive}
+            onHideListing={handleHideListing}
+            onExpandDetail={(listing) => { setSelectedId(listing.id); setDetailListing(listing); }}
+            onSwitchView={() => setMobileView('list')}
+          />
+        ) : (
+          <div className={`flex-1 overflow-y-auto min-h-0 px-3 py-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 ${mobileView === 'map' ? 'hidden lg:grid' : ''}`}>
+            {listingCards}
+          </div>
+        )}
       </div>
 
       {/* Map */}
