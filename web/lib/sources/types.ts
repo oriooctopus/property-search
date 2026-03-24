@@ -2,7 +2,7 @@
  * Shared types for all listing data sources.
  */
 
-export type ListingSource = "realtor" | "apartments" | "craigslist" | "renthop";
+export type ListingSource = "realtor" | "apartments" | "craigslist" | "renthop" | "streeteasy" | "zillow";
 
 /** The shape every source adapter must produce. */
 export interface RawListing {
@@ -22,6 +22,10 @@ export interface RawListing {
   last_update_date: string | null;
   availability_date: string | null;
   source: ListingSource;
+  /** All sources this listing was found on (populated after composite dedup). */
+  sources?: ListingSource[];
+  /** URL per source (populated after composite dedup). */
+  source_urls?: Record<string, string>;
 }
 
 export interface SearchParams {
