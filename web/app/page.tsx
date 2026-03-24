@@ -206,8 +206,10 @@ function HomeInner() {
   // Inline AI search bar handler — sends to chat API and applies filters
   const handleInlineAISearch = useCallback(
     async (query: string) => {
-      setLastAIQuery(query);
-      await chat.sendMessage(query);
+      const success = await chat.sendMessage(query);
+      if (success) {
+        setLastAIQuery(query);
+      }
     },
     [chat],
   );
@@ -699,6 +701,7 @@ function HomeInner() {
           onSearch={handleInlineAISearch}
           isLoading={chat.isLoading}
           lastQuery={lastAIQuery}
+          isLoggedIn={!!userId}
         />
 
         {/* AI-applied filter pills */}

@@ -36,7 +36,7 @@ export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
           ref={ref}
           onClick={onToggle}
           className={cn(
-            'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium whitespace-nowrap',
+            'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 min-h-[44px] text-sm font-medium whitespace-nowrap',
             'border',
             active
               ? 'bg-[#58a6ff]/[0.08] text-[#58a6ff] border-[#58a6ff] hover:bg-[#58a6ff]/[0.18]'
