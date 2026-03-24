@@ -12,6 +12,10 @@ Launch all implementation tasks as separate agents via the Agent tool (with `run
 
 When agents complete and the user hasn't acknowledged or acted on the results (e.g., picking a design option, reviewing a fix), gently remind them at the end of your next message. With many parallel agents it's easy to lose track of pending decisions.
 
+## Test Credentials
+
+Test account credentials are in `web/.env.local` (not committed). Use these for Playwright-based verification of authenticated features like AI search, favorites, and would-live-there.
+
 ## Core UI Components
 
 All interactive elements must use the composable button system in `web/components/ui/`. Never create inline buttons with raw style props or ad-hoc hover handlers.
