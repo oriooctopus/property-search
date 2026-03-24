@@ -199,6 +199,7 @@ function HomeInner() {
 
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const [lastAIQuery, setLastAIQuery] = useState<string | null>(null);
+  const [lastAIError, setLastAIError] = useState<string | null>(null);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(chatMode);
 
   // Open chat drawer when ?chat=1 is in URL
@@ -211,9 +212,12 @@ function HomeInner() {
   // Inline AI search bar handler — sends to chat API and applies filters
   const handleInlineAISearch = useCallback(
     async (query: string) => {
+      setLastAIError(null);
       const success = await chat.sendMessage(query);
       if (success) {
         setLastAIQuery(query);
+      } else {
+        setLastAIError('Search failed — please try again');
       }
     },
     [chat],
@@ -758,6 +762,7 @@ function HomeInner() {
           onSearch={handleInlineAISearch}
           isLoading={chat.isLoading}
           lastQuery={lastAIQuery}
+          lastError={lastAIError}
           isLoggedIn={!!userId}
         />
 

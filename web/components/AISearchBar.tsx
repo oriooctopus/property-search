@@ -33,10 +33,11 @@ interface AISearchBarProps {
   onSearch: (query: string) => void;
   isLoading: boolean;
   lastQuery?: string | null;
+  lastError?: string | null;
   isLoggedIn?: boolean;
 }
 
-export default function AISearchBar({ onSearch, isLoading, lastQuery, isLoggedIn = true }: AISearchBarProps) {
+export default function AISearchBar({ onSearch, isLoading, lastQuery, lastError, isLoggedIn = true }: AISearchBarProps) {
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -107,7 +108,16 @@ export default function AISearchBar({ onSearch, isLoading, lastQuery, isLoggedIn
           </button>
         )}
       </div>
-      {lastQuery && (
+      {lastError ? (
+        <div className="mt-1.5 flex items-center gap-1.5 text-[11px]" style={{ color: '#f87171' }}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
+            <circle cx="5" cy="5" r="4" />
+            <path d="M5 3v3" />
+            <circle cx="5" cy="7.5" r="0.5" fill="currentColor" />
+          </svg>
+          <span className="truncate">{lastError}</span>
+        </div>
+      ) : lastQuery ? (
         <div className="mt-1.5 flex items-center gap-1.5 text-[11px]" style={{ color: '#8b949e' }}>
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round">
             <path d="M5 1v4l2.5 1.5" />
@@ -115,7 +125,7 @@ export default function AISearchBar({ onSearch, isLoading, lastQuery, isLoggedIn
           </svg>
           <span className="truncate">AI searched: &ldquo;{lastQuery}&rdquo;</span>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
