@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 function SearchIcon() {
   return (
@@ -32,11 +33,13 @@ interface AISearchBarProps {
   onSearch: (query: string) => void;
   isLoading: boolean;
   lastQuery?: string | null;
+  isLoggedIn?: boolean;
 }
 
-export default function AISearchBar({ onSearch, isLoading, lastQuery }: AISearchBarProps) {
+export default function AISearchBar({ onSearch, isLoading, lastQuery, isLoggedIn = true }: AISearchBarProps) {
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   const handleSubmit = useCallback(() => {
     const value = input.trim();
@@ -73,9 +76,16 @@ export default function AISearchBar({ onSearch, isLoading, lastQuery }: AISearch
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Search apartments with AI..."
+          onFocus={() => {
+            if (!isLoggedIn) {
+              inputRef.current?.blur();
+              router.push('/auth/login');
+            }
+          }}
+          placeholder={isLoggedIn ? 'Search apartments with AI...' : 'Log in to search with AI...'}
           disabled={isLoading}
-          className="flex-1 bg-transparent text-sm outline-none placeholder:text-[#6e7681]"
+          readOnly={!isLoggedIn}
+          className={`flex-1 bg-transparent text-sm outline-none placeholder:text-[#6e7681] ${!isLoggedIn ? 'cursor-pointer' : ''}`}
           style={{ color: '#e1e4e8', minHeight: '22px' }}
         />
         {isLoading ? (
@@ -86,7 +96,7 @@ export default function AISearchBar({ onSearch, isLoading, lastQuery }: AISearch
           <button
             onClick={handleSubmit}
             disabled={!input.trim()}
-            className="shrink-0 rounded-md p-1.5 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed"
+            className="shrink-0 rounded-md min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed"
             style={{
               backgroundColor: input.trim() ? '#58a6ff' : 'transparent',
               color: input.trim() ? '#0f1117' : '#8b949e',

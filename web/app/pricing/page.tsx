@@ -18,31 +18,40 @@ export default function PricingPage() {
   const supabase = createClient();
 
   useEffect(() => {
+    let cancelled = false;
+
     async function load() {
-      const { data: tierData } = await supabase
-        .from("pricing_tiers")
-        .select("id, name, monthly_query_limit, price_monthly, features")
-        .order("price_monthly", { ascending: true });
+      try {
+        const { data: tierData } = await supabase
+          .from("pricing_tiers")
+          .select("id, name, monthly_query_limit, price_monthly, features")
+          .order("price_monthly", { ascending: true });
 
-      if (tierData) setTiers(tierData as TierInfo[]);
+        if (!cancelled && tierData) setTiers(tierData as TierInfo[]);
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (user) {
-        const { data: userTier } = await supabase
-          .from("user_tiers")
-          .select("tier_id")
-          .eq("user_id", user.id)
-          .single();
+        if (!cancelled && user) {
+          const { data: userTier } = await supabase
+            .from("user_tiers")
+            .select("tier_id")
+            .eq("user_id", user.id)
+            .single();
 
-        if (userTier) setCurrentTier(userTier.tier_id);
+          if (!cancelled && userTier) setCurrentTier(userTier.tier_id);
+        }
+      } catch {
+        // Supabase query failed — page should still render
       }
     }
 
     load();
-  }, [supabase]);
+
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const showToast = (msg: string) => {
     setToast(msg);

@@ -153,8 +153,8 @@ export default function ListingCard({
               }}
               className="flex items-center justify-center rounded-full"
               style={{
-                width: 28,
-                height: 28,
+                width: 44,
+                height: 44,
                 backgroundColor: 'rgba(0,0,0,0.6)',
                 color: '#fff',
                 border: 'none',

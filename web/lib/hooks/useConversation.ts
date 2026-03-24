@@ -35,7 +35,7 @@ export interface UseConversationReturn {
   messages: ChatMessageData[];
   filters: FiltersState;
   isLoading: boolean;
-  sendMessage: (text: string) => Promise<void>;
+  sendMessage: (text: string) => Promise<boolean>;
   removeFilter: (key: keyof FiltersState) => void;
   reAddFilter: (key: keyof FiltersState, value: FiltersState[keyof FiltersState]) => void;
   saveConversation: (name: string) => Promise<void>;
@@ -139,6 +139,7 @@ export function useConversation({
             updatedAt: now,
           };
         });
+        return true;
       } catch (err) {
         const errorMsg: ChatMessageData = {
           id: uid(),
@@ -147,6 +148,7 @@ export function useConversation({
           timestamp: Date.now(),
         };
         addMessage(errorMsg);
+        return false;
       } finally {
         setIsLoading(false);
       }

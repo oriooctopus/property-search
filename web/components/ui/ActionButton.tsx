@@ -31,12 +31,12 @@ const StarIcon = ({ active }: { active: boolean }) => (
 
 const compactClasses: Record<ActionVariant, { base: string; active: string; inactive: string }> = {
   wouldLive: {
-    base: 'p-1.5 rounded-md',
+    base: 'p-1.5 rounded-md min-w-[44px] min-h-[44px] flex items-center justify-center',
     active: 'text-[#f97316] bg-[#f97316]/[0.12] hover:bg-[#f97316]/25 hover:text-[#fb923c]',
     inactive: 'text-[#8b949e] bg-transparent hover:bg-[#8b949e]/[0.08] hover:text-[#a1a7ae]',
   },
   favorite: {
-    base: 'p-1.5 rounded-md',
+    base: 'p-1.5 rounded-md min-w-[44px] min-h-[44px] flex items-center justify-center',
     active: 'text-[#fbbf24] bg-[#fbbf24]/[0.12] hover:bg-[#fbbf24]/25 hover:text-[#fcd34d]',
     inactive: 'text-[#8b949e] bg-transparent hover:bg-[#8b949e]/[0.08] hover:text-[#a1a7ae]',
   },

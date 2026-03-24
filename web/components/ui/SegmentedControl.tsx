@@ -26,7 +26,7 @@ export const SegmentedControl = forwardRef<HTMLDivElement, SegmentedControlProps
               key={opt.value}
               onClick={() => onChange(opt.value)}
               className={cn(
-                'border-none text-[13px] font-medium px-3 sm:px-5 py-[5px] cursor-pointer transition-all duration-150 relative whitespace-nowrap',
+                'border-none text-[13px] font-medium px-3 sm:px-5 py-[5px] min-h-[44px] cursor-pointer transition-all duration-150 relative whitespace-nowrap',
                 isActive
                   ? 'font-semibold'
                   : 'hover:text-[#e1e4e8]',

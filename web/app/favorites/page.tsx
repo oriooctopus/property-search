@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import type { Database } from "@/lib/types";
 import { TextButton } from "@/components/ui";
@@ -14,6 +15,7 @@ export default function FavoritesPage() {
 
   const [favorites, setFavorites] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loggedOut, setLoggedOut] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -22,7 +24,8 @@ export default function FavoritesPage() {
       } = await supabase.auth.getUser();
 
       if (!user) {
-        router.replace("/auth/login");
+        setLoggedOut(true);
+        setLoading(false);
         return;
       }
 
@@ -85,6 +88,26 @@ export default function FavoritesPage() {
     }
 
     setFavorites((prev) => prev.filter((l) => l.id !== listingId));
+  }
+
+  if (loggedOut) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 px-6 text-center">
+        <p className="text-xl font-semibold" style={{ color: "#e1e4e8" }}>
+          Log in to see your favorites
+        </p>
+        <p style={{ color: "#8b949e" }}>
+          Save listings you love and access them anytime.
+        </p>
+        <Link
+          href="/auth/login"
+          className="mt-2 rounded-md px-6 py-2.5 text-sm font-medium transition-colors hover:opacity-90"
+          style={{ backgroundColor: "#58a6ff", color: "#0f1117" }}
+        >
+          Log in
+        </Link>
+      </div>
+    );
   }
 
   if (loading) {

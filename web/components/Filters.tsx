@@ -544,7 +544,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
       </div>
 
       {/* Row 2: Search tags + Sort + listing count */}
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5 overflow-x-clip">
         {/* Search tags */}
         <div className="flex items-center gap-1.5 flex-wrap">
           {SEARCH_TABS.map((tab) => {

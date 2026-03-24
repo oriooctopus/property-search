@@ -134,21 +134,21 @@ export default function Navbar() {
           <>
             <Link
               href="/?chat=1"
-              className="text-sm transition-colors hover:opacity-80"
+              className="min-h-[44px] flex items-center text-sm transition-colors hover:opacity-80"
               style={{ color: "#8b949e" }}
             >
               Search
             </Link>
             <Link
               href="/favorites"
-              className="text-sm transition-colors hover:opacity-80"
+              className="min-h-[44px] flex items-center text-sm transition-colors hover:opacity-80"
               style={{ color: "#8b949e" }}
             >
               Favorites
             </Link>
             <Link
               href="/hidden"
-              className="text-sm transition-colors hover:opacity-80"
+              className="min-h-[44px] flex items-center text-sm transition-colors hover:opacity-80"
               style={{ color: "#8b949e" }}
             >
               Hidden
@@ -208,14 +208,14 @@ export default function Navbar() {
           <>
             <Link
               href="/hidden"
-              className="text-sm transition-colors hover:opacity-80"
+              className="min-h-[44px] flex items-center text-sm transition-colors hover:opacity-80"
               style={{ color: "#8b949e" }}
             >
               Hidden
             </Link>
             <Link
               href="/auth/login"
-              className="text-sm transition-colors hover:opacity-80"
+              className="min-h-[44px] flex items-center text-sm transition-colors hover:opacity-80"
               style={{ color: "#8b949e" }}
             >
               Log in
