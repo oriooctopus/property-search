@@ -531,12 +531,37 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
         </FilterChip>
 
         {/* Photos first toggle chip */}
-        <FilterChip
-          label="Photos first"
-          active={filters.photosFirst}
-          open={false}
-          onToggle={() => onChange({ ...filters, photosFirst: !filters.photosFirst })}
-        />
+        <div className="relative group shrink-0">
+          <FilterChip
+            label="Photos first"
+            active={filters.photosFirst}
+            open={false}
+            onToggle={() => onChange({ ...filters, photosFirst: !filters.photosFirst })}
+          />
+          {/* Tooltip */}
+          <div
+            className="pointer-events-none absolute left-0 top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-75 z-50"
+          >
+            <div
+              className="absolute -top-1 w-2 h-2 rotate-45"
+              style={{ left: 12, backgroundColor: '#1c2028', border: '1px solid #2d333b', borderRight: 'none', borderBottom: 'none' }}
+            />
+            <div
+              className="rounded-md px-2.5 py-1.5 text-xs"
+              style={{
+                backgroundColor: '#1c2028',
+                color: '#e1e4e8',
+                border: '1px solid #2d333b',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                maxWidth: 'min(260px, calc(100vw - 32px))',
+                width: 'max-content',
+                wordWrap: 'break-word',
+              }}
+            >
+              Prioritize listings with photos at the top of results
+            </div>
+          </div>
+        </div>
 
         </div>
         {/* List/Map segmented control (mobile only, right-aligned) */}
