@@ -787,7 +787,7 @@ function HomeInner() {
             onToggleFavorite={handleToggleFavorite}
             onToggleWouldLive={handleToggleWouldLive}
             onHideListing={handleHideListing}
-            onExpandDetail={(listing) => { setSelectedId(listing.id); setDetailListing(listing); }}
+            onExpandDetail={(listing) => { setSelectedId(listing.id); setDetailListing(filteredListings.find(l => l.id === listing.id) ?? null); }}
             onSwitchView={() => setMobileView('list')}
           />
         ) : (
