@@ -1,89 +1,81 @@
 /**
- * Facebook Marketplace adapter via TaskAGI Facebook Scraper (RapidAPI).
+ * Facebook Marketplace adapter via Apify Facebook Marketplace Scraper.
  *
- * Uses the facebook-scraper4.p.rapidapi.com API to search for rental listings.
+ * Uses the apify~facebook-marketplace-scraper actor with startUrls pointing
+ * to Facebook Marketplace search URLs. Runs synchronously and returns
+ * dataset items directly.
  *
  * MISSING / UNRELIABLE FIELDS vs Realtor.com:
- *  - beds / baths      (not structured — parsed from description text via regex)
  *  - sqft              (not provided)
- *  - lat / lon         (may not be available)
- *  - list_date         (may be relative like "2 days ago")
+ *  - lat / lon         (not provided in listing-level data)
+ *  - list_date         (not provided)
  *  - last_update_date  (not provided)
  *  - availability_date (not provided)
  */
 
-import type { RawListing, SearchParams } from "./types";
+import type { AdapterOutput, SearchParams } from "./types";
+import { extractBaths, extractBeds, makeSearchTag, parsePrice } from "./parse-utils";
 
-const RAPIDAPI_HOST = "facebook-scraper4.p.rapidapi.com";
+const APIFY_RUN_URL =
+  "https://api.apify.com/v2/acts/apify~facebook-marketplace-scraper/run-sync-get-dataset-items";
 
-// ---------------------------------------------------------------------------
-// Beds / baths extraction from free-text descriptions
-// ---------------------------------------------------------------------------
+const TIMEOUT_MS = 180_000; // Apify actors need time to scrape Facebook
 
-/**
- * Extract bedroom count from description text.
- * Matches patterns like: "3BR", "3 br", "3 bed", "3 bedroom", "3 bedrooms",
- * "three bedroom", etc.
- */
-function extractBeds(text: string): number {
-  if (!text) return 0;
-  const t = text.toLowerCase();
-
-  // Numeric patterns: "3br", "3 br", "3bed", "3 bed", "3 bedroom(s)"
-  const numMatch = t.match(/(\d+)\s*(?:br|bed(?:room)?s?)\b/);
-  if (numMatch) return parseInt(numMatch[1], 10);
-
-  // Word-number patterns: "three bedroom"
-  const wordNums: Record<string, number> = {
-    one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
-    studio: 0,
-  };
-  for (const [word, num] of Object.entries(wordNums)) {
-    if (t.includes(`${word} bed`) || t.includes(`${word} br`)) return num;
-  }
-
-  // "studio" standalone
-  if (/\bstudio\b/.test(t)) return 0;
-
-  return 0;
-}
-
-/**
- * Extract bathroom count from description text.
- * Matches patterns like: "2ba", "2 bath", "2 bathroom(s)", "2.5 bath"
- */
-function extractBaths(text: string): number {
-  if (!text) return 0;
-  const t = text.toLowerCase();
-
-  const numMatch = t.match(/(\d+(?:\.\d+)?)\s*(?:ba(?:th(?:room)?s?)?)\b/);
-  if (numMatch) return parseFloat(numMatch[1]);
-
-  return 0;
-}
+// Facebook Marketplace city slugs for URL construction
+const CITY_SLUGS: Record<string, string> = {
+  "new york": "nyc",
+  "los angeles": "la",
+  chicago: "chicago",
+  houston: "houston",
+  phoenix: "phoenix",
+  philadelphia: "philly",
+  "san antonio": "sanantonio",
+  "san diego": "sandiego",
+  dallas: "dallas",
+  austin: "austin",
+  miami: "miami",
+  denver: "denver",
+  seattle: "seattle",
+  boston: "boston",
+  nashville: "nashville",
+  portland: "portland",
+  atlanta: "atlanta",
+  "san francisco": "sanfrancisco",
+};
 
 // ---------------------------------------------------------------------------
-// API response types (loosely typed — API shape may vary)
+// Apify response shape (based on real API responses)
 // ---------------------------------------------------------------------------
 
-interface FBMarketplaceItem {
+interface ApifyFBItem {
   id?: string;
-  title?: string;
-  description?: string;
-  price?: string | number;
-  location?: string;
-  latitude?: number;
-  longitude?: number;
-  image?: string;
-  images?: string[];
-  image_url?: string;
-  image_urls?: string[];
-  photos?: string[];
-  url?: string;
-  link?: string;
-  created_time?: string;
-  posted_at?: string;
-  date?: string;
+  marketplace_listing_title?: string;
+  custom_title?: string;
+  listing_price?: {
+    formatted_amount?: string;
+    amount?: string;
+    amount_with_offset_in_currency?: string;
+  };
+  location?: {
+    reverse_geocode?: {
+      city?: string;
+      state?: string;
+      city_page?: {
+        display_name?: string;
+      };
+    };
+  };
+  primary_listing_photo?: {
+    photo_image_url?: string;
+    id?: string;
+  };
+  listingUrl?: string;
+  custom_sub_titles_with_rendering_flags?: Array<{
+    subtitle?: string;
+  }>;
+  is_sold?: boolean;
+  is_pending?: boolean;
+  is_hidden?: boolean;
   [key: string]: unknown;
 }
 
@@ -93,135 +85,119 @@ interface FBMarketplaceItem {
 
 export async function fetchFacebookMarketplaceListings(
   params: SearchParams,
-  apiKey: string,
-): Promise<{ listings: RawListing[]; total: number }> {
+): Promise<{ listings: AdapterOutput[]; total: number }> {
   const { city, stateCode, priceMax, priceMin, bedsMin } = params;
 
-  // Build the keyword query for housing/rental listings
-  const keyword = `apartment for rent ${city} ${stateCode}`;
-  const location = `${city}, ${stateCode}`;
-
-  // Try keyword-based search first (more flexible)
-  const url = `https://${RAPIDAPI_HOST}/marketplace-items-by-keyword`;
-
-  const queryParams = new URLSearchParams({
-    keyword,
-    location,
-    category: "propertyrentals",
-    limit: "50",
-  });
-
-  if (priceMin != null) queryParams.set("min_price", String(priceMin));
-  if (priceMax != null) queryParams.set("max_price", String(priceMax));
-
-  let items: FBMarketplaceItem[] = [];
-
-  try {
-    const res = await fetch(`${url}?${queryParams.toString()}`, {
-      method: "GET",
-      headers: {
-        "X-RapidAPI-Key": apiKey,
-        "X-RapidAPI-Host": RAPIDAPI_HOST,
-      },
-      signal: AbortSignal.timeout(15000),
-    });
-
-    if (!res.ok) {
-      console.error(`[FacebookMarketplace] API returned ${res.status}: ${res.statusText}`);
-      return { listings: [], total: 0 };
-    }
-
-    const data = await res.json();
-
-    // The API may return items at the top level or nested under a key
-    if (Array.isArray(data)) {
-      items = data;
-    } else if (data?.results && Array.isArray(data.results)) {
-      items = data.results;
-    } else if (data?.data && Array.isArray(data.data)) {
-      items = data.data;
-    } else if (data?.items && Array.isArray(data.items)) {
-      items = data.items;
-    } else {
-      console.warn("[FacebookMarketplace] Unexpected API response shape:", Object.keys(data));
-      return { listings: [], total: 0 };
-    }
-  } catch (err) {
-    console.error("[FacebookMarketplace] fetch error:", err);
-    return { listings: [], total: 0 };
+  const token = process.env.APIFY_TOKEN;
+  if (!token) {
+    throw new Error("APIFY_TOKEN not set — cannot query Facebook Marketplace");
   }
 
-  const listings: RawListing[] = [];
+  // Build the Facebook Marketplace search URL
+  const cityKey = city.toLowerCase();
+  const slug = CITY_SLUGS[cityKey] ?? city.toLowerCase().replace(/\s+/g, "");
+
+  const fbUrl = new URL(`https://www.facebook.com/marketplace/${slug}/propertyrentals`);
+  if (priceMin != null) fbUrl.searchParams.set("minPrice", String(priceMin));
+  if (priceMax != null) fbUrl.searchParams.set("maxPrice", String(priceMax));
+  if (bedsMin != null && bedsMin > 0) {
+    fbUrl.searchParams.set("query", `${bedsMin} bedroom`);
+  }
+
+  const input = {
+    startUrls: [{ url: fbUrl.toString() }],
+    maxItems: 50,
+  };
+
+  console.log(`[FacebookMarketplace] Starting Apify actor run for ${fbUrl.toString()}`);
+  const res = await fetch(APIFY_RUN_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(input),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Apify returned ${res.status}: ${res.statusText} — ${body.slice(0, 500)}`,
+    );
+  }
+
+  const data = await res.json();
+
+  if (!Array.isArray(data)) {
+    throw new Error(
+      `Unexpected Apify response shape: ${typeof data === "object" ? Object.keys(data as Record<string, unknown>).join(",") : typeof data}`,
+    );
+  }
+
+  const items: ApifyFBItem[] = data;
+  console.log(`[FacebookMarketplace] Apify returned ${items.length} raw items`);
+
+  const listings: AdapterOutput[] = [];
 
   for (const item of items) {
-    const title = item.title ?? "";
-    const description = item.description ?? "";
-    const combinedText = `${title} ${description}`;
+    // Skip sold, pending, or hidden items
+    if (item.is_sold || item.is_pending || item.is_hidden) continue;
 
-    // Parse price — could be string like "$1,500" or number
-    let price = 0;
-    if (typeof item.price === "number") {
-      price = item.price;
-    } else if (typeof item.price === "string") {
-      const parsed = parseInt(item.price.replace(/[^0-9]/g, ""), 10);
-      if (!isNaN(parsed)) price = parsed;
-    }
+    const title = item.marketplace_listing_title ?? "";
+    const customTitle = item.custom_title ?? "";
+    const combinedText = `${title} ${customTitle}`;
 
-    // Skip items with no price (likely not real listings)
-    if (price === 0) continue;
+    // Parse price from structured price object
+    const rawPrice = item.listing_price?.amount
+      ?? item.listing_price?.formatted_amount
+      ?? null;
+    const price = parsePrice(rawPrice);
 
-    // Extract beds/baths from description since FB has no structured fields
+    // Skip items with no price
+    if (price == null) continue;
+
+    // Extract beds/baths using shared utilities
     const beds = extractBeds(combinedText);
     const baths = extractBaths(combinedText);
 
     // Filter by minimum beds if specified
-    if (bedsMin != null && beds > 0 && beds < bedsMin) continue;
+    if (bedsMin != null && beds != null && beds > 0 && beds < bedsMin) continue;
 
-    // Photos: collect from various possible fields
+    // Photo URL from primary_listing_photo
     const photoUrls: string[] = [];
-    const photoSources = [
-      ...(item.images ?? []),
-      ...(item.image_urls ?? []),
-      ...(item.photos ?? []),
-    ];
-    if (item.image) photoSources.push(item.image);
-    if (item.image_url) photoSources.push(item.image_url);
-
-    for (const src of photoSources) {
-      if (typeof src === "string" && src.startsWith("http") && !photoUrls.includes(src)) {
-        photoUrls.push(src);
-      }
+    if (item.primary_listing_photo?.photo_image_url) {
+      photoUrls.push(item.primary_listing_photo.photo_image_url);
     }
 
-    // Location
-    const locationStr = item.location ?? `${city}, ${stateCode}`;
+    // Location from reverse_geocode
+    const geo = item.location?.reverse_geocode;
+    const locationStr = geo?.city_page?.display_name
+      ?? (geo?.city && geo?.state ? `${geo.city}, ${geo.state}` : `${city}, ${stateCode}`);
 
-    // Coordinates
-    const lat = typeof item.latitude === "number" ? item.latitude : 0;
-    const lon = typeof item.longitude === "number" ? item.longitude : 0;
+    // Build address from subtitles (street info)
+    const subtitles = (item.custom_sub_titles_with_rendering_flags ?? [])
+      .map((s) => s.subtitle)
+      .filter(Boolean) as string[];
+    const address = title || subtitles.join(", ") || null;
 
-    // URL
-    const listingUrl = item.url ?? item.link ?? "";
-
-    // Date — may be absolute or relative
-    const dateStr = item.created_time ?? item.posted_at ?? item.date ?? null;
+    const listingUrl = item.listingUrl ?? "";
 
     listings.push({
-      address: title || "Facebook Marketplace Listing",
-      area: typeof locationStr === "string" ? locationStr : `${city}, ${stateCode}`,
+      address,
+      area: locationStr,
       price,
       beds,
       baths,
-      sqft: null, // Not provided by Facebook Marketplace
-      lat,
-      lon,
-      photos: photoUrls.length,
-      photo_urls: photoUrls.slice(0, 8),
+      sqft: null,
+      lat: null,
+      lon: null,
+      photo_urls: photoUrls,
       url: listingUrl,
-      search_tag: `search_${city.toLowerCase().replace(/\s+/g, "_")}`,
-      list_date: typeof dateStr === "string" ? dateStr : null,
-      last_update_date: null, // Not provided
-      availability_date: null, // Not provided
+      search_tag: makeSearchTag(city),
+      list_date: null,
+      last_update_date: null,
+      availability_date: null,
       source: "facebook" as const,
     });
   }
