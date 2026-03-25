@@ -236,6 +236,8 @@ export default function ListingCard({
       {/* Tag pill + actions */}
       <div className="flex items-center justify-between mt-2">
         <div className="flex items-center gap-2">
+          {/* Only show tag pill for known tags with labels (hide raw search_* tags) */}
+          {TAG_LABELS[listing.search_tag] && (
           <div className="relative group/tag">
             <span
               className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold cursor-default"
@@ -245,7 +247,7 @@ export default function ListingCard({
                 border: `1px solid ${tagColor}40`,
               }}
             >
-              {TAG_LABELS[listing.search_tag] ?? listing.search_tag}
+              {TAG_LABELS[listing.search_tag]}
             </span>
             {TAG_DESCRIPTIONS[listing.search_tag] && (
               <div
@@ -274,6 +276,7 @@ export default function ListingCard({
               </div>
             )}
           </div>
+          )}
         </div>
 
         <div className="flex items-center gap-1">
