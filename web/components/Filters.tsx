@@ -616,16 +616,8 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
         </div>
       </div>
 
-      {/* Row 2 (expandable): Filter chips — use clip on Y only so dropdowns aren't clipped */}
-      <div
-        className="transition-all duration-200 ease-in-out"
-        style={{
-          maxHeight: filtersExpanded ? expandedHeight + 12 : 0,
-          opacity: filtersExpanded ? 1 : 0,
-          overflowX: 'visible',
-          overflowY: filtersExpanded ? 'visible' : 'clip',
-        }}
-      >
+      {/* Row 2 (expandable): Filter chips — conditional render so dropdowns aren't clipped */}
+      {filtersExpanded && (
         <div ref={expandedRowRef} className="flex items-center gap-1.5 flex-wrap overflow-x-auto pt-1.5 pb-1" style={{ borderTop: '1px solid #2d333b', scrollbarWidth: 'none' } as React.CSSProperties}>
           {/* Price chip */}
           <FilterChip
@@ -837,7 +829,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
