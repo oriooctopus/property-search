@@ -111,8 +111,8 @@ export default function ListingCard({
       }}
       onClick={handleCardClick}
     >
-      {/* Photo carousel with slide animation */}
-      {totalPhotos > 0 && (
+      {/* Photo area — always takes same height via aspect-ratio */}
+      {totalPhotos > 0 ? (
         <div
           className="relative w-full overflow-hidden select-none rounded-t-lg"
           style={{ aspectRatio: '4 / 3' }}
@@ -179,6 +179,17 @@ export default function ListingCard({
               </div>
             </>
           )}
+        </div>
+      ) : (
+        <div
+          className="relative w-full rounded-t-lg flex items-center justify-center"
+          style={{ aspectRatio: '4 / 3', backgroundColor: '#161b22' }}
+        >
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#30363d" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <polyline points="21 15 16 10 5 21" />
+          </svg>
         </div>
       )}
 
