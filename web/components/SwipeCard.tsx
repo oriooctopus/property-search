@@ -9,6 +9,7 @@ const SOURCE_LABELS: Record<string, string> = {
   craigslist: 'Craigslist',
   renthop: 'RentHop',
   apartments: 'Apartments.com',
+  facebook: 'FB Marketplace',
 };
 
 interface SwipeCardProps {
@@ -179,14 +180,14 @@ export default function SwipeCard({
         className="absolute inset-0 rounded-2xl pointer-events-none z-[1]"
         style={{
           opacity: rightTint,
-          background: 'linear-gradient(to left, rgba(210, 170, 50, 0.5), transparent 60%)',
+          background: 'linear-gradient(to left, rgba(251, 191, 36, 0.5), transparent 60%)',
         }}
       />
       <motion.div
         className="absolute inset-0 rounded-2xl pointer-events-none z-[1]"
         style={{
           opacity: topTint,
-          background: 'linear-gradient(to bottom, rgba(227, 150, 40, 0.5), transparent 60%)',
+          background: 'linear-gradient(to bottom, rgba(249, 115, 22, 0.5), transparent 60%)',
         }}
       />
 
@@ -209,7 +210,7 @@ export default function SwipeCard({
         </div>
       </motion.div>
 
-      {/* FAVE ★ - top left, gold, rotated 12° */}
+      {/* FAVE ★ - top left, gold #fbbf24, rotated 12° */}
       <motion.div
         className="absolute top-8 left-6 z-[5] pointer-events-none"
         style={{ opacity: faveOpacity, rotate: 12 }}
@@ -217,17 +218,17 @@ export default function SwipeCard({
         <div
           className="px-4 py-2 text-3xl font-black uppercase tracking-wider"
           style={{
-            color: '#d2aa32',
-            border: '4px solid #d2aa32',
+            color: '#fbbf24',
+            border: '4px solid #fbbf24',
             borderRadius: 8,
-            textShadow: '0 0 4px rgba(210,170,50,0.3)',
+            textShadow: '0 0 4px rgba(251,191,36,0.3)',
           }}
         >
           FAVE ★
         </div>
       </motion.div>
 
-      {/* LIVE HERE 🏠 - top center, orange */}
+      {/* LIVE HERE 🏠 - top center, orange #f97316 */}
       <motion.div
         className="absolute top-8 left-1/2 -translate-x-1/2 z-[5] pointer-events-none"
         style={{ opacity: liveOpacity }}
@@ -235,10 +236,10 @@ export default function SwipeCard({
         <div
           className="px-4 py-2 text-2xl font-black uppercase tracking-wider whitespace-nowrap"
           style={{
-            color: '#e39628',
-            border: '4px solid #e39628',
+            color: '#f97316',
+            border: '4px solid #f97316',
             borderRadius: 8,
-            textShadow: '0 0 4px rgba(227,150,40,0.3)',
+            textShadow: '0 0 4px rgba(249,115,22,0.3)',
           }}
         >
           LIVE HERE 🏠
