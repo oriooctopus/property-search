@@ -28,6 +28,17 @@ Agents must check for these layout issues after any UI change:
 
 After every implementation agent completes, spawn the `verify` agent before reporting results to the user. Pass it a description of what the task was supposed to accomplish. Do not tell the user something is done until the verifier confirms it.
 
+## Agent Context Continuity
+
+When multiple agents work on the same topic across iterations (e.g., Facebook Marketplace adapter → test it → fix issues), prefer `SendMessage` to continue the same agent rather than spawning a fresh one. Fresh agents lose all prior context.
+
+When a fresh agent is unavoidable, include in its prompt:
+- File paths of code the previous agent created/modified
+- Key decisions or findings from the previous agent's result
+- Any errors or issues discovered
+
+Do not assume a new agent knows what a previous agent did.
+
 ## Always Use Agents
 
 Launch all implementation tasks as separate agents via the Agent tool (with `run_in_background: true`) so they are non-blocking. Never do multi-step work inline when it could be parallelized across agents.
