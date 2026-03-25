@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ButtonBase, FilterChip, PillButton, TagButton, PrimaryButton, TextButton } from '@/components/ui';
+import { ButtonBase, FilterChip, PillButton, PrimaryButton, TextButton } from '@/components/ui';
 import { cn } from '@/lib/cn';
 
 export type SearchTag = 'all' | 'fulton' | 'ltrain' | 'manhattan' | 'brooklyn';
@@ -358,7 +358,7 @@ function FilterToggleButton({
     <ButtonBase
       onClick={onClick}
       className={cn(
-        'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap border',
+        'flex items-center gap-1 rounded-md px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap border h-[26px]',
         expanded
           ? 'bg-[#58a6ff]/[0.08] text-[#58a6ff] border-[#58a6ff]'
           : activeCount > 0
@@ -472,123 +472,140 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
   return (
     <div
       ref={containerRef}
-      className="px-4 py-2"
+      className="px-2"
       style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}
     >
       {/* Row 1 (always visible): Area tabs + listing count + Filters button + Sort + View toggle */}
-      <div className="flex items-center gap-1.5 overflow-x-clip">
-        {/* Search tags */}
-        <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
-          {SEARCH_TABS.map((tab) => {
-            const active = filters.searchTag === tab.value;
-            return (
-              <div key={tab.value} className="relative group shrink-0">
-                <TagButton
-                  active={active}
-                  onClick={() => onChange({ ...filters, searchTag: tab.value })}
-                  className="!text-xs !px-2.5 !py-1 !min-h-[32px]"
-                >
-                  {tab.label}
-                </TagButton>
-                {/* Custom tooltip — left-aligned to avoid clipping at container edges */}
-                <div
-                  className="pointer-events-none absolute left-0 top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-75 z-50"
-                >
-                  {/* Arrow */}
-                  <div
-                    className="absolute -top-1 w-2 h-2 rotate-45"
-                    style={{ left: 12, backgroundColor: '#1c2028', border: '1px solid #2d333b', borderRight: 'none', borderBottom: 'none' }}
-                  />
-                  {/* Body */}
-                  <div
-                    className="rounded-md px-2.5 py-1.5 text-xs"
-                    style={{
-                      backgroundColor: '#1c2028',
-                      color: '#e1e4e8',
-                      border: '1px solid #2d333b',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-                      maxWidth: 'min(260px, calc(100vw - 32px))',
-                      width: 'max-content',
-                      wordWrap: 'break-word',
-                    }}
+      <div className="flex items-center h-8">
+        {/* Search tags — horizontally scrollable, hidden scrollbar */}
+        <div
+          className="flex items-center flex-1 min-w-0 overflow-x-auto"
+          style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
+        >
+          <style dangerouslySetInnerHTML={{ __html: `.area-tabs-scroll::-webkit-scrollbar { display: none; }` }} />
+          <div className="area-tabs-scroll flex items-center overflow-x-auto" style={{ scrollbarWidth: 'none' } as React.CSSProperties}>
+            {SEARCH_TABS.map((tab) => {
+              const active = filters.searchTag === tab.value;
+              return (
+                <div key={tab.value} className="relative group shrink-0">
+                  <button
+                    onClick={() => onChange({ ...filters, searchTag: tab.value })}
+                    className={cn(
+                      'relative flex items-center h-8 px-2.5 text-[11px] whitespace-nowrap cursor-pointer transition-colors duration-150',
+                      active ? 'text-[#e1e4e8]' : 'text-[#8b949e] hover:text-[#c0d6f5]',
+                    )}
                   >
-                    {tab.title}
+                    {tab.label}
+                    {/* Active underline indicator */}
+                    {active && (
+                      <span
+                        className="absolute bottom-0 left-2.5 right-2.5 h-0.5 rounded-sm"
+                        style={{ backgroundColor: '#58a6ff' }}
+                      />
+                    )}
+                  </button>
+                  {/* Custom tooltip */}
+                  <div
+                    className="pointer-events-none absolute left-0 top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-75 z-50"
+                  >
+                    <div
+                      className="absolute -top-1 w-2 h-2 rotate-45"
+                      style={{ left: 12, backgroundColor: '#1c2028', border: '1px solid #2d333b', borderRight: 'none', borderBottom: 'none' }}
+                    />
+                    <div
+                      className="rounded-md px-2.5 py-1.5 text-xs"
+                      style={{
+                        backgroundColor: '#1c2028',
+                        color: '#e1e4e8',
+                        border: '1px solid #2d333b',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                        maxWidth: 'min(260px, calc(100vw - 32px))',
+                        width: 'max-content',
+                        wordWrap: 'break-word',
+                      }}
+                    >
+                      {tab.title}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+        </div>
 
+        {/* Right-side controls */}
+        <div className="flex items-center gap-1.5 shrink-0 pl-2">
           {listingCount !== undefined && (
-            <span className="text-[11px] ml-1 whitespace-nowrap shrink-0" style={{ color: '#8b949e' }}>
+            <span className="text-[11px] whitespace-nowrap" style={{ color: '#8b949e' }}>
               {listingCount}
             </span>
           )}
-        </div>
 
-        {/* Filters toggle button */}
-        <FilterToggleButton
-          activeCount={activeCount}
-          expanded={filtersExpanded}
-          onClick={() => {
-            setFiltersExpanded((prev) => !prev);
-            if (filtersExpanded) {
-              setOpenChip(null);
-            }
-          }}
-        />
-
-        {/* Sort dropdown */}
-        <div className="relative shrink-0">
-          <TextButton
-            variant="muted"
-            onClick={() => {
-              setSortOpen((prev) => !prev);
-              setOpenChip(null);
-            }}
-            className="flex items-center gap-1 text-xs font-medium tracking-wide whitespace-nowrap"
-          >
-            {sortLabel}
-            <ChevronDown className={`transition-transform ${sortOpen ? 'rotate-180' : ''}`} />
-          </TextButton>
-
-          {sortOpen && (
-            <div
-              className="absolute right-0 top-full mt-2 z-50 min-w-[140px] rounded-lg border border-[#2d333b] py-1 shadow-xl"
-              style={{ backgroundColor: '#1c2028' }}
+          {/* Sort dropdown */}
+          <div className="relative shrink-0">
+            <button
+              onClick={() => {
+                setSortOpen((prev) => !prev);
+                setOpenChip(null);
+              }}
+              className="flex items-center gap-1 text-[11px] text-[#8b949e] hover:text-[#e1e4e8] cursor-pointer whitespace-nowrap px-1 transition-colors duration-150"
             >
-              {SORT_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => {
-                    onChange({ ...filters, sort: opt.value });
-                    setSortOpen(false);
-                  }}
-                  className="w-full text-left px-3 py-1.5 text-xs font-medium tracking-wide transition-colors hover:bg-[#2d333b] cursor-pointer"
-                  style={{
-                    color: filters.sort === opt.value ? '#58a6ff' : '#8b949e',
-                  }}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+              <span>&#8645;</span>
+              <span className="hidden sm:inline">{sortLabel}</span>
+              <span className="sm:hidden">Sort</span>
+              <ChevronDown className={`transition-transform ${sortOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-        {/* View toggle (list/map) */}
-        {viewToggle && <div className="shrink-0">{viewToggle}</div>}
+            {sortOpen && (
+              <div
+                className="absolute right-0 top-full mt-2 z-50 min-w-[140px] rounded-lg border border-[#2d333b] py-1 shadow-xl"
+                style={{ backgroundColor: '#1c2028' }}
+              >
+                {SORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => {
+                      onChange({ ...filters, sort: opt.value });
+                      setSortOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-xs font-medium tracking-wide transition-colors hover:bg-[#2d333b] cursor-pointer"
+                    style={{
+                      color: filters.sort === opt.value ? '#58a6ff' : '#8b949e',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Filters toggle button */}
+          <FilterToggleButton
+            activeCount={activeCount}
+            expanded={filtersExpanded}
+            onClick={() => {
+              setFiltersExpanded((prev) => !prev);
+              if (filtersExpanded) {
+                setOpenChip(null);
+              }
+            }}
+          />
+
+          {/* View toggle (list/map) */}
+          {viewToggle && <div className="shrink-0">{viewToggle}</div>}
+        </div>
       </div>
 
       {/* Row 2 (expandable): Filter chips */}
       <div
         className="overflow-hidden transition-all duration-200 ease-in-out"
         style={{
-          maxHeight: filtersExpanded ? expandedHeight + 16 : 0,
+          maxHeight: filtersExpanded ? expandedHeight + 12 : 0,
           opacity: filtersExpanded ? 1 : 0,
         }}
       >
-        <div ref={expandedRowRef} className="flex items-center gap-2 flex-wrap pt-2">
+        <div ref={expandedRowRef} className="flex items-center gap-1.5 overflow-x-auto pt-1.5 pb-1" style={{ borderTop: '1px solid #2d333b', scrollbarWidth: 'none' } as React.CSSProperties}>
           {/* Price chip */}
           <FilterChip
             label={priceLabel(filters.minRent, filters.maxRent)}
