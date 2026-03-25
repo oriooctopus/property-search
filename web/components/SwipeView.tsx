@@ -305,12 +305,15 @@ export default function SwipeView({
             </svg>
           </button>
 
-          {/* Action buttons */}
+          {/* Action buttons: Hide (left) | Would Live (middle, bigger) | Favorite (right) */}
           <div className="flex items-center gap-5">
-            {/* Nope / Hide */}
+            {/* Hide / Skip — red #f85149 */}
             <button
               onClick={() => handleSwipe('left')}
-              className="w-14 h-14 rounded-full flex items-center justify-center border-2 border-red-500 text-red-500 hover:bg-red-500/15 transition-colors active:scale-95"
+              className="w-14 h-14 rounded-full flex items-center justify-center border-2 transition-colors active:scale-95"
+              style={{ borderColor: '#f85149', color: '#f85149' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(248,81,73,0.15)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
               title="Skip"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -318,26 +321,32 @@ export default function SwipeView({
               </svg>
             </button>
 
-            {/* Favorite */}
+            {/* Would Live Here — orange #f97316, bigger center button */}
             <button
-              onClick={() => handleSwipe('right')}
-              className="w-16 h-16 rounded-full flex items-center justify-center border-2 border-yellow-500 text-yellow-500 hover:bg-yellow-500/15 transition-colors active:scale-95"
-              title="Favorite"
+              onClick={() => handleSwipe('up')}
+              className="w-16 h-16 rounded-full flex items-center justify-center border-2 transition-colors active:scale-95"
+              style={{ borderColor: '#f97316', color: '#f97316' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(249,115,22,0.15)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+              title="Would live here"
             >
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 12l9-9 9 9" />
+                <path d="M5 10v10a1 1 0 001 1h3v-5h6v5h3a1 1 0 001-1V10" />
               </svg>
             </button>
 
-            {/* Would live */}
+            {/* Favorite / Star — gold #fbbf24 */}
             <button
-              onClick={() => handleSwipe('up')}
-              className="w-14 h-14 rounded-full flex items-center justify-center border-2 border-orange-500 text-orange-500 hover:bg-orange-500/15 transition-colors active:scale-95"
-              title="Would live here"
+              onClick={() => handleSwipe('right')}
+              className="w-14 h-14 rounded-full flex items-center justify-center border-2 transition-colors active:scale-95"
+              style={{ borderColor: '#fbbf24', color: '#fbbf24' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(251,191,36,0.15)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+              title="Favorite"
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 12l9-9 9 9" />
-                <path d="M5 10v10a1 1 0 001 1h3v-5h6v5h3a1 1 0 001-1V10" />
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
             </button>
           </div>
