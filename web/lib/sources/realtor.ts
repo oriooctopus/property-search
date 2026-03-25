@@ -72,7 +72,17 @@ export async function fetchRealtorListings(
       lon: coord.lon ?? 0,
       photos: r.photo_count ?? 0,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      photo_urls: (r.photos ?? []).slice(0, 6).map((p: any) => p.href),
+      photo_urls: (() => {
+        // The API may return photos as an array of {href} objects
+        const photosArr = r.photos ?? [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const urls: string[] = photosArr.slice(0, 10).map((p: any) => p.href ?? p.url ?? "").filter(Boolean);
+        // Fallback: use primary_photo if the full photos array is empty
+        if (urls.length === 0 && r.primary_photo?.href) {
+          urls.push(r.primary_photo.href);
+        }
+        return urls;
+      })(),
       url: href,
       search_tag: `search_${city.toLowerCase().replace(/\s+/g, "_")}`,
       list_date: r.list_date ?? null,
