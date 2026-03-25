@@ -30,13 +30,16 @@ After every implementation agent completes, spawn the `verify` agent before repo
 
 ## MANDATORY: Status Table on Every Response
 
-Every response must end with a status table of all active work items. Format:
+Every response must end with a compact status table of active work items. Done items drop off. Format:
 
-| Item | Status | Notes |
-|------|--------|-------|
-| Feature X | Done / In Progress / Blocked / Waiting on User | Brief detail |
+| Item | Next step |
+|------|-----------|
+| Feature X | ⏳ Agent running / 🔲 Not started / Description |
 
-This helps the user track parallel workstreams. Update it honestly — don't hide blockers or stale items.
+When presenting design options (A/B/C/D), make each letter a separate clickable link using format:
+`[A](url1) / [B](url2) / [C](url3) / [D](url4)`
+
+Each letter must link to a different URL or anchor. If the mockup HTML doesn't have per-option anchors, add them to the HTML file first. This keeps the table compact while letting the user click directly to each option.
 
 ## Agent Context Continuity
 
