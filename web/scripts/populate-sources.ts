@@ -18,6 +18,7 @@ import { fetchFacebookMarketplaceListings } from "../lib/sources/facebook-market
 import type { SearchParams, AdapterOutput } from "../lib/sources/types";
 import { validateAndNormalize, mergeQualitySummaries, type QualitySummary } from "../lib/sources/pipeline";
 import { deduplicateAndComposite } from "../lib/sources/dedup";
+import { assignSearchTag } from "../lib/tag-constants";
 
 // Load env from .env.local
 import { readFileSync } from "fs";
@@ -180,9 +181,24 @@ async function main() {
   console.error(`  VALIDATED: ${pipeline.listings.length}`);
   console.error(`  REJECTED:  ${pipeline.rejected.length}`);
 
+  // Geo-tag: assign search_tag based on coordinates or neighborhood
+  let geoTagged = 0;
+  let geoDropped = 0;
+  const tagged = pipeline.listings.filter((l) => {
+    const tag = assignSearchTag(l.lat, l.lon, l.area);
+    if (tag) {
+      l.search_tag = tag;
+      geoTagged++;
+      return true;
+    }
+    geoDropped++;
+    return false;
+  });
+  console.error(`  GEO-TAGGED: ${geoTagged} (dropped ${geoDropped} outside all areas)`);
+
   // Deduplicate
-  const deduped = deduplicateAndComposite(pipeline.listings);
-  console.error(`  DEDUPED:   ${deduped.length} (removed ${pipeline.listings.length - deduped.length})`);
+  const deduped = deduplicateAndComposite(tagged);
+  console.error(`  DEDUPED:   ${deduped.length} (removed ${tagged.length - deduped.length})`);
 
   if (merged.warnings.length > 0) {
     console.error("  QUALITY WARNINGS:");
