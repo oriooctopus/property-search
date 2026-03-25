@@ -403,7 +403,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
       style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}
     >
       {/* Row 1: Filter chips + view toggle */}
-      <div className="flex items-start gap-2 mb-3">
+      <div className="flex items-start gap-4 mb-3">
         <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
         {/* Price chip */}
         <FilterChip
