@@ -7,10 +7,18 @@ Any agent modifying files in `web/components/` or `web/app/` that contain JSX:
 2. AFTER changes: run `npm run test:visual` again
 3. If any screenshot diff is detected, the Playwright HTML report opens at `web/playwright-report/index.html`
 4. Agents MUST NOT deploy or report UI work as complete until the user has approved the visual diff
-5. If screenshots changed, pause and tell the user: "Visual changes detected — please review the diff at `web/playwright-report/index.html`"
-6. If the user approves, run `npm run test:visual:update` to accept new baselines
+5. If screenshots changed, run `npm run test:visual:review` to start the approval UI, then tell the user: "Visual changes detected — please review at http://localhost:9400"
+6. If the user approves, the approval UI updates baselines automatically
 7. If the user rejects, fix the regression before continuing
 8. A feature that works but looks broken is NOT done
+
+## CRITICAL: Layout Quality Checks
+
+Agents must check for these layout issues after any UI change:
+- **Fill ratio**: Cards and content should fill at least 80% of their container width. A card floating at 60% width looks broken.
+- **Consistent spacing**: Elements should have even padding/margin from container edges. Content butting up against a border with no breathing room is a bug.
+- **No orphaned whitespace**: Large empty areas next to undersized content indicate a width constraint issue (e.g., `max-w-sm` when `max-w-lg` is needed).
+- **Vertical breathing room**: Content needs padding from section dividers (borders, separators). Minimum 8px gap between content and any horizontal rule/border.
 
 ## CRITICAL: Verify All Work
 

@@ -1,10 +1,10 @@
-import { forwardRef, type ComponentPropsWithoutRef } from 'react';
+import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 
 export interface SegmentedControlProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onChange'> {
   value: string;
   onChange: (value: string) => void;
-  options: { value: string; label: string }[];
+  options: { value: string; label: ReactNode }[];
 }
 
 export const SegmentedControl = forwardRef<HTMLDivElement, SegmentedControlProps>(
@@ -26,7 +26,7 @@ export const SegmentedControl = forwardRef<HTMLDivElement, SegmentedControlProps
               key={opt.value}
               onClick={() => onChange(opt.value)}
               className={cn(
-                'border-none text-[13px] font-medium px-3 sm:px-5 py-[5px] cursor-pointer transition-all duration-150 relative whitespace-nowrap',
+                'border-none text-[13px] font-medium px-3 sm:px-5 py-[5px] cursor-pointer transition-all duration-150 relative whitespace-nowrap min-h-[44px]',
                 isActive
                   ? 'font-semibold'
                   : 'hover:text-[#e1e4e8]',
