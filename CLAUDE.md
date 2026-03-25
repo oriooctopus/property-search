@@ -28,6 +28,16 @@ Agents must check for these layout issues after any UI change:
 
 After every implementation agent completes, spawn the `verify` agent before reporting results to the user. Pass it a description of what the task was supposed to accomplish. Do not tell the user something is done until the verifier confirms it.
 
+## MANDATORY: Status Table on Every Response
+
+Every response must end with a status table of all active work items. Format:
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Feature X | Done / In Progress / Blocked / Waiting on User | Brief detail |
+
+This helps the user track parallel workstreams. Update it honestly — don't hide blockers or stale items.
+
 ## Agent Context Continuity
 
 When multiple agents work on the same topic across iterations (e.g., Facebook Marketplace adapter → test it → fix issues), prefer `SendMessage` to continue the same agent rather than spawning a fresh one. Fresh agents lose all prior context.
