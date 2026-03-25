@@ -206,11 +206,11 @@ export default function SwipeCard({
             textShadow: '0 0 4px rgba(248,81,73,0.3)',
           }}
         >
-          NOPE
+          NOPE 👎
         </div>
       </motion.div>
 
-      {/* FAVE ★ - top left, gold #fbbf24, rotated 12° */}
+      {/* LIKE 👍 - top left, gold #fbbf24, rotated 12° */}
       <motion.div
         className="absolute top-8 left-6 z-[5] pointer-events-none"
         style={{ opacity: faveOpacity, rotate: 12 }}
@@ -224,7 +224,7 @@ export default function SwipeCard({
             textShadow: '0 0 4px rgba(251,191,36,0.3)',
           }}
         >
-          FAVE ★
+          LIKE 👍
         </div>
       </motion.div>
 
