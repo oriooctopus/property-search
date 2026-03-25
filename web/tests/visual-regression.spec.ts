@@ -35,7 +35,13 @@ test.describe("Visual Regression — Desktop (1440×900)", () => {
   test("home page layout", async ({ page }) => {
     await mockSupabase(page);
     await page.goto("/", { waitUntil: "networkidle" });
-    await page.waitForTimeout(1500); // let map tiles + images settle
+    await page.waitForTimeout(1500);
+    // Expand filters so the screenshot catches filter chip differences
+    const filtersBtn = page.locator('button:has-text("Filters")').first();
+    if (await filtersBtn.isVisible()) {
+      await filtersBtn.click();
+      await page.waitForTimeout(300); // wait for expand animation
+    }
     await expect(page).toHaveScreenshot("desktop-home.png", {
       maxDiffPixelRatio: 0.01,
       animations: "disabled",
