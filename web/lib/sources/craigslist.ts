@@ -179,6 +179,19 @@ export async function fetchCraigslistListings(
           ? parseInt(housingBedsMatch[1], 10)
           : 0;
 
+      // Baths — try title patterns first, then housing span
+      // Matches: "3 bath", "2BA", "2 bathroom", "1 bth", "5BR/2BA"
+      const titleBathsMatchSlash = title.match(/(\d+)\s*(?:BR)\s*\/\s*(\d+)\s*(?:BA)/i);
+      const titleBathsMatch = title.match(/(\d+)\s*(?:ba(?:th(?:room)?)?|bth)\b/i);
+      const housingBathsMatch = housingText.match(/(\d+)\s*(?:ba(?:th(?:room)?)?|bth)\b/i);
+      const baths = titleBathsMatchSlash
+        ? parseInt(titleBathsMatchSlash[2], 10)
+        : titleBathsMatch
+          ? parseInt(titleBathsMatch[1], 10)
+          : housingBathsMatch
+            ? parseInt(housingBathsMatch[1], 10)
+            : 0;
+
       // Location / neighborhood — new layout uses div.location, old uses span.result-hood
       const neighborhood =
         $el.find("div.location").first().text().trim() ||
@@ -204,7 +217,7 @@ export async function fetchCraigslistListings(
           area: neighborhood || "New York, NY",
           price,
           beds,
-          baths: 0, // NOT PROVIDED
+          baths,
           sqft: null, // NOT RELIABLY PROVIDED
           lat: 0, // NOT PROVIDED — would need geocoding
           lon: 0, // NOT PROVIDED — would need geocoding
