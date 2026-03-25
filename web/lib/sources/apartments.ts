@@ -8,17 +8,18 @@
  *  - sqft              (not provided by Apartments.com API)
  *  - last_update_date  (not provided)
  *  - availability_date (not provided)
- *  - transit_summary   (not provided — but Realtor doesn't reliably provide it either)
  */
 
-import type { RawListing, SearchParams } from "./types";
+import type { AdapterOutput, SearchParams } from "./types";
+import { extractPhotoUrls, makeSearchTag, parsePrice } from "./parse-utils";
 
 const RAPIDAPI_HOST = "apartments-com1.p.rapidapi.com";
+const TIMEOUT_MS = 15_000;
 
 export async function fetchApartmentsListings(
   params: SearchParams,
   apiKey: string,
-): Promise<{ listings: RawListing[]; total: number }> {
+): Promise<{ listings: AdapterOutput[]; total: number }> {
   const { city, stateCode, bedsMin, bathsMin, priceMax, priceMin } = params;
 
   const queryParams = new URLSearchParams();
@@ -36,6 +37,7 @@ export async function fetchApartmentsListings(
         "X-RapidAPI-Key": apiKey,
         "X-RapidAPI-Host": RAPIDAPI_HOST,
       },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     },
   );
 
@@ -45,43 +47,37 @@ export async function fetchApartmentsListings(
   }
 
   const data = await res.json();
-  // The API returns an array of properties (or { properties: [...] })
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const results: any[] = Array.isArray(data) ? data : (data?.properties ?? data?.data ?? []);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const listings: RawListing[] = results.map((r: any) => {
-    const lat = r.latitude ?? r.location?.lat ?? r.geo?.lat ?? 0;
-    const lon = r.longitude ?? r.location?.lng ?? r.location?.lon ?? r.geo?.lng ?? 0;
-    const address = r.address ?? r.streetAddress ?? r.location?.address ?? "";
+  const listings: AdapterOutput[] = results.map((r: any) => {
+    const lat = r.latitude ?? r.location?.lat ?? r.geo?.lat ?? null;
+    const lon = r.longitude ?? r.location?.lng ?? r.location?.lon ?? r.geo?.lng ?? null;
+    const address = r.address ?? r.streetAddress ?? r.location?.address ?? null;
     const cityName = r.city ?? r.location?.city ?? city;
     const state = r.state ?? r.location?.state ?? stateCode;
-    const price = r.price ?? r.rent ?? r.min_rent ?? r.rentRange?.min ?? 0;
-    const beds = r.bedrooms ?? r.beds ?? r.min_bedrooms ?? 0;
-    const baths = r.bathrooms ?? r.baths ?? r.min_bathrooms ?? 0;
-    const photoUrls: string[] = (r.photos ?? r.images ?? r.photo_urls ?? [])
-      .slice(0, 6)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((p: any) => (typeof p === "string" ? p : p.url ?? p.href ?? ""))
-      .filter(Boolean);
+    const rawPrice = r.price ?? r.rent ?? r.min_rent ?? r.rentRange?.min ?? null;
+    const rawBeds = r.bedrooms ?? r.beds ?? r.min_bedrooms ?? null;
+    const rawBaths = r.bathrooms ?? r.baths ?? r.min_bathrooms ?? null;
+    const photoUrls = extractPhotoUrls(r.photos ?? r.images ?? r.photo_urls ?? []);
     const url = r.url ?? r.link ?? r.detail_url ?? "";
 
     return {
       address,
       area: `${cityName}, ${state}`,
-      price: typeof price === "string" ? parseInt(price.replace(/[^0-9]/g, ""), 10) || 0 : price,
-      beds: typeof beds === "string" ? parseInt(beds, 10) || 0 : beds,
-      baths: typeof baths === "string" ? parseFloat(baths) || 0 : baths,
-      sqft: null, // NOT PROVIDED by Apartments.com
+      price: parsePrice(rawPrice),
+      beds: rawBeds != null ? (typeof rawBeds === "string" ? parseInt(rawBeds, 10) || null : rawBeds) : null,
+      baths: rawBaths != null ? (typeof rawBaths === "string" ? parseFloat(rawBaths) || null : rawBaths) : null,
+      sqft: null,
       lat,
       lon,
-      photos: photoUrls.length,
       photo_urls: photoUrls,
       url,
-      search_tag: `search_${city.toLowerCase().replace(/\s+/g, "_")}`,
+      search_tag: makeSearchTag(city),
       list_date: r.listed_date ?? r.list_date ?? null,
-      last_update_date: null, // NOT PROVIDED
-      availability_date: null, // NOT PROVIDED
+      last_update_date: null,
+      availability_date: null,
       source: "apartments" as const,
     };
   });

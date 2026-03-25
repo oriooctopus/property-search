@@ -10,14 +10,14 @@
  *  - lat / lon          (not in listing HTML; would need geocoding)
  *  - last_update_date   (not provided)
  *  - availability_date  (not provided)
- *  - transit_summary    (not provided)
  *
  * Photos are fetched from individual listing pages because the search
  * results page loads images via JavaScript (not in static HTML).
  */
 
 import * as cheerio from "cheerio";
-import type { RawListing, SearchParams } from "./types";
+import type { AdapterOutput, SearchParams } from "./types";
+import { extractBaths, extractBeds, makeSearchTag, parsePrice } from "./parse-utils";
 
 const FETCH_HEADERS = {
   "User-Agent":
@@ -28,10 +28,6 @@ const FETCH_HEADERS = {
 
 /**
  * Upgrade a Craigslist CDN thumbnail URL to the largest available size.
- * Patterns seen:
- *   _50x50c.jpg  → _600x450.jpg  (cropped thumbnail → large)
- *   _300x300.jpg → _600x450.jpg  (medium → large)
- *   _50.jpg      → _600.jpg      (old format)
  */
 function upgradeCraigslistUrl(src: string): string {
   return src
@@ -52,21 +48,16 @@ async function fetchListingPhotos(url: string): Promise<string[]> {
     const $ = cheerio.load(html);
     const photos: string[] = [];
 
-    // Target the main gallery images — not the thumbnail strips (#bi_thumbs, .thumb)
-    // Craigslist listing pages have full/medium images in figure.swipe-wrap or .gallery-inner
     $(".gallery-inner img, figure.swipe-wrap img, #slideshow_image").each(
       (_i, img) => {
-        const src =
-          $(img).attr("src") ??
-          $(img).attr("data-src") ??
-          "";
+        const src = $(img).attr("src") ?? $(img).attr("data-src") ?? "";
         if (src && src.startsWith("http")) {
           photos.push(upgradeCraigslistUrl(src));
         }
       },
     );
 
-    // Fallback: any Craigslist CDN image (including thumb strips — better than nothing)
+    // Fallback: any Craigslist CDN image
     if (photos.length === 0) {
       $("img").each((_i, img) => {
         const src = $(img).attr("src") ?? $(img).attr("data-src") ?? "";
@@ -76,7 +67,6 @@ async function fetchListingPhotos(url: string): Promise<string[]> {
       });
     }
 
-    // Deduplicate and limit
     return [...new Set(photos)].slice(0, 8);
   } catch {
     return [];
@@ -84,7 +74,7 @@ async function fetchListingPhotos(url: string): Promise<string[]> {
 }
 
 /** Fetch photos for a batch of listings concurrently (max 5 at a time). */
-async function batchFetchPhotos(listings: RawListing[]): Promise<void> {
+async function batchFetchPhotos(listings: AdapterOutput[]): Promise<void> {
   const BATCH_SIZE = 5;
   for (let i = 0; i < listings.length; i += BATCH_SIZE) {
     const batch = listings.slice(i, i + BATCH_SIZE);
@@ -92,10 +82,8 @@ async function batchFetchPhotos(listings: RawListing[]): Promise<void> {
     results.forEach((urls, idx) => {
       if (urls.length > 0) {
         listings[i + idx].photo_urls = urls;
-        listings[i + idx].photos = urls.length;
       }
     });
-    // Small delay between batches to be polite to Craigslist
     if (i + BATCH_SIZE < listings.length) {
       await new Promise((r) => setTimeout(r, 300));
     }
@@ -106,8 +94,8 @@ const BASE_URL = "https://newyork.craigslist.org/search/apa";
 
 export async function fetchCraigslistListings(
   params: SearchParams,
-): Promise<{ listings: RawListing[]; total: number }> {
-  const { bedsMin, priceMax, priceMin } = params;
+): Promise<{ listings: AdapterOutput[]; total: number }> {
+  const { city, bedsMin, priceMax, priceMin } = params;
 
   const queryParams = new URLSearchParams();
   if (priceMin != null) queryParams.set("min_price", String(priceMin));
@@ -117,43 +105,22 @@ export async function fetchCraigslistListings(
 
   const url = `${BASE_URL}?${queryParams.toString()}`;
 
-  let html: string;
-  try {
-    const res = await fetch(url, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(15000) });
-
-    if (!res.ok) {
-      throw new Error(`Craigslist returned ${res.status}`);
-    }
-
-    html = await res.text();
-  } catch (err) {
-    console.error("Craigslist fetch error:", err);
-    return { listings: [], total: 0 };
+  const res = await fetch(url, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(15000) });
+  if (!res.ok) {
+    throw new Error(`Craigslist returned ${res.status}`);
   }
 
+  const html = await res.text();
   const $ = cheerio.load(html);
-  const listings: RawListing[] = [];
+  const listings: AdapterOutput[] = [];
 
-  // Craigslist current layout (2025+):
-  //   <li class="cl-static-search-result">
-  //     <a href="...">
-  //       <div class="title">TITLE</div>
-  //       <div class="details">
-  //         <div class="price">$X,XXX</div>
-  //         <div class="location">Neighborhood</div>
-  //       </div>
-  //     </a>
-  //   </li>
-  // Also handle older layouts with result-row and result-node.
   $("li.cl-static-search-result, li.result-row, div.result-node").each(
     (_i, el) => {
       const $el = $(el);
 
-      // Title & URL — try new layout first, then old
       let title = $el.find("div.title").first().text().trim();
       let listingUrl = $el.find("a").first().attr("href") ?? "";
 
-      // Fallback for old layout
       if (!title) {
         const $titleLink =
           $el.find("a.titlestring, a.result-title, a.posting-title").first();
@@ -161,47 +128,23 @@ export async function fetchCraigslistListings(
         listingUrl = $titleLink.attr("href") ?? listingUrl;
       }
 
-      // Price — new layout uses div.price, old uses span.priceinfo / span.result-price
       const priceText =
         ($el.find("div.price").first().text().trim() ||
          $el.find("span.priceinfo, span.result-price").first().text().trim());
-      const price = parseInt(priceText.replace(/[^0-9]/g, ""), 10) || 0;
 
-      // Beds — try to extract from title (e.g. "7BR", "5 bedroom")
-      const titleBedsMatch = title.match(/(\d+)\s*(?:br|bed|bedroom)/i);
-      // Also check old housing span
+      // Use shared extractors for beds/baths from title + housing span
       const housingText =
         $el.find("span.housing, span.post-bedrooms").first().text().trim();
-      const housingBedsMatch = housingText.match(/(\d+)\s*br/i);
-      const beds = titleBedsMatch
-        ? parseInt(titleBedsMatch[1], 10)
-        : housingBedsMatch
-          ? parseInt(housingBedsMatch[1], 10)
-          : 0;
+      const combinedText = `${title} ${housingText}`;
 
-      // Baths — try title patterns first, then housing span
-      // Matches: "3 bath", "2BA", "2 bathroom", "1 bth", "5BR/2BA"
-      const titleBathsMatchSlash = title.match(/(\d+)\s*(?:BR)\s*\/\s*(\d+)\s*(?:BA)/i);
-      const titleBathsMatch = title.match(/(\d+)\s*(?:ba(?:th(?:room)?)?|bth)\b/i);
-      const housingBathsMatch = housingText.match(/(\d+)\s*(?:ba(?:th(?:room)?)?|bth)\b/i);
-      const baths = titleBathsMatchSlash
-        ? parseInt(titleBathsMatchSlash[2], 10)
-        : titleBathsMatch
-          ? parseInt(titleBathsMatch[1], 10)
-          : housingBathsMatch
-            ? parseInt(housingBathsMatch[1], 10)
-            : 0;
+      const beds = extractBeds(combinedText);
+      const baths = extractBaths(combinedText);
 
-      // Location / neighborhood — new layout uses div.location, old uses span.result-hood
       const neighborhood =
         $el.find("div.location").first().text().trim() ||
         $el.find("span.result-hood, span.nearby").first().text().trim().replace(/[()]/g, "") ||
         "New York";
 
-      // Photos will be fetched from individual listing pages below.
-      const photoUrls: string[] = [];
-
-      // List date — from <time> element
       const dateStr =
         $el.find("time").attr("datetime") ??
         $el.find("span.date, span.cl-search-result-date").first().text().trim() ??
@@ -213,28 +156,27 @@ export async function fetchCraigslistListings(
           : `https://newyork.craigslist.org${listingUrl}`;
 
         listings.push({
-          address: title, // Craigslist titles often include address-like info
+          address: title,
           area: neighborhood || "New York, NY",
-          price,
+          price: parsePrice(priceText),
           beds,
           baths,
-          sqft: null, // NOT RELIABLY PROVIDED
-          lat: 0, // NOT PROVIDED — would need geocoding
-          lon: 0, // NOT PROVIDED — would need geocoding
-          photos: photoUrls.length,
-          photo_urls: photoUrls.slice(0, 6),
+          sqft: null,
+          lat: null,
+          lon: null,
+          photo_urls: [], // Fetched below from individual pages
           url: fullUrl,
-          search_tag: "search_new_york",
+          search_tag: makeSearchTag(city),
           list_date: dateStr,
-          last_update_date: null, // NOT PROVIDED
-          availability_date: null, // NOT PROVIDED
+          last_update_date: null,
+          availability_date: null,
           source: "craigslist" as const,
         });
       }
     },
   );
 
-  // Fetch photos from individual listing pages (search results don't include photos in static HTML)
+  // Fetch photos from individual listing pages
   if (listings.length > 0) {
     await batchFetchPhotos(listings);
   }

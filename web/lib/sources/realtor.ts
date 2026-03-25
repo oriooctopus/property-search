@@ -2,14 +2,16 @@
  * Realtor.com data source via RapidAPI (existing logic extracted).
  */
 
-import type { RawListing, SearchParams } from "./types";
+import type { AdapterOutput, SearchParams } from "./types";
+import { extractPhotoUrls, makeSearchTag, parsePrice } from "./parse-utils";
 
 const RAPIDAPI_HOST = "realty-in-us.p.rapidapi.com";
+const TIMEOUT_MS = 15_000;
 
 export async function fetchRealtorListings(
   params: SearchParams,
   apiKey: string,
-): Promise<{ listings: RawListing[]; total: number }> {
+): Promise<{ listings: AdapterOutput[]; total: number }> {
   const { city, stateCode, bedsMin, bathsMin, priceMax, priceMin } = params;
 
   const apiBody: Record<string, unknown> = {
@@ -38,6 +40,7 @@ export async function fetchRealtorListings(
       "X-RapidAPI-Host": RAPIDAPI_HOST,
     },
     body: JSON.stringify(apiBody),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
 
   if (!res.ok) {
@@ -51,7 +54,7 @@ export async function fetchRealtorListings(
   const total: number = data?.data?.home_search?.total ?? 0;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const listings: RawListing[] = results.map((r: any) => {
+  const listings: AdapterOutput[] = results.map((r: any) => {
     const loc = r.location?.address ?? {};
     const desc = r.description ?? {};
     const coord = loc.coordinate ?? {};
@@ -61,35 +64,36 @@ export async function fetchRealtorListings(
         : `https://www.realtor.com${r.href}`
       : "";
 
+    // Photo extraction with Realtor-specific URL upgrade
+    const photosArr = r.photos ?? [];
+    let photoUrls = extractPhotoUrls(photosArr, 10);
+    if (photoUrls.length === 0 && r.primary_photo?.href) {
+      photoUrls = [r.primary_photo.href];
+    }
+    // Upgrade rdcpix.com thumbnails to 1024px
+    photoUrls = photoUrls.map((u) => u.replace(/s\.jpg$/, "od-w1024_h768.jpg"));
+
+    const bathsFull = desc.baths_full ?? null;
+    const bathsHalf = desc.baths_half ?? null;
+    const baths = bathsFull != null || bathsHalf != null
+      ? (bathsFull ?? 0) + (bathsHalf ?? 0) * 0.5
+      : null;
+
     return {
-      address: loc.line ?? "",
+      address: loc.line ?? null,
       area: `${loc.city ?? city}, ${loc.state_code ?? stateCode}`,
-      price: r.list_price ?? 0,
-      beds: desc.beds ?? 0,
-      baths: (desc.baths_full ?? 0) + (desc.baths_half ?? 0) * 0.5,
+      price: parsePrice(r.list_price),
+      beds: desc.beds ?? null,
+      baths,
       sqft: desc.sqft ?? null,
-      lat: coord.lat ?? 0,
-      lon: coord.lon ?? 0,
-      photos: r.photo_count ?? 0,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      photo_urls: (() => {
-        // The API may return photos as an array of {href} objects
-        const photosArr = r.photos ?? [];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const urls: string[] = photosArr.slice(0, 10).map((p: any) => p.href ?? p.url ?? "").filter(Boolean);
-        // Fallback: use primary_photo if the full photos array is empty
-        if (urls.length === 0 && r.primary_photo?.href) {
-          urls.push(r.primary_photo.href);
-        }
-        // Upgrade to large resolution: rdcpix.com URLs ending in 's.jpg' are small thumbnails (~200px).
-        // Replace with 'od-w1024_h768.jpg' for 1024px wide images.
-        return urls.map((u) => u.replace(/s\.jpg$/, "od-w1024_h768.jpg"));
-      })(),
+      lat: coord.lat ?? null,
+      lon: coord.lon ?? null,
+      photo_urls: photoUrls,
       url: href,
-      search_tag: `search_${city.toLowerCase().replace(/\s+/g, "_")}`,
+      search_tag: makeSearchTag(city),
       list_date: r.list_date ?? null,
       last_update_date: r.last_update_date ?? null,
-      availability_date: r.description?.available_date ?? null,
+      availability_date: desc.available_date ?? null,
       source: "realtor" as const,
     };
   });

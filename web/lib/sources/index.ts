@@ -6,4 +6,6 @@ export { fetchStreetEasyListings } from "./streeteasy";
 export { fetchZillowListings } from "./zillow";
 export { fetchFacebookMarketplaceListings } from "./facebook-marketplace";
 export { unifiedSearch } from "./unified-search";
-export type { RawListing, SearchParams, ListingSource } from "./types";
+export type { RawListing, SearchParams, ListingSource, AdapterOutput, ValidatedListing, DataQuality } from "./types";
+export { validateAndNormalize } from "./pipeline";
+export { deduplicateAndComposite } from "./dedup";

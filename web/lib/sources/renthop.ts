@@ -8,18 +8,19 @@
  *  - sqft               (not consistently shown in search results)
  *  - last_update_date   (not provided)
  *  - availability_date  (not provided)
- *  - transit_summary    (not provided)
  */
 
 import * as cheerio from "cheerio";
-import type { RawListing, SearchParams } from "./types";
+import type { AdapterOutput, SearchParams } from "./types";
+import { extractBaths, extractBeds, makeSearchTag, parsePrice } from "./parse-utils";
 
 const BASE_URL = "https://www.renthop.com/search/nyc";
+const TIMEOUT_MS = 15_000;
 
 export async function fetchRentHopListings(
   params: SearchParams,
-): Promise<{ listings: RawListing[]; total: number }> {
-  const { bedsMin, priceMax, priceMin } = params;
+): Promise<{ listings: AdapterOutput[]; total: number }> {
+  const { city, bedsMin, priceMax, priceMin } = params;
 
   const queryParams = new URLSearchParams();
   if (priceMin != null) queryParams.set("min_price", String(priceMin));
@@ -29,45 +30,37 @@ export async function fetchRentHopListings(
 
   const url = `${BASE_URL}?${queryParams.toString()}`;
 
-  let html: string;
-  try {
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-    });
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      Accept: "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9",
+    },
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
 
-    if (!res.ok) {
-      throw new Error(`RentHop returned ${res.status}`);
-    }
-
-    html = await res.text();
-  } catch (err) {
-    console.error("RentHop fetch error:", err);
-    return { listings: [], total: 0 };
+  if (!res.ok) {
+    throw new Error(`RentHop returned ${res.status}`);
   }
 
+  const html = await res.text();
   const $ = cheerio.load(html);
-  const listings: RawListing[] = [];
+  const listings: AdapterOutput[] = [];
 
-  // RentHop listing cards
   $(
     "div.search-listing, div.listing-card, div[class*='listing'], article.listing",
   ).each((_i, el) => {
     const $el = $(el);
 
-    // Address
     const address =
       $el.find("a.listing-title-link, h4.listing-title, div.listing-address, a[class*='address']")
         .first()
         .text()
         .trim() ||
-      $el.find("h4, h3").first().text().trim();
+      $el.find("h4, h3").first().text().trim() ||
+      null;
 
-    // URL
     const listingPath =
       $el.find("a.listing-title-link, a[class*='address'], a[href*='/listings/']")
         .first()
@@ -78,50 +71,40 @@ export async function fetchRentHopListings(
         ? `https://www.renthop.com${listingPath}`
         : "";
 
-    // Price
     const priceText =
       $el.find("span.listing-price, div.price, span[class*='price']")
         .first()
         .text()
         .trim();
-    const price = parseInt(priceText.replace(/[^0-9]/g, ""), 10) || 0;
 
-    // Beds & baths
+    // Use shared extractors
     const detailText =
       $el.find("div.listing-details, span.details, div[class*='detail']")
         .first()
         .text()
         .trim();
-
     const fullText = $el.text();
-    const bedsMatch = (detailText || fullText).match(/(\d+)\s*(?:bed|br|BD)/i);
-    const bathsMatch = (detailText || fullText).match(
-      /(\d+(?:\.\d+)?)\s*(?:bath|ba|BA)/i,
-    );
-    const beds = bedsMatch ? parseInt(bedsMatch[1], 10) : 0;
-    const baths = bathsMatch ? parseFloat(bathsMatch[1]) : 0;
+    const combinedText = detailText || fullText;
 
-    // Neighborhood
+    const beds = extractBeds(combinedText);
+    const baths = extractBaths(combinedText);
+
     const neighborhood =
       $el
-        .find(
-          "div.listing-neighborhood, span.neighborhood, div[class*='hood']",
-        )
+        .find("div.listing-neighborhood, span.neighborhood, div[class*='hood']")
         .first()
         .text()
         .trim() || "New York";
 
-    // Photos
+    // Photos from search result thumbnails
     const photoUrls: string[] = [];
     $el.find("img").each((_j, img) => {
-      const src =
-        $(img).attr("src") ?? $(img).attr("data-src") ?? "";
+      const src = $(img).attr("src") ?? $(img).attr("data-src") ?? "";
       if (src && !src.includes("pixel") && !src.includes("blank")) {
         photoUrls.push(src);
       }
     });
 
-    // List date
     const dateText =
       $el.find("span.listing-date, time, span[class*='date']")
         .first()
@@ -136,19 +119,18 @@ export async function fetchRentHopListings(
         area: neighborhood.includes(",")
           ? neighborhood
           : `${neighborhood}, NY`,
-        price,
+        price: parsePrice(priceText),
         beds,
         baths,
-        sqft: null, // NOT RELIABLY PROVIDED in search results
-        lat: 0, // Would need geocoding or detail page scrape
-        lon: 0,
-        photos: photoUrls.length,
-        photo_urls: photoUrls.slice(0, 6),
+        sqft: null,
+        lat: null,
+        lon: null,
+        photo_urls: photoUrls.slice(0, 10),
         url: listingUrl,
-        search_tag: "search_new_york",
+        search_tag: makeSearchTag(city),
         list_date: dateText,
-        last_update_date: null, // NOT PROVIDED
-        availability_date: null, // NOT PROVIDED
+        last_update_date: null,
+        availability_date: null,
         source: "renthop" as const,
       });
     }

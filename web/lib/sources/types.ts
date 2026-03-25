@@ -36,3 +36,53 @@ export interface SearchParams {
   priceMax?: number;
   priceMin?: number;
 }
+
+// ---------------------------------------------------------------------------
+// Adapter pipeline types
+// ---------------------------------------------------------------------------
+
+/**
+ * What each source adapter returns. Nullable fields mean "I don't know".
+ * The pipeline converts these into ValidatedListing (with backwards-compat defaults).
+ */
+export interface AdapterOutput {
+  address: string | null;
+  area: string | null;
+  price: number | null;
+  beds: number | null; // null = unknown, 0 = studio
+  baths: number | null; // null = unknown
+  sqft: number | null;
+  lat: number | null;
+  lon: number | null;
+  photo_urls: string[];
+  url: string;
+  search_tag: string;
+  list_date: string | null;
+  last_update_date: string | null;
+  availability_date: string | null;
+  source: ListingSource;
+}
+
+/** How confident we are in a field's value. */
+export type FieldConfidence = "api" | "parsed" | "missing";
+
+/** Per-field confidence tracking attached to each validated listing. */
+export interface DataQuality {
+  beds: FieldConfidence;
+  baths: FieldConfidence;
+  price: FieldConfidence;
+  geo: FieldConfidence;
+  photos: FieldConfidence;
+}
+
+/** A validated listing with quality metadata. Extends RawListing for backwards compat. */
+export interface ValidatedListing extends RawListing {
+  quality: DataQuality;
+}
+
+/** Sources that extract data from text rather than structured API fields. */
+export const SCRAPER_SOURCES: ReadonlySet<ListingSource> = new Set([
+  "craigslist",
+  "renthop",
+  "facebook",
+]);

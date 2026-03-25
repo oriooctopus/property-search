@@ -65,7 +65,8 @@ export default function ListingCard({
   const pricePerBed = Math.round(listing.price / listing.beds);
   const tagColor = TAG_COLORS[listing.search_tag] ?? '#8b949e';
   const photos = listing.photo_urls ?? [];
-  const totalPhotos = photos.length;
+  const hasMorePhotosSlide = photos.length === 1;
+  const totalPhotos = photos.length + (hasMorePhotosSlide ? 1 : 0);
 
   const [photoIndex, setPhotoIndex] = useState(0);
 
@@ -156,6 +157,38 @@ export default function ListingCard({
                 draggable={false}
               />
             ))}
+            {hasMorePhotosSlide && (
+              <a
+                href={listing.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: `${100 / totalPhotos}%`,
+                  height: '100%',
+                  flexShrink: 0,
+                  backgroundColor: '#161b22',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  textDecoration: 'none',
+                }}
+              >
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+                <span style={{ color: '#58a6ff', fontSize: 13, fontWeight: 500 }}>
+                  See more photos
+                </span>
+                <span style={{ color: '#8b949e', fontSize: 11 }}>
+                  View on {SOURCE_LABELS[listing.source] ?? 'listing'}
+                </span>
+              </a>
+            )}
           </div>
           {totalPhotos > 1 && (
             <>
