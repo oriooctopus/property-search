@@ -491,7 +491,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
   return (
     <div
       ref={containerRef}
-      className="px-2"
+      className="px-2 relative z-[1200]"
       style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}
     >
       {/* Row 1 (always visible): Area tabs + listing count + Filters button + Sort + View toggle */}
