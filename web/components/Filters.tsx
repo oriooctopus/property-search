@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { FilterChip, PillButton, TagButton, PrimaryButton, TextButton } from '@/components/ui';
+import { ButtonBase, FilterChip, PillButton, TagButton, PrimaryButton, TextButton } from '@/components/ui';
+import { cn } from '@/lib/cn';
 
 export type SearchTag = 'all' | 'fulton' | 'ltrain' | 'manhattan' | 'brooklyn';
 export type SortField = 'pricePerBed' | 'price' | 'beds' | 'listDate';
@@ -324,9 +325,65 @@ function ListingAgeSlider({
 
 type ChipId = 'price' | 'bedsBaths' | 'pricePerBed' | 'listingAge';
 
+// ---------------------------------------------------------------------------
+// Active filter count helper
+// ---------------------------------------------------------------------------
+
+function countActiveFilters(filters: FiltersState): number {
+  let count = 0;
+  if (filters.minBeds !== null) count++;
+  if (filters.minBaths !== null) count++;
+  if (filters.minRent !== null) count++;
+  if (filters.maxRent !== null) count++;
+  if (filters.maxPricePerBed !== null) count++;
+  if (filters.maxListingAge !== null && filters.maxListingAge !== '1m') count++;
+  if (filters.photosFirst) count++;
+  return count;
+}
+
+// ---------------------------------------------------------------------------
+// Filter toggle button (funnel icon)
+// ---------------------------------------------------------------------------
+
+function FilterToggleButton({
+  activeCount,
+  expanded,
+  onClick,
+}: {
+  activeCount: number;
+  expanded: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <ButtonBase
+      onClick={onClick}
+      className={cn(
+        'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap border',
+        expanded
+          ? 'bg-[#58a6ff]/[0.08] text-[#58a6ff] border-[#58a6ff]'
+          : activeCount > 0
+            ? 'bg-[#58a6ff]/[0.08] text-[#58a6ff] border-[#58a6ff] hover:bg-[#58a6ff]/[0.18]'
+            : 'bg-transparent text-[#8b949e] border-[#2d333b] hover:bg-[#58a6ff]/20 hover:text-[#c0d6f5] hover:border-[#58a6ff]/40',
+      )}
+    >
+      {/* Funnel icon */}
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 2h10M3 6h6M5 10h2" />
+      </svg>
+      Filters
+      {activeCount > 0 && (
+        <span className="bg-[#58a6ff] text-[#0f1117] text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+          {activeCount}
+        </span>
+      )}
+    </ButtonBase>
+  );
+}
+
 export default function Filters({ filters, onChange, listingCount, viewToggle }: FiltersProps) {
   const [openChip, setOpenChip] = useState<ChipId | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   // Draft state for dropdowns — only applied on "Done"
   const [draftMinRent, setDraftMinRent] = useState<number | null>(filters.minRent);
@@ -395,182 +452,33 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
   }
 
   const sortLabel = SORT_OPTIONS.find((o) => o.value === filters.sort)?.label ?? 'PRICE/BEDROOM';
+  const activeCount = countActiveFilters(filters);
+
+  // Measure the expanded row for smooth transition
+  const expandedRowRef = useRef<HTMLDivElement>(null);
+  const [expandedHeight, setExpandedHeight] = useState(0);
+  useEffect(() => {
+    if (expandedRowRef.current) {
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setExpandedHeight(entry.contentRect.height);
+        }
+      });
+      ro.observe(expandedRowRef.current);
+      return () => ro.disconnect();
+    }
+  }, []);
 
   return (
     <div
       ref={containerRef}
-      className="px-4 py-3"
+      className="px-4 py-2"
       style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}
     >
-      {/* Row 1: Filter chips + view toggle */}
-      <div className="flex items-start gap-4 mb-3">
-        <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
-        {/* Price chip */}
-        <FilterChip
-          label={priceLabel(filters.minRent, filters.maxRent)}
-          active={filters.minRent !== null || filters.maxRent !== null}
-          open={openChip === 'price'}
-          onToggle={() => toggleChip('price')}
-        >
-          <SectionTitle>Price</SectionTitle>
-          <RangeSlider
-            label="Min Price"
-            min={PRICE_SLIDER_MIN}
-            max={PRICE_SLIDER_MAX}
-            step={PRICE_SLIDER_STEP}
-            value={draftMinRent ?? PRICE_SLIDER_MIN}
-            onChange={(v) => setDraftMinRent(v === PRICE_SLIDER_MIN ? null : v)}
-          />
-          <RangeSlider
-            label="Max Price"
-            min={PRICE_SLIDER_MIN}
-            max={PRICE_SLIDER_MAX}
-            step={PRICE_SLIDER_STEP}
-            value={draftMaxRent ?? PRICE_SLIDER_MAX}
-            onChange={(v) => setDraftMaxRent(v === PRICE_SLIDER_MAX ? null : v)}
-          />
-          <p className="text-xs mb-1" style={{ color: '#8b949e' }}>
-            Applies to monthly rent
-          </p>
-          <DropdownFooter
-            onReset={() => {
-              onChange({ ...filters, minRent: null, maxRent: null });
-              setOpenChip(null);
-            }}
-            onDone={() => {
-              onChange({ ...filters, minRent: draftMinRent, maxRent: draftMaxRent });
-              setOpenChip(null);
-            }}
-          />
-        </FilterChip>
-
-        {/* Beds / Baths chip */}
-        <FilterChip
-          label={bedsBathsLabel(filters.minBeds, filters.minBaths)}
-          active={filters.minBeds !== null || filters.minBaths !== null}
-          open={openChip === 'bedsBaths'}
-          onToggle={() => toggleChip('bedsBaths')}
-        >
-          <SectionTitle>Bedrooms</SectionTitle>
-          <PillGroup
-            options={BEDROOM_OPTIONS}
-            value={draftMinBeds}
-            onSelect={setDraftMinBeds}
-          />
-
-          <div className="mt-5">
-            <SectionTitle>Bathrooms</SectionTitle>
-            <PillGroup
-              options={BATHROOM_OPTIONS}
-              value={draftMinBaths}
-              onSelect={setDraftMinBaths}
-            />
-          </div>
-
-          <DropdownFooter
-            onReset={() => {
-              onChange({ ...filters, minBeds: null, minBaths: null });
-              setOpenChip(null);
-            }}
-            onDone={() => {
-              onChange({ ...filters, minBeds: draftMinBeds, minBaths: draftMinBaths });
-              setOpenChip(null);
-            }}
-          />
-        </FilterChip>
-
-        {/* $/Bedroom chip */}
-        <FilterChip
-          label={pricePerBedLabel(filters.maxPricePerBed)}
-          active={filters.maxPricePerBed !== null}
-          open={openChip === 'pricePerBed'}
-          onToggle={() => toggleChip('pricePerBed')}
-        >
-          <SectionTitle>Max $/Bedroom</SectionTitle>
-          <RangeSlider
-            label="Max $/Bedroom"
-            min={PRICE_PER_BED_SLIDER_MIN}
-            max={PRICE_PER_BED_SLIDER_MAX}
-            step={PRICE_PER_BED_SLIDER_STEP}
-            value={draftMaxPricePerBed ?? PRICE_PER_BED_SLIDER_MAX}
-            onChange={(v) => setDraftMaxPricePerBed(v === PRICE_PER_BED_SLIDER_MAX ? null : v)}
-          />
-          <DropdownFooter
-            onReset={() => {
-              onChange({ ...filters, maxPricePerBed: null });
-              setOpenChip(null);
-            }}
-            onDone={() => {
-              onChange({ ...filters, maxPricePerBed: draftMaxPricePerBed });
-              setOpenChip(null);
-            }}
-          />
-        </FilterChip>
-
-        {/* Listing age chip */}
-        <FilterChip
-          label={listingAgeLabel(filters.maxListingAge)}
-          active={filters.maxListingAge !== null}
-          open={openChip === 'listingAge'}
-          onToggle={() => toggleChip('listingAge')}
-        >
-          <ListingAgeSlider
-            value={draftMaxListingAge}
-            onChange={setDraftMaxListingAge}
-          />
-          <DropdownFooter
-            onReset={() => {
-              onChange({ ...filters, maxListingAge: '1m' });
-              setOpenChip(null);
-            }}
-            onDone={() => {
-              onChange({ ...filters, maxListingAge: draftMaxListingAge });
-              setOpenChip(null);
-            }}
-          />
-        </FilterChip>
-
-        {/* Photos first toggle chip */}
-        <div className="relative group shrink-0">
-          <FilterChip
-            label="Photos first"
-            active={filters.photosFirst}
-            open={false}
-            onToggle={() => onChange({ ...filters, photosFirst: !filters.photosFirst })}
-          />
-          <div
-            className="pointer-events-none absolute left-0 top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-75 z-50"
-          >
-            <div
-              className="absolute -top-1 w-2 h-2 rotate-45"
-              style={{ left: 12, backgroundColor: '#1c2028', border: '1px solid #2d333b', borderRight: 'none', borderBottom: 'none' }}
-            />
-            <div
-              className="rounded-md px-2.5 py-1.5 text-xs"
-              style={{
-                backgroundColor: '#1c2028',
-                color: '#e1e4e8',
-                border: '1px solid #2d333b',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-                maxWidth: 'min(260px, calc(100vw - 32px))',
-                width: 'max-content',
-                wordWrap: 'break-word',
-              }}
-            >
-              Prioritize listings with photos at the top of results
-            </div>
-          </div>
-        </div>
-
-        </div>
-        {/* List/Map segmented control (mobile only, right-aligned) */}
-        {viewToggle && <div className="shrink-0">{viewToggle}</div>}
-      </div>
-
-      {/* Row 2: Search tags + Sort + listing count */}
-      <div className="flex flex-wrap items-center gap-1.5 overflow-x-clip">
+      {/* Row 1 (always visible): Area tabs + listing count + Filters button + Sort + View toggle */}
+      <div className="flex items-center gap-1.5 overflow-x-clip">
         {/* Search tags */}
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
           {SEARCH_TABS.map((tab) => {
             const active = filters.searchTag === tab.value;
             return (
@@ -578,6 +486,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
                 <TagButton
                   active={active}
                   onClick={() => onChange({ ...filters, searchTag: tab.value })}
+                  className="!text-xs !px-2.5 !py-1 !min-h-[32px]"
                 >
                   {tab.label}
                 </TagButton>
@@ -611,14 +520,26 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
           })}
 
           {listingCount !== undefined && (
-            <span className="text-xs ml-2 whitespace-nowrap" style={{ color: '#8b949e' }}>
-              {listingCount} listing{listingCount !== 1 ? 's' : ''}
+            <span className="text-[11px] ml-1 whitespace-nowrap shrink-0" style={{ color: '#8b949e' }}>
+              {listingCount}
             </span>
           )}
         </div>
 
+        {/* Filters toggle button */}
+        <FilterToggleButton
+          activeCount={activeCount}
+          expanded={filtersExpanded}
+          onClick={() => {
+            setFiltersExpanded((prev) => !prev);
+            if (filtersExpanded) {
+              setOpenChip(null);
+            }
+          }}
+        />
+
         {/* Sort dropdown */}
-        <div className="relative ml-auto sm:ml-auto shrink-0">
+        <div className="relative shrink-0">
           <TextButton
             variant="muted"
             onClick={() => {
@@ -627,7 +548,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
             }}
             className="flex items-center gap-1 text-xs font-medium tracking-wide whitespace-nowrap"
           >
-            Sort by: {sortLabel}
+            {sortLabel}
             <ChevronDown className={`transition-transform ${sortOpen ? 'rotate-180' : ''}`} />
           </TextButton>
 
@@ -653,6 +574,177 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
               ))}
             </div>
           )}
+        </div>
+
+        {/* View toggle (list/map) */}
+        {viewToggle && <div className="shrink-0">{viewToggle}</div>}
+      </div>
+
+      {/* Row 2 (expandable): Filter chips */}
+      <div
+        className="overflow-hidden transition-all duration-200 ease-in-out"
+        style={{
+          maxHeight: filtersExpanded ? expandedHeight + 16 : 0,
+          opacity: filtersExpanded ? 1 : 0,
+        }}
+      >
+        <div ref={expandedRowRef} className="flex items-center gap-2 flex-wrap pt-2">
+          {/* Price chip */}
+          <FilterChip
+            label={priceLabel(filters.minRent, filters.maxRent)}
+            active={filters.minRent !== null || filters.maxRent !== null}
+            open={openChip === 'price'}
+            onToggle={() => toggleChip('price')}
+          >
+            <SectionTitle>Price</SectionTitle>
+            <RangeSlider
+              label="Min Price"
+              min={PRICE_SLIDER_MIN}
+              max={PRICE_SLIDER_MAX}
+              step={PRICE_SLIDER_STEP}
+              value={draftMinRent ?? PRICE_SLIDER_MIN}
+              onChange={(v) => setDraftMinRent(v === PRICE_SLIDER_MIN ? null : v)}
+            />
+            <RangeSlider
+              label="Max Price"
+              min={PRICE_SLIDER_MIN}
+              max={PRICE_SLIDER_MAX}
+              step={PRICE_SLIDER_STEP}
+              value={draftMaxRent ?? PRICE_SLIDER_MAX}
+              onChange={(v) => setDraftMaxRent(v === PRICE_SLIDER_MAX ? null : v)}
+            />
+            <p className="text-xs mb-1" style={{ color: '#8b949e' }}>
+              Applies to monthly rent
+            </p>
+            <DropdownFooter
+              onReset={() => {
+                onChange({ ...filters, minRent: null, maxRent: null });
+                setOpenChip(null);
+              }}
+              onDone={() => {
+                onChange({ ...filters, minRent: draftMinRent, maxRent: draftMaxRent });
+                setOpenChip(null);
+              }}
+            />
+          </FilterChip>
+
+          {/* Beds / Baths chip */}
+          <FilterChip
+            label={bedsBathsLabel(filters.minBeds, filters.minBaths)}
+            active={filters.minBeds !== null || filters.minBaths !== null}
+            open={openChip === 'bedsBaths'}
+            onToggle={() => toggleChip('bedsBaths')}
+          >
+            <SectionTitle>Bedrooms</SectionTitle>
+            <PillGroup
+              options={BEDROOM_OPTIONS}
+              value={draftMinBeds}
+              onSelect={setDraftMinBeds}
+            />
+
+            <div className="mt-5">
+              <SectionTitle>Bathrooms</SectionTitle>
+              <PillGroup
+                options={BATHROOM_OPTIONS}
+                value={draftMinBaths}
+                onSelect={setDraftMinBaths}
+              />
+            </div>
+
+            <DropdownFooter
+              onReset={() => {
+                onChange({ ...filters, minBeds: null, minBaths: null });
+                setOpenChip(null);
+              }}
+              onDone={() => {
+                onChange({ ...filters, minBeds: draftMinBeds, minBaths: draftMinBaths });
+                setOpenChip(null);
+              }}
+            />
+          </FilterChip>
+
+          {/* $/Bedroom chip */}
+          <FilterChip
+            label={pricePerBedLabel(filters.maxPricePerBed)}
+            active={filters.maxPricePerBed !== null}
+            open={openChip === 'pricePerBed'}
+            onToggle={() => toggleChip('pricePerBed')}
+          >
+            <SectionTitle>Max $/Bedroom</SectionTitle>
+            <RangeSlider
+              label="Max $/Bedroom"
+              min={PRICE_PER_BED_SLIDER_MIN}
+              max={PRICE_PER_BED_SLIDER_MAX}
+              step={PRICE_PER_BED_SLIDER_STEP}
+              value={draftMaxPricePerBed ?? PRICE_PER_BED_SLIDER_MAX}
+              onChange={(v) => setDraftMaxPricePerBed(v === PRICE_PER_BED_SLIDER_MAX ? null : v)}
+            />
+            <DropdownFooter
+              onReset={() => {
+                onChange({ ...filters, maxPricePerBed: null });
+                setOpenChip(null);
+              }}
+              onDone={() => {
+                onChange({ ...filters, maxPricePerBed: draftMaxPricePerBed });
+                setOpenChip(null);
+              }}
+            />
+          </FilterChip>
+
+          {/* Listing age chip */}
+          <FilterChip
+            label={listingAgeLabel(filters.maxListingAge)}
+            active={filters.maxListingAge !== null}
+            open={openChip === 'listingAge'}
+            onToggle={() => toggleChip('listingAge')}
+          >
+            <ListingAgeSlider
+              value={draftMaxListingAge}
+              onChange={setDraftMaxListingAge}
+            />
+            <DropdownFooter
+              onReset={() => {
+                onChange({ ...filters, maxListingAge: '1m' });
+                setOpenChip(null);
+              }}
+              onDone={() => {
+                onChange({ ...filters, maxListingAge: draftMaxListingAge });
+                setOpenChip(null);
+              }}
+            />
+          </FilterChip>
+
+          {/* Photos first toggle chip */}
+          <div className="relative group shrink-0">
+            <FilterChip
+              label="Photos first"
+              active={filters.photosFirst}
+              open={false}
+              onToggle={() => onChange({ ...filters, photosFirst: !filters.photosFirst })}
+            />
+            <div
+              className="pointer-events-none absolute left-0 top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-75 z-50"
+            >
+              <div
+                className="absolute -top-1 w-2 h-2 rotate-45"
+                style={{ left: 12, backgroundColor: '#1c2028', border: '1px solid #2d333b', borderRight: 'none', borderBottom: 'none' }}
+              />
+              <div
+                className="rounded-md px-2.5 py-1.5 text-xs"
+                style={{
+                  backgroundColor: '#1c2028',
+                  color: '#e1e4e8',
+                  border: '1px solid #2d333b',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                  maxWidth: 'min(260px, calc(100vw - 32px))',
+                  width: 'max-content',
+                  wordWrap: 'break-word',
+                }}
+              >
+                Prioritize listings with photos at the top of results
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
