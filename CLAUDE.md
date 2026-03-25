@@ -12,6 +12,10 @@ Any agent modifying files in `web/components/` or `web/app/` that contain JSX:
 7. If the user rejects, fix the regression before continuing
 8. A feature that works but looks broken is NOT done
 
+When adding a new Supabase table that is queried by UI components, add a corresponding
+mock entry to `web/tests/fixtures/`. The MockRegistry type enforces this at compile time
+for tables in the Database type, but API routes called via fetch() need manual mocking.
+
 ## CRITICAL: Layout Quality Checks
 
 Agents must check for these layout issues after any UI change:
