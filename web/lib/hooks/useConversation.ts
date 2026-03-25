@@ -21,6 +21,7 @@ const DEFAULT_FILTERS: FiltersState = {
   maxPricePerBed: null,
   maxListingAge: '1m' as MaxListingAge,
   photosFirst: false,
+  selectedSources: null,
 };
 
 interface UseConversationOptions {
@@ -176,6 +177,7 @@ export function useConversation({
         sort: 'sort',
         maxListingAge: 'listing age',
         photosFirst: 'photos first',
+        selectedSources: 'sources',
       };
 
       const sysMsg: ChatMessageData = {
@@ -207,6 +209,7 @@ export function useConversation({
         sort: 'sort',
         maxListingAge: 'listing age',
         photosFirst: 'photos first',
+        selectedSources: 'sources',
       };
 
       const sysMsg: ChatMessageData = {

@@ -9,6 +9,17 @@ export type SortField = 'pricePerBed' | 'price' | 'beds' | 'listDate';
 
 export type MaxListingAge = '1w' | '2w' | '1m' | '3m' | '6m' | '1y' | null;
 
+export const ALL_SOURCES = ['realtor', 'craigslist', 'streeteasy', 'zillow', 'facebook'] as const;
+export type ListingSource = (typeof ALL_SOURCES)[number];
+
+export const SOURCE_LABELS: Record<ListingSource, string> = {
+  realtor: 'Realtor.com',
+  craigslist: 'Craigslist',
+  streeteasy: 'StreetEasy',
+  zillow: 'Zillow',
+  facebook: 'Facebook',
+};
+
 export interface FiltersState {
   maxPricePerBed: number | null;
   minBeds: number | null;
@@ -19,6 +30,7 @@ export interface FiltersState {
   searchTag: SearchTag;
   maxListingAge: MaxListingAge;
   photosFirst: boolean;
+  selectedSources: string[] | null;
 }
 
 interface FiltersProps {
@@ -323,7 +335,7 @@ function ListingAgeSlider({
   );
 }
 
-type ChipId = 'price' | 'bedsBaths' | 'pricePerBed' | 'listingAge';
+type ChipId = 'price' | 'bedsBaths' | 'pricePerBed' | 'listingAge' | 'source';
 
 // ---------------------------------------------------------------------------
 // Active filter count helper
@@ -338,6 +350,7 @@ function countActiveFilters(filters: FiltersState): number {
   if (filters.maxPricePerBed !== null) count++;
   if (filters.maxListingAge !== null && filters.maxListingAge !== '1m') count++;
   if (filters.photosFirst) count++;
+  if (filters.selectedSources !== null) count++;
   return count;
 }
 
@@ -396,6 +409,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
   const [draftMaxListingAge, setDraftMaxListingAge] = useState<MaxListingAge>(
     filters.maxListingAge,
   );
+  const [draftSources, setDraftSources] = useState<string[] | null>(filters.selectedSources);
 
   // Sync drafts when filters change externally
   useEffect(() => {
@@ -416,6 +430,9 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
   useEffect(() => {
     setDraftMaxListingAge(filters.maxListingAge);
   }, [filters.maxListingAge]);
+  useEffect(() => {
+    setDraftSources(filters.selectedSources);
+  }, [filters.selectedSources]);
 
   // Reset drafts when a dropdown opens
   useEffect(() => {
@@ -429,6 +446,8 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
       setDraftMaxPricePerBed(filters.maxPricePerBed);
     } else if (openChip === 'listingAge') {
       setDraftMaxListingAge(filters.maxListingAge);
+    } else if (openChip === 'source') {
+      setDraftSources(filters.selectedSources);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openChip]);
@@ -605,9 +624,10 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
           opacity: filtersExpanded ? 1 : 0,
         }}
       >
-        <div ref={expandedRowRef} className="flex items-center gap-1.5 overflow-x-auto pt-1.5 pb-1" style={{ borderTop: '1px solid #2d333b', scrollbarWidth: 'none' } as React.CSSProperties}>
+        <div ref={expandedRowRef} className="flex items-center gap-1.5 flex-wrap overflow-x-auto pt-1.5 pb-1" style={{ borderTop: '1px solid #2d333b', scrollbarWidth: 'none' } as React.CSSProperties}>
           {/* Price chip */}
           <FilterChip
+            compact
             label={priceLabel(filters.minRent, filters.maxRent)}
             active={filters.minRent !== null || filters.maxRent !== null}
             open={openChip === 'price'}
@@ -647,6 +667,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
 
           {/* Beds / Baths chip */}
           <FilterChip
+            compact
             label={bedsBathsLabel(filters.minBeds, filters.minBaths)}
             active={filters.minBeds !== null || filters.minBaths !== null}
             open={openChip === 'bedsBaths'}
@@ -682,6 +703,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
 
           {/* $/Bedroom chip */}
           <FilterChip
+            compact
             label={pricePerBedLabel(filters.maxPricePerBed)}
             active={filters.maxPricePerBed !== null}
             open={openChip === 'pricePerBed'}
@@ -710,6 +732,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
 
           {/* Listing age chip */}
           <FilterChip
+            compact
             label={listingAgeLabel(filters.maxListingAge)}
             active={filters.maxListingAge !== null}
             open={openChip === 'listingAge'}
@@ -731,9 +754,58 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
             />
           </FilterChip>
 
+          {/* Source chip */}
+          <FilterChip
+            compact
+            label={filters.selectedSources !== null ? `Sources (${filters.selectedSources.length})` : 'Source'}
+            active={filters.selectedSources !== null}
+            open={openChip === 'source'}
+            onToggle={() => toggleChip('source')}
+          >
+            <SectionTitle>Sources</SectionTitle>
+            <div className="flex flex-col gap-2">
+              {ALL_SOURCES.map((src) => {
+                const checked = draftSources === null || draftSources.includes(src);
+                return (
+                  <label key={src} className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: '#e1e4e8' }}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        if (draftSources === null) {
+                          // All selected -> uncheck this one
+                          setDraftSources(ALL_SOURCES.filter((s) => s !== src) as string[]);
+                        } else if (checked) {
+                          const next = draftSources.filter((s) => s !== src);
+                          setDraftSources(next.length === 0 ? null : next);
+                        } else {
+                          const next = [...draftSources, src];
+                          setDraftSources(next.length === ALL_SOURCES.length ? null : next);
+                        }
+                      }}
+                      className="accent-[#58a6ff] w-4 h-4"
+                    />
+                    {SOURCE_LABELS[src]}
+                  </label>
+                );
+              })}
+            </div>
+            <DropdownFooter
+              onReset={() => {
+                onChange({ ...filters, selectedSources: null });
+                setOpenChip(null);
+              }}
+              onDone={() => {
+                onChange({ ...filters, selectedSources: draftSources });
+                setOpenChip(null);
+              }}
+            />
+          </FilterChip>
+
           {/* Photos first toggle chip */}
           <div className="relative group shrink-0">
             <FilterChip
+              compact
               label="Photos first"
               active={filters.photosFirst}
               open={false}
