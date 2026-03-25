@@ -14,6 +14,19 @@ const SOURCE_LABELS: Record<string, string> = {
   craigslist: 'Craigslist',
   renthop: 'RentHop',
   apartments: 'Apartments.com',
+  streeteasy: 'StreetEasy',
+  zillow: 'Zillow',
+  facebook: 'Facebook',
+};
+
+const SOURCE_DOT_COLORS: Record<string, string> = {
+  realtor: '#3b82f6',
+  craigslist: '#a855f7',
+  streeteasy: '#22c55e',
+  zillow: '#006aff',
+  facebook: '#1877f2',
+  renthop: '#f59e0b',
+  apartments: '#ef4444',
 };
 
 interface Person {
@@ -233,9 +246,9 @@ export default function ListingCard({
         {formatListedDate(listing.list_date ?? listing.created_at)}
       </div>
 
-      {/* Tag pill + actions */}
+      {/* Tag pill + source badges + actions */}
       <div className="flex items-center justify-between mt-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {/* Only show tag pill for known tags with labels (hide raw search_* tags) */}
           {TAG_LABELS[listing.search_tag] && (
           <div className="relative group/tag">
@@ -277,6 +290,27 @@ export default function ListingCard({
             )}
           </div>
           )}
+          {/* Source badges */}
+          {((listing as Record<string, unknown>).sources as string[] | undefined ?? (listing.source ? [listing.source] : [])).map((src) => (
+            <span
+              key={src}
+              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] cursor-default"
+              style={{
+                color: '#8b949e',
+                border: '1px solid #2d333b',
+              }}
+            >
+              <span
+                className="inline-block rounded-full shrink-0"
+                style={{
+                  width: 6,
+                  height: 6,
+                  backgroundColor: SOURCE_DOT_COLORS[src] ?? '#8b949e',
+                }}
+              />
+              {SOURCE_LABELS[src] ?? src}
+            </span>
+          ))}
         </div>
 
         <div className="flex items-center gap-1">
@@ -314,13 +348,6 @@ export default function ListingCard({
           />
         </div>
       </div>
-
-      {/* Source indicator */}
-      {listing.source && (
-        <div className="text-[10px] mt-1" style={{ color: '#6e7681' }}>
-          via {SOURCE_LABELS[listing.source] ?? listing.source}
-        </div>
-      )}
 
       {/* Who would live here + View listing (combined row) */}
       <div className="mt-2 flex items-center justify-between gap-2">
