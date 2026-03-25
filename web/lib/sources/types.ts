@@ -2,7 +2,7 @@
  * Shared types for all listing data sources.
  */
 
-export type ListingSource = "realtor" | "apartments" | "craigslist" | "renthop" | "streeteasy" | "zillow";
+export type ListingSource = "realtor" | "apartments" | "craigslist" | "renthop" | "streeteasy" | "zillow" | "facebook";
 
 /** The shape every source adapter must produce. */
 export interface RawListing {

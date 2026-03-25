@@ -11,6 +11,7 @@ import { fetchCraigslistListings } from "./craigslist";
 import { fetchRentHopListings } from "./renthop";
 import { fetchStreetEasyListings } from "./streeteasy";
 import { fetchZillowListings } from "./zillow";
+import { fetchFacebookMarketplaceListings } from "./facebook-marketplace";
 
 // ---------------------------------------------------------------------------
 // Address normalization
@@ -100,6 +101,7 @@ const SOURCE_PRIORITY: ListingSource[] = [
   "apartments",
   "renthop",
   "craigslist",
+  "facebook",
 ];
 
 /** Priority specifically for lat/lon (geocoded sources first). */
@@ -110,6 +112,7 @@ const GEO_PRIORITY: ListingSource[] = [
   "apartments",
   "renthop",
   "craigslist",
+  "facebook",
 ];
 
 function priorityIndex(source: ListingSource, order: ListingSource[]): number {
@@ -397,6 +400,7 @@ export async function unifiedSearch(
     renthop: 0,
     streeteasy: 0,
     zillow: 0,
+    facebook: 0,
     merged: 0,
     deduplicated: 0,
   };
@@ -409,6 +413,7 @@ export async function unifiedSearch(
     renthopResult,
     streeteasyResult,
     zillowResult,
+    facebookResult,
   ] = await Promise.allSettled([
     fetchRealtorListings(params, apiKey),
     fetchApartmentsListings(params, apiKey),
@@ -416,6 +421,7 @@ export async function unifiedSearch(
     fetchRentHopListings(params),
     fetchStreetEasyListings(params, apiKey),
     fetchZillowListings(params, apiKey),
+    fetchFacebookMarketplaceListings(params, apiKey),
   ]);
 
   let allListings: RawListing[] = [];
@@ -443,10 +449,11 @@ export async function unifiedSearch(
   processResult("RentHop", "renthop", renthopResult);
   processResult("StreetEasy", "streeteasy", streeteasyResult);
   processResult("Zillow", "zillow", zillowResult);
+  processResult("Facebook Marketplace", "facebook", facebookResult);
 
   const totalBefore = allListings.length;
   console.log(
-    `[UnifiedSearch] Total before dedup: ${totalBefore} from ${6 - errors.length}/6 sources`,
+    `[UnifiedSearch] Total before dedup: ${totalBefore} from ${7 - errors.length}/7 sources`,
   );
 
   // Composite-deduplicate
