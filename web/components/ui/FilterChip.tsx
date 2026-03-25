@@ -1,4 +1,4 @@
-import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from 'react';
+import { forwardRef, useRef, type ComponentPropsWithoutRef, type ReactNode } from 'react';
 import { cn } from '@/lib/cn';
 import { ButtonBase } from './ButtonBase';
 
@@ -31,8 +31,9 @@ function ChevronDown({ className }: { className?: string }) {
 
 export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
   function FilterChip({ label, active = false, open = false, compact = false, children, onToggle, className, ...rest }, ref) {
+    const chipRef = useRef<HTMLDivElement>(null);
     return (
-      <div className="relative shrink-0">
+      <div className="relative shrink-0" ref={chipRef}>
         <ButtonBase
           ref={ref}
           onClick={onToggle}
@@ -56,8 +57,13 @@ export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
 
         {open && children && (
           <div
-            className="absolute left-0 top-full mt-2 z-[1200] rounded-xl border border-[#2d333b] p-5 shadow-xl"
-            style={{ backgroundColor: '#1c2028', minWidth: '320px' }}
+            className="fixed z-[9999] rounded-xl border border-[#2d333b] p-5 shadow-xl"
+            style={{
+              backgroundColor: '#1c2028',
+              minWidth: '320px',
+              top: chipRef.current ? chipRef.current.getBoundingClientRect().bottom + 8 : 0,
+              left: chipRef.current ? chipRef.current.getBoundingClientRect().left : 0,
+            }}
           >
             {children}
           </div>
