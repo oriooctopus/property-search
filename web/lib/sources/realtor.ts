@@ -81,7 +81,9 @@ export async function fetchRealtorListings(
         if (urls.length === 0 && r.primary_photo?.href) {
           urls.push(r.primary_photo.href);
         }
-        return urls;
+        // Upgrade to large resolution: rdcpix.com URLs ending in 's.jpg' are small thumbnails (~200px).
+        // Replace with 'od-w1024_h768.jpg' for 1024px wide images.
+        return urls.map((u) => u.replace(/s\.jpg$/, "od-w1024_h768.jpg"));
       })(),
       url: href,
       search_tag: `search_${city.toLowerCase().replace(/\s+/g, "_")}`,
