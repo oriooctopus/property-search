@@ -175,8 +175,6 @@ function HomeInner() {
   const [mobileView, setMobileView] = useState<'list' | 'map' | 'swipe'>(() => {
     const v = searchParams.get('view');
     if (v && VALID_VIEWS.has(v)) return v as 'list' | 'map' | 'swipe';
-    // Default to swipe on mobile, list on desktop
-    if (typeof window !== 'undefined' && window.innerWidth < 768) return 'swipe';
     return 'list';
   });
   const [filters, setFilters] = useState<FiltersState>(() =>
