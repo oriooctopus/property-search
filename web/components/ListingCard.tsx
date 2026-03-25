@@ -327,7 +327,7 @@ export default function ListingCard({
           {((listing as Record<string, unknown>).sources as string[] | undefined ?? (listing.source ? [listing.source] : [])).map((src) => (
             <span
               key={src}
-              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] cursor-default"
+              className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold cursor-default"
               style={{
                 color: '#8b949e',
                 border: '1px solid #2d333b',
