@@ -1,21 +1,27 @@
 /**
- * Populate listings from Apartments.com, Craigslist, and RentHop.
+ * Populate listings from all sources aligned with the 4 search areas:
+ *   - fulton: Lower Manhattan near Fulton St station
+ *   - ltrain: Bedford Ave through DeKalb Ave L train corridor
+ *   - manhattan: Park Place (Tribeca) to 38th St (Midtown)
+ *   - brooklyn: Brooklyn within 35-min subway of 14th St
  *
- * Usage: npx tsx scripts/populate-sources.ts
- *
- * Outputs JSON results to stdout for each source.
+ * Usage: npx tsx scripts/populate-sources.ts > /tmp/listings.json
  */
 
 import { fetchApartmentsListings } from "../lib/sources/apartments";
 import { fetchCraigslistListings } from "../lib/sources/craigslist";
 import { fetchRentHopListings } from "../lib/sources/renthop";
 import { fetchRealtorListings } from "../lib/sources/realtor";
-import type { SearchParams, RawListing } from "../lib/sources/types";
+import { fetchStreetEasyListings } from "../lib/sources/streeteasy";
+import { fetchZillowListings } from "../lib/sources/zillow";
+import { fetchFacebookMarketplaceListings } from "../lib/sources/facebook-marketplace";
+import type { SearchParams, AdapterOutput } from "../lib/sources/types";
+import { validateAndNormalize, mergeQualitySummaries, type QualitySummary } from "../lib/sources/pipeline";
+import { deduplicateAndComposite } from "../lib/sources/dedup";
 
 // Load env from .env.local
 import { readFileSync } from "fs";
 import { resolve } from "path";
-
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 const __filename = fileURLToPath(import.meta.url);
@@ -34,104 +40,157 @@ for (const line of envContent.split("\n")) {
 
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY!;
 
-// Search configs matching the existing 4 search areas
-const SEARCHES: Array<{ params: SearchParams; tag: string }> = [
+// Common search params: 5+ beds, 2+ baths, $4k-$100k rent
+const BASE_PARAMS = { bedsMin: 5, bathsMin: 2, priceMin: 4000, priceMax: 100000 };
+
+// Search configs aligned with the app's 4 filter tabs
+const SEARCHES: Array<{ params: SearchParams; tag: string; label: string }> = [
   {
-    params: { city: "Brooklyn", stateCode: "NY", bedsMin: 5, bathsMin: 2, priceMin: 4000, priceMax: 100000 },
-    tag: "brooklyn",
+    params: { city: "New York", stateCode: "NY", ...BASE_PARAMS },
+    tag: "manhattan",
+    label: "Manhattan (Tribeca to Midtown)",
   },
   {
-    params: { city: "New York", stateCode: "NY", bedsMin: 5, bathsMin: 2, priceMin: 4000, priceMax: 100000 },
-    tag: "manhattan",
+    params: { city: "Brooklyn", stateCode: "NY", ...BASE_PARAMS },
+    tag: "brooklyn",
+    label: "Brooklyn (subway to 14th St)",
   },
 ];
 
-interface SourceResult {
+// Sources that are NYC-wide (don't need per-city runs)
+const NYC_PARAMS: SearchParams = { city: "New York", stateCode: "NY", ...BASE_PARAMS };
+
+interface SourceRun {
   source: string;
   count: number;
   error?: string;
-  listings: RawListing[];
+}
+
+async function fetchSource(
+  name: string,
+  fn: () => Promise<{ listings: AdapterOutput[]; total: number }>,
+  tag: string,
+): Promise<{ run: SourceRun; listings: AdapterOutput[] }> {
+  try {
+    console.error(`  Fetching ${name}...`);
+    const result = await fn();
+    for (const l of result.listings) l.search_tag = tag;
+    console.error(`  ${name}: ${result.listings.length} listings`);
+    return { run: { source: name, count: result.listings.length }, listings: result.listings };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`  ${name} ERROR: ${msg}`);
+    return { run: { source: name, count: 0, error: msg }, listings: [] };
+  }
 }
 
 async function main() {
-  const allResults: SourceResult[] = [];
-  const allListings: RawListing[] = [];
+  const runs: SourceRun[] = [];
+  const allRaw: AdapterOutput[] = [];
+  const qualitySummaries: QualitySummary[] = [];
 
+  // Per-city searches (Realtor + Apartments)
   for (const search of SEARCHES) {
-    console.error(`\n=== Searching: ${search.params.city}, ${search.params.stateCode} (tag: ${search.tag}) ===`);
+    console.error(`\n=== ${search.label} ===`);
 
-    // Apartments.com
-    try {
-      console.error("  Fetching Apartments.com...");
-      const result = await fetchApartmentsListings(search.params, RAPIDAPI_KEY);
-      // Override search_tag
-      for (const l of result.listings) l.search_tag = search.tag;
-      console.error(`  Apartments.com: ${result.listings.length} listings`);
-      allResults.push({ source: `apartments_${search.tag}`, count: result.listings.length, listings: result.listings });
-      allListings.push(...result.listings);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`  Apartments.com ERROR: ${msg}`);
-      allResults.push({ source: `apartments_${search.tag}`, count: 0, error: msg, listings: [] });
-    }
-
-    // Small delay
+    const realtor = await fetchSource(
+      `realtor_${search.tag}`,
+      () => fetchRealtorListings(search.params, RAPIDAPI_KEY),
+      search.tag,
+    );
+    runs.push(realtor.run);
+    allRaw.push(...realtor.listings);
     await new Promise((r) => setTimeout(r, 1000));
 
-    // Realtor.com (to refresh)
-    try {
-      console.error("  Fetching Realtor.com...");
-      const result = await fetchRealtorListings(search.params, RAPIDAPI_KEY);
-      for (const l of result.listings) l.search_tag = search.tag;
-      console.error(`  Realtor.com: ${result.listings.length} listings`);
-      allResults.push({ source: `realtor_${search.tag}`, count: result.listings.length, listings: result.listings });
-      allListings.push(...result.listings);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`  Realtor.com ERROR: ${msg}`);
-      allResults.push({ source: `realtor_${search.tag}`, count: 0, error: msg, listings: [] });
-    }
-
+    const apartments = await fetchSource(
+      `apartments_${search.tag}`,
+      () => fetchApartmentsListings(search.params, RAPIDAPI_KEY),
+      search.tag,
+    );
+    runs.push(apartments.run);
+    allRaw.push(...apartments.listings);
     await new Promise((r) => setTimeout(r, 1000));
   }
 
-  // Craigslist (NYC-wide, not per city)
-  try {
-    console.error("\n  Fetching Craigslist (NYC-wide)...");
-    const result = await fetchCraigslistListings({ city: "New York", stateCode: "NY", bedsMin: 5, priceMin: 4000, priceMax: 100000 });
-    console.error(`  Craigslist: ${result.listings.length} listings`);
-    allResults.push({ source: "craigslist", count: result.listings.length, listings: result.listings });
-    allListings.push(...result.listings);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`  Craigslist ERROR: ${msg}`);
-    allResults.push({ source: "craigslist", count: 0, error: msg, listings: [] });
-  }
+  // NYC-wide scrapers
+  console.error("\n=== NYC-wide sources ===");
 
+  const craigslist = await fetchSource(
+    "craigslist",
+    () => fetchCraigslistListings(NYC_PARAMS),
+    "search_new_york",
+  );
+  runs.push(craigslist.run);
+  allRaw.push(...craigslist.listings);
   await new Promise((r) => setTimeout(r, 1000));
 
-  // RentHop (NYC-wide)
-  try {
-    console.error("\n  Fetching RentHop (NYC-wide)...");
-    const result = await fetchRentHopListings({ city: "New York", stateCode: "NY", bedsMin: 5, priceMin: 4000, priceMax: 100000 });
-    console.error(`  RentHop: ${result.listings.length} listings`);
-    allResults.push({ source: "renthop", count: result.listings.length, listings: result.listings });
-    allListings.push(...result.listings);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error(`  RentHop ERROR: ${msg}`);
-    allResults.push({ source: "renthop", count: 0, error: msg, listings: [] });
+  const renthop = await fetchSource(
+    "renthop",
+    () => fetchRentHopListings(NYC_PARAMS),
+    "search_new_york",
+  );
+  runs.push(renthop.run);
+  allRaw.push(...renthop.listings);
+  await new Promise((r) => setTimeout(r, 1000));
+
+  // StreetEasy per borough
+  for (const borough of ["Manhattan", "Brooklyn"]) {
+    const tag = borough.toLowerCase();
+    const se = await fetchSource(
+      `streeteasy_${tag}`,
+      () => fetchStreetEasyListings({ city: borough, stateCode: "NY", ...BASE_PARAMS }, RAPIDAPI_KEY),
+      tag,
+    );
+    runs.push(se.run);
+    allRaw.push(...se.listings);
+    await new Promise((r) => setTimeout(r, 1000));
   }
+
+  // Zillow
+  const zillow = await fetchSource(
+    "zillow",
+    () => fetchZillowListings(NYC_PARAMS, RAPIDAPI_KEY),
+    "search_new_york",
+  );
+  runs.push(zillow.run);
+  allRaw.push(...zillow.listings);
+  await new Promise((r) => setTimeout(r, 1000));
+
+  // Facebook Marketplace
+  const facebook = await fetchSource(
+    "facebook",
+    () => fetchFacebookMarketplaceListings(NYC_PARAMS),
+    "search_new_york",
+  );
+  runs.push(facebook.run);
+  allRaw.push(...facebook.listings);
+
+  // Run through pipeline
+  console.error("\n=== PIPELINE ===");
+  const pipeline = validateAndNormalize(allRaw, "all-sources");
+  qualitySummaries.push(pipeline.qualitySummary);
+  const merged = mergeQualitySummaries(qualitySummaries);
 
   // Summary
   console.error("\n=== SUMMARY ===");
-  for (const r of allResults) {
-    console.error(`  ${r.source}: ${r.count} listings${r.error ? ` (ERROR: ${r.error})` : ""}`);
+  for (const r of runs) {
+    console.error(`  ${r.source}: ${r.count}${r.error ? ` (ERROR: ${r.error})` : ""}`);
   }
-  console.error(`  TOTAL: ${allListings.length} listings`);
+  console.error(`  RAW TOTAL: ${allRaw.length}`);
+  console.error(`  VALIDATED: ${pipeline.listings.length}`);
+  console.error(`  REJECTED:  ${pipeline.rejected.length}`);
 
-  // Output JSON to stdout for processing
-  console.log(JSON.stringify(allListings, null, 2));
+  // Deduplicate
+  const deduped = deduplicateAndComposite(pipeline.listings);
+  console.error(`  DEDUPED:   ${deduped.length} (removed ${pipeline.listings.length - deduped.length})`);
+
+  if (merged.warnings.length > 0) {
+    console.error("  QUALITY WARNINGS:");
+    for (const w of merged.warnings) console.error(`    - ${w}`);
+  }
+
+  // Output deduplicated JSON
+  console.log(JSON.stringify(deduped, null, 2));
 }
 
 main().catch((err) => {

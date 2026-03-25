@@ -4,6 +4,8 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { unifiedSearch } from "@/lib/sources";
 
+export const maxDuration = 60;
+
 interface SearchBody {
   city: string;
   stateCode: string;
@@ -122,7 +124,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { listings, totals, errors: sourceErrors } = result;
+  const { listings, totals, errors: sourceErrors, qualitySummary } = result;
 
   // Apply maxCostPerBed filter client-side
   const filtered = maxCostPerBed
@@ -184,5 +186,6 @@ export async function POST(request: NextRequest) {
     totals,
     sourceErrors,
     queryUsage: { used: newUsed, limit, tier: tierId },
+    qualitySummary,
   });
 }

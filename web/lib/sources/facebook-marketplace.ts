@@ -19,7 +19,7 @@ import { extractBaths, extractBeds, makeSearchTag, parsePrice } from "./parse-ut
 const APIFY_RUN_URL =
   "https://api.apify.com/v2/acts/apify~facebook-marketplace-scraper/run-sync-get-dataset-items";
 
-const TIMEOUT_MS = 180_000; // Apify actors need time to scrape Facebook
+const TIMEOUT_MS = 45_000; // Must fit within Vercel's 60s maxDuration
 
 // Facebook Marketplace city slugs for URL construction
 const CITY_SLUGS: Record<string, string> = {
@@ -182,6 +182,9 @@ export async function fetchFacebookMarketplaceListings(
     const address = title || subtitles.join(", ") || null;
 
     const listingUrl = item.listingUrl ?? "";
+
+    // Skip listings without URLs — can't link or dedup
+    if (!listingUrl) continue;
 
     listings.push({
       address,

@@ -36,10 +36,9 @@ Every response must end with a compact status table of active work items. Done i
 |------|-----------|
 | Feature X | ⏳ Agent running / 🔲 Not started / Description |
 
-When presenting design options (A/B/C/D), make each letter a separate clickable link using format:
-`[A](url1) / [B](url2) / [C](url3) / [D](url4)`
-
-Each letter must link to a different URL or anchor. If the mockup HTML doesn't have per-option anchors, add them to the HTML file first. This keeps the table compact while letting the user click directly to each option.
+When presenting design options (A/B/C/D):
+- If all options are on ONE page: single link like `[Pick A/B/C/D](url)`
+- If options are on SEPARATE pages: individual links like `[A](url1) / [B](url2) / [C](url3) / [D](url4)`
 
 ## Agent Context Continuity
 
