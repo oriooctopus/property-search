@@ -56,7 +56,7 @@ export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
 
         {open && children && (
           <div
-            className="absolute left-0 top-full mt-2 z-50 rounded-xl border border-[#2d333b] p-5 shadow-xl"
+            className="absolute left-0 top-full mt-2 z-[1200] rounded-xl border border-[#2d333b] p-5 shadow-xl"
             style={{ backgroundColor: '#1c2028', minWidth: '320px' }}
           >
             {children}
