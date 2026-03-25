@@ -12,29 +12,28 @@ export const SegmentedControl = forwardRef<HTMLDivElement, SegmentedControlProps
     return (
       <div
         ref={ref}
-        className={cn('inline-flex items-stretch rounded-lg overflow-hidden', className)}
+        className={cn('inline-flex items-stretch rounded-md overflow-hidden', className)}
         style={{
-          background: '#0f1117',
-          border: '1px solid #2d333b',
+          background: 'transparent',
         }}
         {...rest}
       >
-        {options.map((opt, i) => {
+        {options.map((opt) => {
           const isActive = opt.value === value;
           return (
             <button
               key={opt.value}
               onClick={() => onChange(opt.value)}
               className={cn(
-                'border-none text-[13px] font-medium px-3 sm:px-5 py-[5px] cursor-pointer transition-all duration-150 relative whitespace-nowrap min-h-[44px]',
+                'border-none text-[11px] font-medium px-2 py-0.5 cursor-pointer transition-all duration-150 relative whitespace-nowrap h-[26px]',
                 isActive
                   ? 'font-semibold'
                   : 'hover:text-[#e1e4e8]',
               )}
               style={{
-                background: isActive ? 'rgba(88, 166, 255, 0.15)' : 'transparent',
+                background: isActive ? 'rgba(88, 166, 255, 0.1)' : 'transparent',
                 color: isActive ? '#58a6ff' : '#8b949e',
-                borderLeft: i > 0 ? '1px solid #2d333b' : 'none',
+                borderRadius: '5px',
               }}
             >
               {opt.label}

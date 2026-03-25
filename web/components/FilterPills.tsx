@@ -48,6 +48,9 @@ function getActiveFilters(filters: FiltersState): FilterPillData[] {
     };
     pills.push({ key: 'maxListingAge', label: `Within ${ageLabels[filters.maxListingAge] ?? filters.maxListingAge}` });
   }
+  if (filters.selectedSources !== null) {
+    pills.push({ key: 'selectedSources', label: `Sources (${filters.selectedSources.length})` });
+  }
 
   return pills;
 }

@@ -71,6 +71,7 @@ function readFiltersFromParams(params: URLSearchParams): FiltersState {
     maxPricePerBed: parseNumOrNull(params.get('maxPerBed')),
     maxListingAge: (age === 'any' ? null : age && VALID_LISTING_AGES.has(age) ? age : '1m') as MaxListingAge,
     photosFirst: params.get('photosFirst') === '1',
+    selectedSources: params.get('sources') ? params.get('sources')!.split(',') : null,
   };
 }
 
@@ -89,6 +90,7 @@ function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatM
   if (f.maxListingAge === null) p.set('maxAge', 'any');
   else if (f.maxListingAge !== '1m') p.set('maxAge', f.maxListingAge);
   if (f.photosFirst) p.set('photosFirst', '1');
+  if (f.selectedSources !== null) p.set('sources', f.selectedSources.join(','));
   const qs = p.toString();
   return qs ? `?${qs}` : '/';
 }
@@ -443,6 +445,12 @@ function HomeInner() {
         if (!dateStr) return true;
         return new Date(dateStr).getTime() >= cutoff;
       });
+    }
+
+    // Source filter
+    if (filters.selectedSources !== null) {
+      const srcSet = new Set(filters.selectedSources);
+      result = result.filter((l) => l.source && srcSet.has(l.source));
     }
 
     result.sort((a, b) => {

@@ -6,6 +6,7 @@ interface FilterChipProps extends Omit<ComponentPropsWithoutRef<'button'>, 'chil
   label: string;
   active?: boolean;
   open?: boolean;
+  compact?: boolean;
   children?: ReactNode;
   onToggle?: () => void;
 }
@@ -29,15 +30,17 @@ function ChevronDown({ className }: { className?: string }) {
 }
 
 export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
-  function FilterChip({ label, active = false, open = false, children, onToggle, className, ...rest }, ref) {
+  function FilterChip({ label, active = false, open = false, compact = false, children, onToggle, className, ...rest }, ref) {
     return (
       <div className="relative shrink-0">
         <ButtonBase
           ref={ref}
           onClick={onToggle}
           className={cn(
-            'flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium whitespace-nowrap',
-            'border',
+            'flex items-center gap-1 rounded-md font-medium whitespace-nowrap border',
+            compact
+              ? 'px-2.5 py-0.5 text-[11px] h-[28px]'
+              : 'px-3.5 py-1.5 text-sm min-h-[44px] gap-1.5 rounded-full',
             active
               ? 'bg-[#58a6ff]/[0.08] text-[#58a6ff] border-[#58a6ff] hover:bg-[#58a6ff]/[0.18]'
               : 'bg-transparent text-[#8b949e] border-[#2d333b] hover:bg-[#58a6ff]/20 hover:text-[#c0d6f5] hover:border-[#58a6ff]/40',
