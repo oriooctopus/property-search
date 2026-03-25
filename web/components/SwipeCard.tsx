@@ -26,7 +26,7 @@ interface SwipeCardProps {
     url: string;
     [key: string]: unknown;
   };
-  onSwipe: (direction: 'left' | 'right' | 'up') => void;
+  onSwipe: (direction: 'left' | 'right' | 'up' | 'down') => void;
   onExpandDetail: () => void;
   isTop: boolean;
   scale?: number;
@@ -46,7 +46,7 @@ export default function SwipeCard({
   yOffset = 0,
 }: SwipeCardProps) {
   const [photoIndex, setPhotoIndex] = useState(0);
-  const [exiting, setExiting] = useState<'left' | 'right' | 'up' | null>(null);
+  const [exiting, setExiting] = useState<'left' | 'right' | 'up' | 'down' | null>(null);
 
   const photos = listing.photo_urls ?? [];
   const totalPhotos = photos.length;
@@ -62,21 +62,24 @@ export default function SwipeCard({
   const nopeOpacity = useTransform(x, [-(SWIPE_X_THRESHOLD * STAMP_FADE_RATIO), -SWIPE_X_THRESHOLD], [0, 1]);
   const faveOpacity = useTransform(x, [SWIPE_X_THRESHOLD * STAMP_FADE_RATIO, SWIPE_X_THRESHOLD], [0, 1]);
   const liveOpacity = useTransform(y, [-(SWIPE_Y_THRESHOLD * STAMP_FADE_RATIO), -SWIPE_Y_THRESHOLD], [0, 1]);
+  const laterOpacity = useTransform(y, [SWIPE_Y_THRESHOLD * STAMP_FADE_RATIO, SWIPE_Y_THRESHOLD], [0, 1]);
 
   // Background tint opacities
   const leftTint = useTransform(x, [0, -SWIPE_X_THRESHOLD], [0, 0.3]);
   const rightTint = useTransform(x, [0, SWIPE_X_THRESHOLD], [0, 0.3]);
   const topTint = useTransform(y, [0, -SWIPE_Y_THRESHOLD], [0, 0.3]);
+  const bottomTint = useTransform(y, [0, SWIPE_Y_THRESHOLD], [0, 0.3]);
 
   const isDragging = useRef(false);
 
-  const commitSwipe = useCallback((direction: 'left' | 'right' | 'up') => {
+  const commitSwipe = useCallback((direction: 'left' | 'right' | 'up' | 'down') => {
     setExiting(direction);
 
     const targets = {
       left: { x: -window.innerWidth * 1.5, y: 0, rotate: -30, scale: 0.9, opacity: 1 },
       right: { x: window.innerWidth * 1.5, y: 0, rotate: 30, scale: 0.9, opacity: 1 },
       up: { x: 0, y: -window.innerHeight * 1.5, rotate: 0, scale: 0.8, opacity: 0.5 },
+      down: { x: 0, y: window.innerHeight * 1.5, rotate: 0, scale: 0.8, opacity: 0.5 },
     };
 
     const t = targets[direction];
@@ -107,6 +110,8 @@ export default function SwipeCard({
           commitSwipe(mx < 0 ? 'left' : 'right');
         } else if (my < -SWIPE_Y_THRESHOLD && absY > absX) {
           commitSwipe('up');
+        } else if (my > SWIPE_Y_THRESHOLD && absY > absX) {
+          commitSwipe('down');
         } else {
           // Spring back
           const springBack = { type: 'spring' as const, stiffness: 500, damping: 30 };
@@ -173,26 +178,33 @@ export default function SwipeCard({
         className="absolute inset-0 rounded-2xl pointer-events-none z-[1]"
         style={{
           opacity: leftTint,
-          background: 'linear-gradient(to right, rgba(248, 81, 73, 0.5), transparent 60%)',
+          background: 'linear-gradient(to right, rgba(139, 148, 158, 0.4), transparent 60%)',
         }}
       />
       <motion.div
         className="absolute inset-0 rounded-2xl pointer-events-none z-[1]"
         style={{
           opacity: rightTint,
-          background: 'linear-gradient(to left, rgba(251, 191, 36, 0.5), transparent 60%)',
+          background: 'linear-gradient(to left, rgba(88, 166, 255, 0.4), transparent 60%)',
         }}
       />
       <motion.div
         className="absolute inset-0 rounded-2xl pointer-events-none z-[1]"
         style={{
           opacity: topTint,
-          background: 'linear-gradient(to bottom, rgba(249, 115, 22, 0.5), transparent 60%)',
+          background: 'linear-gradient(to bottom, rgba(225, 228, 232, 0.4), transparent 60%)',
+        }}
+      />
+      <motion.div
+        className="absolute inset-0 rounded-2xl pointer-events-none z-[1]"
+        style={{
+          opacity: bottomTint,
+          background: 'linear-gradient(to top, rgba(88, 166, 255, 0.4), transparent 60%)',
         }}
       />
 
       {/* Stamp overlays */}
-      {/* NOPE - top right, red, rotated -12° */}
+      {/* SKIP - top right, muted grey, rotated -12° */}
       <motion.div
         className="absolute top-8 right-6 z-[5] pointer-events-none"
         style={{ opacity: nopeOpacity, rotate: -12 }}
@@ -200,17 +212,16 @@ export default function SwipeCard({
         <div
           className="px-4 py-2 text-3xl font-black uppercase tracking-wider"
           style={{
-            color: '#f85149',
-            border: '4px solid #f85149',
+            color: '#8b949e',
+            border: '4px solid #8b949e',
             borderRadius: 8,
-            textShadow: '0 0 4px rgba(248,81,73,0.3)',
           }}
         >
-          NOPE 👎
+          SKIP
         </div>
       </motion.div>
 
-      {/* LIKE 👍 - top left, gold #fbbf24, rotated 12° */}
+      {/* LIKE - top left, blue #58a6ff, rotated 12° */}
       <motion.div
         className="absolute top-8 left-6 z-[5] pointer-events-none"
         style={{ opacity: faveOpacity, rotate: 12 }}
@@ -218,17 +229,16 @@ export default function SwipeCard({
         <div
           className="px-4 py-2 text-3xl font-black uppercase tracking-wider"
           style={{
-            color: '#fbbf24',
-            border: '4px solid #fbbf24',
+            color: '#58a6ff',
+            border: '4px solid #58a6ff',
             borderRadius: 8,
-            textShadow: '0 0 4px rgba(251,191,36,0.3)',
           }}
         >
-          LIKE 👍
+          LIKE
         </div>
       </motion.div>
 
-      {/* LIVE HERE 🏠 - top center, orange #f97316 */}
+      {/* LIVE HERE - top center, white #e1e4e8 */}
       <motion.div
         className="absolute top-8 left-1/2 -translate-x-1/2 z-[5] pointer-events-none"
         style={{ opacity: liveOpacity }}
@@ -236,13 +246,29 @@ export default function SwipeCard({
         <div
           className="px-4 py-2 text-2xl font-black uppercase tracking-wider whitespace-nowrap"
           style={{
-            color: '#f97316',
-            border: '4px solid #f97316',
+            color: '#e1e4e8',
+            border: '4px solid #e1e4e8',
             borderRadius: 8,
-            textShadow: '0 0 4px rgba(249,115,22,0.3)',
           }}
         >
-          LIVE HERE 🏠
+          LIVE HERE
+        </div>
+      </motion.div>
+
+      {/* LATER - bottom center, blue #58a6ff */}
+      <motion.div
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[5] pointer-events-none"
+        style={{ opacity: laterOpacity }}
+      >
+        <div
+          className="px-4 py-2 text-2xl font-black uppercase tracking-wider whitespace-nowrap"
+          style={{
+            color: '#58a6ff',
+            border: '4px solid #58a6ff',
+            borderRadius: 8,
+          }}
+        >
+          LATER
         </div>
       </motion.div>
 

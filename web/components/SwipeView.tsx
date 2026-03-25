@@ -34,7 +34,7 @@ interface SwipeViewProps {
 interface UndoEntry {
   index: number;
   listingId: number;
-  action: 'left' | 'right' | 'up';
+  action: 'left' | 'right' | 'up' | 'down';
 }
 
 const SWIPED_IDS_KEY = 'dwelligence_swiped_ids';
@@ -64,7 +64,7 @@ export default function SwipeView({
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
   const [authToast, setAuthToast] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [exitDirection, setExitDirection] = useState<'left' | 'right' | 'up' | null>(null);
+  const [exitDirection, setExitDirection] = useState<'left' | 'right' | 'up' | 'down' | null>(null);
 
   useEffect(() => {
     setShowOnboarding(!localStorage.getItem(ONBOARDED_KEY));
@@ -83,7 +83,7 @@ export default function SwipeView({
   // Swipe handler
   // ---------------------------------------------------------------------------
   const handleSwipe = useCallback(
-    (direction: 'left' | 'right' | 'up') => {
+    (direction: 'left' | 'right' | 'up' | 'down') => {
       const listing = deck[currentIndex];
       if (!listing) return;
 
@@ -98,28 +98,42 @@ export default function SwipeView({
       if (direction === 'left') onHideListing(listing.id);
       if (direction === 'right') onToggleFavorite(listing.id);
       if (direction === 'up') onToggleWouldLive(listing.id);
+      // 'down' = move to back of queue (no action on the listing itself)
 
       // Animate exit
       setExitDirection(direction);
       setTimeout(() => {
         setExitDirection(null);
 
-        // Track as swiped
-        setSwipedIds((prev) => {
-          const next = new Set(prev);
-          next.add(listing.id);
-          localStorage.setItem(SWIPED_IDS_KEY, JSON.stringify([...next]));
-          return next;
-        });
+        if (direction === 'down') {
+          // Move listing to end of deck by NOT marking as swiped
+          // Just advance the index — the listing stays in the unfiltered list
+          // and will appear again at the end
+          setCurrentIndex((prev) => prev + 1);
 
-        // Push to undo stack (max 10)
-        setUndoStack((prev) => [
-          ...prev.slice(-9),
-          { index: currentIndex, listingId: listing.id, action: direction },
-        ]);
+          // Push to undo stack
+          setUndoStack((prev) => [
+            ...prev.slice(-9),
+            { index: currentIndex, listingId: listing.id, action: direction },
+          ]);
+        } else {
+          // Track as swiped
+          setSwipedIds((prev) => {
+            const next = new Set(prev);
+            next.add(listing.id);
+            localStorage.setItem(SWIPED_IDS_KEY, JSON.stringify([...next]));
+            return next;
+          });
 
-        // Advance
-        setCurrentIndex((prev) => prev + 1);
+          // Push to undo stack (max 10)
+          setUndoStack((prev) => [
+            ...prev.slice(-9),
+            { index: currentIndex, listingId: listing.id, action: direction },
+          ]);
+
+          // Advance
+          setCurrentIndex((prev) => prev + 1);
+        }
       }, 250);
     },
     [currentIndex, deck, userId, onHideListing, onToggleFavorite, onToggleWouldLive],
@@ -136,14 +150,17 @@ export default function SwipeView({
     if (last.action === 'left') onHideListing(last.listingId); // toggle unhide
     if (last.action === 'right') onToggleFavorite(last.listingId);
     if (last.action === 'up') onToggleWouldLive(last.listingId);
+    // 'down' has no action to reverse — it just moved the card to back of queue
 
-    // Remove from swiped
-    setSwipedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(last.listingId);
-      localStorage.setItem(SWIPED_IDS_KEY, JSON.stringify([...next]));
-      return next;
-    });
+    // Remove from swiped (only if it was actually swiped)
+    if (last.action !== 'down') {
+      setSwipedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(last.listingId);
+        localStorage.setItem(SWIPED_IDS_KEY, JSON.stringify([...next]));
+        return next;
+      });
+    }
 
     setUndoStack((prev) => prev.slice(0, -1));
     setCurrentIndex((prev) => Math.max(0, prev - 1));
@@ -167,6 +184,7 @@ export default function SwipeView({
     if (exitDirection === 'left') return 'translateX(-120%) rotate(-15deg)';
     if (exitDirection === 'right') return 'translateX(120%) rotate(15deg)';
     if (exitDirection === 'up') return 'translateY(-120%)';
+    if (exitDirection === 'down') return 'translateY(120%)';
   };
 
   // ---------------------------------------------------------------------------
@@ -305,28 +323,29 @@ export default function SwipeView({
             </svg>
           </button>
 
-          {/* Action buttons: Dislike (left) | Would Live (middle, bigger) | Like (right) */}
+          {/* Action buttons: Skip (left) | Would Live (middle, bigger) | Like (right) */}
           <div className="flex items-center gap-5">
-            {/* Dislike — red #f85149 */}
+            {/* Skip — grey outline */}
             <button
               onClick={() => handleSwipe('left')}
               className="w-14 h-14 rounded-full flex items-center justify-center border-2 transition-colors active:scale-95"
-              style={{ borderColor: '#f85149', color: '#f85149' }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(248,81,73,0.15)'; }}
+              style={{ borderColor: '#8b949e', color: '#8b949e' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(139,148,158,0.15)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-              title="Dislike"
+              title="Skip"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 2H20a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3m-7 2v4a3 3 0 0 0 3 3l4-9V2H6.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10" />
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
 
-            {/* Would Live Here — orange #f97316, bigger center button */}
+            {/* Would Live Here — white outline, bigger center button */}
             <button
               onClick={() => handleSwipe('up')}
               className="w-16 h-16 rounded-full flex items-center justify-center border-2 transition-colors active:scale-95"
-              style={{ borderColor: '#f97316', color: '#f97316' }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(249,115,22,0.15)'; }}
+              style={{ borderColor: '#e1e4e8', color: '#e1e4e8' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(225,228,232,0.15)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
               title="Would live here"
             >
@@ -336,17 +355,17 @@ export default function SwipeView({
               </svg>
             </button>
 
-            {/* Like — gold #fbbf24 */}
+            {/* Like — blue fill, white icon */}
             <button
               onClick={() => handleSwipe('right')}
               className="w-14 h-14 rounded-full flex items-center justify-center border-2 transition-colors active:scale-95"
-              style={{ borderColor: '#fbbf24', color: '#fbbf24' }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(251,191,36,0.15)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+              style={{ borderColor: '#58a6ff', backgroundColor: '#58a6ff', color: '#ffffff' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4090e0'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#58a6ff'; }}
               title="Like"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3m7-2V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14" />
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
               </svg>
             </button>
           </div>
