@@ -305,19 +305,19 @@ export default function SwipeView({
             </svg>
           </button>
 
-          {/* Action buttons: Hide (left) | Would Live (middle, bigger) | Favorite (right) */}
+          {/* Action buttons: Dislike (left) | Would Live (middle, bigger) | Like (right) */}
           <div className="flex items-center gap-5">
-            {/* Hide / Skip — red #f85149 */}
+            {/* Dislike — red #f85149 */}
             <button
               onClick={() => handleSwipe('left')}
               className="w-14 h-14 rounded-full flex items-center justify-center border-2 transition-colors active:scale-95"
               style={{ borderColor: '#f85149', color: '#f85149' }}
               onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(248,81,73,0.15)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-              title="Skip"
+              title="Dislike"
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M18 6L6 18M6 6l12 12" />
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 2H20a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3m-7 2v4a3 3 0 0 0 3 3l4-9V2H6.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10" />
               </svg>
             </button>
 
@@ -336,17 +336,17 @@ export default function SwipeView({
               </svg>
             </button>
 
-            {/* Favorite / Star — gold #fbbf24 */}
+            {/* Like — gold #fbbf24 */}
             <button
               onClick={() => handleSwipe('right')}
               className="w-14 h-14 rounded-full flex items-center justify-center border-2 transition-colors active:scale-95"
               style={{ borderColor: '#fbbf24', color: '#fbbf24' }}
               onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(251,191,36,0.15)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-              title="Favorite"
+              title="Like"
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3m7-2V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14" />
               </svg>
             </button>
           </div>
@@ -364,7 +364,7 @@ export default function SwipeView({
           className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#2a2d3a] text-white text-sm px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-4"
           style={{ zIndex: 1400 }}
         >
-          Sign in to save favorites
+          Sign in to like listings
           <a
             href="/login"
             className="text-[#58a6ff] font-medium hover:underline ml-1"

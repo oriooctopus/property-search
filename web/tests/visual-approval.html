@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visual Regression Review</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a0a;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.5;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 300px;
+      min-width: 300px;
+      background: #0d1117;
+      border-right: 1px solid #30363d;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header h1 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .badge {
+      background: #1f2937;
+      color: #9ca3af;
+      padding: 2px 10px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .badge.has-changes {
+      background: #7f1d1d;
+      color: #fca5a5;
+    }
+
+    .sidebar-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    .sidebar-list::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .sidebar-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .sidebar-list::-webkit-scrollbar-thumb {
+      background: #30363d;
+      border-radius: 3px;
+    }
+
+    .sidebar-item {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      border-left: 2px solid transparent;
+      position: relative;
+    }
+
+    .sidebar-item:hover {
+      background: #1c2333;
+    }
+
+    .sidebar-item.selected {
+      border-left: 2px solid #58a6ff;
+      background: #1c2333;
+    }
+
+    .sidebar-item.approved .sidebar-thumbs {
+      opacity: 0.6;
+    }
+
+    .sidebar-thumbs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .sidebar-thumb {
+      width: 120px;
+      height: 72px;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      overflow: hidden;
+      background: #0d1117;
+      flex-shrink: 0;
+    }
+
+    .sidebar-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .sidebar-thumb:hover {
+      border-color: #58a6ff;
+      box-shadow: 0 0 6px rgba(88, 166, 255, 0.3);
+    }
+
+    .sidebar-thumb.no-img {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #484f58;
+    }
+
+    .sidebar-item-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e6edf3;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sidebar-item-summary {
+      font-size: 11px;
+      color: #8b949e;
+      margin-top: 2px;
+      line-height: 1.4;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sidebar-item-actions {
+      display: flex;
+      gap: 4px;
+      margin-top: 6px;
+    }
+
+    .sidebar-btn {
+      border: 1px solid #30363d;
+      background: none;
+      color: #8b949e;
+      border-radius: 4px;
+      padding: 2px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+
+    .sidebar-btn:hover {
+      border-color: #58a6ff;
+      color: #e6edf3;
+    }
+
+    .sidebar-btn-approve.active,
+    .sidebar-btn-approve:hover {
+      border-color: #238636;
+      color: #56d364;
+      background: rgba(35, 134, 54, 0.15);
+    }
+
+    .sidebar-btn-reject.active,
+    .sidebar-btn-reject:hover {
+      border-color: #da3633;
+      color: #f85149;
+      background: rgba(218, 54, 51, 0.15);
+    }
+
+    .status-dot {
+      width: 16px;
+      height: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 12px;
+      line-height: 1;
+    }
+
+    .status-dot.pending {
+      color: #484f58;
+    }
+
+    .status-dot.pending::after {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: #484f58;
+      border-radius: 50%;
+      display: block;
+    }
+
+    .status-dot.approved {
+      color: #56d364;
+    }
+
+    .status-dot.approved::after {
+      content: '\2713';
+    }
+
+    .status-dot.rejected {
+      color: #f85149;
+    }
+
+    .status-dot.rejected::after {
+      content: '\2717';
+    }
+
+    .approved-stamp {
+      display: none;
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(35, 134, 54, 0.85);
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    .sidebar-item.approved .approved-stamp {
+      display: block;
+    }
+
+    .sidebar-footer {
+      padding: 12px;
+      border-top: 1px solid #30363d;
+      flex-shrink: 0;
+    }
+
+    .sidebar-footer-counter {
+      font-size: 12px;
+      color: #8b949e;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    .sidebar-footer-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      flex: 1;
+      text-align: center;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-approve {
+      background: #238636;
+      color: #fff;
+    }
+
+    .btn-approve:hover:not(:disabled) {
+      background: #2ea043;
+    }
+
+    .btn-reject {
+      background: #da3633;
+      color: #fff;
+    }
+
+    .btn-reject:hover:not(:disabled) {
+      background: #f85149;
+    }
+
+    .btn-sm {
+      padding: 6px 14px;
+      font-size: 12px;
+    }
+
+    /* ── Main Panel ── */
+    .main-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    .main-panel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .main-panel-content::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .main-panel-content::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .main-panel-content::-webkit-scrollbar-thumb {
+      background: #30363d;
+      border-radius: 4px;
+    }
+
+    .main-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 4px;
+      text-align: center;
+    }
+
+    .main-summary {
+      font-size: 13px;
+      color: #8b949e;
+      margin-bottom: 16px;
+      text-align: center;
+      max-width: 600px;
+    }
+
+    .hover-swap {
+      position: relative;
+      cursor: crosshair;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #0d1117;
+      max-width: 100%;
+      width: fit-content;
+      transition: border-color 0.15s;
+    }
+
+    .hover-swap:hover {
+      border-color: #56d364;
+      border-width: 2px;
+    }
+
+    .hover-swap img.swap-base {
+      display: block;
+      max-width: 90vw;
+      max-height: calc(100vh - 240px);
+      width: auto;
+      height: auto;
+      object-fit: contain;
+    }
+
+    .hover-swap img.swap-overlay {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      opacity: 0;
+      transition: opacity 0.15s ease-in-out;
+    }
+
+    .hover-swap:hover img.swap-overlay {
+      opacity: 1;
+    }
+
+    /* Border flashes green on hover to signal the swap */
+    .hover-swap:hover {
+      border-color: #56d364;
+      border-width: 2px;
+      box-shadow: 0 0 12px rgba(86, 211, 100, 0.25);
+    }
+
+    .hover-swap .swap-label {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 5px 14px;
+      border-radius: 5px;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      pointer-events: none;
+      z-index: 2;
+      transition: opacity 0.15s ease-in-out;
+    }
+
+    .hover-swap .label-before {
+      background: rgba(249, 117, 131, 0.95);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(249, 117, 131, 0.4);
+    }
+
+    .hover-swap .label-after {
+      background: rgba(86, 211, 100, 0.95);
+      color: #fff;
+      opacity: 0;
+      box-shadow: 0 2px 8px rgba(86, 211, 100, 0.4);
+    }
+
+    .hover-swap:hover .label-before { opacity: 0; }
+    .hover-swap:hover .label-after { opacity: 1; }
+
+    .main-image-container {
+      position: relative;
+      cursor: zoom-in;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #0d1117;
+      max-width: 100%;
+      width: fit-content;
+      transition: border-color 0.15s;
+    }
+
+    .main-image-container:hover {
+      border-color: #58a6ff;
+    }
+
+    .main-image-container img.swap-base {
+      display: block;
+      max-width: 90vw;
+      max-height: calc(100vh - 240px);
+      width: auto;
+      height: auto;
+      object-fit: contain;
+    }
+
+    .main-image-container .swap-label {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 5px 14px;
+      border-radius: 5px;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      pointer-events: none;
+      z-index: 2;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+
+    .hover-hint {
+      font-size: 12px;
+      color: #484f58;
+      margin-top: 8px;
+      text-align: center;
+    }
+
+    .main-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+      margin-bottom: 8px;
+    }
+
+    .status-message {
+      text-align: center;
+      margin-top: 12px;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      display: none;
+    }
+
+    .status-message.success {
+      display: block;
+      background: rgba(35, 134, 54, 0.15);
+      border: 1px solid #238636;
+      color: #56d364;
+    }
+
+    .status-message.error {
+      display: block;
+      background: rgba(218, 54, 51, 0.15);
+      border: 1px solid #da3633;
+      color: #f97583;
+    }
+
+    .status-message.info {
+      display: block;
+      background: rgba(88, 166, 255, 0.1);
+      border: 1px solid #1f6feb;
+      color: #58a6ff;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      color: #8b949e;
+      padding: 40px;
+      text-align: center;
+    }
+
+    .empty-state h2 {
+      font-size: 20px;
+      color: #56d364;
+      margin-bottom: 8px;
+    }
+
+    .loading-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      color: #8b949e;
+      font-size: 15px;
+    }
+
+    .no-selection {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      color: #484f58;
+      font-size: 14px;
+    }
+
+    /* ── Lightbox ── */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(0, 0, 0, 0.92);
+      align-items: center;
+      justify-content: center;
+      cursor: zoom-out;
+      padding: 24px;
+    }
+
+    .lightbox.open {
+      display: flex;
+    }
+
+    .lightbox img {
+      max-width: 95vw;
+      max-height: 95vh;
+      object-fit: contain;
+      border-radius: 4px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+
+    .lightbox-label {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #161b22;
+      border: 1px solid #30363d;
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #e6edf3;
+      pointer-events: none;
+    }
+
+    .lightbox-close {
+      position: fixed;
+      top: 16px;
+      right: 20px;
+      background: none;
+      border: none;
+      color: #8b949e;
+      font-size: 28px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 4px 8px;
+    }
+
+    .lightbox-close:hover {
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h1>Visual Review</h1>
+      <span id="change-badge" class="badge">Loading...</span>
+    </div>
+    <div class="sidebar-list" id="sidebar-list">
+      <div class="loading-state" style="padding:40px 0;">Scanning for changes...</div>
+    </div>
+    <div class="sidebar-footer" id="sidebar-footer" style="display:none;">
+      <div class="sidebar-footer-counter" id="footer-counter">0 of 0 reviewed</div>
+      <div class="sidebar-footer-actions">
+        <button class="btn btn-approve" id="btn-approve-all" onclick="approveAll()">Approve All</button>
+        <button class="btn btn-reject" id="btn-reject-all" onclick="rejectAll()">Reject All</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Panel -->
+  <div class="main-panel">
+    <div class="main-panel-content" id="main-panel">
+      <div class="loading-state">Scanning for changes...</div>
+    </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+    <span class="lightbox-label" id="lightbox-label"></span>
+    <button class="lightbox-close" onclick="closeLightbox()">&times;</button>
+    <img id="lightbox-img" src="" alt="Full size preview">
+  </div>
+
+  <script>
+    let changesData = [];
+    let analysisData = {};
+    let selectedIndex = 0;
+    let approvedSet = new Set();
+    let rejectedSet = new Set();
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function getUrls(change) {
+      const baselineUrl = change.hasBaseline
+        ? '/images/baseline/' + encodeURIComponent(change.baselineFile)
+        : null;
+      const actualUrl = '/images/result/' + encodeURIComponent(change.dirName) + '/' + encodeURIComponent(change.actualFile);
+      return { baselineUrl, actualUrl };
+    }
+
+    function getStatusClass(index) {
+      if (approvedSet.has(index)) return 'approved';
+      if (rejectedSet.has(index)) return 'rejected';
+      return 'pending';
+    }
+
+    function updateCounter() {
+      const reviewed = approvedSet.size + rejectedSet.size;
+      const total = changesData.length;
+      const el = document.getElementById('footer-counter');
+      el.textContent = reviewed + ' of ' + total + ' reviewed';
+    }
+
+    // Full rebuild: call when changesData changes or approval/rejection state changes.
+    // Do NOT call this just to update the selected highlight — use updateSidebarSelection() instead.
+    function renderSidebar() {
+      const list = document.getElementById('sidebar-list');
+      const badge = document.getElementById('change-badge');
+      const footer = document.getElementById('sidebar-footer');
+
+      if (changesData.length === 0) {
+        badge.textContent = 'No changes';
+        badge.className = 'badge';
+        list.innerHTML = '';
+        footer.style.display = 'none';
+        updateCounter();
+        return;
+      }
+
+      badge.textContent = changesData.length + ' change' + (changesData.length !== 1 ? 's' : '');
+      badge.className = 'badge has-changes';
+      footer.style.display = 'block';
+
+      let html = '';
+      changesData.forEach(function(change, i) {
+        const urls = getUrls(change);
+        const status = getStatusClass(i);
+        const isSelected = i === selectedIndex;
+        const summary = analysisData[change.id] || '';
+        const summaryText = summary.replace(/\*\*/g, '').replace(/`/g, '');
+
+        html += '<div class="sidebar-item ' + status + (isSelected ? ' selected' : '') + '" onmouseenter="selectItem(' + i + ')" data-index="' + i + '">';
+        html += '<span class="approved-stamp">Approved</span>';
+        html += '<div class="sidebar-thumbs">';
+
+        if (urls.baselineUrl) {
+          html += '<div class="sidebar-thumb" onmouseenter="showMainImage(' + i + ', \'before\')" title="Hover for Before"><img src="' + urls.baselineUrl + '" alt="Before" loading="lazy"></div>';
+        } else {
+          html += '<div class="sidebar-thumb no-img">No baseline</div>';
+        }
+        html += '<div class="sidebar-thumb" onmouseenter="showMainImage(' + i + ', \'after\')" title="Hover for After"><img src="' + urls.actualUrl + '" alt="After" loading="lazy"></div>';
+
+        html += '</div>';
+        html += '<div class="sidebar-item-name">';
+        html += '<span class="status-dot ' + status + '"></span>';
+        html += escapeHtml(change.testName);
+        html += '</div>';
+
+        if (summaryText) {
+          html += '<div class="sidebar-item-summary" title="' + escapeHtml(summaryText) + '">' + escapeHtml(summaryText) + '</div>';
+        }
+
+        html += '<div class="sidebar-item-actions">';
+        html += '<button class="sidebar-btn sidebar-btn-approve' + (status === 'approved' ? ' active' : '') + '" onclick="event.stopPropagation(); approveItem(' + i + ')" title="Approve">&#10003;</button>';
+        html += '<button class="sidebar-btn sidebar-btn-reject' + (status === 'rejected' ? ' active' : '') + '" onclick="event.stopPropagation(); rejectItem(' + i + ')" title="Reject">&#10007;</button>';
+        html += '</div>';
+
+        html += '</div>';
+      });
+
+      list.innerHTML = html;
+      updateCounter();
+    }
+
+    // Cheap selection update: only patches CSS classes on existing DOM nodes.
+    // Does NOT rebuild innerHTML. Safe to call from selectItem() on every hover.
+    function updateSidebarSelection(prevIndex, nextIndex) {
+      const list = document.getElementById('sidebar-list');
+      if (prevIndex !== nextIndex && prevIndex >= 0) {
+        const prev = list.querySelector('[data-index="' + prevIndex + '"]');
+        if (prev) prev.classList.remove('selected');
+      }
+      const next = list.querySelector('[data-index="' + nextIndex + '"]');
+      if (next) {
+        next.classList.add('selected');
+        next.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+
+    function renderMainPanel() {
+      const panel = document.getElementById('main-panel');
+
+      if (changesData.length === 0) {
+        panel.innerHTML = '<div class="empty-state"><h2>No visual changes</h2><p>All screenshots match their baselines. Nothing to review.</p></div>';
+        return;
+      }
+
+      if (selectedIndex < 0 || selectedIndex >= changesData.length) {
+        panel.innerHTML = '<div class="no-selection">Select an item from the sidebar</div>';
+        return;
+      }
+
+      const change = changesData[selectedIndex];
+      const urls = getUrls(change);
+      const status = getStatusClass(selectedIndex);
+      const summary = analysisData[change.id] || '';
+      const summaryClean = summary.replace(/\*\*/g, '').replace(/`/g, '');
+
+      let html = '';
+      html += '<h2 class="main-title">' + escapeHtml(change.testName) + '</h2>';
+      if (summaryClean) {
+        html += '<p class="main-summary">' + escapeHtml(summaryClean) + '</p>';
+      }
+
+      // Main image: single image that switches between before/after
+      // based on which sidebar thumbnail is hovered
+      const defaultSrc = urls.baselineUrl || urls.actualUrl;
+      const defaultLabel = urls.baselineUrl ? 'Before' : 'New';
+      html += '<div class="main-image-container" onclick="openLightbox(document.getElementById(\'main-img\').src, \'' + escapeHtml(change.testName) + '\')">';
+      html += '<span class="swap-label" id="main-img-label" style="background:rgba(249,117,131,0.95);color:#fff;box-shadow:0 2px 8px rgba(249,117,131,0.4);opacity:1;">' + defaultLabel + '</span>';
+      html += '<img id="main-img" class="swap-base" src="' + defaultSrc + '" alt="Screenshot">';
+      html += '</div>';
+      html += '<div class="hover-hint">Hover <strong>left thumbnail</strong> in sidebar for Before · <strong>right thumbnail</strong> for After · Click to zoom</div>';
+
+      html += '<div class="main-actions">';
+      html += '<button class="btn btn-approve btn-sm" onclick="approveItem(' + selectedIndex + ')"' + (status === 'approved' ? ' disabled' : '') + '>';
+      html += status === 'approved' ? 'Approved' : 'Approve';
+      html += '</button>';
+      html += '<button class="btn btn-reject btn-sm" onclick="rejectItem(' + selectedIndex + ')"' + (status === 'rejected' ? ' disabled' : '') + '>';
+      html += status === 'rejected' ? 'Rejected' : 'Reject';
+      html += '</button>';
+      html += '</div>';
+
+      html += '<div id="item-status" class="status-message"></div>';
+
+      panel.innerHTML = html;
+    }
+
+    function showMainImage(index, which) {
+      // Switch the selected item if needed
+      if (index !== selectedIndex) {
+        const prev = selectedIndex;
+        selectedIndex = index;
+        updateSidebarSelection(prev, index);
+        // Full main panel rebuild for new item
+        if (_selectTimer) clearTimeout(_selectTimer);
+        _selectTimer = setTimeout(function() {
+          renderMainPanel();
+          // After rebuild, apply the which
+          setTimeout(function() { applyMainImage(which); }, 10);
+        }, 50);
+        return;
+      }
+      applyMainImage(which);
+    }
+
+    function applyMainImage(which) {
+      const img = document.getElementById('main-img');
+      const label = document.getElementById('main-img-label');
+      if (!img || !label) return;
+      const change = changesData[selectedIndex];
+      if (!change) return;
+      const urls = getUrls(change);
+      if (which === 'before' && urls.baselineUrl) {
+        img.src = urls.baselineUrl;
+        label.textContent = 'Before';
+        label.style.background = 'rgba(249,117,131,0.95)';
+        label.style.boxShadow = '0 2px 8px rgba(249,117,131,0.4)';
+      } else {
+        img.src = urls.actualUrl;
+        label.textContent = 'After';
+        label.style.background = 'rgba(86,211,100,0.95)';
+        label.style.boxShadow = '0 2px 8px rgba(86,211,100,0.4)';
+      }
+    }
+
+    let _selectTimer = null;
+    function selectItem(index) {
+      // Bail early if already selected
+      if (index === selectedIndex && changesData.length > 0) return;
+      const prev = selectedIndex;
+      selectedIndex = index;
+      // Patch sidebar classes immediately (cheap, no DOM rebuild)
+      updateSidebarSelection(prev, index);
+      // Debounce main panel rebuild so it doesn't destroy hover state
+      // when the user moves quickly between sidebar items
+      if (_selectTimer) clearTimeout(_selectTimer);
+      _selectTimer = setTimeout(function() {
+        renderMainPanel();
+        _selectTimer = null;
+      }, 100);
+    }
+
+    function approveItem(index) {
+      if (index < 0 || index >= changesData.length) return;
+      rejectedSet.delete(index);
+      approvedSet.add(index);
+      // Approval state changed — need a full sidebar rebuild to update status dots
+      // and the approved-stamp overlay.
+      renderSidebar();
+      renderMainPanel();
+    }
+
+    function rejectItem(index) {
+      if (index < 0 || index >= changesData.length) return;
+      approvedSet.delete(index);
+      rejectedSet.add(index);
+      // Same: rejection state changed — full sidebar rebuild required.
+      renderSidebar();
+      renderMainPanel();
+    }
+
+    async function approveAll() {
+      const btn = document.getElementById('btn-approve-all');
+      btn.disabled = true;
+      btn.textContent = 'Approving...';
+
+      try {
+        const res = await fetch('/approve', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          changesData.forEach(function(_, i) {
+            approvedSet.add(i);
+            rejectedSet.delete(i);
+          });
+          renderSidebar();
+          renderMainPanel();
+          btn.textContent = 'All Approved';
+          document.getElementById('btn-reject-all').disabled = true;
+        } else {
+          btn.disabled = false;
+          btn.textContent = 'Approve All';
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Approve All';
+      }
+    }
+
+    async function rejectAll() {
+      const btn = document.getElementById('btn-reject-all');
+      btn.disabled = true;
+      btn.textContent = 'Rejecting...';
+
+      try {
+        const res = await fetch('/reject', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          changesData.forEach(function(_, i) {
+            rejectedSet.add(i);
+            approvedSet.delete(i);
+          });
+          renderSidebar();
+          renderMainPanel();
+          btn.textContent = 'All Rejected';
+          document.getElementById('btn-approve-all').disabled = true;
+        } else {
+          btn.disabled = false;
+          btn.textContent = 'Reject All';
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Reject All';
+      }
+    }
+
+    function openLightbox(src, label) {
+      var lightbox = document.getElementById('lightbox');
+      var img = document.getElementById('lightbox-img');
+      var lbl = document.getElementById('lightbox-label');
+      img.src = src;
+      lbl.textContent = label;
+      lightbox.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      document.getElementById('lightbox').classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeLightbox();
+      if (document.querySelector('.lightbox.open')) return;
+      if (e.key === 'ArrowDown' || e.key === 'j') {
+        e.preventDefault();
+        if (selectedIndex < changesData.length - 1) selectItem(selectedIndex + 1);
+      }
+      if (e.key === 'ArrowUp' || e.key === 'k') {
+        e.preventDefault();
+        if (selectedIndex > 0) selectItem(selectedIndex - 1);
+      }
+      if (e.key === 'a') approveItem(selectedIndex);
+      if (e.key === 'r') rejectItem(selectedIndex);
+    });
+
+    async function loadChanges() {
+      try {
+        const [changesRes, analysisRes] = await Promise.all([
+          fetch('/api/changes'),
+          fetch('/api/analysis'),
+        ]);
+        changesData = await changesRes.json();
+        const analysis = await analysisRes.json();
+        analysisData = analysis.explanations || {};
+        selectedIndex = 0;
+        renderSidebar();
+        renderMainPanel();
+      } catch (err) {
+        document.getElementById('sidebar-list').innerHTML =
+          '<div style="padding:20px;color:#f97583;font-size:13px;text-align:center;">Failed to load. Is the server running?</div>';
+        document.getElementById('main-panel').innerHTML =
+          '<div class="no-selection">Failed to connect to server</div>';
+      }
+    }
+
+    loadChanges();
+  </script>
+</body>
+</html>
