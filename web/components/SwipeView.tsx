@@ -177,6 +177,51 @@ export default function SwipeView({
   };
 
   // ---------------------------------------------------------------------------
+  // Keyboard shortcuts
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't interfere with typing in inputs/textareas
+      const tag = (document.activeElement?.tagName ?? '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      if ((document.activeElement as HTMLElement)?.isContentEditable) return;
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          handleSwipe('left');
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          handleSwipe('right');
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          handleSwipe('up');
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          handleSwipe('down');
+          break;
+        case 'z':
+        case 'Z':
+          if (e.ctrlKey || e.metaKey || e.key === 'z' || e.key === 'Z') {
+            e.preventDefault();
+            handleUndo();
+          }
+          break;
+        case ' ':
+          e.preventDefault();
+          if (currentListing) onExpandDetail(currentListing);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSwipe, handleUndo, currentListing, onExpandDetail]);
+
+  // ---------------------------------------------------------------------------
   // Card exit animation styles
   // ---------------------------------------------------------------------------
   const getExitTransform = () => {
@@ -374,6 +419,13 @@ export default function SwipeView({
           <span className="text-white/30 text-xs tabular-nums whitespace-nowrap">
             {currentIndex + 1} of {deck.length}
           </span>
+        </div>
+      )}
+
+      {/* Keyboard shortcut hint */}
+      {currentListing && (
+        <div className="text-center pb-2 text-[11px] text-white/20 select-none hidden sm:block">
+          ← → ↑ ↓ to swipe · Z to undo · Space for details
         </div>
       )}
 
