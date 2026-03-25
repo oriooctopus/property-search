@@ -259,9 +259,9 @@ export default function SwipeView({
       )}
 
       {/* Card area */}
-      <div className="flex-1 relative flex items-center justify-center px-4 pb-2 overflow-hidden">
+      <div className="flex-1 relative flex items-center justify-center px-4 pt-3 pb-2 overflow-hidden">
         {currentListing ? (
-          <div className="relative w-full max-w-sm" style={{ height: '70vh', maxHeight: 520 }}>
+          <div className="relative w-full max-w-lg" style={{ height: '70vh', maxHeight: 520 }}>
             {/* Render up to 3 cards: back to front */}
             {[2, 1, 0].map((stackPos) => {
               const idx = currentIndex + stackPos;
