@@ -618,7 +618,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
 
       {/* Row 2 (expandable): Filter chips — conditional render so dropdowns aren't clipped */}
       {filtersExpanded && (
-        <div ref={expandedRowRef} className="flex items-center gap-1.5 flex-wrap overflow-x-auto pt-1.5 pb-1" style={{ borderTop: '1px solid #2d333b', scrollbarWidth: 'none' } as React.CSSProperties}>
+        <div ref={expandedRowRef} className="flex items-center gap-1.5 flex-wrap pt-1.5 pb-1" style={{ borderTop: '1px solid #2d333b' }}>
           {/* Price chip */}
           <FilterChip
             compact
