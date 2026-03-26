@@ -22,7 +22,7 @@ export const SOURCE_LABELS: Record<ListingSource, string> = {
 
 export interface FiltersState {
   maxPricePerBed: number | null;
-  minBeds: number | null;
+  selectedBeds: number[] | null;
   minBaths: number | null;
   minRent: number | null;
   maxRent: number | null;
@@ -155,9 +155,15 @@ function priceLabel(minRent: number | null, maxRent: number | null): string {
   return `$${(minRent! / 1000).toFixed(minRent! % 1000 === 0 ? 0 : 1)}K+`;
 }
 
-function bedsBathsLabel(minBeds: number | null, minBaths: number | null): string {
+function bedsBathsLabel(selectedBeds: number[] | null, minBaths: number | null): string {
   const parts: string[] = [];
-  if (minBeds !== null) parts.push(`${minBeds}+ Beds`);
+  if (selectedBeds !== null && selectedBeds.length > 0) {
+    const labels = selectedBeds
+      .slice()
+      .sort((a, b) => a - b)
+      .map((b) => (b === 7 ? '7+' : String(b)));
+    parts.push(`${labels.join(', ')} Beds`);
+  }
   if (minBaths !== null) parts.push(`${minBaths}+ Baths`);
   return parts.length > 0 ? parts.join(', ') : 'Beds / Baths';
 }
@@ -230,6 +236,45 @@ function PillGroup<T extends number | string | null>({
             active={opt.value === value}
             position={position}
             onClick={() => onSelect(opt.value)}
+          >
+            {opt.label}
+          </PillButton>
+        );
+      })}
+    </div>
+  );
+}
+
+function MultiPillGroup({
+  options,
+  selected,
+  onToggle,
+}: {
+  options: { value: number | null; label: string }[];
+  selected: number[];
+  onToggle: (v: number | null) => void;
+}) {
+  return (
+    <div className="flex">
+      {options.map((opt, i) => {
+        const position = options.length === 1
+          ? 'only' as const
+          : i === 0
+            ? 'first' as const
+            : i === options.length - 1
+              ? 'last' as const
+              : 'middle' as const;
+
+        const isActive = opt.value === null
+          ? selected.length === 0
+          : selected.includes(opt.value);
+
+        return (
+          <PillButton
+            key={opt.label}
+            active={isActive}
+            position={position}
+            onClick={() => onToggle(opt.value)}
           >
             {opt.label}
           </PillButton>
@@ -344,7 +389,7 @@ type ChipId = 'price' | 'bedsBaths' | 'pricePerBed' | 'listingAge' | 'source';
 
 function countActiveFilters(filters: FiltersState): number {
   let count = 0;
-  if (filters.minBeds !== null) count++;
+  if (filters.selectedBeds !== null) count++;
   if (filters.minBaths !== null) count++;
   if (filters.minRent !== null) count++;
   if (filters.maxRent !== null) count++;
@@ -402,7 +447,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
   // Draft state for dropdowns — only applied on "Done"
   const [draftMinRent, setDraftMinRent] = useState<number | null>(filters.minRent);
   const [draftMaxRent, setDraftMaxRent] = useState<number | null>(filters.maxRent);
-  const [draftMinBeds, setDraftMinBeds] = useState<number | null>(filters.minBeds);
+  const [draftSelectedBeds, setDraftSelectedBeds] = useState<number[]>(filters.selectedBeds ?? []);
   const [draftMinBaths, setDraftMinBaths] = useState<number | null>(filters.minBaths);
   const [draftMaxPricePerBed, setDraftMaxPricePerBed] = useState<number | null>(
     filters.maxPricePerBed,
@@ -420,8 +465,8 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
     setDraftMaxRent(filters.maxRent);
   }, [filters.maxRent]);
   useEffect(() => {
-    setDraftMinBeds(filters.minBeds);
-  }, [filters.minBeds]);
+    setDraftSelectedBeds(filters.selectedBeds ?? []);
+  }, [filters.selectedBeds]);
   useEffect(() => {
     setDraftMinBaths(filters.minBaths);
   }, [filters.minBaths]);
@@ -441,7 +486,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
       setDraftMinRent(filters.minRent);
       setDraftMaxRent(filters.maxRent);
     } else if (openChip === 'bedsBaths') {
-      setDraftMinBeds(filters.minBeds);
+      setDraftSelectedBeds(filters.selectedBeds ?? []);
       setDraftMinBaths(filters.minBaths);
     } else if (openChip === 'pricePerBed') {
       setDraftMaxPricePerBed(filters.maxPricePerBed);
@@ -496,7 +541,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
       style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}
     >
       {/* Row 1 (always visible): Area tabs + listing count + Filters button + Sort + View toggle */}
-      <div className="flex items-center h-8">
+      <div className="flex items-center h-8 gap-3">
         {/* Search tags — horizontally scrollable, hidden scrollbar */}
         <div
           className="flex items-center flex-1 min-w-0 overflow-x-auto"
@@ -664,16 +709,25 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
           {/* Beds / Baths chip */}
           <FilterChip
             compact
-            label={bedsBathsLabel(filters.minBeds, filters.minBaths)}
-            active={filters.minBeds !== null || filters.minBaths !== null}
+            label={bedsBathsLabel(filters.selectedBeds, filters.minBaths)}
+            active={filters.selectedBeds !== null || filters.minBaths !== null}
             open={openChip === 'bedsBaths'}
             onToggle={() => toggleChip('bedsBaths')}
           >
             <SectionTitle>Bedrooms</SectionTitle>
-            <PillGroup
+            <MultiPillGroup
               options={BEDROOM_OPTIONS}
-              value={draftMinBeds}
-              onSelect={setDraftMinBeds}
+              selected={draftSelectedBeds}
+              onToggle={(v) => {
+                if (v === null) {
+                  // "Any" clears all selections
+                  setDraftSelectedBeds([]);
+                } else {
+                  setDraftSelectedBeds((prev) =>
+                    prev.includes(v) ? prev.filter((b) => b !== v) : [...prev, v],
+                  );
+                }
+              }}
             />
 
             <div className="mt-5">
@@ -687,11 +741,15 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
 
             <DropdownFooter
               onReset={() => {
-                onChange({ ...filters, minBeds: null, minBaths: null });
+                onChange({ ...filters, selectedBeds: null, minBaths: null });
                 setOpenChip(null);
               }}
               onDone={() => {
-                onChange({ ...filters, minBeds: draftMinBeds, minBaths: draftMinBaths });
+                onChange({
+                  ...filters,
+                  selectedBeds: draftSelectedBeds.length > 0 ? draftSelectedBeds : null,
+                  minBaths: draftMinBaths,
+                });
                 setOpenChip(null);
               }}
             />
