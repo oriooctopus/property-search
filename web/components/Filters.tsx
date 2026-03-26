@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ButtonBase, FilterChip, PillButton, PrimaryButton, TextButton } from '@/components/ui';
 import { cn } from '@/lib/cn';
 
-export type SearchTag = 'all' | 'fulton' | 'ltrain' | 'manhattan' | 'brooklyn';
+export type SearchTag = 'all' | 'fulton' | 'ltrain' | 'manhattan' | 'brooklyn' | 'uptown';
 export type SortField = 'pricePerBed' | 'price' | 'beds' | 'listDate';
 
 export type MaxListingAge = '1w' | '2w' | '1m' | '3m' | '6m' | '1y' | null;
@@ -46,6 +46,7 @@ const SEARCH_TABS: { value: SearchTag; label: string; title: string }[] = [
   { value: 'ltrain', label: 'L Train', title: 'Listings within a 10-minute walk of L train stops from Bedford Ave through DeKalb Ave' },
   { value: 'manhattan', label: 'Manhattan', title: 'Manhattan listings between Park Place (Tribeca) and 38th St (Midtown), covering Downtown, SoHo, the Village, Chelsea, and the Flatiron area' },
   { value: 'brooklyn', label: 'Brooklyn 14th', title: 'Brooklyn listings within a 35-minute subway ride of 14th St (any stop between 8th Ave and 1st Ave)' },
+  { value: 'uptown', label: 'Uptown West', title: 'West side of Manhattan from Midtown to 100th St — Hell\'s Kitchen, Columbus Circle, Lincoln Center, Upper West Side (excludes Upper East Side)' },
 ];
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
@@ -611,9 +612,10 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
             }}
           />
 
-          {/* View toggle (list/map) */}
-          {viewToggle && <div className="shrink-0">{viewToggle}</div>}
         </div>
+
+        {/* View toggle (list/map/swipe) — outside the scrollable area */}
+        {viewToggle && <div className="shrink-0">{viewToggle}</div>}
       </div>
 
       {/* Row 2 (expandable): Filter chips — conditional render so dropdowns aren't clipped */}
