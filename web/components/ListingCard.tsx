@@ -286,7 +286,7 @@ export default function ListingCard({
           {TAG_LABELS[listing.search_tag] && (
           <div className="relative group/tag">
             <span
-              className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold cursor-default"
+              className="inline-flex items-center rounded-full px-2.5 h-[22px] text-[10px] font-semibold cursor-default"
               style={{
                 backgroundColor: `${tagColor}20`,
                 color: tagColor,
@@ -327,7 +327,7 @@ export default function ListingCard({
           {((listing as Record<string, unknown>).sources as string[] | undefined ?? (listing.source ? [listing.source] : [])).map((src) => (
             <span
               key={src}
-              className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold cursor-default"
+              className="inline-flex items-center gap-1 rounded-full px-2.5 h-[22px] text-[10px] font-semibold cursor-default"
               style={{
                 color: '#8b949e',
                 border: '1px solid #2d333b',
