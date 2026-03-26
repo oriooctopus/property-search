@@ -10,3 +10,5 @@ src/exclusions.json
 src/search-config.json
 src/evaluate-config.json
 src/saved-filters/
+.vercel
+otp/data/
