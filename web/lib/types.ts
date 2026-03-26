@@ -374,9 +374,126 @@ export type Database = {
           },
         ];
       };
+      isochrones: {
+        Row: {
+          id: number;
+          origin_name: string;
+          origin_lat: number;
+          origin_lon: number;
+          origin_type: string;
+          travel_mode: string;
+          cutoff_minutes: number;
+          polygon: unknown;
+          generated_at: string;
+          otp_params: Record<string, unknown> | null;
+        };
+        Insert: {
+          id?: number;
+          origin_name: string;
+          origin_lat: number;
+          origin_lon: number;
+          origin_type: string;
+          travel_mode: string;
+          cutoff_minutes: number;
+          polygon: unknown;
+          generated_at?: string;
+          otp_params?: Record<string, unknown> | null;
+        };
+        Update: {
+          id?: number;
+          origin_name?: string;
+          origin_lat?: number;
+          origin_lon?: number;
+          origin_type?: string;
+          travel_mode?: string;
+          cutoff_minutes?: number;
+          polygon?: unknown;
+          generated_at?: string;
+          otp_params?: Record<string, unknown> | null;
+        };
+        Relationships: [];
+      };
+      listing_isochrones: {
+        Row: {
+          listing_id: number;
+          isochrone_id: number;
+        };
+        Insert: {
+          listing_id: number;
+          isochrone_id: number;
+        };
+        Update: {
+          listing_id?: number;
+          isochrone_id?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "listing_isochrones_listing_id_fkey";
+            columns: ["listing_id"];
+            isOneToOne: false;
+            referencedRelation: "listings";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "listing_isochrones_isochrone_id_fkey";
+            columns: ["isochrone_id"];
+            isOneToOne: false;
+            referencedRelation: "isochrones";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      find_containing_isochrones: {
+        Args: {
+          p_lat: number;
+          p_lon: number;
+          p_mode: string;
+          p_max_minutes: number;
+        };
+        Returns: {
+          station_stop_id: string;
+          station_name: string;
+          cutoff_minutes: number;
+        }[];
+      };
+      get_listing_isochrones: {
+        Args: {
+          p_listing_id: number;
+        };
+        Returns: {
+          isochrone_id: number;
+          station_stop_id: string;
+          station_name: string;
+          cutoff_minutes: number;
+          mode: string;
+        }[];
+      };
+      get_listings_in_isochrone: {
+        Args: {
+          p_isochrone_id: number;
+        };
+        Returns: {
+          listing_id: number;
+        }[];
+      };
+      enrich_listing_isochrones: {
+        Args: {
+          p_listing_id: number;
+          p_lat: number;
+          p_lon: number;
+        };
+        Returns: undefined;
+      };
+      batch_enrich_listing_isochrones: {
+        Args: {
+          p_listings: Record<string, unknown>[];
+        };
+        Returns: undefined;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

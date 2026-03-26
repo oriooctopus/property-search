@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  otp-build:
+    image: opentripplanner/opentripplanner:2.5.0
+    container_name: otp-build
+    profiles: ["build"]
+    volumes:
+      - ./data:/var/opentripplanner/data
+    environment:
+      - JAVA_TOOL_OPTIONS=-Xmx4G
+    command: --build --save /var/opentripplanner/data
+
+  otp-serve:
+    image: opentripplanner/opentripplanner:2.5.0
+    container_name: otp-serve
+    profiles: ["serve"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/var/opentripplanner/data
+    environment:
+      - JAVA_TOOL_OPTIONS=-Xmx4G
+    command: --load /var/opentripplanner/data --serve
