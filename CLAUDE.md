@@ -36,9 +36,13 @@ Every response must end with a compact status table of active work items. Done i
 |------|-----------|
 | Feature X | ⏳ Agent running / 🔲 Not started / Description |
 
+When a status table row references a deliverable (file, HTML mockup, screenshot, URL), always include a clickable link. "Done — ready for review" is not enough; include the path or URL so the user can click it directly. This applies to all tables and lists, not just status tables — whenever a file or URL is relevant, link it.
+
 When presenting design options (A/B/C/D):
 - If all options are on ONE page: single link like `[Pick A/B/C/D](url)`
 - If options are on SEPARATE pages: individual links like `[A](url1) / [B](url2) / [C](url3) / [D](url4)`
+
+Links always go in the **Next step** column, never in the **Item** column. The Item column is plain text only.
 
 ## Agent Context Continuity
 
@@ -58,6 +62,10 @@ Launch all implementation tasks as separate agents via the Agent tool (with `run
 ## Remind User of Open Threads
 
 When agents complete and the user hasn't acknowledged or acted on the results (e.g., picking a design option, reviewing a fix), gently remind them at the end of your next message. With many parallel agents it's easy to lose track of pending decisions.
+
+## Dev Server
+
+The dev server runs on port **8000** (`http://localhost:8000`), not the Next.js default of 3000. Always use port 8000 when linking to local pages.
 
 ## Test Credentials
 
