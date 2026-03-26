@@ -43,15 +43,48 @@ interface GtfsRoute {
 // CSV parsing (simple — GTFS CSVs don't have quoted commas in subway data)
 // ---------------------------------------------------------------------------
 
+function parseCsvLine(line: string): string[] {
+  const fields: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (i + 1 < line.length && line[i + 1] === '"') {
+          current += '"';
+          i++; // skip escaped quote
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ",") {
+        fields.push(current.trim());
+        current = "";
+      } else {
+        current += ch;
+      }
+    }
+  }
+  fields.push(current.trim());
+  return fields;
+}
+
 function parseCsv(content: string): Array<Record<string, string>> {
   const lines = content.trim().split("\n");
   if (lines.length < 2) return [];
 
-  const headers = lines[0].split(",").map((h) => h.trim().replace(/^\uFEFF/, ""));
+  const headers = parseCsvLine(lines[0]).map((h) => h.replace(/^\uFEFF/, ""));
   const rows: Array<Record<string, string>> = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(",").map((v) => v.trim());
+    const values = parseCsvLine(lines[i]);
     const row: Record<string, string> = {};
     for (let j = 0; j < headers.length; j++) {
       row[headers[j]] = values[j] ?? "";
@@ -89,14 +122,26 @@ function main() {
   }
 
   // 2. Parse routes (subway only — route_type = 1)
+  //    Normalize short names: GS/FS/H → "S" (shuttles), FX → "F", 6X → "6", 7X → "7"
+  const ROUTE_NAME_MAP: Record<string, string> = {
+    GS: "S",
+    FS: "S",
+    H: "S",
+    FX: "F",
+    "6X": "6",
+    "7X": "7",
+  };
+
   const routesRaw = parseCsv(readFileSync(join(gtfsDir, "routes.txt"), "utf-8"));
   const subwayRoutes = new Map<string, GtfsRoute>();
 
   for (const row of routesRaw) {
     if (row.route_type === "1") {
+      const rawName = row.route_short_name || row.route_id;
+      const shortName = ROUTE_NAME_MAP[row.route_id] ?? rawName;
       subwayRoutes.set(row.route_id, {
         routeId: row.route_id,
-        shortName: row.route_short_name || row.route_id,
+        shortName,
       });
     }
   }
