@@ -22,6 +22,7 @@ const DEFAULT_FILTERS: FiltersState = {
   maxListingAge: '1m' as MaxListingAge,
   photosFirst: false,
   selectedSources: null,
+  commuteRules: [],
 };
 
 interface UseConversationOptions {
@@ -178,6 +179,7 @@ export function useConversation({
         maxListingAge: 'listing age',
         photosFirst: 'photos first',
         selectedSources: 'sources',
+        commuteRules: 'commute rules',
       };
 
       const sysMsg: ChatMessageData = {
@@ -210,6 +212,7 @@ export function useConversation({
         maxListingAge: 'listing age',
         photosFirst: 'photos first',
         selectedSources: 'sources',
+        commuteRules: 'commute rules',
       };
 
       const sysMsg: ChatMessageData = {

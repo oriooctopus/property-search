@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { ButtonBase, FilterChip, PillButton, PrimaryButton, TextButton } from '@/components/ui';
 import { cn } from '@/lib/cn';
+import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
 
 export type SearchTag = 'all' | 'fulton' | 'ltrain' | 'manhattan' | 'brooklyn' | 'uptown';
 export type SortField = 'pricePerBed' | 'price' | 'beds' | 'listDate';
@@ -20,6 +21,57 @@ export const SOURCE_LABELS: Record<ListingSource, string> = {
   facebook: 'Facebook',
 };
 
+export interface CommuteRule {
+  id: string;
+  type: 'subway-line' | 'station' | 'address' | 'park';
+  lines?: string[];
+  stops?: string[];
+  stationName?: string;
+  address?: string;
+  addressLat?: number;
+  addressLon?: number;
+  parkName?: string;
+  maxMinutes: number;
+  mode: 'walk' | 'transit' | 'bike';
+}
+
+// ---------------------------------------------------------------------------
+// Nominatim address autocomplete types + helpers
+// ---------------------------------------------------------------------------
+
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+  type: string;
+  class: string;
+}
+
+async function fetchNominatimSuggestions(
+  query: string,
+  signal?: AbortSignal,
+): Promise<NominatimResult[]> {
+  if (!query.trim()) return [];
+  const params = new URLSearchParams({
+    q: query,
+    format: 'json',
+    countrycodes: 'us',
+    viewbox: '-74.3,40.4,-73.6,40.95',
+    bounded: '1',
+    limit: '5',
+  });
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/search?${params}`,
+    {
+      signal,
+      headers: { 'User-Agent': 'Dwelligence/1.0' },
+    },
+  );
+  if (!res.ok) throw new Error('Nominatim request failed');
+  return res.json();
+}
+
 export interface FiltersState {
   maxPricePerBed: number | null;
   selectedBeds: number[] | null;
@@ -31,6 +83,7 @@ export interface FiltersState {
   maxListingAge: MaxListingAge;
   photosFirst: boolean;
   selectedSources: string[] | null;
+  commuteRules: CommuteRule[];
 }
 
 interface FiltersProps {
@@ -174,6 +227,84 @@ function pricePerBedLabel(maxPricePerBed: number | null): string {
 }
 
 // ---------------------------------------------------------------------------
+// MTA line colors
+// ---------------------------------------------------------------------------
+
+const MTA_COLORS: Record<string, string> = {
+  '1': '#ee352e', '2': '#ee352e', '3': '#ee352e',
+  '4': '#00933c', '5': '#00933c', '6': '#00933c',
+  '7': '#b933ad',
+  'A': '#0039a6', 'C': '#0039a6', 'E': '#0039a6',
+  'B': '#ff6319', 'D': '#ff6319', 'F': '#ff6319', 'M': '#ff6319',
+  'G': '#6cbe45',
+  'L': '#a7a9ac',
+  'J': '#996633', 'Z': '#996633',
+  'N': '#fccc0a', 'Q': '#fccc0a', 'R': '#fccc0a', 'W': '#fccc0a',
+  'S': '#808183',
+};
+
+const DARK_TEXT_LINES = new Set(['N', 'Q', 'R', 'W']);
+
+const ALL_SUBWAY_LINES = ['1', '2', '3', '4', '5', '6', '7', 'A', 'C', 'E', 'B', 'D', 'F', 'M', 'G', 'L', 'J', 'Z', 'N', 'Q', 'R', 'W', 'S'];
+
+const NYC_PARKS = [
+  { name: 'Central Park', borough: 'Manhattan' },
+  { name: 'Prospect Park', borough: 'Brooklyn' },
+  { name: 'Brooklyn Bridge Park', borough: 'Brooklyn' },
+  { name: 'Washington Square Park', borough: 'Manhattan' },
+  { name: 'Tompkins Square Park', borough: 'Manhattan' },
+  { name: 'McCarren Park', borough: 'Brooklyn' },
+  { name: 'Fort Greene Park', borough: 'Brooklyn' },
+  { name: 'Domino Park', borough: 'Brooklyn' },
+  { name: 'Hudson River Park', borough: 'Manhattan' },
+  { name: 'The High Line', borough: 'Manhattan' },
+  { name: 'Bryant Park', borough: 'Manhattan' },
+  { name: 'Madison Square Park', borough: 'Manhattan' },
+];
+
+function commuteLabel(rules: CommuteRule[]): string {
+  if (rules.length === 0) return 'Commute';
+  if (rules.length === 1) {
+    const r = rules[0];
+    if (r.type === 'subway-line' && r.lines && r.lines.length > 0) {
+      const parts = r.lines.map((line) => {
+        const lineStops = r.stops?.filter((s) => {
+          const station = SUBWAY_STATIONS.find((st) => st.name === s);
+          return station?.lines.includes(line);
+        });
+        if (lineStops && lineStops.length > 0) {
+          const shortNames = lineStops.map((s) => s.replace(/\s*\(.*\)/, '').split(' - ')[0].split('–')[0].trim());
+          return `${line} (${shortNames.join(', ')})`;
+        }
+        return line;
+      });
+      return parts.join(' · ');
+    }
+    if (r.type === 'station' && r.stationName) return r.stationName;
+    if (r.type === 'address' && r.address) return r.address;
+    if (r.type === 'park' && r.parkName) return r.parkName;
+    return 'Commute';
+  }
+  return `${rules.length} commute rules`;
+}
+
+let _ruleIdCounter = 0;
+function newRuleId(): string {
+  return `rule-${Date.now()}-${++_ruleIdCounter}`;
+}
+
+function createDefaultRule(): CommuteRule {
+  return {
+    id: newRuleId(),
+    type: 'subway-line',
+    lines: [],
+    stops: [],
+    maxMinutes: 10,
+    mode: 'walk',
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Chevron SVG
 // ---------------------------------------------------------------------------
 
@@ -308,6 +439,539 @@ function DropdownFooter({
 }
 
 // ---------------------------------------------------------------------------
+// Commute Rule Editor
+// ---------------------------------------------------------------------------
+
+const CommuteRuleEditor = memo(function CommuteRuleEditor({
+  rule,
+  onChange,
+  onDelete,
+}: {
+  rule: CommuteRule;
+  onChange: (updated: CommuteRule) => void;
+  onDelete: () => void;
+}) {
+  const [expandedLine, setExpandedLine] = useState<string | null>(null);
+
+  // Local state for text inputs — only sync to parent on blur / Enter to avoid
+  // re-rendering the entire filter tree on every keystroke.
+  const [localStationName, setLocalStationName] = useState(rule.stationName ?? '');
+  const [localAddress, setLocalAddress] = useState(rule.address ?? '');
+
+  // Sync local state when rule changes externally (e.g. reset, type change)
+  useEffect(() => { setLocalStationName(rule.stationName ?? ''); }, [rule.stationName]);
+  useEffect(() => { setLocalAddress(rule.address ?? ''); }, [rule.address]);
+
+  // --- Address autocomplete state ---
+  const [addressSuggestions, setAddressSuggestions] = useState<NominatimResult[]>([]);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [addressError, setAddressError] = useState<string | null>(null);
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+  const addressAbortRef = useRef<AbortController | null>(null);
+  const addressDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const addressWrapperRef = useRef<HTMLDivElement | null>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (addressWrapperRef.current && !addressWrapperRef.current.contains(e.target as Node)) {
+        setShowAddressSuggestions(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleAddressInput = useCallback((value: string) => {
+    setLocalAddress(value);
+    setShowAddressSuggestions(true);
+
+    // Clear previous debounce
+    if (addressDebounceRef.current) clearTimeout(addressDebounceRef.current);
+    // Abort previous request
+    if (addressAbortRef.current) addressAbortRef.current.abort();
+
+    if (!value.trim()) {
+      setAddressSuggestions([]);
+      setAddressLoading(false);
+      setAddressError(null);
+      return;
+    }
+
+    setAddressLoading(true);
+    setAddressError(null);
+
+    addressDebounceRef.current = setTimeout(async () => {
+      const controller = new AbortController();
+      addressAbortRef.current = controller;
+      try {
+        const results = await fetchNominatimSuggestions(value, controller.signal);
+        if (!controller.signal.aborted) {
+          setAddressSuggestions(results);
+          setAddressLoading(false);
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          if (err instanceof DOMException && err.name === 'AbortError') return;
+          setAddressSuggestions([]);
+          setAddressLoading(false);
+          setAddressError('Search unavailable');
+        }
+      }
+    }, 300);
+  }, []);
+
+  const handleAddressSelect = useCallback((result: NominatimResult) => {
+    const displayName = result.display_name;
+    setLocalAddress(displayName);
+    setShowAddressSuggestions(false);
+    setAddressSuggestions([]);
+    onChange({
+      ...rule,
+      address: displayName,
+      addressLat: parseFloat(result.lat),
+      addressLon: parseFloat(result.lon),
+    });
+  }, [onChange, rule]);
+
+  const stationsForLine = useCallback((line: string) => {
+    return SUBWAY_STATIONS.filter((s) => s.lines.includes(line));
+  }, []);
+
+  const stopsForExpandedLine = useMemo(() => {
+    if (!expandedLine) return [];
+    return stationsForLine(expandedLine);
+  }, [expandedLine, stationsForLine]);
+
+  const selectedStopsOnLine = useMemo(() => {
+    if (!expandedLine || !rule.stops) return new Set<string>();
+    const lineStations = stationsForLine(expandedLine);
+    const lineStationNames = new Set(lineStations.map((s) => s.name));
+    return new Set(rule.stops.filter((s) => lineStationNames.has(s)));
+  }, [expandedLine, rule.stops, stationsForLine]);
+
+  const toggleLine = (line: string) => {
+    const lines = rule.lines ?? [];
+    if (lines.includes(line)) {
+      onChange({ ...rule, lines: lines.filter((l) => l !== line) });
+      if (expandedLine === line) setExpandedLine(null);
+    } else {
+      onChange({ ...rule, lines: [...lines, line] });
+    }
+  };
+
+  const toggleExpandLine = (line: string) => {
+    setExpandedLine((prev) => (prev === line ? null : line));
+  };
+
+  const toggleStop = (stopName: string) => {
+    const stops = rule.stops ?? [];
+    if (stops.includes(stopName)) {
+      onChange({ ...rule, stops: stops.filter((s) => s !== stopName) });
+    } else {
+      onChange({ ...rule, stops: [...stops, stopName] });
+    }
+  };
+
+  const selectAllStops = () => {
+    if (!expandedLine) return;
+    const lineStations = stationsForLine(expandedLine);
+    const lineStationNames = lineStations.map((s) => s.name);
+    const currentStops = rule.stops ?? [];
+    const allSelected = lineStationNames.every((n) => currentStops.includes(n));
+    if (allSelected) {
+      // Deselect all stops on this line
+      const lineSet = new Set(lineStationNames);
+      onChange({ ...rule, stops: currentStops.filter((s) => !lineSet.has(s)) });
+    } else {
+      // Select all stops on this line
+      const existing = new Set(currentStops);
+      const merged = [...currentStops, ...lineStationNames.filter((n) => !existing.has(n))];
+      onChange({ ...rule, stops: merged });
+    }
+  };
+
+  const isPark = rule.type === 'park';
+
+  const timePct = ((rule.maxMinutes - 1) / 59) * 100;
+  const maxSlider = rule.type === 'subway-line' ? 20 : 60;
+  const minSlider = 1;
+  const sliderPct = ((rule.maxMinutes - minSlider) / (maxSlider - minSlider)) * 100;
+
+  return (
+    <div
+      className="relative rounded-lg border p-2.5 mb-2"
+      style={{
+        backgroundColor: '#161b22',
+        borderColor: '#2d333b',
+        borderLeftWidth: isPark ? 3 : 1,
+        borderLeftColor: isPark ? '#2ea043' : '#2d333b',
+      }}
+    >
+      {/* Delete button — w-8 h-8 touch target, visual icon stays 20px via text-sm */}
+      <button
+        onClick={onDelete}
+        className="absolute top-0.5 right-0.5 w-8 h-8 rounded flex items-center justify-center text-sm transition-colors cursor-pointer text-[#484f58] bg-transparent hover:text-red-400 hover:bg-red-400/10"
+      >
+        &times;
+      </button>
+
+      {/* Row 1: Type selector + content */}
+      <div className="flex items-center gap-2 flex-wrap pr-6">
+        <select
+          value={rule.type}
+          onChange={(e) => {
+            const newType = e.target.value as CommuteRule['type'];
+            onChange({
+              ...rule,
+              type: newType,
+              lines: newType === 'subway-line' ? [] : undefined,
+              stops: newType === 'subway-line' ? [] : undefined,
+              stationName: newType === 'station' ? '' : undefined,
+              address: newType === 'address' ? '' : undefined,
+              addressLat: undefined,
+              addressLon: undefined,
+              parkName: newType === 'park' ? '' : undefined,
+              maxMinutes: newType === 'subway-line' ? 10 : 30,
+              mode: newType === 'subway-line' ? 'walk' : rule.mode,
+            });
+            setExpandedLine(null);
+          }}
+          className="h-[26px] text-[11px] font-medium rounded-[5px] pl-2 pr-6 cursor-pointer border appearance-none"
+          style={{
+            color: '#e1e4e8',
+            backgroundColor: '#0d1117',
+            borderColor: '#2d333b',
+            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238b949e'/%3E%3C/svg%3E")`,
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'right 8px center',
+          }}
+        >
+          <option value="subway-line">Subway Line</option>
+          <option value="station">Station</option>
+          <option value="address">Address</option>
+          <option value="park">Park</option>
+        </select>
+
+        {/* Station / Address inline inputs */}
+        {rule.type === 'station' && (
+          <input
+            type="text"
+            placeholder="Station name..."
+            value={localStationName}
+            onChange={(e) => setLocalStationName(e.target.value)}
+            onBlur={() => onChange({ ...rule, stationName: localStationName })}
+            onKeyDown={(e) => { if (e.key === 'Enter') onChange({ ...rule, stationName: localStationName }); }}
+            className="h-[26px] text-[11px] rounded-[5px] px-2 border flex-1 min-w-[120px]"
+            style={{ color: '#e1e4e8', backgroundColor: '#0d1117', borderColor: '#2d333b' }}
+          />
+        )}
+        {rule.type === 'address' && (
+          <div ref={addressWrapperRef} className="relative flex-1 min-w-[120px]">
+            <input
+              type="text"
+              placeholder="Search address..."
+              value={localAddress}
+              onChange={(e) => handleAddressInput(e.target.value)}
+              onFocus={() => { if (addressSuggestions.length > 0 || addressLoading || addressError) setShowAddressSuggestions(true); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setShowAddressSuggestions(false);
+              }}
+              className="h-[26px] text-[11px] rounded-[5px] px-2 border w-full"
+              style={{ color: '#e1e4e8', backgroundColor: '#0d1117', borderColor: '#2d333b' }}
+            />
+            {showAddressSuggestions && (rule.type === 'address') && (
+              <div
+                className="absolute left-0 right-0 top-[28px] z-50 rounded-md border shadow-lg overflow-hidden"
+                style={{ backgroundColor: '#1c2028', borderColor: '#2d333b' }}
+              >
+                {addressLoading && (
+                  <div className="flex items-center gap-2 px-3 py-2 text-[11px]" style={{ color: '#8b949e' }}>
+                    <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Searching...
+                  </div>
+                )}
+                {addressError && !addressLoading && (
+                  <div className="px-3 py-2 text-[11px]" style={{ color: '#f85149' }}>
+                    {addressError}
+                  </div>
+                )}
+                {!addressLoading && !addressError && addressSuggestions.length === 0 && localAddress.trim().length > 0 && (
+                  <div className="px-3 py-2 text-[11px]" style={{ color: '#8b949e' }}>
+                    No results found
+                  </div>
+                )}
+                {!addressLoading && addressSuggestions.map((result) => (
+                  <button
+                    key={result.place_id}
+                    type="button"
+                    onClick={() => handleAddressSelect(result)}
+                    className="w-full text-left px-3 py-1.5 text-[11px] cursor-pointer transition-colors duration-150 hover:bg-[#161b22] flex items-center gap-2"
+                    style={{ color: '#e1e4e8' }}
+                  >
+                    <span className="flex-1 truncate">{result.display_name}</span>
+                    <span
+                      className="shrink-0 text-[9px] font-medium uppercase rounded px-1.5 py-0.5"
+                      style={{ backgroundColor: '#21262d', color: '#8b949e' }}
+                    >
+                      {result.type}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {rule.type === 'park' && rule.parkName && (
+          <span
+            className="inline-flex items-center gap-1 rounded text-[11px] font-medium px-2 py-0.5"
+            style={{ backgroundColor: '#0d1c14', borderColor: '#1b3325', color: '#7ee787', border: '1px solid #1b3325' }}
+          >
+            🌳 {rule.parkName}
+          </span>
+        )}
+      </div>
+
+      {/* Coming-soon warnings for unimplemented rule types */}
+      {rule.type === 'address' && (
+        <p className="text-[10px] mt-1.5 ml-0.5" style={{ color: '#d29922' }}>
+          Address filtering coming soon
+        </p>
+      )}
+      {rule.type === 'park' && (
+        <p className="text-[10px] mt-1.5 ml-0.5" style={{ color: '#d29922' }}>
+          Park filtering coming soon
+        </p>
+      )}
+
+      {/* Subway line pills */}
+      {rule.type === 'subway-line' && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {ALL_SUBWAY_LINES.map((line) => {
+            const selected = rule.lines?.includes(line) ?? false;
+            return (
+              <button
+                key={line}
+                onClick={() => toggleLine(line)}
+                className="w-[22px] h-[22px] rounded-full text-[10px] font-bold flex items-center justify-center cursor-pointer transition-all relative"
+                style={{
+                  backgroundColor: MTA_COLORS[line] ?? '#808183',
+                  color: DARK_TEXT_LINES.has(line) ? '#333' : '#fff',
+                  opacity: selected ? 1 : 0.35,
+                  border: selected ? '2px solid #58a6ff' : '2px solid transparent',
+                  transform: selected ? 'scale(1.1)' : 'scale(1)',
+                }}
+              >
+                {line}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Selected line summary tags */}
+      {rule.type === 'subway-line' && rule.lines && rule.lines.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2 items-center">
+          {rule.lines.map((line) => {
+            const lineStations = stationsForLine(line);
+            const stopsOnLine = (rule.stops ?? []).filter((s) => lineStations.some((st) => st.name === s));
+            const isExpanded = expandedLine === line;
+            return (
+              <button
+                key={line}
+                onClick={() => toggleExpandLine(line)}
+                className="inline-flex items-center gap-1 rounded text-[10px] font-medium px-2 py-0.5 cursor-pointer transition-all"
+                style={{
+                  backgroundColor: '#0d1b2a',
+                  border: '1px solid #1d3557',
+                  color: '#58a6ff',
+                }}
+              >
+                <span
+                  className="w-3 h-3 rounded-full text-[7px] font-bold flex items-center justify-center shrink-0"
+                  style={{ backgroundColor: MTA_COLORS[line], color: DARK_TEXT_LINES.has(line) ? '#333' : '#fff' }}
+                >
+                  {line}
+                </span>
+                <span>{stopsOnLine.length > 0 ? `${stopsOnLine.length} stop${stopsOnLine.length > 1 ? 's' : ''}` : 'all'}</span>
+                <span
+                  className="text-[7px] ml-0.5 transition-transform"
+                  style={{ opacity: 0.6, transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                >
+                  &#9662;
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Stop drill-down panel */}
+      {rule.type === 'subway-line' && expandedLine && rule.lines?.includes(expandedLine) && (
+        <div className="mt-2 rounded-md border overflow-hidden" style={{ backgroundColor: '#0d1117', borderColor: '#2d333b' }}>
+          <div className="flex items-center justify-between px-2.5 py-2" style={{ borderBottom: '1px solid #2d333b' }}>
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold" style={{ color: '#c9d1d9' }}>
+              <span
+                className="w-3.5 h-3.5 rounded-full text-[8px] font-bold flex items-center justify-center"
+                style={{ backgroundColor: MTA_COLORS[expandedLine], color: DARK_TEXT_LINES.has(expandedLine) ? '#333' : '#fff' }}
+              >
+                {expandedLine}
+              </span>
+              {expandedLine} train stops
+            </div>
+            <button
+              onClick={selectAllStops}
+              className="text-[10px] font-medium px-1.5 py-0.5 rounded cursor-pointer transition-colors text-[#58a6ff] bg-transparent hover:bg-[#58a6ff]/10"
+            >
+              {stopsForExpandedLine.every((s) => (rule.stops ?? []).includes(s.name)) ? 'Deselect All' : 'Select All'}
+            </button>
+          </div>
+          <div className="max-h-[180px] overflow-y-auto py-1" style={{ scrollbarWidth: 'thin', scrollbarColor: '#2d333b #0d1117' }}>
+            {stopsForExpandedLine.map((station) => {
+              const isChecked = selectedStopsOnLine.has(station.name);
+              return (
+                <div
+                  key={station.stopId}
+                  onClick={() => toggleStop(station.name)}
+                  className={cn(
+                    'flex items-center gap-2 px-2.5 py-1 cursor-pointer transition-colors text-[11px] hover:bg-[#161b22]',
+                    isChecked ? 'text-[#e1e4e8]' : 'text-[#8b949e]',
+                  )}
+                >
+                  <div
+                    className="w-3.5 h-3.5 rounded-[3px] flex items-center justify-center shrink-0 border transition-all"
+                    style={{
+                      backgroundColor: isChecked ? '#58a6ff' : '#0d1117',
+                      borderColor: isChecked ? '#58a6ff' : '#2d333b',
+                    }}
+                  >
+                    {isChecked && (
+                      <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M1.5 4L3.5 6L6.5 2" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="flex-1">{station.name}</span>
+                  {/* Transfer line dots */}
+                  <div className="flex gap-0.5">
+                    {station.lines.filter((l) => l !== expandedLine).map((l) => (
+                      <span
+                        key={l}
+                        className="w-2.5 h-2.5 rounded-full text-[6px] font-bold flex items-center justify-center"
+                        style={{
+                          backgroundColor: MTA_COLORS[l],
+                          color: DARK_TEXT_LINES.has(l) ? '#333' : '#fff',
+                          opacity: 0.5,
+                        }}
+                      >
+                        {l}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-between px-2.5 py-1.5 text-[10px]" style={{ borderTop: '1px solid #2d333b', color: '#8b949e' }}>
+            <span>
+              <span style={{ color: '#58a6ff', fontWeight: 600 }}>{selectedStopsOnLine.size}</span> of {stopsForExpandedLine.length} stops selected
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Park selection grid */}
+      {rule.type === 'park' && (
+        <div className="mt-2 rounded-md border overflow-hidden" style={{ backgroundColor: '#0d1117', borderColor: '#2d333b' }}>
+          <div className="flex items-center gap-1.5 px-2.5 py-2 text-[10px] font-semibold" style={{ borderBottom: '1px solid #2d333b', color: '#7ee787' }}>
+            🌳 Select a park
+          </div>
+          <div className="max-h-[140px] overflow-y-auto py-1" style={{ scrollbarWidth: 'thin', scrollbarColor: '#2d333b #0d1117' }}>
+            {NYC_PARKS.map((park) => {
+              const isSelected = rule.parkName === park.name;
+              return (
+                <div
+                  key={park.name}
+                  onClick={() => onChange({ ...rule, parkName: park.name })}
+                  className={cn(
+                    'flex items-center gap-2 px-2.5 py-1.5 cursor-pointer transition-colors text-[11px]',
+                    isSelected
+                      ? 'text-[#7ee787] bg-[#7ee787]/5'
+                      : 'text-[#8b949e] bg-transparent hover:bg-[#161b22]',
+                  )}
+                >
+                  <div
+                    className="w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0 border transition-all"
+                    style={{
+                      backgroundColor: isSelected ? '#2ea043' : '#0d1117',
+                      borderColor: isSelected ? '#2ea043' : '#2d333b',
+                    }}
+                  >
+                    {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                  <span className="flex-1">{park.name}</span>
+                  <span className="text-[9px] font-medium" style={{ color: '#484f58' }}>{park.borough}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Time slider + mode toggle */}
+      <div className="flex items-center gap-2 mt-2">
+        <span className="text-[11px]" style={{ color: '#8b949e' }}>Within</span>
+        <div className="flex-1 relative">
+          <input
+            type="range"
+            min={minSlider}
+            max={maxSlider}
+            step={1}
+            value={rule.maxMinutes}
+            onChange={(e) => onChange({ ...rule, maxMinutes: Number(e.target.value) })}
+            className="range-slider w-full"
+            style={{
+              background: `linear-gradient(to right, #58a6ff 0%, #58a6ff ${sliderPct}%, #2d333b ${sliderPct}%, #2d333b 100%)`,
+            }}
+          />
+        </div>
+        <span className="text-[11px] font-semibold min-w-[42px] text-right whitespace-nowrap" style={{ color: '#58a6ff' }}>
+          {rule.maxMinutes} min
+        </span>
+        <div className="inline-flex rounded-[5px] border overflow-hidden h-7" style={{ borderColor: '#2d333b' }}>
+          {(['walk', 'transit', 'bike'] as const)
+            .filter((m) => rule.type === 'subway-line' ? m !== 'transit' : true)
+            .map((m) => (
+              <button
+                key={m}
+                onClick={() => {
+                  if (rule.type === 'subway-line' && m === 'bike') return;
+                  onChange({ ...rule, mode: m });
+                }}
+                title={rule.type === 'subway-line' && m === 'bike' ? 'Bike isochrones coming soon' : undefined}
+                disabled={rule.type === 'subway-line' && m === 'bike'}
+                className="text-[10px] font-medium px-2 flex items-center transition-all"
+                style={{
+                  backgroundColor: rule.mode === m ? '#1d3557' : '#0d1117',
+                  color: rule.mode === m ? '#58a6ff' : '#8b949e',
+                  borderLeft: m !== 'walk' && !(rule.type === 'subway-line' && m === 'bike') ? '1px solid #2d333b' : 'none',
+                  opacity: rule.type === 'subway-line' && m === 'bike' ? 0.4 : 1,
+                  cursor: rule.type === 'subway-line' && m === 'bike' ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {m.charAt(0).toUpperCase() + m.slice(1)}
+              </button>
+            ))}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// ---------------------------------------------------------------------------
 // Main Filters component
 // ---------------------------------------------------------------------------
 
@@ -381,7 +1045,7 @@ function ListingAgeSlider({
   );
 }
 
-type ChipId = 'price' | 'bedsBaths' | 'pricePerBed' | 'listingAge' | 'source';
+type ChipId = 'price' | 'bedsBaths' | 'pricePerBed' | 'listingAge' | 'source' | 'commute';
 
 // ---------------------------------------------------------------------------
 // Active filter count helper
@@ -397,6 +1061,7 @@ function countActiveFilters(filters: FiltersState): number {
   if (filters.maxListingAge !== null && filters.maxListingAge !== '1m') count++;
   if (filters.photosFirst) count++;
   if (filters.selectedSources !== null) count++;
+  if (filters.commuteRules && filters.commuteRules.length > 0) count++;
   return count;
 }
 
@@ -456,6 +1121,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
     filters.maxListingAge,
   );
   const [draftSources, setDraftSources] = useState<string[] | null>(filters.selectedSources);
+  const [draftCommuteRules, setDraftCommuteRules] = useState<CommuteRule[]>(filters.commuteRules ?? []);
 
   // Sync drafts when filters change externally
   useEffect(() => {
@@ -479,6 +1145,9 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
   useEffect(() => {
     setDraftSources(filters.selectedSources);
   }, [filters.selectedSources]);
+  useEffect(() => {
+    setDraftCommuteRules(filters.commuteRules ?? []);
+  }, [filters.commuteRules]);
 
   // Reset drafts when a dropdown opens
   useEffect(() => {
@@ -494,6 +1163,8 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
       setDraftMaxListingAge(filters.maxListingAge);
     } else if (openChip === 'source') {
       setDraftSources(filters.selectedSources);
+    } else if (openChip === 'commute') {
+      setDraftCommuteRules(filters.commuteRules ?? []);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openChip]);
@@ -854,6 +1525,54 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
                 setOpenChip(null);
               }}
             />
+          </FilterChip>
+
+          {/* Commute chip */}
+          <FilterChip
+            compact
+            label={commuteLabel(filters.commuteRules ?? [])}
+            active={(filters.commuteRules ?? []).length > 0}
+            open={openChip === 'commute'}
+            onToggle={() => toggleChip('commute')}
+            dropdownAlign="right"
+          >
+            <div style={{ minWidth: 'min(380px, calc(100vw - 16px))', maxWidth: '440px' }}>
+              <div className="flex items-center justify-between mb-3">
+                <SectionTitle>Commute Rules</SectionTitle>
+              </div>
+              <div className="overflow-y-auto" style={{ maxHeight: 'min(400px, calc(100vh - 280px))', scrollbarWidth: 'thin', scrollbarColor: '#2d333b #1c2028' }}>
+                {draftCommuteRules.map((rule, idx) => (
+                  <CommuteRuleEditor
+                    key={rule.id}
+                    rule={rule}
+                    onChange={(updated) => {
+                      setDraftCommuteRules((prev) => prev.map((r) => (r.id === rule.id ? updated : r)));
+                    }}
+                    onDelete={() => {
+                      setDraftCommuteRules((prev) => prev.filter((r) => r.id !== rule.id));
+                    }}
+                  />
+                ))}
+              </div>
+              {draftCommuteRules.length < 10 && (
+                <button
+                  onClick={() => setDraftCommuteRules((prev) => [...prev, createDefaultRule()])}
+                  className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg text-[11px] font-medium cursor-pointer transition-all mt-1 mb-1 text-[#58a6ff] bg-transparent border border-dashed border-[#2d333b] hover:border-[#58a6ff] hover:bg-[#58a6ff]/[0.04]"
+                >
+                  + Add rule
+                </button>
+              )}
+              <DropdownFooter
+                onReset={() => {
+                  onChange({ ...filters, commuteRules: [] });
+                  setOpenChip(null);
+                }}
+                onDone={() => {
+                  onChange({ ...filters, commuteRules: draftCommuteRules });
+                  setOpenChip(null);
+                }}
+              />
+            </div>
           </FilterChip>
 
           {/* Photos first toggle chip */}

@@ -12,7 +12,6 @@ import RadarLoader from '@/components/RadarLoader';
 import { SegmentedControl } from '@/components/ui';
 import ChatPanel from '@/components/ChatPanel';
 import SaveSearchModal from '@/components/SaveSearchModal';
-import AISearchBar from '@/components/AISearchBar';
 import FilterPills from '@/components/FilterPills';
 import SwipeView from '@/components/SwipeView';
 import { useConversation } from '@/lib/hooks/useConversation';
@@ -72,6 +71,7 @@ function readFiltersFromParams(params: URLSearchParams): FiltersState {
     maxListingAge: (age === 'any' ? null : age && VALID_LISTING_AGES.has(age) ? age : '1m') as MaxListingAge,
     photosFirst: params.get('photosFirst') === '1',
     selectedSources: params.get('sources') ? params.get('sources')!.split(',') : null,
+    commuteRules: [],
   };
 }
 
@@ -113,6 +113,11 @@ function HomeInner() {
   const [wouldLiveSet, setWouldLiveSet] = useState<Set<number>>(new Set());
   const [favoritesSet, setFavoritesSet] = useState<Set<number>>(new Set());
   const [wouldLivePeopleMap, setWouldLivePeopleMap] = useState<Record<number, PersonWithBio[]>>({});
+
+  // Commute filter state
+  const [commuteMatchIds, setCommuteMatchIds] = useState<Set<number> | null>(null);
+  const [commuteMessage, setCommuteMessage] = useState<string | null>(null);
+  const [commuteLoading, setCommuteLoading] = useState(false);
 
   // Hidden listings — persisted in localStorage
   const [hiddenIds, setHiddenIds] = useState<Set<number>>(() => {
@@ -198,8 +203,6 @@ function HomeInner() {
   const { conversations, invalidate: invalidateConversations } = useConversations();
 
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
-  const [lastAIQuery, setLastAIQuery] = useState<string | null>(null);
-  const [lastAIError, setLastAIError] = useState<string | null>(null);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(chatMode);
 
   // Open chat drawer when ?chat=1 is in URL
@@ -208,20 +211,6 @@ function HomeInner() {
       setChatDrawerOpen(true);
     }
   }, [chatMode]);
-
-  // Inline AI search bar handler — sends to chat API and applies filters
-  const handleInlineAISearch = useCallback(
-    async (query: string) => {
-      setLastAIError(null);
-      const success = await chat.sendMessage(query);
-      if (success) {
-        setLastAIQuery(query);
-      } else {
-        setLastAIError('Search failed — please try again');
-      }
-    },
-    [chat],
-  );
 
   // Sync state changes to URL via history.replaceState (avoids Next.js
   // navigation overhead and unnecessary re-renders).
@@ -352,6 +341,53 @@ function HomeInner() {
   }, []);
 
   // -----------------------------------------------------------------------
+  // Commute filter: call API when commuteRules change
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    const rules = filters.commuteRules;
+    if (!rules || rules.length === 0) {
+      setCommuteMatchIds(null);
+      setCommuteMessage(null);
+      setCommuteLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setCommuteLoading(true);
+
+    (async () => {
+      try {
+        const res = await fetch('/api/commute-filter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commuteRules: rules }),
+        });
+        if (cancelled) return;
+        const data = await res.json();
+        if (cancelled) return;
+
+        if (data.listingIds != null) {
+          setCommuteMatchIds(new Set(data.listingIds as number[]));
+          setCommuteMessage(null);
+        } else {
+          setCommuteMatchIds(null);
+          setCommuteMessage(data.message ?? null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('[commute-filter] fetch failed:', err);
+          setCommuteMatchIds(null);
+          setCommuteMessage('Failed to apply commute filter');
+        }
+      } finally {
+        if (!cancelled) setCommuteLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [filters.commuteRules]);
+
+  // -----------------------------------------------------------------------
   // Deep-link: auto-open listing from ?listing=ID on page load
   // -----------------------------------------------------------------------
   const deepLinkHandled = useRef(false);
@@ -457,6 +493,11 @@ function HomeInner() {
       result = result.filter((l) => l.source && srcSet.has(l.source));
     }
 
+    // Commute filter: restrict to listings matching commute rules
+    if (commuteMatchIds !== null) {
+      result = result.filter((l) => commuteMatchIds.has(l.id));
+    }
+
     result.sort((a, b) => {
       if (filters.photosFirst) {
         const aHasPhotos = (a.photos ?? 0) > 0 ? 0 : 1;
@@ -478,7 +519,7 @@ function HomeInner() {
     });
 
     return result;
-  }, [listings, filters, hiddenIds]);
+  }, [listings, filters, hiddenIds, commuteMatchIds]);
 
   // Keep the ref in sync so the chat hook's getListingCount stays current
   filteredListingsRef.current = filteredListings;
@@ -576,7 +617,17 @@ function HomeInner() {
         />
       ))}
 
-      {filteredListings.length === 0 && (
+      {commuteLoading && filters.commuteRules.length > 0 && (
+        <div className="text-center py-8 text-sm" style={{ color: '#8b949e' }}>
+          Applying commute filter…
+        </div>
+      )}
+      {commuteMessage && !commuteLoading && (
+        <div className="text-center py-4 text-xs" style={{ color: '#f0883e' }}>
+          {commuteMessage}
+        </div>
+      )}
+      {filteredListings.length === 0 && !commuteLoading && (
         <div className="text-center py-12 text-sm" style={{ color: '#8b949e' }}>
           No listings match your filters.
         </div>
@@ -766,15 +817,6 @@ function HomeInner() {
         className={`w-full lg:w-[480px] shrink-0 flex flex-col ${mobileView === 'map' ? 'max-lg:shrink max-lg:flex-none' : ''}`}
         style={{ borderRight: '1px solid #2d333b' }}
       >
-        {/* AI search bar */}
-        <AISearchBar
-          onSearch={handleInlineAISearch}
-          isLoading={chat.isLoading}
-          lastQuery={lastAIQuery}
-          lastError={lastAIError}
-          isLoggedIn={!!userId}
-        />
-
         {/* AI-applied filter pills */}
         {hasAIFilters && (
           <FilterPills

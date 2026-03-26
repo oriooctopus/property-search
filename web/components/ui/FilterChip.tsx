@@ -9,6 +9,8 @@ interface FilterChipProps extends Omit<ComponentPropsWithoutRef<'button'>, 'chil
   compact?: boolean;
   children?: ReactNode;
   onToggle?: () => void;
+  /** Align the dropdown to the right edge of the chip instead of the left */
+  dropdownAlign?: 'left' | 'right';
 }
 
 function ChevronDown({ className }: { className?: string }) {
@@ -30,7 +32,7 @@ function ChevronDown({ className }: { className?: string }) {
 }
 
 export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
-  function FilterChip({ label, active = false, open = false, compact = false, children, onToggle, className, ...rest }, ref) {
+  function FilterChip({ label, active = false, open = false, compact = false, children, onToggle, dropdownAlign = 'left', className, ...rest }, ref) {
     const chipRef = useRef<HTMLDivElement>(null);
     return (
       <div className="relative shrink-0" ref={chipRef}>
@@ -61,8 +63,11 @@ export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
             style={{
               backgroundColor: '#1c2028',
               minWidth: '320px',
+              maxWidth: 'calc(100vw - 16px)',
               top: chipRef.current ? chipRef.current.getBoundingClientRect().bottom + 8 : 0,
-              left: chipRef.current ? chipRef.current.getBoundingClientRect().left : 0,
+              ...(dropdownAlign === 'right'
+                ? { right: chipRef.current ? window.innerWidth - chipRef.current.getBoundingClientRect().right : 0 }
+                : { left: chipRef.current ? chipRef.current.getBoundingClientRect().left : 0 }),
             }}
           >
             {children}

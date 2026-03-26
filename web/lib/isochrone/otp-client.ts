@@ -15,10 +15,10 @@ import type {
 } from "./types";
 
 const OTP_BASE_URL =
-  process.env.OTP_BASE_URL ?? "http://localhost:8080";
+  process.env.OTP_BASE_URL ?? "http://localhost:9090";
 
-const ISOCHRONE_PATH = "/otp/routers/default/isochrone";
-const HEALTH_PATH = "/otp/routers/default";
+const ISOCHRONE_PATH = "/otp/traveltime/isochrone";
+const HEALTH_PATH = "/otp/";
 
 const MAX_RETRIES = 3;
 const INITIAL_BACKOFF_MS = 1_000;
@@ -80,30 +80,11 @@ interface OtpFeatureCollection {
 // ---------------------------------------------------------------------------
 
 /**
- * Fetch isochrone polygons from OTP for a single origin point.
- *
- * Handles multiple cutoff values in one request (OTP supports this natively).
- * Retries up to 3 times with exponential backoff on transient failures.
+ * Fetch a single isochrone from OTP with retries.
  */
-export async function fetchIsochrones(
-  request: IsochroneRequest,
-): Promise<IsochroneResponse> {
-  const date = request.date ?? nextWeekday();
-  const time = request.time ?? "09:00";
-
-  // OTP expects cutoffSec repeated for each value
-  const cutoffParams = request.cutoffMinutes
-    .map((m) => `cutoffSec=${m * 60}`)
-    .join("&");
-
-  const url =
-    `${OTP_BASE_URL}${ISOCHRONE_PATH}` +
-    `?fromPlace=${request.lat},${request.lon}` +
-    `&mode=${request.mode}` +
-    `&date=${date}` +
-    `&time=${encodeURIComponent(time)}` +
-    `&${cutoffParams}`;
-
+async function fetchSingleIsochrone(
+  url: string,
+): Promise<OtpFeatureCollection> {
   let lastError: Error | null = null;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -112,9 +93,7 @@ export async function fetchIsochrones(
 
       if (!response.ok) {
         const body = await response.text().catch(() => "(no body)");
-        throw new Error(
-          `OTP returned ${response.status}: ${body}`,
-        );
+        throw new Error(`OTP returned ${response.status}: ${body}`);
       }
 
       const geojson = (await response.json()) as OtpFeatureCollection;
@@ -129,28 +108,10 @@ export async function fetchIsochrones(
         );
       }
 
-      // OTP returns features in order of ascending cutoff.
-      // Each feature's properties may contain { time: <seconds> }.
-      const polygons: IsochronePolygon[] = geojson.features.map(
-        (feature, index) => ({
-          cutoffMinutes:
-            typeof feature.properties?.time === "number"
-              ? feature.properties.time / 60
-              : request.cutoffMinutes[index] ?? 0,
-          geometry: feature.geometry,
-        }),
-      );
-
-      return {
-        origin: { lat: request.lat, lon: request.lon },
-        mode: request.mode,
-        polygons,
-      };
+      return geojson;
     } catch (err) {
-      lastError =
-        err instanceof Error ? err : new Error(String(err));
+      lastError = err instanceof Error ? err : new Error(String(err));
 
-      // Abort errors (timeout) or network errors are retryable
       const isRetryable =
         lastError.name === "AbortError" ||
         lastError.message.includes("fetch failed") ||
@@ -168,18 +129,60 @@ export async function fetchIsochrones(
     }
   }
 
-  // If we get here, all retries failed
   if (
     lastError?.message.includes("ECONNREFUSED") ||
     lastError?.name === "AbortError"
   ) {
     throw new Error(
       `Cannot connect to OTP at ${OTP_BASE_URL}. Is OpenTripPlanner running? ` +
-        `Start it with: java -Xmx4G -jar otp.jar --load ./graphs/nyc`,
+        `Start it with: docker compose --profile serve up`,
     );
   }
 
   throw lastError ?? new Error("Unknown OTP error");
+}
+
+/**
+ * Fetch isochrone polygons from OTP for a single origin point.
+ *
+ * OTP 2.5 TravelTime sandbox: one request per cutoff with ISO 8601 duration.
+ * Retries up to 3 times with exponential backoff on transient failures.
+ */
+export async function fetchIsochrones(
+  request: IsochroneRequest,
+): Promise<IsochroneResponse> {
+  const date = request.date ?? nextWeekday();
+  const time = request.time ?? "09:00";
+
+  // Mode mapping: WALK -> WALK, TRANSIT,WALK -> TRANSIT, BICYCLE -> BICYCLE
+  const otpMode = request.mode === "TRANSIT,WALK" ? "TRANSIT" : request.mode;
+  const isoTime = `${date}T${time}:00-04:00`;
+
+  const polygons: IsochronePolygon[] = [];
+
+  for (const minutes of request.cutoffMinutes) {
+    const url =
+      `${OTP_BASE_URL}${ISOCHRONE_PATH}` +
+      `?location=${request.lat},${request.lon}` +
+      `&modes=${otpMode}` +
+      `&time=${encodeURIComponent(isoTime)}` +
+      `&cutoff=PT${minutes}M`;
+
+    const geojson = await fetchSingleIsochrone(url);
+
+    for (const feature of geojson.features) {
+      polygons.push({
+        cutoffMinutes: minutes,
+        geometry: feature.geometry,
+      });
+    }
+  }
+
+  return {
+    origin: { lat: request.lat, lon: request.lon },
+    mode: request.mode,
+    polygons,
+  };
 }
 
 /**

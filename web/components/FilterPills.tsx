@@ -56,6 +56,9 @@ function getActiveFilters(filters: FiltersState): FilterPillData[] {
   if (filters.selectedSources !== null) {
     pills.push({ key: 'selectedSources', label: `Sources (${filters.selectedSources.length})` });
   }
+  if (filters.commuteRules && filters.commuteRules.length > 0) {
+    pills.push({ key: 'commuteRules', label: `${filters.commuteRules.length} commute rule${filters.commuteRules.length > 1 ? 's' : ''}` });
+  }
 
   return pills;
 }
@@ -69,6 +72,8 @@ function getDefaultValue(key: keyof FiltersState): FiltersState[keyof FiltersSta
       return 'pricePerBed';
     case 'maxListingAge':
       return '1m' as MaxListingAge;
+    case 'commuteRules':
+      return [] as never;
     default:
       return null;
   }
