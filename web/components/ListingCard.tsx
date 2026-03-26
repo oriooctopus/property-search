@@ -254,16 +254,13 @@ export default function ListingCard({
           <div className="font-bold text-sm" style={{ color: '#7ee787' }}>
             ${listing.price.toLocaleString()}
           </div>
-          <div className="text-xs" style={{ color: '#8b949e' }}>
-            ${pricePerBed.toLocaleString()}/bed
-          </div>
         </div>
       </div>
 
       {/* Details row */}
       <div className="flex items-center gap-3 text-xs mt-2 mb-2" style={{ color: '#8b949e' }}>
         <span>{listing.beds} bd</span>
-        <span>{listing.baths != null ? listing.baths : '--'} ba</span>
+        <span>{listing.baths != null && Number(listing.baths) > 0 ? `${listing.baths} ba` : 'N/A ba'}</span>
         {listing.sqft != null && <span>{listing.sqft.toLocaleString()} sqft</span>}
       </div>
 
