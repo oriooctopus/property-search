@@ -64,7 +64,7 @@ function readFiltersFromParams(params: URLSearchParams): FiltersState {
   return {
     searchTag: (tag && VALID_TAGS.has(tag) ? tag : 'all') as SearchTag,
     sort: (sort && VALID_SORTS.has(sort) ? sort : 'pricePerBed') as SortField,
-    minBeds: parseNumOrNull(params.get('minBeds')),
+    selectedBeds: params.get('beds') ? params.get('beds')!.split(',').map(Number).filter(Number.isFinite) : null,
     minBaths: parseNumOrNull(params.get('minBaths')),
     minRent: parseNumOrNull(params.get('minRent')),
     maxRent: parseNumOrNull(params.get('maxRent')),
@@ -82,7 +82,7 @@ function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatM
   if (view !== 'list') p.set('view', view);
   if (f.searchTag !== 'all') p.set('tag', f.searchTag);
   if (f.sort !== 'pricePerBed') p.set('sort', f.sort);
-  if (f.minBeds != null) p.set('minBeds', String(f.minBeds));
+  if (f.selectedBeds != null) p.set('beds', f.selectedBeds.join(','));
   if (f.minBaths != null) p.set('minBaths', String(f.minBaths));
   if (f.minRent != null) p.set('minRent', String(f.minRent));
   if (f.maxRent != null) p.set('maxRent', String(f.maxRent));
@@ -418,8 +418,12 @@ function HomeInner() {
     if (filters.maxPricePerBed !== null) {
       result = result.filter((l) => l.price / l.beds <= filters.maxPricePerBed!);
     }
-    if (filters.minBeds !== null) {
-      result = result.filter((l) => l.beds >= filters.minBeds!);
+    if (filters.selectedBeds !== null && filters.selectedBeds.length > 0) {
+      result = result.filter((l) => {
+        // If 7 is selected, include listings with 7+ beds
+        if (filters.selectedBeds!.includes(7) && l.beds >= 7) return true;
+        return filters.selectedBeds!.includes(l.beds);
+      });
     }
     if (filters.minRent !== null) {
       result = result.filter((l) => l.price >= filters.minRent!);

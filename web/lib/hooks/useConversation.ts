@@ -14,7 +14,7 @@ function uid(): string {
 const DEFAULT_FILTERS: FiltersState = {
   searchTag: 'all' as SearchTag,
   sort: 'pricePerBed',
-  minBeds: null,
+  selectedBeds: null,
   minBaths: null,
   minRent: null,
   maxRent: null,
@@ -168,7 +168,7 @@ export function useConversation({
 
       // Build a human-readable label for the removed filter
       const labelMap: Record<keyof FiltersState, string> = {
-        minBeds: 'minimum beds',
+        selectedBeds: 'bedrooms',
         minBaths: 'minimum baths',
         minRent: 'minimum rent',
         maxRent: 'maximum rent',
@@ -200,7 +200,7 @@ export function useConversation({
       setFilters(newFilters);
 
       const labelMap: Record<keyof FiltersState, string> = {
-        minBeds: 'minimum beds',
+        selectedBeds: 'bedrooms',
         minBaths: 'minimum baths',
         minRent: 'minimum rent',
         maxRent: 'maximum rent',

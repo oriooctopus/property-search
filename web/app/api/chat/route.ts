@@ -18,7 +18,7 @@ Available filters you can set:
   - "ltrain": listings near L train stops from Bedford Ave through DeKalb Ave (within 10-min walk)
   - "manhattan": Manhattan listings between Park Place (Tribeca) and 38th St (Midtown)
   - "brooklyn": Brooklyn listings within 35-min subway ride of 14th St
-- minBeds: minimum number of bedrooms (integer, e.g. 1, 2, 3)
+- selectedBeds: array of specific bedroom counts to show (e.g. [3, 4, 5] to show 3, 4, and 5-bedroom listings). Use [7] to include 7+ bedrooms. Set to null for any/all.
 - minBaths: minimum number of bathrooms (integer, e.g. 1, 2)
 - minRent: minimum monthly rent in dollars (integer)
 - maxRent: maximum monthly rent in dollars (integer)

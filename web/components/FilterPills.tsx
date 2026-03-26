@@ -10,8 +10,12 @@ interface FilterPillData {
 function getActiveFilters(filters: FiltersState): FilterPillData[] {
   const pills: FilterPillData[] = [];
 
-  if (filters.minBeds !== null) {
-    pills.push({ key: 'minBeds', label: `${filters.minBeds}+ Beds` });
+  if (filters.selectedBeds !== null && filters.selectedBeds.length > 0) {
+    const labels = filters.selectedBeds
+      .slice()
+      .sort((a, b) => a - b)
+      .map((b) => (b === 7 ? '7+' : String(b)));
+    pills.push({ key: 'selectedBeds', label: `${labels.join(', ')} Beds` });
   }
   if (filters.minBaths !== null) {
     pills.push({ key: 'minBaths', label: `${filters.minBaths}+ Baths` });
@@ -34,6 +38,7 @@ function getActiveFilters(filters: FiltersState): FilterPillData[] {
       ltrain: 'Near L Train',
       manhattan: 'Manhattan',
       brooklyn: 'Brooklyn',
+      uptown: 'Uptown West',
     };
     pills.push({ key: 'searchTag', label: tagLabels[filters.searchTag] });
   }
