@@ -658,6 +658,7 @@ function HomeInner() {
         wouldLiveIds={wouldLiveSet}
         onToggleFavorite={handleToggleFavorite}
         onToggleWouldLive={handleToggleWouldLive}
+        onHideListing={handleHideListing}
         onSelectDetail={(listing) => setDetailListing(listing)}
         onMarkerClick={(id) => {
           setSelectedId(id);
