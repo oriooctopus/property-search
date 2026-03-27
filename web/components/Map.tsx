@@ -26,9 +26,10 @@ interface MapProps {
   wouldLiveIds: Set<number>;
   onToggleFavorite: (id: number) => void;
   onToggleWouldLive: (id: number) => void;
+  onHideListing: (id: number) => void;
 }
 
-export default function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive }: MapProps) {
+export default function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing }: MapProps) {
   return (
     <MapInner
       listings={listings}
@@ -39,6 +40,7 @@ export default function Map({ listings, selectedId, onMarkerClick, onSelectDetai
       wouldLiveIds={wouldLiveIds}
       onToggleFavorite={onToggleFavorite}
       onToggleWouldLive={onToggleWouldLive}
+      onHideListing={onHideListing}
     />
   );
 }

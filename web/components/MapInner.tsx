@@ -142,6 +142,7 @@ interface MapProps {
   wouldLiveIds: Set<number>;
   onToggleFavorite: (id: number) => void;
   onToggleWouldLive: (id: number) => void;
+  onHideListing: (id: number) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -217,38 +218,30 @@ function buildPopupContent(listing: Listing, isFavorited: boolean, isWouldLive: 
     : '';
 
   const wouldLiveColor = isWouldLive ? '#f97316' : '#8b949e';
-  const favoriteColor = isFavorited ? '#fbbf24' : '#8b949e';
+  const likeColor = isFavorited ? '#58a6ff' : '#8b949e';
+
+  const actionBtnStyle = `background:none;border:none;cursor:pointer;padding:4px;display:flex;align-items:center;border-radius:4px;`;
 
   const actionsHtml = `
     <div style="display: flex; gap: 8px; margin-top: 6px;">
       <button
+        data-action="dislike"
+        data-listing-id="${listing.id}"
+        title="Dislike"
+        style="${actionBtnStyle} color: #8b949e;"
+      ><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2H20a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3m-7 2v4a3 3 0 0 0 3 3l4-9V2H6.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10"/></svg></button>
+      <button
         data-action="would-live"
         data-listing-id="${listing.id}"
-        title="I would live there"
-        style="
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 2px;
-          color: ${wouldLiveColor};
-          display: flex;
-          align-items: center;
-        "
-      ><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1L1 7h2v6h4v-4h2v4h4V7h2L8 1z"/></svg></button>
+        title="Would live here"
+        style="${actionBtnStyle} color: ${wouldLiveColor};"
+      ><svg width="16" height="16" viewBox="0 0 24 24" fill="${isWouldLive ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><rect x="9" y="12" width="6" height="10"/></svg></button>
       <button
         data-action="favorite"
         data-listing-id="${listing.id}"
-        title="Save to favorites"
-        style="
-          background: none;
-          border: none;
-          cursor: pointer;
-          padding: 2px;
-          color: ${favoriteColor};
-          display: flex;
-          align-items: center;
-        "
-      ><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0l2.5 5 5.5.8-4 3.9.9 5.3L8 12.5 3.1 15l.9-5.3-4-3.9L5.5 5z"/></svg></button>
+        title="Like"
+        style="${actionBtnStyle} color: ${likeColor};"
+      ><svg width="16" height="16" viewBox="0 0 24 24" fill="${isFavorited ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3m7-2V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14"/></svg></button>
     </div>`;
 
   return `
@@ -312,7 +305,7 @@ function buildPopupContent(listing: Listing, isFavorited: boolean, isWouldLive: 
   `;
 }
 
-export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive }: MapProps) {
+export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing }: MapProps) {
   // Supabase returns numeric columns as strings — coerce to numbers
   const validListings = listings
     .map((l) => ({ ...l, lat: Number(l.lat), lon: Number(l.lon) }))
@@ -339,6 +332,8 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
   onToggleFavoriteRef.current = onToggleFavorite;
   const onToggleWouldLiveRef = useRef(onToggleWouldLive);
   onToggleWouldLiveRef.current = onToggleWouldLive;
+  const onHideListingRef = useRef(onHideListing);
+  onHideListingRef.current = onHideListing;
   const onSelectDetailRef = useRef(onSelectDetail);
   onSelectDetailRef.current = onSelectDetail;
   // Keep a map of listings by id for the detail callback
@@ -415,6 +410,14 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
           ev.stopPropagation();
           const id = Number(favoriteBtn.getAttribute('data-listing-id'));
           onToggleFavoriteRef.current(id);
+        };
+      }
+      const dislikeBtn = container.querySelector('[data-action="dislike"]') as HTMLElement | null;
+      if (dislikeBtn) {
+        dislikeBtn.onclick = (ev) => {
+          ev.stopPropagation();
+          const id = Number(dislikeBtn.getAttribute('data-listing-id'));
+          onHideListingRef.current(id);
         };
       }
 
