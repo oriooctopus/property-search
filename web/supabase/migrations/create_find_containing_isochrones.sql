@@ -21,7 +21,7 @@ CREATE OR REPLACE FUNCTION public.find_containing_isochrones(
   FROM public.isochrones i
   WHERE LOWER(i.travel_mode) = LOWER(p_mode)
     AND i.cutoff_minutes <= p_max_minutes
-    AND ST_Contains(
+    AND ST_Intersects(
       i.polygon::geometry,
       ST_SetSRID(ST_MakePoint(p_lon, p_lat), 4326)
     );
@@ -76,7 +76,7 @@ CREATE OR REPLACE FUNCTION public.enrich_listing_isochrones(
   INSERT INTO public.listing_isochrones (listing_id, isochrone_id)
   SELECT p_listing_id, i.id
   FROM public.isochrones i
-  WHERE ST_Contains(
+  WHERE ST_Intersects(
     i.polygon::geometry,
     ST_SetSRID(ST_MakePoint(p_lon, p_lat), 4326)
   )
@@ -95,7 +95,7 @@ CREATE OR REPLACE FUNCTION public.batch_enrich_listing_isochrones(
     (item->>'listing_id')::bigint,
     i.id
   FROM json_array_elements(p_listings) AS item
-  JOIN public.isochrones i ON ST_Contains(
+  JOIN public.isochrones i ON ST_Intersects(
     i.polygon::geometry,
     ST_SetSRID(
       ST_MakePoint(
