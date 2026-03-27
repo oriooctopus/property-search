@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import type { CommuteRule } from "@/components/Filters";
 import SUBWAY_STATIONS from "@/lib/isochrone/subway-stations";
 
+const OTP_BASE_URL = process.env.OTP_BASE_URL ?? "http://localhost:9090";
+
 // ---------------------------------------------------------------------------
 // Supabase admin client (service role for reading isochrones)
 // ---------------------------------------------------------------------------
@@ -137,6 +139,101 @@ async function resolveStationRule(
 }
 
 // ---------------------------------------------------------------------------
+// Address rule helpers
+// ---------------------------------------------------------------------------
+
+/** Returns the next weekday date string (YYYY-MM-DD) from today. */
+function nextWeekday(): string {
+  const d = new Date();
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  return d.toISOString().split("T")[0];
+}
+
+/** Map CommuteRule mode to OTP mode string. */
+function otpMode(mode: string): string {
+  switch (mode) {
+    case "walk": return "WALK";
+    case "transit": return "TRANSIT";
+    case "bike": return "BICYCLE";
+    default: return "WALK";
+  }
+}
+
+async function resolveAddressRule(
+  supabase: ReturnType<typeof getClient>,
+  rule: CommuteRule,
+): Promise<Set<number> | null> {
+  // Need lat/lon from autocomplete selection
+  if (!rule.addressLat || !rule.addressLon) {
+    console.log("[commute-filter] Address rule missing lat/lon, skipping");
+    return null;
+  }
+
+  // Build OTP TravelTime isochrone URL
+  const date = nextWeekday();
+  const isoTime = `${date}T09:00:00-04:00`;
+  const url =
+    `${OTP_BASE_URL}/otp/traveltime/isochrone` +
+    `?location=${rule.addressLat},${rule.addressLon}` +
+    `&modes=${otpMode(rule.mode)}` +
+    `&time=${encodeURIComponent(isoTime)}` +
+    `&cutoff=PT${rule.maxMinutes}M`;
+
+  // Fetch isochrone polygon from OTP
+  let geojson: { type: string; features: Array<{ geometry: object }> };
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30_000);
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "(no body)");
+      console.error(`[commute-filter] OTP returned ${response.status}: ${body}`);
+      return null;
+    }
+
+    geojson = await response.json();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("ECONNREFUSED") || msg.includes("fetch failed")) {
+      console.error("[commute-filter] OTP not running, skipping address rule");
+    } else {
+      console.error("[commute-filter] OTP fetch error:", msg);
+    }
+    return null;
+  }
+
+  if (
+    !geojson ||
+    geojson.type !== "FeatureCollection" ||
+    !Array.isArray(geojson.features) ||
+    geojson.features.length === 0
+  ) {
+    console.log("[commute-filter] OTP returned empty polygon for address rule");
+    return new Set<number>();
+  }
+
+  // Use the first feature's geometry as the isochrone polygon
+  const polygonJson = JSON.stringify(geojson.features[0].geometry);
+
+  // Query listings within the polygon using PostGIS RPC
+  const { data, error } = await supabase.rpc("listings_in_polygon", {
+    polygon_geojson: polygonJson,
+  });
+
+  if (error) {
+    console.error("[commute-filter] listings_in_polygon RPC failed:", error.message);
+    return null;
+  }
+
+  if (!data || data.length === 0) return new Set<number>();
+
+  return new Set((data as Array<{ id: number }>).map((r) => r.id));
+}
+
+// ---------------------------------------------------------------------------
 // POST handler
 // ---------------------------------------------------------------------------
 
@@ -168,9 +265,7 @@ export async function POST(request: NextRequest) {
           break;
 
         case "address":
-          // TODO: Needs geocoding + point-in-polygon — return null (no filter) for now
-          console.log("[commute-filter] Address rule not yet implemented, skipping");
-          result = null;
+          result = await resolveAddressRule(supabase, rule);
           break;
 
         case "park":
@@ -189,7 +284,7 @@ export async function POST(request: NextRequest) {
     if (validSets.length === 0) {
       // Check if any rules were implemented types (subway-line / station)
       const hasImplementedRule = commuteRules.some(
-        (r) => r.type === "subway-line" || r.type === "station",
+        (r) => r.type === "subway-line" || r.type === "station" || r.type === "address",
       );
       if (hasImplementedRule) {
         // Implemented rules all returned null (shouldn't happen after empty-set fix, but be safe)
