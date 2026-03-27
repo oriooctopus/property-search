@@ -177,7 +177,9 @@ async function resolveAddressRule(
     `?location=${rule.addressLat},${rule.addressLon}` +
     `&modes=${otpMode(rule.mode)}` +
     `&time=${encodeURIComponent(isoTime)}` +
-    `&cutoff=PT${rule.maxMinutes}M`;
+    // Add 15% buffer to transit times — OTP uses worst-case wait times
+    // while users expect Google-like optimistic estimates
+    `&cutoff=PT${rule.mode === "transit" ? Math.ceil(rule.maxMinutes * 1.15) : rule.maxMinutes}M`;
 
   // Fetch isochrone polygon from OTP
   let geojson: { type: string; features: Array<{ geometry: object }> };
