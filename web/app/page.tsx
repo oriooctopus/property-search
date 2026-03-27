@@ -16,6 +16,7 @@ import FilterPills from '@/components/FilterPills';
 import SwipeView from '@/components/SwipeView';
 import { useConversation } from '@/lib/hooks/useConversation';
 import { useConversations } from '@/lib/hooks/useConversations';
+import { useSavedSearches } from '@/lib/hooks/useSavedSearches';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -201,6 +202,7 @@ function HomeInner() {
   });
 
   const { conversations, invalidate: invalidateConversations } = useConversations();
+  const { savedSearches, saveSearch: saveSavedSearch, deleteSearch: deleteSavedSearch } = useSavedSearches(userId);
 
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(chatMode);
@@ -831,6 +833,11 @@ function HomeInner() {
             onChange={setFilters}
             listingCount={filteredListings.length}
             viewToggle={viewToggle}
+            userId={userId}
+            savedSearches={savedSearches}
+            onSaveSearch={(name) => saveSavedSearch(name, filters)}
+            onDeleteSearch={deleteSavedSearch}
+            onLoadSearch={setFilters}
           />
         </div>
 

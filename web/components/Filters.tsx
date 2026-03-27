@@ -86,11 +86,23 @@ export interface FiltersState {
   commuteRules: CommuteRule[];
 }
 
+export interface SavedSearchEntry {
+  id: number;
+  name: string;
+  filters: Record<string, unknown>;
+  created_at: string;
+}
+
 interface FiltersProps {
   filters: FiltersState;
   onChange: (filters: FiltersState) => void;
   listingCount?: number;
   viewToggle?: React.ReactNode;
+  userId?: string | null;
+  savedSearches?: SavedSearchEntry[];
+  onSaveSearch?: (name: string) => void;
+  onDeleteSearch?: (id: number) => void;
+  onLoadSearch?: (filters: FiltersState) => void;
 }
 
 const SEARCH_TABS: { value: SearchTag; label: string; title: string }[] = [
@@ -286,6 +298,56 @@ function commuteLabel(rules: CommuteRule[]): string {
     return 'Commute';
   }
   return `${rules.length} commute rules`;
+}
+
+// ---------------------------------------------------------------------------
+// Auto-suggest search name from active filters
+// ---------------------------------------------------------------------------
+
+export function suggestSearchName(filters: FiltersState): string {
+  const parts: string[] = [];
+
+  // Area
+  const tag = SEARCH_TABS.find((t) => t.value === filters.searchTag);
+  if (tag && filters.searchTag !== 'all') {
+    parts.push(tag.label);
+  }
+
+  // Beds
+  if (filters.selectedBeds !== null && filters.selectedBeds.length > 0) {
+    const sorted = filters.selectedBeds.slice().sort((a, b) => a - b);
+    if (sorted.length === 1) {
+      parts.push(`${sorted[0] === 7 ? '7+' : sorted[0]} bed`);
+    } else {
+      parts.push(`${sorted.map((b) => (b === 7 ? '7+' : String(b))).join('/')} bed`);
+    }
+  }
+
+  // Price
+  if (filters.maxRent !== null) {
+    const k = filters.maxRent / 1000;
+    parts.push(`Under $${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}K`);
+  } else if (filters.minRent !== null) {
+    const k = filters.minRent / 1000;
+    parts.push(`$${k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)}K+`);
+  }
+
+  // Commute
+  if (filters.commuteRules && filters.commuteRules.length > 0) {
+    const rule = filters.commuteRules[0];
+    if (rule.type === 'subway-line' && rule.lines && rule.lines.length > 0) {
+      parts.push(rule.lines.join('/') + ' train');
+    } else if (rule.type === 'station' && rule.stationName) {
+      parts.push(rule.stationName);
+    }
+  }
+
+  // Sources
+  if (filters.selectedSources !== null && filters.selectedSources.length < ALL_SOURCES.length) {
+    parts.push(filters.selectedSources.map((s) => SOURCE_LABELS[s as ListingSource] ?? s).join(', '));
+  }
+
+  return parts.length > 0 ? parts.join(' \u00B7 ') : 'My Search';
 }
 
 let _ruleIdCounter = 0;
@@ -1104,7 +1166,7 @@ function FilterToggleButton({
   );
 }
 
-export default function Filters({ filters, onChange, listingCount, viewToggle }: FiltersProps) {
+export default function Filters({ filters, onChange, listingCount, viewToggle, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch }: FiltersProps) {
   const [openChip, setOpenChip] = useState<ChipId | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -1122,6 +1184,16 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
   );
   const [draftSources, setDraftSources] = useState<string[] | null>(filters.selectedSources);
   const [draftCommuteRules, setDraftCommuteRules] = useState<CommuteRule[]>(filters.commuteRules ?? []);
+
+  // Save search dropdown state
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saveName, setSaveName] = useState('');
+  const [mySearchesOpen, setMySearchesOpen] = useState(false);
+  const [saveToastVisible, setSaveToastVisible] = useState(false);
+  const saveToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveDropdownRef = useRef<HTMLDivElement>(null);
+  const mySearchesDropdownRef = useRef<HTMLDivElement>(null);
+  const saveInputRef = useRef<HTMLInputElement>(null);
 
   // Sync drafts when filters change externally
   useEffect(() => {
@@ -1176,6 +1248,8 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpenChip(null);
         setSortOpen(false);
+        setSaveOpen(false);
+        setMySearchesOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -1607,6 +1681,254 @@ export default function Filters({ filters, onChange, listingCount, viewToggle }:
               </div>
             </div>
           </div>
+
+          {/* Divider + Save / My Searches — only when logged in */}
+          {userId && (
+            <>
+              {/* Vertical divider */}
+              <div className="h-4 w-px shrink-0" style={{ backgroundColor: '#2d333b' }} />
+
+              {/* Save chip — only when at least one filter is active */}
+              {activeCount > 0 && (
+                <div className="relative shrink-0" ref={saveDropdownRef}>
+                  <ButtonBase
+                    onClick={() => {
+                      setSaveOpen((prev) => {
+                        if (!prev) {
+                          setSaveName(suggestSearchName(filters));
+                          setOpenChip(null);
+                          setMySearchesOpen(false);
+                          // Focus input after render
+                          setTimeout(() => saveInputRef.current?.focus(), 50);
+                        }
+                        return !prev;
+                      });
+                    }}
+                    className={cn(
+                      'flex items-center gap-1 rounded-md font-medium whitespace-nowrap border px-2.5 py-0.5 text-[11px] h-[28px]',
+                      saveOpen
+                        ? 'bg-[#58a6ff]/[0.08] text-[#58a6ff] border-[#58a6ff]'
+                        : 'bg-transparent text-[#8b949e] border-[#2d333b] hover:bg-[#58a6ff]/20 hover:text-[#c0d6f5] hover:border-[#58a6ff]/40',
+                    )}
+                  >
+                    {/* Bookmark icon */}
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 1.5h6a.5.5 0 0 1 .5.5v8.5L6 8l-3.5 2.5V2a.5.5 0 0 1 .5-.5z" />
+                    </svg>
+                    Save
+                  </ButtonBase>
+
+                  {saveOpen && (
+                    <div
+                      className="fixed z-[9999] rounded-xl border border-[#2d333b] p-5 shadow-xl"
+                      style={{
+                        backgroundColor: '#1c2028',
+                        minWidth: '300px',
+                        maxWidth: 'calc(100vw - 16px)',
+                        top: saveDropdownRef.current ? saveDropdownRef.current.getBoundingClientRect().bottom + 8 : 0,
+                        right: saveDropdownRef.current ? window.innerWidth - saveDropdownRef.current.getBoundingClientRect().right : 0,
+                      }}
+                    >
+                      <div className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: '#8b949e', letterSpacing: '0.05em' }}>
+                        Save Search
+                      </div>
+
+                      <input
+                        ref={saveInputRef}
+                        type="text"
+                        value={saveName}
+                        onChange={(e) => setSaveName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && saveName.trim()) {
+                            onSaveSearch?.(saveName.trim());
+                            setSaveOpen(false);
+                            // Show toast
+                            if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
+                            setSaveToastVisible(true);
+                            saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
+                          }
+                          if (e.key === 'Escape') setSaveOpen(false);
+                        }}
+                        placeholder="e.g. Brooklyn 5-bed hunt"
+                        className="w-full rounded-lg px-3 py-2 text-sm outline-none mb-3"
+                        style={{ backgroundColor: '#0f1117', border: '1px solid #2d333b', color: '#e1e4e8' }}
+                      />
+
+                      {/* Active filter summary pills */}
+                      <div className="flex flex-wrap gap-1 mb-4">
+                        {filters.searchTag !== 'all' && (
+                          <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
+                            {SEARCH_TABS.find((t) => t.value === filters.searchTag)?.label}
+                          </span>
+                        )}
+                        {filters.selectedBeds !== null && (
+                          <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
+                            {filters.selectedBeds.slice().sort((a, b) => a - b).map((b) => (b === 7 ? '7+' : String(b))).join(', ')} bed
+                          </span>
+                        )}
+                        {(filters.minRent !== null || filters.maxRent !== null) && (
+                          <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
+                            {priceLabel(filters.minRent, filters.maxRent)}
+                          </span>
+                        )}
+                        {filters.maxPricePerBed !== null && (
+                          <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
+                            {pricePerBedLabel(filters.maxPricePerBed)}
+                          </span>
+                        )}
+                        {filters.commuteRules && filters.commuteRules.length > 0 && (
+                          <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
+                            {commuteLabel(filters.commuteRules)}
+                          </span>
+                        )}
+                        {filters.selectedSources !== null && (
+                          <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
+                            {filters.selectedSources.length} source{filters.selectedSources.length !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-end gap-3">
+                        <TextButton variant="muted" onClick={() => setSaveOpen(false)}>
+                          Cancel
+                        </TextButton>
+                        <PrimaryButton
+                          onClick={() => {
+                            if (saveName.trim()) {
+                              onSaveSearch?.(saveName.trim());
+                              setSaveOpen(false);
+                              if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
+                              setSaveToastVisible(true);
+                              saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
+                            }
+                          }}
+                          disabled={!saveName.trim()}
+                          className="h-8 px-5 text-xs font-bold"
+                        >
+                          Save
+                        </PrimaryButton>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* My Searches chip — only when user has saved searches */}
+              {savedSearches && savedSearches.length > 0 && (
+                <div className="relative shrink-0" ref={mySearchesDropdownRef}>
+                  <ButtonBase
+                    onClick={() => {
+                      setMySearchesOpen((prev) => {
+                        if (!prev) {
+                          setOpenChip(null);
+                          setSaveOpen(false);
+                        }
+                        return !prev;
+                      });
+                    }}
+                    className={cn(
+                      'flex items-center gap-1 rounded-md font-medium whitespace-nowrap border px-2.5 py-0.5 text-[11px] h-[28px]',
+                      mySearchesOpen
+                        ? 'bg-[#58a6ff]/[0.08] text-[#58a6ff] border-[#58a6ff]'
+                        : 'bg-transparent text-[#8b949e] border-[#2d333b] hover:bg-[#58a6ff]/20 hover:text-[#c0d6f5] hover:border-[#58a6ff]/40',
+                    )}
+                  >
+                    {/* List icon */}
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2 3h8M2 6h8M2 9h8" />
+                    </svg>
+                    My Searches
+                    <span className="bg-[#58a6ff] text-[#0f1117] text-[9px] font-bold rounded-full min-w-[14px] h-3.5 flex items-center justify-center px-1">
+                      {savedSearches.length}
+                    </span>
+                  </ButtonBase>
+
+                  {mySearchesOpen && (
+                    <div
+                      className="fixed z-[9999] rounded-xl border border-[#2d333b] p-4 shadow-xl"
+                      style={{
+                        backgroundColor: '#1c2028',
+                        minWidth: '280px',
+                        maxWidth: 'min(360px, calc(100vw - 16px))',
+                        maxHeight: 'min(400px, calc(100vh - 200px))',
+                        overflowY: 'auto',
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: '#2d333b #1c2028',
+                        top: mySearchesDropdownRef.current ? mySearchesDropdownRef.current.getBoundingClientRect().bottom + 8 : 0,
+                        right: mySearchesDropdownRef.current ? window.innerWidth - mySearchesDropdownRef.current.getBoundingClientRect().right : 0,
+                      }}
+                    >
+                      <div className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: '#8b949e', letterSpacing: '0.05em' }}>
+                        Saved Searches
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        {savedSearches.map((s) => {
+                          const savedFilters = s.filters as unknown as FiltersState;
+                          const filterParts: string[] = [];
+                          if (savedFilters.searchTag && savedFilters.searchTag !== 'all') {
+                            filterParts.push(SEARCH_TABS.find((t) => t.value === savedFilters.searchTag)?.label ?? savedFilters.searchTag);
+                          }
+                          if (savedFilters.selectedBeds) filterParts.push(`${Array.isArray(savedFilters.selectedBeds) ? savedFilters.selectedBeds.join('/') : savedFilters.selectedBeds} bed`);
+                          if (savedFilters.maxRent) filterParts.push(`Under $${(savedFilters.maxRent / 1000).toFixed(savedFilters.maxRent % 1000 === 0 ? 0 : 1)}K`);
+                          if (savedFilters.commuteRules && savedFilters.commuteRules.length > 0) filterParts.push('Commute');
+                          const summary = filterParts.length > 0 ? filterParts.join(' \u00B7 ') : 'All filters';
+                          const dateStr = new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+                          return (
+                            <div
+                              key={s.id}
+                              className="group/card flex items-center gap-2 rounded-lg px-3 py-2 cursor-pointer transition-colors hover:bg-[#161b22]"
+                              onClick={() => {
+                                onLoadSearch?.(savedFilters);
+                                setMySearchesOpen(false);
+                              }}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-medium truncate" style={{ color: '#e1e4e8' }}>
+                                  {s.name}
+                                </div>
+                                <div className="text-[10px] truncate mt-0.5" style={{ color: '#8b949e' }}>
+                                  {summary} &middot; {dateStr}
+                                </div>
+                              </div>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeleteSearch?.(s.id);
+                                }}
+                                className="shrink-0 w-6 h-6 rounded flex items-center justify-center text-sm opacity-0 group-hover/card:opacity-100 transition-opacity cursor-pointer text-[#484f58] hover:text-red-400 hover:bg-red-400/10"
+                              >
+                                &times;
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Save success toast — positioned at bottom center */}
+      {saveToastVisible && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-2 rounded-lg px-4 py-2.5 shadow-xl transition-opacity"
+          style={{
+            backgroundColor: '#1c2028',
+            border: '1px solid #58a6ff',
+            color: '#e1e4e8',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#58a6ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3.5 7.5L6 10L10.5 4" />
+          </svg>
+          <span className="text-sm font-medium">Search saved</span>
         </div>
       )}
     </div>
