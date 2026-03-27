@@ -359,8 +359,11 @@ export default function SwipeView({
           <button
             onClick={handleUndo}
             disabled={undoStack.length === 0}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-white/40 hover:text-white/70 hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            title="Undo"
+            className="w-10 h-10 rounded-full flex items-center justify-center border transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+            style={{ borderColor: '#3d444d', color: '#8b949e' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(139,148,158,0.1)'; e.currentTarget.style.borderColor = '#8b949e'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; }}
+            title="Undo (Z)"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 7v6h6" />
@@ -370,14 +373,14 @@ export default function SwipeView({
 
           {/* Action buttons: Skip (left) | Would Live (middle, bigger) | Like (right) */}
           <div className="flex items-center gap-5">
-            {/* Skip — grey outline */}
+            {/* Skip — subtle border */}
             <button
               onClick={() => handleSwipe('left')}
-              className="w-14 h-14 rounded-full flex items-center justify-center border-2 transition-colors active:scale-95"
-              style={{ borderColor: '#8b949e', color: '#8b949e' }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(139,148,158,0.15)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-              title="Skip"
+              className="w-12 h-12 rounded-full flex items-center justify-center border transition-all active:scale-95 cursor-pointer"
+              style={{ borderColor: '#3d444d', color: '#8b949e' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(139,148,158,0.1)'; e.currentTarget.style.borderColor = '#8b949e'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; }}
+              title="Skip (←)"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" />
@@ -385,14 +388,14 @@ export default function SwipeView({
               </svg>
             </button>
 
-            {/* Would Live Here — white outline, bigger center button */}
+            {/* Would Live Here — white border, bigger center button */}
             <button
               onClick={() => handleSwipe('up')}
-              className="w-16 h-16 rounded-full flex items-center justify-center border-2 transition-colors active:scale-95"
-              style={{ borderColor: '#e1e4e8', color: '#e1e4e8' }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(225,228,232,0.15)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-              title="Would live here"
+              className="w-14 h-14 rounded-full flex items-center justify-center border transition-all active:scale-95 cursor-pointer"
+              style={{ borderColor: '#8b949e', color: '#e1e4e8' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(225,228,232,0.1)'; e.currentTarget.style.borderColor = '#e1e4e8'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#8b949e'; }}
+              title="Would live here (↑)"
             >
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 12l9-9 9 9" />
@@ -400,14 +403,14 @@ export default function SwipeView({
               </svg>
             </button>
 
-            {/* Like — blue fill, white icon */}
+            {/* Like — blue accent */}
             <button
               onClick={() => handleSwipe('right')}
-              className="w-14 h-14 rounded-full flex items-center justify-center border-2 transition-colors active:scale-95"
-              style={{ borderColor: '#58a6ff', backgroundColor: '#58a6ff', color: '#ffffff' }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4090e0'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#58a6ff'; }}
-              title="Like"
+              className="w-12 h-12 rounded-full flex items-center justify-center border transition-all active:scale-95 cursor-pointer"
+              style={{ borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,0.1)', color: '#58a6ff' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.2)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.1)'; }}
+              title="Like (→)"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
@@ -424,7 +427,7 @@ export default function SwipeView({
 
       {/* Keyboard shortcut hint */}
       {currentListing && (
-        <div className="text-center pb-2 text-[11px] text-white/20 select-none hidden sm:block">
+        <div className="text-center pb-2 text-xs text-white/40 select-none hidden sm:block">
           ← → ↑ ↓ to swipe · Z to undo · Space for details
         </div>
       )}
