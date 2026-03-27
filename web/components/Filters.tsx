@@ -744,7 +744,7 @@ const CommuteRuleEditor = memo(function CommuteRuleEditor({
             />
             {showAddressSuggestions && (rule.type === 'address') && (
               <div
-                className="absolute left-0 right-0 top-[28px] z-50 rounded-md border shadow-lg overflow-hidden"
+                className="absolute left-0 right-0 top-[28px] z-[9999] rounded-md border shadow-lg overflow-hidden"
                 style={{ backgroundColor: '#1c2028', borderColor: '#2d333b' }}
               >
                 {addressLoading && (
@@ -796,18 +796,6 @@ const CommuteRuleEditor = memo(function CommuteRuleEditor({
           </span>
         )}
       </div>
-
-      {/* Coming-soon warnings for unimplemented rule types */}
-      {rule.type === 'address' && (
-        <p className="text-[10px] mt-1.5 ml-0.5" style={{ color: '#d29922' }}>
-          Address filtering coming soon
-        </p>
-      )}
-      {rule.type === 'park' && (
-        <p className="text-[10px] mt-1.5 ml-0.5" style={{ color: '#d29922' }}>
-          Park filtering coming soon
-        </p>
-      )}
 
       {/* Subway line pills */}
       {rule.type === 'subway-line' && (
