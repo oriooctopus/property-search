@@ -34,7 +34,7 @@ test.describe("Visual Regression — Desktop (1440×900)", () => {
 
   test("home page layout", async ({ page }) => {
     await mockSupabase(page);
-    await page.goto("/", { waitUntil: "networkidle" });
+    await page.goto("/", { waitUntil: "load" });
     await page.waitForTimeout(1500);
     // Expand filters so the screenshot catches filter chip differences
     const filtersBtn = page.locator('button:has-text("Filters")').first();
@@ -50,7 +50,7 @@ test.describe("Visual Regression — Desktop (1440×900)", () => {
 
   test("listing detail modal", async ({ page }) => {
     await mockSupabase(page);
-    await page.goto("/", { waitUntil: "networkidle" });
+    await page.goto("/", { waitUntil: "load" });
     await page.waitForTimeout(1000);
     // Click the first listing card to open detail
     const card = page
@@ -72,7 +72,7 @@ test.describe("Visual Regression — Mobile (390×844)", () => {
 
   test("home page layout", async ({ page }) => {
     await mockSupabase(page);
-    await page.goto("/", { waitUntil: "networkidle" });
+    await page.goto("/", { waitUntil: "load" });
     await page.waitForTimeout(1500);
     await expect(page).toHaveScreenshot("mobile-home.png", {
       maxDiffPixelRatio: 0.01,
@@ -82,7 +82,7 @@ test.describe("Visual Regression — Mobile (390×844)", () => {
 
   test("swipe mode", async ({ page }) => {
     await mockSupabase(page);
-    await page.goto("/?view=swipe", { waitUntil: "networkidle" });
+    await page.goto("/?view=swipe", { waitUntil: "load" });
     await page.waitForTimeout(1500);
     await expect(page).toHaveScreenshot("mobile-swipe.png", {
       maxDiffPixelRatio: 0.01,
@@ -92,7 +92,7 @@ test.describe("Visual Regression — Mobile (390×844)", () => {
 
   test("filter area", async ({ page }) => {
     await mockSupabase(page);
-    await page.goto("/?view=list", { waitUntil: "networkidle" });
+    await page.goto("/?view=list", { waitUntil: "load" });
     await page.waitForTimeout(1000);
     // Screenshot just the filter section
     const filterArea = page.locator('[class*="z-[1100]"]');
@@ -110,7 +110,7 @@ test.describe("Visual Regression — Tablet (768×1024)", () => {
 
   test("home page layout", async ({ page }) => {
     await mockSupabase(page);
-    await page.goto("/", { waitUntil: "networkidle" });
+    await page.goto("/", { waitUntil: "load" });
     await page.waitForTimeout(1500);
     await expect(page).toHaveScreenshot("tablet-home.png", {
       maxDiffPixelRatio: 0.01,
