@@ -1602,27 +1602,95 @@ export default function Filters({ filters, onChange, listingCount, viewToggle, u
               <div className="flex items-center justify-between mb-3">
                 <SectionTitle>Commute Rules</SectionTitle>
               </div>
-              <div className="overflow-y-auto" style={{ maxHeight: 'min(400px, calc(100vh - 280px))', scrollbarWidth: 'thin', scrollbarColor: '#2d333b #1c2028' }}>
-                {draftCommuteRules.map((rule, idx) => (
-                  <CommuteRuleEditor
-                    key={rule.id}
-                    rule={rule}
-                    onChange={(updated) => {
-                      setDraftCommuteRules((prev) => prev.map((r) => (r.id === rule.id ? updated : r)));
-                    }}
-                    onDelete={() => {
-                      setDraftCommuteRules((prev) => prev.filter((r) => r.id !== rule.id));
-                    }}
-                  />
-                ))}
-              </div>
-              {draftCommuteRules.length < 10 && (
-                <button
-                  onClick={() => setDraftCommuteRules((prev) => [...prev, createDefaultRule()])}
-                  className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg text-[11px] font-medium cursor-pointer transition-all mt-1 mb-1 text-[#58a6ff] bg-transparent border border-dashed border-[#2d333b] hover:border-[#58a6ff] hover:bg-[#58a6ff]/[0.04]"
-                >
-                  + Add rule
-                </button>
+              {draftCommuteRules.length === 0 ? (
+                /* Animated subway train empty state */
+                <div className="flex flex-col items-center py-6 gap-4">
+                  <style>{`
+                    @keyframes commuteTrainSlide {
+                      from { left: -90px; }
+                      to   { left: 50%; transform: translateX(-50%); }
+                    }
+                    @keyframes commuteTrainBob {
+                      0%, 100% { transform: translateX(-50%) translateY(0px); }
+                      50%       { transform: translateX(-50%) translateY(-3px); }
+                    }
+                  `}</style>
+                  <div style={{ position: 'relative', width: 220, height: 80, overflow: 'hidden' }}>
+                    {/* Track ties */}
+                    <div style={{ position: 'absolute', bottom: 14, left: 0, right: 0, display: 'flex', gap: 14, padding: '0 4px' }}>
+                      {Array.from({ length: 14 }).map((_, i) => (
+                        <div key={i} style={{ width: 4, height: 8, background: '#2d333b', borderRadius: 1, flexShrink: 0 }} />
+                      ))}
+                    </div>
+                    {/* Track line */}
+                    <div style={{ position: 'absolute', bottom: 18, left: 0, right: 0, height: 2, background: '#2d333b', borderRadius: 1 }} />
+                    {/* Station dots */}
+                    <div style={{ position: 'absolute', bottom: 15, left: 20, width: 6, height: 6, borderRadius: '50%', background: '#2d333b', border: '1.5px solid #3d4450' }} />
+                    <div style={{ position: 'absolute', bottom: 15, right: 20, width: 6, height: 6, borderRadius: '50%', background: '#2d333b', border: '1.5px solid #3d4450' }} />
+                    {/* Train */}
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 20,
+                      animation: 'commuteTrainSlide 1.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both, commuteTrainBob 2.4s ease-in-out 2.2s infinite',
+                    }}>
+                      <svg width="72" height="38" viewBox="0 0 72 38" fill="none">
+                        <rect x="2" y="8" width="68" height="26" rx="5" fill="#252d38" stroke="#3d4450" strokeWidth="1.5"/>
+                        <path d="M60 8 Q70 8 70 20 Q70 34 60 34" fill="#2d3748" stroke="#3d4450" strokeWidth="1.5"/>
+                        <rect x="2" y="8" width="68" height="5" rx="3" fill="#58a6ff" opacity="0.7"/>
+                        <rect x="8" y="16" width="10" height="9" rx="2" fill="#1a2535" stroke="#58a6ff" strokeWidth="1" opacity="0.9"/>
+                        <rect x="24" y="16" width="10" height="9" rx="2" fill="#1a2535" stroke="#58a6ff" strokeWidth="1" opacity="0.9"/>
+                        <rect x="40" y="16" width="10" height="9" rx="2" fill="#1a2535" stroke="#58a6ff" strokeWidth="1" opacity="0.9"/>
+                        <rect x="10" y="18" width="2" height="2" rx="1" fill="#58a6ff" opacity="0.5"/>
+                        <rect x="26" y="18" width="2" height="2" rx="1" fill="#58a6ff" opacity="0.5"/>
+                        <rect x="42" y="18" width="2" height="2" rx="1" fill="#58a6ff" opacity="0.5"/>
+                        <circle cx="65" cy="20" r="3" fill="#7ee787" opacity="0.85"/>
+                        <circle cx="65" cy="20" r="1.5" fill="#fff" opacity="0.7"/>
+                        <circle cx="14" cy="36" r="4" fill="#1c2028" stroke="#3d4450" strokeWidth="1.5"/>
+                        <circle cx="14" cy="36" r="1.5" fill="#3d4450"/>
+                        <circle cx="36" cy="36" r="4" fill="#1c2028" stroke="#3d4450" strokeWidth="1.5"/>
+                        <circle cx="36" cy="36" r="1.5" fill="#3d4450"/>
+                        <circle cx="58" cy="36" r="4" fill="#1c2028" stroke="#3d4450" strokeWidth="1.5"/>
+                        <circle cx="58" cy="36" r="1.5" fill="#3d4450"/>
+                      </svg>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 13, color: '#8b949e', textAlign: 'center', lineHeight: 1.5 }}>Where do you commute?</div>
+                  <button
+                    onClick={() => setDraftCommuteRules((prev) => [...prev, createDefaultRule()])}
+                    className="inline-flex items-center gap-1.5 cursor-pointer transition-colors duration-150"
+                    style={{ padding: '9px 18px', background: 'rgba(88,166,255,0.12)', border: '1px solid rgba(88,166,255,0.3)', borderRadius: 8, color: '#58a6ff', fontSize: 13, fontWeight: 600 }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                      <path d="M6.5 1v11M1 6.5h11" stroke="#58a6ff" strokeWidth="2" strokeLinecap="round"/>
+                    </svg>
+                    Add commute filter
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-y-auto" style={{ maxHeight: 'min(400px, calc(100vh - 280px))', scrollbarWidth: 'thin', scrollbarColor: '#2d333b #1c2028' }}>
+                    {draftCommuteRules.map((rule, idx) => (
+                      <CommuteRuleEditor
+                        key={rule.id}
+                        rule={rule}
+                        onChange={(updated) => {
+                          setDraftCommuteRules((prev) => prev.map((r) => (r.id === rule.id ? updated : r)));
+                        }}
+                        onDelete={() => {
+                          setDraftCommuteRules((prev) => prev.filter((r) => r.id !== rule.id));
+                        }}
+                      />
+                    ))}
+                  </div>
+                  {draftCommuteRules.length < 10 && (
+                    <button
+                      onClick={() => setDraftCommuteRules((prev) => [...prev, createDefaultRule()])}
+                      className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg text-[11px] font-medium cursor-pointer transition-all mt-1 mb-1 text-[#58a6ff] bg-transparent border border-dashed border-[#2d333b] hover:border-[#58a6ff] hover:bg-[#58a6ff]/[0.04]"
+                    >
+                      + Add rule
+                    </button>
+                  )}
+                </>
               )}
               <DropdownFooter
                 onReset={() => {
