@@ -5,19 +5,17 @@ import { ButtonBase, FilterChip, PillButton, PrimaryButton, TextButton } from '@
 import { cn } from '@/lib/cn';
 import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
 
-export type SearchTag = 'all' | 'fulton' | 'ltrain' | 'manhattan' | 'brooklyn' | 'uptown';
-export type SortField = 'pricePerBed' | 'price' | 'beds' | 'listDate';
+export type SortField = 'price' | 'beds' | 'listDate';
 
 export type MaxListingAge = '1w' | '2w' | '1m' | '3m' | '6m' | '1y' | null;
 
-export const ALL_SOURCES = ['realtor', 'craigslist', 'streeteasy', 'zillow', 'facebook'] as const;
+export const ALL_SOURCES = ['realtor', 'craigslist', 'streeteasy', 'facebook'] as const;
 export type ListingSource = (typeof ALL_SOURCES)[number];
 
 export const SOURCE_LABELS: Record<ListingSource, string> = {
   realtor: 'Realtor.com',
   craigslist: 'Craigslist',
   streeteasy: 'StreetEasy',
-  zillow: 'Zillow',
   facebook: 'Facebook',
 };
 
@@ -73,16 +71,19 @@ async function fetchNominatimSuggestions(
 }
 
 export interface FiltersState {
-  maxPricePerBed: number | null;
   selectedBeds: number[] | null;
   minBaths: number | null;
   minRent: number | null;
   maxRent: number | null;
   sort: SortField;
-  searchTag: SearchTag;
   maxListingAge: MaxListingAge;
   photosFirst: boolean;
   selectedSources: string[] | null;
+  minYearBuilt: number | null;
+  maxYearBuilt: number | null;
+  minSqft: number | null;
+  maxSqft: number | null;
+  excludeNoSqft: boolean;
   commuteRules: CommuteRule[];
 }
 
@@ -100,22 +101,14 @@ interface FiltersProps {
   viewToggle?: React.ReactNode;
   userId?: string | null;
   savedSearches?: SavedSearchEntry[];
-  onSaveSearch?: (name: string) => void;
+  onSaveSearch?: (name: string) => Promise<SavedSearchEntry | null>;
   onDeleteSearch?: (id: number) => void;
   onLoadSearch?: (filters: FiltersState) => void;
+  onUpdateSearch?: (id: number, name: string) => void;
+  onLoginRequired?: () => void;
 }
 
-const SEARCH_TABS: { value: SearchTag; label: string; title: string }[] = [
-  { value: 'all', label: 'All', title: 'Show all listings across every area, with no location filter applied' },
-  { value: 'fulton', label: 'Fulton St', title: 'Listings within a 25-minute subway/bus ride of Fulton St station in Lower Manhattan' },
-  { value: 'ltrain', label: 'L Train', title: 'Listings within a 10-minute walk of L train stops from Bedford Ave through DeKalb Ave' },
-  { value: 'manhattan', label: 'Manhattan', title: 'Manhattan listings between Park Place (Tribeca) and 38th St (Midtown), covering Downtown, SoHo, the Village, Chelsea, and the Flatiron area' },
-  { value: 'brooklyn', label: 'Brooklyn 14th', title: 'Brooklyn listings within a 35-minute subway ride of 14th St (any stop between 8th Ave and 1st Ave)' },
-  { value: 'uptown', label: 'Uptown West', title: 'West side of Manhattan from Midtown to 100th St — Hell\'s Kitchen, Columbus Circle, Lincoln Center, Upper West Side (excludes Upper East Side)' },
-];
-
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
-  { value: 'pricePerBed', label: 'Price/Bedroom' },
   { value: 'price', label: 'Price' },
   { value: 'beds', label: 'Beds' },
   { value: 'listDate', label: 'List Date' },
@@ -125,9 +118,6 @@ const PRICE_SLIDER_MIN = 0;
 const PRICE_SLIDER_MAX = 25000;
 const PRICE_SLIDER_STEP = 500;
 
-const PRICE_PER_BED_SLIDER_MIN = 0;
-const PRICE_PER_BED_SLIDER_MAX = 5000;
-const PRICE_PER_BED_SLIDER_STEP = 250;
 
 const BEDROOM_OPTIONS = [
   { value: null, label: 'Any' },
@@ -145,6 +135,24 @@ const BATHROOM_OPTIONS = [
   { value: 2, label: '2+' },
   { value: 3, label: '3+' },
   { value: 4, label: '4+' },
+];
+
+const YEAR_BUILT_PRESETS = [
+  { label: 'Pre-war', minYear: null, maxYear: 1940 },
+  { label: 'Post-war', minYear: 1940, maxYear: 1970 },
+  { label: 'Modern', minYear: 1970, maxYear: 2000 },
+  { label: 'New', minYear: 2000, maxYear: null },
+];
+
+const YEAR_BUILT_MIN = 1800;
+const YEAR_BUILT_MAX = new Date().getFullYear();
+
+const SQFT_PRESETS = [
+  { label: 'Studio', minSqft: null, maxSqft: 500 },
+  { label: 'Small', minSqft: 500, maxSqft: 750 },
+  { label: 'Medium', minSqft: 750, maxSqft: 1000 },
+  { label: 'Large', minSqft: 1000, maxSqft: 1500 },
+  { label: 'XL', minSqft: 1500, maxSqft: null },
 ];
 
 function formatSliderPrice(value: number): string {
@@ -233,9 +241,24 @@ function bedsBathsLabel(selectedBeds: number[] | null, minBaths: number | null):
   return parts.length > 0 ? parts.join(', ') : 'Beds / Baths';
 }
 
-function pricePerBedLabel(maxPricePerBed: number | null): string {
-  if (maxPricePerBed === null) return 'Price (per bedroom)';
-  return `Under $${maxPricePerBed.toLocaleString()}/bed`;
+function yearBuiltLabel(minYearBuilt: number | null, maxYearBuilt: number | null): string {
+  if (minYearBuilt === null && maxYearBuilt === null) return 'Year Built';
+  const parts: string[] = [];
+  if (minYearBuilt !== null) parts.push(`${minYearBuilt}+`);
+  if (maxYearBuilt !== null) parts.push(`before ${maxYearBuilt}`);
+  return parts.join(', ');
+}
+
+function sqftLabel(minSqft: number | null, maxSqft: number | null, excludeNoSqft?: boolean): string {
+  if (minSqft === null && maxSqft === null) {
+    if (excludeNoSqft) return 'Has sqft';
+    return 'Sqft';
+  }
+  if (minSqft !== null && maxSqft !== null) {
+    return `${minSqft.toLocaleString()}\u2013${maxSqft.toLocaleString()} sqft`;
+  }
+  if (maxSqft !== null) return `Under ${maxSqft.toLocaleString()} sqft`;
+  return `${minSqft!.toLocaleString()}+ sqft`;
 }
 
 // ---------------------------------------------------------------------------
@@ -293,7 +316,10 @@ function commuteLabel(rules: CommuteRule[]): string {
       return parts.join(' · ');
     }
     if (r.type === 'station' && r.stationName) return r.stationName;
-    if (r.type === 'address' && r.address) return r.address;
+    if (r.type === 'address' && r.address) {
+      const short = r.address.split(',').slice(0, 2).join(',').trim();
+      return short.length > 35 ? short.slice(0, 35) + '…' : short;
+    }
     if (r.type === 'park' && r.parkName) return r.parkName;
     return 'Commute';
   }
@@ -306,12 +332,6 @@ function commuteLabel(rules: CommuteRule[]): string {
 
 export function suggestSearchName(filters: FiltersState): string {
   const parts: string[] = [];
-
-  // Area
-  const tag = SEARCH_TABS.find((t) => t.value === filters.searchTag);
-  if (tag && filters.searchTag !== 'all') {
-    parts.push(tag.label);
-  }
 
   // Beds
   if (filters.selectedBeds !== null && filters.selectedBeds.length > 0) {
@@ -515,14 +535,24 @@ const CommuteRuleEditor = memo(function CommuteRuleEditor({
 }) {
   const [expandedLine, setExpandedLine] = useState<string | null>(null);
 
-  // Local state for text inputs — only sync to parent on blur / Enter to avoid
-  // re-rendering the entire filter tree on every keystroke.
+  // Local state for station name (synced on blur/Enter)
   const [localStationName, setLocalStationName] = useState(rule.stationName ?? '');
-  const [localAddress, setLocalAddress] = useState(rule.address ?? '');
-
-  // Sync local state when rule changes externally (e.g. reset, type change)
   useEffect(() => { setLocalStationName(rule.stationName ?? ''); }, [rule.stationName]);
-  useEffect(() => { setLocalAddress(rule.address ?? ''); }, [rule.address]);
+
+  // Local state for slider — visual feedback while dragging, commits to parent on release
+  const [localMaxMinutes, setLocalMaxMinutes] = useState(rule.maxMinutes);
+  useEffect(() => { setLocalMaxMinutes(rule.maxMinutes); }, [rule.maxMinutes]);
+
+  // Address input is uncontrolled — browser owns the value to avoid React
+  // state resets wiping out mid-type characters.
+  const addressInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync external address changes (e.g. suggestion select, search load) to DOM
+  useEffect(() => {
+    if (addressInputRef.current) {
+      addressInputRef.current.value = rule.address ?? '';
+    }
+  }, [rule.address]);
 
   // --- Address autocomplete state ---
   const [addressSuggestions, setAddressSuggestions] = useState<NominatimResult[]>([]);
@@ -545,7 +575,6 @@ const CommuteRuleEditor = memo(function CommuteRuleEditor({
   }, []);
 
   const handleAddressInput = useCallback((value: string) => {
-    setLocalAddress(value);
     setShowAddressSuggestions(true);
 
     // Clear previous debounce
@@ -585,7 +614,7 @@ const CommuteRuleEditor = memo(function CommuteRuleEditor({
 
   const handleAddressSelect = useCallback((result: NominatimResult) => {
     const displayName = result.display_name;
-    setLocalAddress(displayName);
+    if (addressInputRef.current) addressInputRef.current.value = displayName;
     setShowAddressSuggestions(false);
     setAddressSuggestions([]);
     onChange({
@@ -655,10 +684,10 @@ const CommuteRuleEditor = memo(function CommuteRuleEditor({
 
   const isPark = rule.type === 'park';
 
-  const timePct = ((rule.maxMinutes - 1) / 59) * 100;
+  const timePct = ((localMaxMinutes - 1) / 59) * 100;
   const maxSlider = rule.type === 'subway-line' ? 20 : 60;
   const minSlider = 1;
-  const sliderPct = ((rule.maxMinutes - minSlider) / (maxSlider - minSlider)) * 100;
+  const sliderPct = ((localMaxMinutes - minSlider) / (maxSlider - minSlider)) * 100;
 
   return (
     <div
@@ -731,9 +760,11 @@ const CommuteRuleEditor = memo(function CommuteRuleEditor({
         {rule.type === 'address' && (
           <div ref={addressWrapperRef} className="relative flex-1 min-w-[120px]">
             <input
+              ref={addressInputRef}
               type="text"
               placeholder="Search address..."
-              value={localAddress}
+              defaultValue={rule.address ?? ''}
+              autoFocus={!rule.address}
               onChange={(e) => handleAddressInput(e.target.value)}
               onFocus={() => { if (addressSuggestions.length > 0 || addressLoading || addressError) setShowAddressSuggestions(true); }}
               onKeyDown={(e) => {
@@ -761,7 +792,7 @@ const CommuteRuleEditor = memo(function CommuteRuleEditor({
                     {addressError}
                   </div>
                 )}
-                {!addressLoading && !addressError && addressSuggestions.length === 0 && localAddress.trim().length > 0 && (
+                {!addressLoading && !addressError && addressSuggestions.length === 0 && showAddressSuggestions && (
                   <div className="px-3 py-2 text-[11px]" style={{ color: '#8b949e' }}>
                     No results found
                   </div>
@@ -980,8 +1011,10 @@ const CommuteRuleEditor = memo(function CommuteRuleEditor({
             min={minSlider}
             max={maxSlider}
             step={1}
-            value={rule.maxMinutes}
-            onChange={(e) => onChange({ ...rule, maxMinutes: Number(e.target.value) })}
+            value={localMaxMinutes}
+            onChange={(e) => setLocalMaxMinutes(Number(e.target.value))}
+            onPointerUp={(e) => onChange({ ...rule, maxMinutes: Number((e.target as HTMLInputElement).value) })}
+            onKeyUp={(e) => onChange({ ...rule, maxMinutes: localMaxMinutes })}
             className="range-slider w-full"
             style={{
               background: `linear-gradient(to right, #58a6ff 0%, #58a6ff ${sliderPct}%, #2d333b ${sliderPct}%, #2d333b 100%)`,
@@ -989,7 +1022,7 @@ const CommuteRuleEditor = memo(function CommuteRuleEditor({
           />
         </div>
         <span className="text-[11px] font-semibold min-w-[42px] text-right whitespace-nowrap" style={{ color: '#58a6ff' }}>
-          {rule.maxMinutes} min
+          {localMaxMinutes} min
         </span>
         <div className="inline-flex rounded-[5px] border overflow-hidden h-7" style={{ borderColor: '#2d333b' }}>
           {(['walk', 'transit', 'bike'] as const)
@@ -1095,7 +1128,7 @@ function ListingAgeSlider({
   );
 }
 
-type ChipId = 'price' | 'bedsBaths' | 'pricePerBed' | 'listingAge' | 'source' | 'commute';
+type ChipId = 'price' | 'bedsBaths' | 'listingAge' | 'source' | 'commute' | 'yearBuilt' | 'sqft';
 
 // ---------------------------------------------------------------------------
 // Active filter count helper
@@ -1107,10 +1140,12 @@ function countActiveFilters(filters: FiltersState): number {
   if (filters.minBaths !== null) count++;
   if (filters.minRent !== null) count++;
   if (filters.maxRent !== null) count++;
-  if (filters.maxPricePerBed !== null) count++;
   if (filters.maxListingAge !== null && filters.maxListingAge !== '1m') count++;
   if (filters.photosFirst) count++;
   if (filters.selectedSources !== null) count++;
+  if (filters.minYearBuilt !== null || filters.maxYearBuilt !== null) count++;
+  if (filters.minSqft !== null || filters.maxSqft !== null) count++;
+  if (filters.excludeNoSqft) count++;
   if (filters.commuteRules && filters.commuteRules.length > 0) count++;
   return count;
 }
@@ -1154,80 +1189,57 @@ function FilterToggleButton({
   );
 }
 
-export default function Filters({ filters, onChange, listingCount, viewToggle, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch }: FiltersProps) {
+const Filters = memo(function Filters({ filters, onChange, listingCount, viewToggle, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onLoginRequired }: FiltersProps) {
   const [openChip, setOpenChip] = useState<ChipId | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
 
   // Draft state for dropdowns — only applied on "Done"
   const [draftMinRent, setDraftMinRent] = useState<number | null>(filters.minRent);
   const [draftMaxRent, setDraftMaxRent] = useState<number | null>(filters.maxRent);
   const [draftSelectedBeds, setDraftSelectedBeds] = useState<number[]>(filters.selectedBeds ?? []);
   const [draftMinBaths, setDraftMinBaths] = useState<number | null>(filters.minBaths);
-  const [draftMaxPricePerBed, setDraftMaxPricePerBed] = useState<number | null>(
-    filters.maxPricePerBed,
-  );
   const [draftMaxListingAge, setDraftMaxListingAge] = useState<MaxListingAge>(
     filters.maxListingAge,
   );
   const [draftSources, setDraftSources] = useState<string[] | null>(filters.selectedSources);
   const [draftCommuteRules, setDraftCommuteRules] = useState<CommuteRule[]>(filters.commuteRules ?? []);
+  const [draftMinYearBuilt, setDraftMinYearBuilt] = useState<number | null>(filters.minYearBuilt);
+  const [draftMaxYearBuilt, setDraftMaxYearBuilt] = useState<number | null>(filters.maxYearBuilt);
+  const [draftMinSqft, setDraftMinSqft] = useState<number | null>(filters.minSqft);
+  const [draftMaxSqft, setDraftMaxSqft] = useState<number | null>(filters.maxSqft);
+  const [draftExcludeNoSqft, setDraftExcludeNoSqft] = useState<boolean>(filters.excludeNoSqft);
 
   // Save search dropdown state
   const [saveOpen, setSaveOpen] = useState(false);
   const [saveName, setSaveName] = useState('');
-  const [mySearchesOpen, setMySearchesOpen] = useState(false);
   const [saveToastVisible, setSaveToastVisible] = useState(false);
   const saveToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveDropdownRef = useRef<HTMLDivElement>(null);
-  const mySearchesDropdownRef = useRef<HTMLDivElement>(null);
   const saveInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync drafts when filters change externally
-  useEffect(() => {
-    setDraftMinRent(filters.minRent);
-  }, [filters.minRent]);
-  useEffect(() => {
-    setDraftMaxRent(filters.maxRent);
-  }, [filters.maxRent]);
-  useEffect(() => {
-    setDraftSelectedBeds(filters.selectedBeds ?? []);
-  }, [filters.selectedBeds]);
-  useEffect(() => {
-    setDraftMinBaths(filters.minBaths);
-  }, [filters.minBaths]);
-  useEffect(() => {
-    setDraftMaxPricePerBed(filters.maxPricePerBed);
-  }, [filters.maxPricePerBed]);
-  useEffect(() => {
-    setDraftMaxListingAge(filters.maxListingAge);
-  }, [filters.maxListingAge]);
-  useEffect(() => {
-    setDraftSources(filters.selectedSources);
-  }, [filters.selectedSources]);
-  useEffect(() => {
-    setDraftCommuteRules(filters.commuteRules ?? []);
-  }, [filters.commuteRules]);
+  // Saved search tabs state
+  const [activeSearchId, setActiveSearchId] = useState<number | null>(null);
+  const [editingSearchId, setEditingSearchId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
 
-  // Reset drafts when a dropdown opens
+  // Sync all drafts from committed filters when no dropdown is open
   useEffect(() => {
-    if (openChip === 'price') {
-      setDraftMinRent(filters.minRent);
-      setDraftMaxRent(filters.maxRent);
-    } else if (openChip === 'bedsBaths') {
-      setDraftSelectedBeds(filters.selectedBeds ?? []);
-      setDraftMinBaths(filters.minBaths);
-    } else if (openChip === 'pricePerBed') {
-      setDraftMaxPricePerBed(filters.maxPricePerBed);
-    } else if (openChip === 'listingAge') {
-      setDraftMaxListingAge(filters.maxListingAge);
-    } else if (openChip === 'source') {
-      setDraftSources(filters.selectedSources);
-    } else if (openChip === 'commute') {
-      setDraftCommuteRules(filters.commuteRules ?? []);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openChip]);
+    if (openChip !== null) return;
+    setDraftMinRent(filters.minRent);
+    setDraftMaxRent(filters.maxRent);
+    setDraftSelectedBeds(filters.selectedBeds ?? []);
+    setDraftMinBaths(filters.minBaths);
+    setDraftMaxListingAge(filters.maxListingAge);
+    setDraftSources(filters.selectedSources);
+    setDraftCommuteRules(filters.commuteRules ?? []);
+    setDraftMinYearBuilt(filters.minYearBuilt);
+    setDraftMaxYearBuilt(filters.maxYearBuilt);
+    setDraftMinSqft(filters.minSqft);
+    setDraftMaxSqft(filters.maxSqft);
+    setDraftExcludeNoSqft(filters.excludeNoSqft);
+  }, [openChip, filters.minRent, filters.maxRent, filters.selectedBeds, filters.minBaths, filters.maxListingAge, filters.selectedSources, filters.commuteRules, filters.minYearBuilt, filters.maxYearBuilt, filters.minSqft, filters.maxSqft, filters.excludeNoSqft]);
 
   // Click-outside handler — discard drafts
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1237,7 +1249,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle, u
         setOpenChip(null);
         setSortOpen(false);
         setSaveOpen(false);
-        setMySearchesOpen(false);
+        setEditingSearchId(null);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -1245,27 +1257,38 @@ export default function Filters({ filters, onChange, listingCount, viewToggle, u
   }, []);
 
   function toggleChip(chip: ChipId) {
-    setOpenChip((prev) => (prev === chip ? null : chip));
+    setOpenChip((prev) => {
+      if (prev === chip) return null;
+      // Reset drafts for the opening chip synchronously (avoids double-render from useEffect)
+      if (chip === 'price') {
+        setDraftMinRent(filters.minRent);
+        setDraftMaxRent(filters.maxRent);
+      } else if (chip === 'bedsBaths') {
+        setDraftSelectedBeds(filters.selectedBeds ?? []);
+        setDraftMinBaths(filters.minBaths);
+      } else if (chip === 'listingAge') {
+        setDraftMaxListingAge(filters.maxListingAge);
+      } else if (chip === 'source') {
+        setDraftSources(filters.selectedSources);
+      } else if (chip === 'commute') {
+        setDraftCommuteRules(filters.commuteRules ?? []);
+      } else if (chip === 'yearBuilt') {
+        setDraftMinYearBuilt(filters.minYearBuilt);
+        setDraftMaxYearBuilt(filters.maxYearBuilt);
+      } else if (chip === 'sqft') {
+        setDraftMinSqft(filters.minSqft);
+        setDraftMaxSqft(filters.maxSqft);
+        setDraftExcludeNoSqft(filters.excludeNoSqft);
+      }
+      return chip;
+    });
     setSortOpen(false);
   }
 
   const sortLabel = SORT_OPTIONS.find((o) => o.value === filters.sort)?.label ?? 'PRICE/BEDROOM';
   const activeCount = countActiveFilters(filters);
 
-  // Measure the expanded row for smooth transition
   const expandedRowRef = useRef<HTMLDivElement>(null);
-  const [expandedHeight, setExpandedHeight] = useState(0);
-  useEffect(() => {
-    if (expandedRowRef.current) {
-      const ro = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          setExpandedHeight(entry.contentRect.height);
-        }
-      });
-      ro.observe(expandedRowRef.current);
-      return () => ro.disconnect();
-    }
-  }, []);
 
   return (
     <div
@@ -1275,56 +1298,112 @@ export default function Filters({ filters, onChange, listingCount, viewToggle, u
     >
       {/* Row 1 (always visible): Area tabs + listing count + Filters button + Sort + View toggle */}
       <div className="flex items-center h-8 gap-3">
-        {/* Search tags — horizontally scrollable, hidden scrollbar */}
+        {/* Saved search tabs — horizontally scrollable, hidden scrollbar */}
         <div
           className="flex items-center flex-1 min-w-0 overflow-x-auto"
           style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
         >
           <style dangerouslySetInnerHTML={{ __html: `.area-tabs-scroll::-webkit-scrollbar { display: none; }` }} />
           <div className="area-tabs-scroll flex items-center overflow-x-auto" style={{ scrollbarWidth: 'none' } as React.CSSProperties}>
-            {SEARCH_TABS.map((tab) => {
-              const active = filters.searchTag === tab.value;
+            {/* "All" tab — always first */}
+            <div className="relative group shrink-0">
+              <button
+                onClick={() => setActiveSearchId(null)}
+                className={cn(
+                  'relative flex items-center h-8 px-2.5 text-[11px] whitespace-nowrap cursor-pointer transition-colors duration-150',
+                  activeSearchId === null ? 'text-[#e1e4e8]' : 'text-[#8b949e] hover:text-[#c0d6f5]',
+                )}
+              >
+                All
+                {activeSearchId === null && (
+                  <span
+                    className="absolute bottom-0 left-2.5 right-2.5 h-0.5 rounded-sm"
+                    style={{ backgroundColor: '#58a6ff' }}
+                  />
+                )}
+              </button>
+            </div>
+
+            {/* Saved search tabs */}
+            {savedSearches?.map((s) => {
+              const active = activeSearchId === s.id;
+              const isEditing = editingSearchId === s.id;
               return (
-                <div key={tab.value} className="relative group shrink-0">
-                  <button
-                    onClick={() => onChange({ ...filters, searchTag: tab.value })}
-                    className={cn(
-                      'relative flex items-center h-8 px-2.5 text-[11px] whitespace-nowrap cursor-pointer transition-colors duration-150',
-                      active ? 'text-[#e1e4e8]' : 'text-[#8b949e] hover:text-[#c0d6f5]',
-                    )}
-                  >
-                    {tab.label}
-                    {/* Active underline indicator */}
-                    {active && (
-                      <span
-                        className="absolute bottom-0 left-2.5 right-2.5 h-0.5 rounded-sm"
-                        style={{ backgroundColor: '#58a6ff' }}
+                <div key={s.id} className="relative group shrink-0">
+                  {isEditing ? (
+                    <div className="flex items-center h-8 px-1">
+                      <input
+                        ref={editInputRef}
+                        type="text"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && editingName.trim()) {
+                            onUpdateSearch?.(s.id, editingName.trim());
+                            setEditingSearchId(null);
+                          }
+                          if (e.key === 'Escape') setEditingSearchId(null);
+                        }}
+                        onBlur={() => {
+                          if (editingName.trim()) {
+                            onUpdateSearch?.(s.id, editingName.trim());
+                          }
+                          setEditingSearchId(null);
+                        }}
+                        className="h-6 px-1.5 text-[11px] rounded outline-none"
+                        style={{ backgroundColor: '#0f1117', border: '1px solid #58a6ff', color: '#e1e4e8', width: `${Math.max(editingName.length, 4) * 7 + 16}px`, maxWidth: '150px' }}
                       />
-                    )}
-                  </button>
-                  {/* Custom tooltip */}
-                  <div
-                    className="pointer-events-none absolute left-0 top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-75 z-50"
-                  >
-                    <div
-                      className="absolute -top-1 w-2 h-2 rotate-45"
-                      style={{ left: 12, backgroundColor: '#1c2028', border: '1px solid #2d333b', borderRight: 'none', borderBottom: 'none' }}
-                    />
-                    <div
-                      className="rounded-md px-2.5 py-1.5 text-xs"
-                      style={{
-                        backgroundColor: '#1c2028',
-                        color: '#e1e4e8',
-                        border: '1px solid #2d333b',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-                        maxWidth: 'min(260px, calc(100vw - 32px))',
-                        width: 'max-content',
-                        wordWrap: 'break-word',
-                      }}
-                    >
-                      {tab.title}
                     </div>
-                  </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setActiveSearchId(s.id);
+                        onLoadSearch?.(s.filters as unknown as FiltersState);
+                      }}
+                      className={cn(
+                        'relative flex items-center gap-1 h-8 px-2.5 text-[11px] whitespace-nowrap cursor-pointer transition-colors duration-150',
+                        active ? 'text-[#e1e4e8]' : 'text-[#8b949e] hover:text-[#c0d6f5]',
+                      )}
+                    >
+                      {s.name}
+                      {active && (
+                        <span
+                          className="absolute bottom-0 left-2.5 right-2.5 h-0.5 rounded-sm"
+                          style={{ backgroundColor: '#58a6ff' }}
+                        />
+                      )}
+                      {/* Edit/delete icons on hover */}
+                      <span className="hidden group-hover:flex items-center gap-0.5 ml-0.5">
+                        <span
+                          role="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingSearchId(s.id);
+                            setEditingName(s.name);
+                            setTimeout(() => editInputRef.current?.focus(), 50);
+                          }}
+                          className="w-4 h-4 rounded flex items-center justify-center text-[#484f58] hover:text-[#58a6ff] hover:bg-[#58a6ff]/10 cursor-pointer transition-colors"
+                        >
+                          <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M8.5 1.5l2 2L4 10H2v-2z" />
+                          </svg>
+                        </span>
+                        <span
+                          role="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (activeSearchId === s.id) setActiveSearchId(null);
+                            onDeleteSearch?.(s.id);
+                          }}
+                          className="w-4 h-4 rounded flex items-center justify-center text-[#484f58] hover:text-red-400 hover:bg-red-400/10 cursor-pointer transition-colors"
+                        >
+                          <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                            <path d="M2 2L8 8M8 2L2 8" />
+                          </svg>
+                        </span>
+                      </span>
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -1334,7 +1413,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle, u
         {/* Right-side controls */}
         <div className="flex items-center gap-1.5 shrink-0 pl-2">
           {listingCount !== undefined && (
-            <span className="text-[11px] whitespace-nowrap" style={{ color: '#8b949e' }}>
+            <span data-testid="listing-count" className="text-[11px] whitespace-nowrap" style={{ color: '#8b949e' }}>
               {listingCount}
             </span>
           )}
@@ -1488,35 +1567,6 @@ export default function Filters({ filters, onChange, listingCount, viewToggle, u
             />
           </FilterChip>
 
-          {/* $/Bedroom chip */}
-          <FilterChip
-            compact
-            label={pricePerBedLabel(filters.maxPricePerBed)}
-            active={filters.maxPricePerBed !== null}
-            open={openChip === 'pricePerBed'}
-            onToggle={() => toggleChip('pricePerBed')}
-          >
-            <SectionTitle>Max $/Bedroom</SectionTitle>
-            <RangeSlider
-              label="Max $/Bedroom"
-              min={PRICE_PER_BED_SLIDER_MIN}
-              max={PRICE_PER_BED_SLIDER_MAX}
-              step={PRICE_PER_BED_SLIDER_STEP}
-              value={draftMaxPricePerBed ?? PRICE_PER_BED_SLIDER_MAX}
-              onChange={(v) => setDraftMaxPricePerBed(v === PRICE_PER_BED_SLIDER_MAX ? null : v)}
-            />
-            <DropdownFooter
-              onReset={() => {
-                onChange({ ...filters, maxPricePerBed: null });
-                setOpenChip(null);
-              }}
-              onDone={() => {
-                onChange({ ...filters, maxPricePerBed: draftMaxPricePerBed });
-                setOpenChip(null);
-              }}
-            />
-          </FilterChip>
-
           {/* Listing age chip */}
           <FilterChip
             compact
@@ -1589,6 +1639,192 @@ export default function Filters({ filters, onChange, listingCount, viewToggle, u
             />
           </FilterChip>
 
+          {/* Year Built chip */}
+          <FilterChip
+            compact
+            label={yearBuiltLabel(filters.minYearBuilt, filters.maxYearBuilt)}
+            active={filters.minYearBuilt !== null || filters.maxYearBuilt !== null}
+            open={openChip === 'yearBuilt'}
+            onToggle={() => toggleChip('yearBuilt')}
+          >
+            <SectionTitle>Year Built Presets</SectionTitle>
+            <div className="flex flex-col gap-2 mb-4">
+              {YEAR_BUILT_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  onClick={() => {
+                    setDraftMinYearBuilt(preset.minYear);
+                    setDraftMaxYearBuilt(preset.maxYear);
+                  }}
+                  className={cn(
+                    'px-3 py-2 rounded-md text-sm text-left transition-colors cursor-pointer border',
+                    draftMinYearBuilt === preset.minYear && draftMaxYearBuilt === preset.maxYear
+                      ? 'bg-[#58a6ff]/10 border-[#58a6ff] text-[#58a6ff]'
+                      : 'bg-transparent border-[#2d333b] text-[#8b949e] hover:bg-[#58a6ff]/5 hover:border-[#58a6ff]/30',
+                  )}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            <SectionTitle>Custom Range</SectionTitle>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: '#8b949e' }}>
+                  Min Year
+                </label>
+                <input
+                  type="number"
+                  value={draftMinYearBuilt ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                    setDraftMinYearBuilt(val && val >= YEAR_BUILT_MIN ? val : null);
+                  }}
+                  placeholder="1800"
+                  min={YEAR_BUILT_MIN}
+                  max={YEAR_BUILT_MAX}
+                  className="w-full h-8 rounded px-2 text-sm border"
+                  style={{
+                    backgroundColor: '#0d1117',
+                    color: '#e1e4e8',
+                    borderColor: '#2d333b',
+                  }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: '#8b949e' }}>
+                  Max Year
+                </label>
+                <input
+                  type="number"
+                  value={draftMaxYearBuilt ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                    setDraftMaxYearBuilt(val && val <= YEAR_BUILT_MAX ? val : null);
+                  }}
+                  placeholder={String(YEAR_BUILT_MAX)}
+                  min={YEAR_BUILT_MIN}
+                  max={YEAR_BUILT_MAX}
+                  className="w-full h-8 rounded px-2 text-sm border"
+                  style={{
+                    backgroundColor: '#0d1117',
+                    color: '#e1e4e8',
+                    borderColor: '#2d333b',
+                  }}
+                />
+              </div>
+            </div>
+
+            <DropdownFooter
+              onReset={() => {
+                onChange({ ...filters, minYearBuilt: null, maxYearBuilt: null });
+                setOpenChip(null);
+              }}
+              onDone={() => {
+                onChange({ ...filters, minYearBuilt: draftMinYearBuilt, maxYearBuilt: draftMaxYearBuilt });
+                setOpenChip(null);
+              }}
+            />
+          </FilterChip>
+
+          {/* Sqft chip */}
+          <FilterChip
+            compact
+            label={sqftLabel(filters.minSqft, filters.maxSqft, filters.excludeNoSqft)}
+            active={filters.minSqft !== null || filters.maxSqft !== null || filters.excludeNoSqft}
+            open={openChip === 'sqft'}
+            onToggle={() => toggleChip('sqft')}
+          >
+            <SectionTitle>Size Presets</SectionTitle>
+            <div className="flex flex-col gap-2 mb-4">
+              {SQFT_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  onClick={() => {
+                    setDraftMinSqft(preset.minSqft);
+                    setDraftMaxSqft(preset.maxSqft);
+                  }}
+                  className={cn(
+                    'px-3 py-2 rounded-md text-sm text-left transition-colors cursor-pointer border',
+                    draftMinSqft === preset.minSqft && draftMaxSqft === preset.maxSqft
+                      ? 'bg-[#58a6ff]/10 border-[#58a6ff] text-[#58a6ff]'
+                      : 'bg-transparent border-[#2d333b] text-[#8b949e] hover:bg-[#58a6ff]/5 hover:border-[#58a6ff]/30',
+                  )}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            <SectionTitle>Custom Range</SectionTitle>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: '#8b949e' }}>
+                  Min Sqft
+                </label>
+                <input
+                  type="number"
+                  value={draftMinSqft ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                    setDraftMinSqft(val && val > 0 ? val : null);
+                  }}
+                  placeholder="0"
+                  min={0}
+                  className="w-full h-8 rounded px-2 text-sm border"
+                  style={{
+                    backgroundColor: '#0d1117',
+                    color: '#e1e4e8',
+                    borderColor: '#2d333b',
+                  }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1" style={{ color: '#8b949e' }}>
+                  Max Sqft
+                </label>
+                <input
+                  type="number"
+                  value={draftMaxSqft ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                    setDraftMaxSqft(val && val > 0 ? val : null);
+                  }}
+                  placeholder="No max"
+                  min={0}
+                  className="w-full h-8 rounded px-2 text-sm border"
+                  style={{
+                    backgroundColor: '#0d1117',
+                    color: '#e1e4e8',
+                    borderColor: '#2d333b',
+                  }}
+                />
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2 cursor-pointer mb-2">
+              <input
+                type="checkbox"
+                checked={draftExcludeNoSqft}
+                onChange={(e) => setDraftExcludeNoSqft(e.target.checked)}
+                className="accent-[#58a6ff] w-4 h-4 rounded cursor-pointer"
+              />
+              <span className="text-sm" style={{ color: '#8b949e' }}>Exclude listings without sqft</span>
+            </label>
+
+            <DropdownFooter
+              onReset={() => {
+                onChange({ ...filters, minSqft: null, maxSqft: null, excludeNoSqft: false });
+                setOpenChip(null);
+              }}
+              onDone={() => {
+                onChange({ ...filters, minSqft: draftMinSqft, maxSqft: draftMaxSqft, excludeNoSqft: draftExcludeNoSqft });
+                setOpenChip(null);
+              }}
+            />
+          </FilterChip>
+
           {/* Commute chip */}
           <FilterChip
             compact
@@ -1597,6 +1833,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle, u
             open={openChip === 'commute'}
             onToggle={() => toggleChip('commute')}
             dropdownAlign="right"
+            data-testid="commute-chip"
           >
             <div style={{ minWidth: 'min(380px, calc(100vw - 16px))', maxWidth: '440px' }}>
               <div className="flex items-center justify-between mb-3">
@@ -1668,7 +1905,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle, u
                 </div>
               ) : (
                 <>
-                  <div className="overflow-y-auto" style={{ maxHeight: 'min(400px, calc(100vh - 280px))', scrollbarWidth: 'thin', scrollbarColor: '#2d333b #1c2028' }}>
+                  <div className="overflow-y-auto dark-scrollbar" style={{ maxHeight: 'min(400px, calc(100vh - 280px))', scrollbarWidth: 'thin', scrollbarColor: '#2d333b #1c2028' }}>
                     {draftCommuteRules.map((rule, idx) => (
                       <CommuteRuleEditor
                         key={rule.id}
@@ -1738,28 +1975,30 @@ export default function Filters({ filters, onChange, listingCount, viewToggle, u
             </div>
           </div>
 
-          {/* Divider + Save / My Searches — only when logged in */}
-          {userId && (
-            <>
-              {/* Vertical divider */}
-              <div className="h-4 w-px shrink-0" style={{ backgroundColor: '#2d333b' }} />
+          {/* Divider + Save / My Searches */}
+          <>
+            {/* Vertical divider */}
+            <div className="h-4 w-px shrink-0" style={{ backgroundColor: '#2d333b' }} />
 
-              {/* Save chip — only when at least one filter is active */}
-              {activeCount > 0 && (
-                <div className="relative shrink-0" ref={saveDropdownRef}>
-                  <ButtonBase
-                    onClick={() => {
-                      setSaveOpen((prev) => {
-                        if (!prev) {
-                          setSaveName(suggestSearchName(filters));
-                          setOpenChip(null);
-                          setMySearchesOpen(false);
-                          // Focus input after render
-                          setTimeout(() => saveInputRef.current?.focus(), 50);
-                        }
-                        return !prev;
-                      });
-                    }}
+            {/* Save chip — only when at least one filter is active */}
+            {activeCount > 0 && (
+              <div className="relative shrink-0" ref={saveDropdownRef}>
+                <ButtonBase
+                  onClick={() => {
+                    if (!userId) {
+                      onLoginRequired?.();
+                      return;
+                    }
+                    setSaveOpen((prev) => {
+                      if (!prev) {
+                        setSaveName(suggestSearchName(filters));
+                        setOpenChip(null);
+                        // Focus input after render
+                        setTimeout(() => saveInputRef.current?.focus(), 50);
+                      }
+                      return !prev;
+                    });
+                  }}
                     className={cn(
                       'flex items-center gap-1 rounded-md font-medium whitespace-nowrap border px-2.5 py-0.5 text-[11px] h-[28px]',
                       saveOpen
@@ -1794,9 +2033,10 @@ export default function Filters({ filters, onChange, listingCount, viewToggle, u
                         type="text"
                         value={saveName}
                         onChange={(e) => setSaveName(e.target.value)}
-                        onKeyDown={(e) => {
+                        onKeyDown={async (e) => {
                           if (e.key === 'Enter' && saveName.trim()) {
-                            onSaveSearch?.(saveName.trim());
+                            const saved = await onSaveSearch?.(saveName.trim());
+                            if (saved) setActiveSearchId(saved.id);
                             setSaveOpen(false);
                             // Show toast
                             if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
@@ -1812,11 +2052,6 @@ export default function Filters({ filters, onChange, listingCount, viewToggle, u
 
                       {/* Active filter summary pills */}
                       <div className="flex flex-wrap gap-1 mb-4">
-                        {filters.searchTag !== 'all' && (
-                          <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
-                            {SEARCH_TABS.find((t) => t.value === filters.searchTag)?.label}
-                          </span>
-                        )}
                         {filters.selectedBeds !== null && (
                           <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
                             {filters.selectedBeds.slice().sort((a, b) => a - b).map((b) => (b === 7 ? '7+' : String(b))).join(', ')} bed
@@ -1825,11 +2060,6 @@ export default function Filters({ filters, onChange, listingCount, viewToggle, u
                         {(filters.minRent !== null || filters.maxRent !== null) && (
                           <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
                             {priceLabel(filters.minRent, filters.maxRent)}
-                          </span>
-                        )}
-                        {filters.maxPricePerBed !== null && (
-                          <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
-                            {pricePerBedLabel(filters.maxPricePerBed)}
                           </span>
                         )}
                         {filters.commuteRules && filters.commuteRules.length > 0 && (
@@ -1849,9 +2079,10 @@ export default function Filters({ filters, onChange, listingCount, viewToggle, u
                           Cancel
                         </TextButton>
                         <PrimaryButton
-                          onClick={() => {
+                          onClick={async () => {
                             if (saveName.trim()) {
-                              onSaveSearch?.(saveName.trim());
+                              const saved = await onSaveSearch?.(saveName.trim());
+                              if (saved) setActiveSearchId(saved.id);
                               setSaveOpen(false);
                               if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
                               setSaveToastVisible(true);
@@ -1869,104 +2100,7 @@ export default function Filters({ filters, onChange, listingCount, viewToggle, u
                 </div>
               )}
 
-              {/* My Searches chip — only when user has saved searches */}
-              {savedSearches && savedSearches.length > 0 && (
-                <div className="relative shrink-0" ref={mySearchesDropdownRef}>
-                  <ButtonBase
-                    onClick={() => {
-                      setMySearchesOpen((prev) => {
-                        if (!prev) {
-                          setOpenChip(null);
-                          setSaveOpen(false);
-                        }
-                        return !prev;
-                      });
-                    }}
-                    className={cn(
-                      'flex items-center gap-1 rounded-md font-medium whitespace-nowrap border px-2.5 py-0.5 text-[11px] h-[28px]',
-                      mySearchesOpen
-                        ? 'bg-[#58a6ff]/[0.08] text-[#58a6ff] border-[#58a6ff]'
-                        : 'bg-transparent text-[#8b949e] border-[#2d333b] hover:bg-[#58a6ff]/20 hover:text-[#c0d6f5] hover:border-[#58a6ff]/40',
-                    )}
-                  >
-                    {/* List icon */}
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M2 3h8M2 6h8M2 9h8" />
-                    </svg>
-                    My Searches
-                    <span className="bg-[#58a6ff] text-[#0f1117] text-[9px] font-bold rounded-full min-w-[14px] h-3.5 flex items-center justify-center px-1">
-                      {savedSearches.length}
-                    </span>
-                  </ButtonBase>
-
-                  {mySearchesOpen && (
-                    <div
-                      className="fixed z-[9999] rounded-xl border border-[#2d333b] p-4 shadow-xl"
-                      style={{
-                        backgroundColor: '#1c2028',
-                        minWidth: '280px',
-                        maxWidth: 'min(360px, calc(100vw - 16px))',
-                        maxHeight: 'min(400px, calc(100vh - 200px))',
-                        overflowY: 'auto',
-                        scrollbarWidth: 'thin',
-                        scrollbarColor: '#2d333b #1c2028',
-                        top: mySearchesDropdownRef.current ? mySearchesDropdownRef.current.getBoundingClientRect().bottom + 8 : 0,
-                        right: mySearchesDropdownRef.current ? window.innerWidth - mySearchesDropdownRef.current.getBoundingClientRect().right : 0,
-                      }}
-                    >
-                      <div className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: '#8b949e', letterSpacing: '0.05em' }}>
-                        Saved Searches
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        {savedSearches.map((s) => {
-                          const savedFilters = s.filters as unknown as FiltersState;
-                          const filterParts: string[] = [];
-                          if (savedFilters.searchTag && savedFilters.searchTag !== 'all') {
-                            filterParts.push(SEARCH_TABS.find((t) => t.value === savedFilters.searchTag)?.label ?? savedFilters.searchTag);
-                          }
-                          if (savedFilters.selectedBeds) filterParts.push(`${Array.isArray(savedFilters.selectedBeds) ? savedFilters.selectedBeds.join('/') : savedFilters.selectedBeds} bed`);
-                          if (savedFilters.maxRent) filterParts.push(`Under $${(savedFilters.maxRent / 1000).toFixed(savedFilters.maxRent % 1000 === 0 ? 0 : 1)}K`);
-                          if (savedFilters.commuteRules && savedFilters.commuteRules.length > 0) filterParts.push('Commute');
-                          const summary = filterParts.length > 0 ? filterParts.join(' \u00B7 ') : 'All filters';
-                          const dateStr = new Date(s.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
-                          return (
-                            <div
-                              key={s.id}
-                              className="group/card flex items-center gap-2 rounded-lg px-3 py-2 cursor-pointer transition-colors hover:bg-[#161b22]"
-                              onClick={() => {
-                                onLoadSearch?.(savedFilters);
-                                setMySearchesOpen(false);
-                              }}
-                            >
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs font-medium truncate" style={{ color: '#e1e4e8' }}>
-                                  {s.name}
-                                </div>
-                                <div className="text-[10px] truncate mt-0.5" style={{ color: '#8b949e' }}>
-                                  {summary} &middot; {dateStr}
-                                </div>
-                              </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onDeleteSearch?.(s.id);
-                                }}
-                                className="shrink-0 w-6 h-6 rounded flex items-center justify-center text-sm opacity-0 group-hover/card:opacity-100 transition-opacity cursor-pointer text-[#484f58] hover:text-red-400 hover:bg-red-400/10"
-                              >
-                                &times;
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
+          </>
         </div>
       )}
 
@@ -1989,4 +2123,6 @@ export default function Filters({ filters, onChange, listingCount, viewToggle, u
       )}
     </div>
   );
-}
+});
+
+export default Filters;

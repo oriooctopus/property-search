@@ -1,6 +1,6 @@
 'use client';
 
-import type { FiltersState, SearchTag, MaxListingAge } from '@/components/Filters';
+import type { FiltersState, MaxListingAge } from '@/components/Filters';
 
 interface FilterPillData {
   key: keyof FiltersState;
@@ -28,20 +28,6 @@ function getActiveFilters(filters: FiltersState): FilterPillData[] {
     const k = filters.minRent >= 1000 ? `$${(filters.minRent / 1000).toFixed(filters.minRent % 1000 === 0 ? 0 : 1)}K` : `$${filters.minRent}`;
     pills.push({ key: 'minRent', label: `${k}+` });
   }
-  if (filters.maxPricePerBed !== null) {
-    pills.push({ key: 'maxPricePerBed', label: `Under $${filters.maxPricePerBed.toLocaleString()}/bed` });
-  }
-  if (filters.searchTag !== 'all') {
-    const tagLabels: Record<SearchTag, string> = {
-      all: 'All',
-      fulton: 'Near Fulton St',
-      ltrain: 'Near L Train',
-      manhattan: 'Manhattan',
-      brooklyn: 'Brooklyn',
-      uptown: 'Uptown West',
-    };
-    pills.push({ key: 'searchTag', label: tagLabels[filters.searchTag] });
-  }
   if (filters.maxListingAge !== null) {
     const ageLabels: Record<string, string> = {
       '1w': '1 Week',
@@ -59,6 +45,24 @@ function getActiveFilters(filters: FiltersState): FilterPillData[] {
   if (filters.commuteRules && filters.commuteRules.length > 0) {
     pills.push({ key: 'commuteRules', label: `${filters.commuteRules.length} commute rule${filters.commuteRules.length > 1 ? 's' : ''}` });
   }
+  if (filters.minYearBuilt !== null || filters.maxYearBuilt !== null) {
+    const parts: string[] = [];
+    if (filters.minYearBuilt !== null) parts.push(`${filters.minYearBuilt}+`);
+    if (filters.maxYearBuilt !== null) parts.push(`before ${filters.maxYearBuilt}`);
+    pills.push({ key: 'minYearBuilt', label: parts.length > 0 ? `Built: ${parts.join(', ')}` : 'Year Built' });
+  }
+  if (filters.minSqft !== null || filters.maxSqft !== null) {
+    if (filters.minSqft !== null && filters.maxSqft !== null) {
+      pills.push({ key: 'minSqft', label: `${filters.minSqft.toLocaleString()}\u2013${filters.maxSqft.toLocaleString()} sqft` });
+    } else if (filters.minSqft !== null) {
+      pills.push({ key: 'minSqft', label: `${filters.minSqft.toLocaleString()}+ sqft` });
+    } else {
+      pills.push({ key: 'minSqft', label: `Under ${filters.maxSqft!.toLocaleString()} sqft` });
+    }
+  }
+  if (filters.excludeNoSqft) {
+    pills.push({ key: 'excludeNoSqft', label: 'Has sqft' });
+  }
 
   return pills;
 }
@@ -66,14 +70,19 @@ function getActiveFilters(filters: FiltersState): FilterPillData[] {
 /** Default value used to "remove" a filter by key */
 function getDefaultValue(key: keyof FiltersState): FiltersState[keyof FiltersState] {
   switch (key) {
-    case 'searchTag':
-      return 'all' as SearchTag;
     case 'sort':
-      return 'pricePerBed';
+      return 'price';
     case 'maxListingAge':
       return '1m' as MaxListingAge;
     case 'commuteRules':
       return [] as never;
+    case 'excludeNoSqft':
+      return false;
+    case 'minYearBuilt':
+    case 'maxYearBuilt':
+    case 'minSqft':
+    case 'maxSqft':
+      return null;
     default:
       return null;
   }

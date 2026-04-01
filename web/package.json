@@ -11,7 +11,9 @@
     "test:ui": "playwright test --ui",
     "test:visual": "playwright test tests/visual-regression.spec.ts",
     "test:visual:update": "playwright test tests/visual-regression.spec.ts --update-snapshots",
-    "predeploy": "npm run test:visual"
+    "test:visual:review": "node tests/serve-visual-approval.js",
+    "predeploy": "npm run test:visual",
+    "refresh": "tsx scripts/refresh-sources.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
@@ -27,6 +29,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-leaflet": "^5.0.0",
+    "streeteasy-api": "^0.1.11",
     "tailwind-merge": "^3.5.0",
     "twilio": "^5.13.0"
   },
@@ -40,6 +43,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.14",
+    "https-proxy-agent": "^7.0.6",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

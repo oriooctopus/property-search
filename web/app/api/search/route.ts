@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { unifiedSearch } from "@/lib/sources";
+import type { ListingSource } from "@/lib/sources/types";
 
 export const maxDuration = 60;
 
@@ -101,77 +101,108 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 4. Call all data sources via unified search
-  const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
-  if (!RAPIDAPI_KEY) {
-    return NextResponse.json(
-      { error: "RAPIDAPI_KEY not configured" },
-      { status: 500 },
-    );
+  // 4. Query listings from Supabase instead of calling scrapers
+  const adminClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  );
+
+  // Build the search tag pattern: "city, ST" (e.g. "New York, NY")
+  const searchTag = `${city}, ${stateCode}`.toLowerCase();
+
+  let query = adminClient
+    .from("listings")
+    .select("*")
+    .order("last_update_date", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  // Filter by area or search_tag matching the city/state
+  // Use ilike for case-insensitive matching
+  query = query.or(`area.ilike.%${city}%,search_tag.ilike.%${searchTag}%`);
+
+  if (bedsMin != null) {
+    query = query.gte("beds", bedsMin);
+  }
+  if (bathsMin != null) {
+    query = query.gte("baths", bathsMin);
+  }
+  if (priceMax != null) {
+    query = query.lte("price", priceMax);
+  }
+  if (priceMin != null) {
+    query = query.gte("price", priceMin);
   }
 
-  let result;
-  try {
-    result = await unifiedSearch(
-      { city, stateCode, bedsMin, bathsMin, priceMax, priceMin },
-      RAPIDAPI_KEY,
-    );
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
+  const { data: dbListings, error: queryError } = await query;
+
+  if (queryError) {
     return NextResponse.json(
-      { error: "Failed to fetch listings", details: message },
+      { error: "Failed to query listings", details: queryError.message },
       { status: 502 },
     );
   }
 
-  const { listings, totals, errors: sourceErrors, qualitySummary } = result;
+  const rows = dbListings ?? [];
 
-  // Apply maxCostPerBed filter client-side
+  // Normalize DB rows into the RawListing shape the frontend expects
+  const listings = rows.map((row) => ({
+    address: row.address ?? "",
+    area: row.area ?? "",
+    price: Number(row.price) || 0,
+    beds: Number(row.beds) || 0,
+    baths: Number(row.baths) || 0,
+    sqft: row.sqft != null ? Number(row.sqft) : null,
+    lat: Number(row.lat) || 0,
+    lon: Number(row.lon) || 0,
+    photos: Number(row.photos) || 0,
+    photo_urls: row.photo_urls ?? [],
+    url: row.url ?? "",
+    search_tag: row.search_tag ?? "",
+    list_date: row.list_date ?? null,
+    last_update_date: row.last_update_date ?? null,
+    availability_date: row.availability_date ?? null,
+    source: row.source as ListingSource,
+    sources: (row.sources ?? [row.source]) as ListingSource[],
+    source_urls: row.source_urls ?? (row.source && row.url ? { [row.source]: row.url } : {}),
+  }));
+
+  // Apply maxCostPerBed filter (can't do this math in Supabase easily)
   const filtered = maxCostPerBed
     ? listings.filter(
         (l) => l.beds > 0 && Math.round(l.price / l.beds) <= maxCostPerBed,
       )
     : listings;
 
-  // 5. Upsert into listings table using service role client
-  const adminClient = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
-    process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
-  );
-
-  if (filtered.length > 0) {
-    const { error: upsertError } = await adminClient
-      .from("listings")
-      .upsert(
-        filtered.map((l) => ({
-          address: l.address,
-          area: l.area,
-          price: l.price,
-          beds: l.beds,
-          baths: l.baths,
-          sqft: l.sqft,
-          lat: l.lat,
-          lon: l.lon,
-          photos: l.photos,
-          photo_urls: l.photo_urls,
-          url: l.url,
-          search_tag: l.search_tag,
-          list_date: l.list_date,
-          last_update_date: l.last_update_date,
-          availability_date: l.availability_date,
-          source: l.source,
-          sources: l.sources ?? [l.source],
-          source_urls: l.source_urls ?? { [l.source]: l.url },
-        })),
-        { onConflict: "url", ignoreDuplicates: false },
-      );
-
-    if (upsertError) {
-      console.error("Upsert error:", upsertError);
-    }
+  // Build totals by source
+  const totals: Record<string, number> = { merged: filtered.length, deduplicated: 0 };
+  for (const l of filtered) {
+    totals[l.source] = (totals[l.source] ?? 0) + 1;
   }
 
-  // 6. Log the query
+  // Build a simple quality summary from DB results
+  const qualitySummary = {
+    totalProcessed: filtered.length,
+    totalValid: filtered.length,
+    totalDropped: 0,
+    fieldCoverage: {
+      beds: filtered.filter((l) => l.beds > 0).length,
+      baths: filtered.filter((l) => l.baths > 0).length,
+      price: filtered.filter((l) => l.price > 0).length,
+      geo: filtered.filter((l) => l.lat !== 0 && l.lon !== 0).length,
+      photos: filtered.filter((l) => l.photos > 0).length,
+    },
+    sourceBreakdown: Object.entries(totals)
+      .filter(([k]) => k !== "merged" && k !== "deduplicated")
+      .map(([source, count]) => ({
+        source,
+        total: count,
+        valid: count,
+        dropped: 0,
+      })),
+  };
+
+  // 5. Log the query
   await adminClient.from("search_queries").insert({
     user_id: user.id,
     query_params: { city, stateCode, bedsMin, bathsMin, priceMax, priceMin, maxCostPerBed },
@@ -184,7 +215,7 @@ export async function POST(request: NextRequest) {
     listings: filtered,
     total: totals.merged,
     totals,
-    sourceErrors,
+    sourceErrors: [],
     queryUsage: { used: newUsed, limit, tier: tierId },
     qualitySummary,
   });

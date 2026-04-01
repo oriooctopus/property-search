@@ -13,7 +13,7 @@ export default function RadarLoader() {
   return (
     <div
       className="flex flex-col items-center justify-center"
-      style={{ height: 'calc(100vh - 56px)', backgroundColor: '#0f1117' }}
+      style={{ height: 'calc(100vh - 60px)', backgroundColor: '#0f1117' }}
     >
       {/* Radar animation container */}
       <div style={{ position: 'relative', width: 160, height: 160 }}>

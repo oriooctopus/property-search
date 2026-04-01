@@ -5,19 +5,18 @@ import type { Database } from '@/lib/types';
 import { ActionButton, IconButton } from '@/components/ui';
 import { formatShortDate } from '@/lib/format-date';
 import DetailMap from './DetailMap';
+import CommuteItinerary from './CommuteItinerary';
+import type { CommuteRule } from '@/components/Filters';
+import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
 const TAG_COLORS: Record<string, string> = {
-  fulton: '#f97316',
-  ltrain: '#a78bfa',
   manhattan: '#38bdf8',
   brooklyn: '#4ade80',
 };
 
 const TAG_LABELS: Record<string, string> = {
-  fulton: 'Fulton St',
-  ltrain: 'L Train',
   manhattan: 'Manhattan',
   brooklyn: 'Brooklyn',
 };
@@ -36,11 +35,42 @@ interface Person {
   bio: string | null;
 }
 
+/** Resolve the first commute destination from active rules. */
+function getCommuteDestination(rules: CommuteRule[]): {
+  lat: number;
+  lon: number;
+  name: string;
+} | null {
+  for (const rule of rules) {
+    // Address rules have explicit lat/lon
+    if (rule.type === 'address' && rule.addressLat && rule.addressLon) {
+      const shortName = rule.address ? rule.address.split(',')[0].trim() : 'Destination';
+      return { lat: rule.addressLat, lon: rule.addressLon, name: shortName };
+    }
+    // Station rules — look up station coordinates
+    if (rule.type === 'station' && rule.stops && rule.stops.length > 0) {
+      const station = SUBWAY_STATIONS.find((s) => s.name === rule.stops![0]);
+      if (station) {
+        return { lat: station.lat, lon: station.lon, name: station.name };
+      }
+    }
+    // Subway-line rules with specific stops selected
+    if (rule.type === 'subway-line' && rule.stops && rule.stops.length > 0) {
+      const station = SUBWAY_STATIONS.find((s) => s.name === rule.stops![0]);
+      if (station) {
+        return { lat: station.lat, lon: station.lon, name: station.name };
+      }
+    }
+  }
+  return null;
+}
+
 interface ListingDetailProps {
   listing: Listing;
   wouldLiveThere: boolean;
   isFavorited: boolean;
   wouldLivePeople: Person[];
+  commuteRules?: CommuteRule[];
   onToggleWouldLive: () => void;
   onToggleFavorite: () => void;
   onHide: () => void;
@@ -52,6 +82,7 @@ export default function ListingDetail({
   wouldLiveThere,
   isFavorited,
   wouldLivePeople,
+  commuteRules = [],
   onToggleWouldLive,
   onToggleFavorite,
   onHide,
@@ -62,8 +93,9 @@ export default function ListingDetail({
   const [photoIndex, setPhotoIndex] = useState(0);
   const [linkCopied, setLinkCopied] = useState(false);
   const photos = listing.photo_urls ?? [];
-  const pricePerBed = Math.round(listing.price / listing.beds);
+  const pricePerBed = listing.beds > 0 ? Math.round(listing.price / listing.beds) : null;
   const tagColor = TAG_COLORS[listing.search_tag] ?? '#8b949e';
+  const commuteDest = getCommuteDestination(commuteRules);
 
   const scrollToPhoto = (index: number) => {
     const clamped = Math.max(0, Math.min(index, photos.length - 1));
@@ -240,9 +272,11 @@ export default function ListingDetail({
             <span className="text-sm" style={{ color: '#8b949e' }}>
               /mo
             </span>
-            <span className="text-sm" style={{ color: '#8b949e' }}>
-              &middot; ${pricePerBed.toLocaleString()}/bed
-            </span>
+            {pricePerBed != null && (
+              <span className="text-sm" style={{ color: '#8b949e' }}>
+                &middot; ${pricePerBed.toLocaleString()}/bed
+              </span>
+            )}
           </div>
 
           {/* Dates info */}
@@ -255,13 +289,21 @@ export default function ListingDetail({
             className="grid grid-cols-3 gap-3 rounded-lg p-3 mb-4"
             style={{ backgroundColor: '#0f1117', border: '1px solid #2d333b' }}
           >
-            <div className="text-center">
-              <div className="text-lg font-bold" style={{ color: '#e1e4e8' }}>
-                {listing.beds}
-              </div>
-              <div className="text-xs" style={{ color: '#8b949e' }}>
-                Beds
-              </div>
+            <div className="text-center flex flex-col items-center justify-center">
+              {listing.beds === 0 ? (
+                <div className="text-lg font-bold" style={{ color: '#e1e4e8' }}>
+                  Studio
+                </div>
+              ) : (
+                <>
+                  <div className="text-lg font-bold" style={{ color: '#e1e4e8' }}>
+                    {listing.beds}
+                  </div>
+                  <div className="text-xs" style={{ color: '#8b949e' }}>
+                    Beds
+                  </div>
+                </>
+              )}
             </div>
             <div className="text-center">
               <div className="text-lg font-bold" style={{ color: '#e1e4e8' }}>
@@ -280,6 +322,13 @@ export default function ListingDetail({
               </div>
             </div>
           </div>
+
+          {/* Year Built */}
+          {(listing as Record<string, unknown>).year_built != null && (
+            <div className="text-sm mb-4" style={{ color: '#8b949e' }}>
+              Built in {String((listing as Record<string, unknown>).year_built)}
+            </div>
+          )}
 
           {/* Transit */}
           {listing.transit_summary && (
@@ -361,6 +410,17 @@ export default function ListingDetail({
               </div>
               <DetailMap lat={listing.lat} lon={listing.lon} />
             </div>
+          )}
+
+          {/* Commute itinerary */}
+          {commuteDest && listing.lat != null && listing.lon != null && (
+            <CommuteItinerary
+              listingLat={listing.lat}
+              listingLon={listing.lon}
+              destinationLat={commuteDest.lat}
+              destinationLon={commuteDest.lon}
+              destinationName={commuteDest.name}
+            />
           )}
 
           {/* Would Live There People */}

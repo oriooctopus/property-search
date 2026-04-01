@@ -35,6 +35,13 @@ interface Person {
   avatar_url: string | null;
 }
 
+export interface CommuteInfo {
+  minutes: number;
+  route?: string;
+  routeColor?: string;
+  destination?: string;
+}
+
 interface ListingCardProps {
   listing: Listing;
   isSelected: boolean;
@@ -42,6 +49,7 @@ interface ListingCardProps {
   wouldLiveThere: boolean;
   wouldLivePeople: Person[];
   isHiding?: boolean;
+  commuteInfo?: CommuteInfo;
   onClick: () => void;
   onToggleWouldLive: () => void;
   onToggleFavorite: () => void;
@@ -56,13 +64,14 @@ export default function ListingCard({
   wouldLiveThere,
   wouldLivePeople,
   isHiding,
+  commuteInfo,
   onClick,
   onToggleWouldLive,
   onToggleFavorite,
   onExpand,
   onHide,
 }: ListingCardProps) {
-  const pricePerBed = Math.round(listing.price / listing.beds);
+  const pricePerBed = listing.beds > 0 ? Math.round(listing.price / listing.beds) : null;
   const tagColor = TAG_COLORS[listing.search_tag] ?? '#8b949e';
   const photos = listing.photo_urls ?? [];
   const hasMorePhotosSlide = photos.length === 1;
@@ -259,9 +268,12 @@ export default function ListingCard({
 
       {/* Details row */}
       <div className="flex items-center gap-3 text-xs mt-2 mb-2" style={{ color: '#8b949e' }}>
-        <span>{listing.beds} bd</span>
+        <span>{listing.beds === 0 ? 'Studio' : `${listing.beds} bd`}</span>
         <span>{listing.baths != null && Number(listing.baths) > 0 ? `${listing.baths} ba` : 'N/A ba'}</span>
         <span>{listing.sqft != null && Number(listing.sqft) > 0 ? `${listing.sqft.toLocaleString()} sqft` : 'N/A sqft'}</span>
+        {(listing as Record<string, unknown>).year_built != null && (
+          <span>Built {String((listing as Record<string, unknown>).year_built)}</span>
+        )}
       </div>
 
       {/* Transit */}
@@ -341,6 +353,36 @@ export default function ListingCard({
               {SOURCE_LABELS[src] ?? src}
             </span>
           ))}
+          {/* Commute time tag */}
+          {commuteInfo && (
+            <span
+              className="inline-flex items-center rounded-full h-[22px] text-[11px] font-semibold cursor-default"
+              style={{
+                padding: '3px 10px 3px 4px',
+                color: '#58a6ff',
+                background: 'rgba(88, 166, 255, 0.08)',
+                border: '1px solid rgba(88, 166, 255, 0.3)',
+                gap: 4,
+              }}
+            >
+              {commuteInfo.route && (
+                <span
+                  className="inline-flex items-center justify-center rounded-full shrink-0 font-extrabold"
+                  style={{
+                    width: 14,
+                    height: 14,
+                    fontSize: 9,
+                    backgroundColor: commuteInfo.routeColor ?? '#8b949e',
+                    color: '#fff',
+                    lineHeight: 1,
+                  }}
+                >
+                  {commuteInfo.route}
+                </span>
+              )}
+              ~{commuteInfo.minutes} min
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-1">

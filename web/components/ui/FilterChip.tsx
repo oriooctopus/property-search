@@ -34,6 +34,26 @@ function ChevronDown({ className }: { className?: string }) {
 export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
   function FilterChip({ label, active = false, open = false, compact = false, children, onToggle, dropdownAlign = 'left', className, ...rest }, ref) {
     const chipRef = useRef<HTMLDivElement>(null);
+
+    function getDropdownStyle(): React.CSSProperties {
+      if (!chipRef.current) return { top: 0, left: 0 };
+      const rect = chipRef.current.getBoundingClientRect();
+      const top = rect.bottom + 8;
+      // Estimated max dropdown width — used for clamping only.
+      // The actual max-width is enforced by CSS (calc(100vw - 16px)).
+      const estimatedWidth = 460;
+      let left: number;
+      if (dropdownAlign === 'right') {
+        // Right-align: right edge of dropdown = right edge of chip
+        left = rect.right - estimatedWidth;
+      } else {
+        left = rect.left;
+      }
+      // Clamp: keep at least 8px from each viewport edge
+      left = Math.max(8, Math.min(left, window.innerWidth - estimatedWidth - 8));
+      return { top, left };
+    }
+
     return (
       <div className="relative shrink-0" ref={chipRef}>
         <ButtonBase
@@ -64,10 +84,7 @@ export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
               backgroundColor: '#1c2028',
               minWidth: '320px',
               maxWidth: 'calc(100vw - 16px)',
-              top: chipRef.current ? chipRef.current.getBoundingClientRect().bottom + 8 : 0,
-              ...(dropdownAlign === 'right'
-                ? { right: chipRef.current ? window.innerWidth - chipRef.current.getBoundingClientRect().right : 0 }
-                : { left: chipRef.current ? chipRef.current.getBoundingClientRect().left : 0 }),
+              ...getDropdownStyle(),
             }}
           >
             {children}

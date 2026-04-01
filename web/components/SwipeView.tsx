@@ -294,7 +294,7 @@ export default function SwipeView({
             </span>
           </div>
           <div className="flex items-center gap-3 text-white/60 text-sm">
-            <span>{listing.beds} bed</span>
+            <span>{listing.beds === 0 ? 'Studio' : `${listing.beds} bed`}</span>
             <span className="text-white/20">|</span>
             <span>{listing.baths} bath</span>
             {listing.sqft && (

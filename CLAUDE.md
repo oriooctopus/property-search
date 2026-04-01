@@ -38,6 +38,8 @@ Every response must end with a compact status table of active work items. Done i
 
 When a status table row references a deliverable (file, HTML mockup, screenshot, URL), always include a clickable link. "Done — ready for review" is not enough; include the path or URL so the user can click it directly. This applies to all tables and lists, not just status tables — whenever a file or URL is relevant, link it.
 
+**Verify agent specifically**: when a verify agent completes and produced screenshots or files as evidence, you MUST link every one of them in the status table. Reporting "verified" without linking the proof screenshots is incomplete.
+
 When presenting design options (A/B/C/D):
 - If all options are on ONE page: single link like `[Pick A/B/C/D](url)`
 - If options are on SEPARATE pages: individual links like `[A](url1) / [B](url2) / [C](url3) / [D](url4)`
@@ -55,9 +57,14 @@ When a fresh agent is unavoidable, include in its prompt:
 
 Do not assume a new agent knows what a previous agent did.
 
-## Always Use Agents
+## Always Use Background Agents
 
-Launch all implementation tasks as separate agents via the Agent tool (with `run_in_background: true`) so they are non-blocking. Never do multi-step work inline when it could be parallelized across agents.
+Launch ALL implementation tasks, bug fixes, and multi-step work as background agents via the Agent tool with `run_in_background: true`. This is mandatory — never do this work inline in the main conversation. The main conversation is only for planning, coordinating, and reporting results.
+
+- Use `run_in_background: true` on every Agent call for implementation work
+- Multiple background agents can run in parallel — launch them together in a single response
+- After launching, immediately respond to the user to confirm what's running
+- When background agents complete, report results and take next steps
 
 ## Remind User of Open Threads
 

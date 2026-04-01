@@ -19,6 +19,7 @@ import type { SearchParams, AdapterOutput } from "../lib/sources/types";
 import { validateAndNormalize, mergeQualitySummaries, type QualitySummary } from "../lib/sources/pipeline";
 import { deduplicateAndComposite } from "../lib/sources/dedup";
 import { assignSearchTag } from "../lib/tag-constants";
+import { createClient } from "@supabase/supabase-js";
 
 // Load env from .env.local
 import { readFileSync } from "fs";
@@ -41,20 +42,20 @@ for (const line of envContent.split("\n")) {
 
 const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY!;
 
-// Common search params: 5+ beds, 2+ baths, $4k-$100k rent
-const BASE_PARAMS = { bedsMin: 5, bathsMin: 2, priceMin: 4000, priceMax: 100000 };
+// No API-side filters — all filtering happens client-side
+const BASE_PARAMS = {};
 
 // Search configs aligned with the app's 4 filter tabs
 const SEARCHES: Array<{ params: SearchParams; tag: string; label: string }> = [
   {
     params: { city: "New York", stateCode: "NY", ...BASE_PARAMS },
     tag: "manhattan",
-    label: "Manhattan (Tribeca to Midtown)",
+    label: "Manhattan (all)",
   },
   {
     params: { city: "Brooklyn", stateCode: "NY", ...BASE_PARAMS },
     tag: "brooklyn",
-    label: "Brooklyn (subway to 14th St)",
+    label: "Brooklyn (all)",
   },
 ];
 
@@ -134,7 +135,7 @@ async function main() {
   allRaw.push(...renthop.listings);
   await new Promise((r) => setTimeout(r, 1000));
 
-  // StreetEasy per borough
+  // StreetEasy per borough — direct GraphQL API with page/perPage pagination (free)
   for (const borough of ["Manhattan", "Brooklyn"]) {
     const tag = borough.toLowerCase();
     const se = await fetchSource(
@@ -205,8 +206,155 @@ async function main() {
     for (const w of merged.warnings) console.error(`    - ${w}`);
   }
 
-  // Output deduplicated JSON
-  console.log(JSON.stringify(deduped, null, 2));
+  // Upsert new listings to Supabase
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.error("  No Supabase credentials — outputting JSON only");
+    console.log(JSON.stringify(deduped, null, 2));
+    return;
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  console.error("\n=== UPSERT ===");
+  const BATCH_SIZE = 50;
+  let upserted = 0;
+  for (let i = 0; i < deduped.length; i += BATCH_SIZE) {
+    const batch = deduped.slice(i, i + BATCH_SIZE).map((l) => ({
+      address: l.address,
+      area: l.area,
+      price: l.price,
+      beds: l.beds,
+      baths: l.baths,
+      sqft: l.sqft,
+      lat: l.lat,
+      lon: l.lon,
+      photos: l.photo_urls.length,
+      photo_urls: l.photo_urls,
+      url: l.url,
+      search_tag: l.search_tag,
+      list_date: l.list_date,
+      last_update_date: l.last_update_date,
+      availability_date: l.availability_date,
+      source: l.source,
+      sources: l.sources ?? [l.source],
+      source_urls: l.source_urls ?? { [l.source]: l.url },
+    }));
+    const { error } = await supabase.from("listings").upsert(batch, { onConflict: "url", ignoreDuplicates: false });
+    if (error) {
+      console.error(`  Batch ${i} error: ${error.message}`);
+    } else {
+      upserted += batch.length;
+    }
+  }
+  console.error(`  Upserted: ${upserted}`);
+
+  // Enrich newly upserted listings with isochrone data
+  console.error("\n=== ISOCHRONE ENRICHMENT ===");
+  const upsertedUrls = deduped.map((l) => l.url);
+  // Fetch IDs + coords for all upserted listings (they may be new or updated)
+  const enrichListings: Array<{ listing_id: number; lat: number; lon: number }> = [];
+  for (let i = 0; i < upsertedUrls.length; i += 500) {
+    const urlBatch = upsertedUrls.slice(i, i + 500);
+    const { data: rows } = await supabase
+      .from("listings")
+      .select("id, lat, lon")
+      .in("url", urlBatch);
+    if (rows) {
+      for (const row of rows) {
+        if (row.lat && row.lon) {
+          enrichListings.push({ listing_id: row.id, lat: Number(row.lat), lon: Number(row.lon) });
+        }
+      }
+    }
+  }
+
+  if (enrichListings.length > 0) {
+    // Batch in groups of 100 to avoid oversized RPC payloads
+    const ENRICH_BATCH = 100;
+    let enriched = 0;
+    for (let i = 0; i < enrichListings.length; i += ENRICH_BATCH) {
+      const batch = enrichListings.slice(i, i + ENRICH_BATCH);
+      const { error: enrichErr } = await supabase.rpc("batch_enrich_listing_isochrones", {
+        p_listings: JSON.stringify(batch),
+      });
+      if (enrichErr) {
+        console.error(`  Enrich batch ${i} error: ${enrichErr.message}`);
+      } else {
+        enriched += batch.length;
+      }
+    }
+    console.error(`  Enriched ${enriched} listings with isochrone data`);
+  } else {
+    console.error(`  No listings to enrich`);
+  }
+
+  // Cross-batch dedup: fetch all DB listings, run dedup, delete losers
+  console.error("\n=== CROSS-BATCH DEDUP ===");
+  // Supabase default limit is 1000 — must paginate for larger DBs
+  const allDb: Record<string, unknown>[] = [];
+  let offset = 0;
+  const PAGE = 1000;
+  while (true) {
+    const { data: page, error: pageErr } = await supabase
+      .from("listings")
+      .select("*")
+      .range(offset, offset + PAGE - 1);
+    if (pageErr || !page) {
+      console.error(`  Fetch error at offset ${offset}: ${pageErr?.message}`);
+      break;
+    }
+    allDb.push(...page);
+    if (page.length < PAGE) break;
+    offset += PAGE;
+  }
+  const fetchErr = allDb.length === 0 ? { message: "No listings fetched" } : null;
+
+  if (fetchErr || !allDb) {
+    console.error(`  Failed to fetch DB listings: ${fetchErr?.message}`);
+    return;
+  }
+
+  console.error(`  Fetched ${allDb.length} listings from DB`);
+
+  // Convert DB rows to ValidatedListing shape for dedup
+  const dbListings = allDb.map((row) => ({
+    ...row,
+    lat: Number(row.lat) || 0,
+    lon: Number(row.lon) || 0,
+    price: Number(row.price) || 0,
+    beds: Number(row.beds) || 0,
+    baths: Number(row.baths) || 0,
+    photos: Number(row.photos) || 0,
+    photo_urls: row.photo_urls ?? [],
+    sources: row.sources ?? [row.source],
+    source_urls: row.source_urls ?? { [row.source]: row.url },
+    quality: row.quality ?? { beds: "parsed", baths: "parsed", price: "parsed", geo: "parsed", photos: "parsed" },
+  }));
+
+  const afterDedup = deduplicateAndComposite(dbListings);
+  const keepUrls = new Set(afterDedup.map((l) => l.url));
+  const toDelete = allDb.filter((row) => !keepUrls.has(row.url)).map((row) => row.id);
+
+  if (toDelete.length > 0) {
+    const { error: delErr } = await supabase
+      .from("listings")
+      .delete()
+      .in("id", toDelete);
+    if (delErr) {
+      console.error(`  Delete error: ${delErr.message}`);
+    } else {
+      console.error(`  Removed ${toDelete.length} cross-batch duplicates`);
+    }
+  } else {
+    console.error(`  No cross-batch duplicates found`);
+  }
+
+  // Final count
+  const { count } = await supabase.from("listings").select("*", { count: "exact", head: true });
+  console.error(`  Final DB count: ${count}`);
 }
 
 main().catch((err) => {

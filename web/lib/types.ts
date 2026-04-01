@@ -56,6 +56,7 @@ export type Database = {
           last_update_date: string | null;
           availability_date: string | null;
           source: string;
+          year_built: number | null;
           created_at: string;
         };
         Insert: {
@@ -77,6 +78,7 @@ export type Database = {
           last_update_date?: string | null;
           availability_date?: string | null;
           source?: string;
+          year_built?: number | null;
           created_at?: string;
         };
         Update: {
@@ -98,6 +100,7 @@ export type Database = {
           last_update_date?: string | null;
           availability_date?: string | null;
           source?: string;
+          year_built?: number | null;
           created_at?: string;
         };
         Relationships: [];

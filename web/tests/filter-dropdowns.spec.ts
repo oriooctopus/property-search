@@ -79,7 +79,7 @@ test.describe("Filter chip dropdowns", () => {
 
   test("Price dropdown is visible when clicked", async ({ page }) => {
     // "Price" chip — uniquely identified by its text; avoids the sort button
-    // which has "Price/Bedroom" or similar multi-word text.
+    // which may have multi-word text in the sort dropdown.
     const priceChip = page
       .locator("button")
       .filter({ hasText: /^Price$/ })
