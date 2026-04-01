@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
-import type { FiltersState, MaxListingAge, SearchTag } from '@/components/Filters';
+import type { FiltersState, MaxListingAge } from '@/components/Filters';
 import type { ChatMessageData, Conversation, ParsedFilter } from '@/lib/chat-types';
 import { getDefaultValue } from '@/components/FilterPills';
 
@@ -12,16 +12,19 @@ function uid(): string {
 
 /** Default filters matching what page.tsx uses */
 const DEFAULT_FILTERS: FiltersState = {
-  searchTag: 'all' as SearchTag,
-  sort: 'pricePerBed',
+  sort: 'price',
   selectedBeds: null,
   minBaths: null,
   minRent: null,
   maxRent: null,
-  maxPricePerBed: null,
   maxListingAge: '1m' as MaxListingAge,
   photosFirst: false,
   selectedSources: null,
+  minYearBuilt: null,
+  maxYearBuilt: null,
+  minSqft: null,
+  maxSqft: null,
+  excludeNoSqft: false,
   commuteRules: [],
 };
 
@@ -173,12 +176,15 @@ export function useConversation({
         minBaths: 'minimum baths',
         minRent: 'minimum rent',
         maxRent: 'maximum rent',
-        maxPricePerBed: 'max price per bed',
-        searchTag: 'location',
         sort: 'sort',
         maxListingAge: 'listing age',
         photosFirst: 'photos first',
         selectedSources: 'sources',
+        minYearBuilt: 'minimum year built',
+        maxYearBuilt: 'maximum year built',
+        minSqft: 'minimum sqft',
+        maxSqft: 'maximum sqft',
+        excludeNoSqft: 'exclude no sqft',
         commuteRules: 'commute rules',
       };
 
@@ -206,12 +212,15 @@ export function useConversation({
         minBaths: 'minimum baths',
         minRent: 'minimum rent',
         maxRent: 'maximum rent',
-        maxPricePerBed: 'max price per bed',
-        searchTag: 'location',
         sort: 'sort',
         maxListingAge: 'listing age',
         photosFirst: 'photos first',
         selectedSources: 'sources',
+        minYearBuilt: 'minimum year built',
+        maxYearBuilt: 'maximum year built',
+        minSqft: 'minimum sqft',
+        maxSqft: 'maximum sqft',
+        excludeNoSqft: 'exclude no sqft',
         commuteRules: 'commute rules',
       };
 

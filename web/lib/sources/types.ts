@@ -61,6 +61,7 @@ export interface AdapterOutput {
   last_update_date: string | null;
   availability_date: string | null;
   source: ListingSource;
+  year_built?: number | null;
 }
 
 /** How confident we are in a field's value. */

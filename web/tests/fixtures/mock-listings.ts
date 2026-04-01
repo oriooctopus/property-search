@@ -32,6 +32,7 @@ export const MOCK_LISTINGS: ListingRow[] = [
     last_update_date: "2026-03-15T12:00:00Z",
     availability_date: "2026-04-01T00:00:00Z",
     source: "realtor",
+    year_built: null,
     created_at: "2026-03-10T12:00:00Z",
   },
   {
@@ -57,6 +58,7 @@ export const MOCK_LISTINGS: ListingRow[] = [
     last_update_date: "2026-03-12T10:00:00Z",
     availability_date: null,
     source: "craigslist",
+    year_built: null,
     created_at: "2026-03-08T10:00:00Z",
   },
   {
@@ -73,11 +75,12 @@ export const MOCK_LISTINGS: ListingRow[] = [
     photos: 0,
     photo_urls: [],
     url: "https://example.com/listing/90003",
-    search_tag: "fulton",
+    search_tag: "manhattan",
     list_date: "2026-03-05T08:00:00Z",
     last_update_date: null,
     availability_date: "2026-04-15T00:00:00Z",
     source: "realtor",
+    year_built: null,
     created_at: "2026-03-05T08:00:00Z",
   },
   {
@@ -96,11 +99,12 @@ export const MOCK_LISTINGS: ListingRow[] = [
       "https://placehold.co/1024x768/1c2028/8b949e?text=Photo+X",
     ],
     url: "https://example.com/listing/90004",
-    search_tag: "ltrain",
+    search_tag: "brooklyn",
     list_date: "2026-03-12T14:00:00Z",
     last_update_date: "2026-03-14T14:00:00Z",
     availability_date: "2026-04-01T00:00:00Z",
     source: "craigslist",
+    year_built: null,
     created_at: "2026-03-12T14:00:00Z",
   },
   {
@@ -124,6 +128,7 @@ export const MOCK_LISTINGS: ListingRow[] = [
     last_update_date: "2026-03-10T09:00:00Z",
     availability_date: null,
     source: "realtor",
+    year_built: null,
     created_at: "2026-03-01T09:00:00Z",
   },
   {
@@ -147,6 +152,7 @@ export const MOCK_LISTINGS: ListingRow[] = [
     last_update_date: null,
     availability_date: "2026-05-01T00:00:00Z",
     source: "realtor",
+    year_built: null,
     created_at: "2026-03-14T16:00:00Z",
   },
   {
@@ -171,6 +177,7 @@ export const MOCK_LISTINGS: ListingRow[] = [
     last_update_date: "2026-03-15T11:00:00Z",
     availability_date: "2026-04-01T00:00:00Z",
     source: "craigslist",
+    year_built: null,
     created_at: "2026-03-15T11:00:00Z",
   },
   {
@@ -189,11 +196,12 @@ export const MOCK_LISTINGS: ListingRow[] = [
       "https://placehold.co/1024x768/1c2028/8b949e?text=Photo+M",
     ],
     url: "https://example.com/listing/90008",
-    search_tag: "fulton",
+    search_tag: "manhattan",
     list_date: "2026-03-11T07:00:00Z",
     last_update_date: "2026-03-13T07:00:00Z",
     availability_date: null,
     source: "realtor",
+    year_built: null,
     created_at: "2026-03-11T07:00:00Z",
   },
 ];

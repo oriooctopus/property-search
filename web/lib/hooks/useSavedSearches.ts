@@ -69,5 +69,22 @@ export function useSavedSearches(userId: string | null) {
     }
   }, []);
 
-  return { savedSearches, loading, saveSearch, deleteSearch, refetch: fetchSavedSearches };
+  const updateSearch = useCallback(async (id: number, name: string) => {
+    try {
+      const res = await fetch(`/api/saved-searches/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (res.ok) {
+        setSavedSearches((prev) =>
+          prev.map((s) => (s.id === id ? { ...s, name } : s)),
+        );
+      }
+    } catch {
+      // silently ignore
+    }
+  }, []);
+
+  return { savedSearches, loading, saveSearch, deleteSearch, updateSearch, refetch: fetchSavedSearches };
 }

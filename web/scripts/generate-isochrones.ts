@@ -1,8 +1,12 @@
 /**
- * Generate walking isochrones for all NYC subway stations (1-30 min).
+ * Generate walking or biking isochrones for all NYC subway stations (1-30 min).
  * Stores results in Supabase PostGIS isochrones table.
  *
- * Usage: npx tsx scripts/generate-isochrones.ts
+ * Usage:
+ *   npx tsx scripts/generate-isochrones.ts              # walk (default)
+ *   npx tsx scripts/generate-isochrones.ts --mode=walk   # explicit walk
+ *   npx tsx scripts/generate-isochrones.ts --mode=bike   # bicycle
+ *
  * Requires: OTP running at OTP_BASE_URL (default http://localhost:9090)
  */
 
@@ -22,6 +26,28 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Parse --mode=walk|bike CLI argument
+type TravelMode = "walk" | "bike";
+const VALID_MODES: TravelMode[] = ["walk", "bike"];
+const OTP_MODE_MAP: Record<TravelMode, string> = {
+  walk: "WALK",
+  bike: "BICYCLE",
+};
+
+function parseMode(): TravelMode {
+  const modeArg = process.argv.find((a) => a.startsWith("--mode="));
+  if (!modeArg) return "walk";
+  const value = modeArg.split("=")[1] as TravelMode;
+  if (!VALID_MODES.includes(value)) {
+    console.error(`Invalid mode "${value}". Valid modes: ${VALID_MODES.join(", ")}`);
+    process.exit(1);
+  }
+  return value;
+}
+
+const MODE = parseMode();
+const OTP_MODE = OTP_MODE_MAP[MODE];
+
 // Use next weekday at 9am for consistent isochrones
 function nextWeekday(): string {
   const d = new Date();
@@ -34,7 +60,7 @@ async function fetchIsochrone(lat: number, lon: number, minutes: number): Promis
   const url =
     `${OTP_BASE_URL}${ISOCHRONE_PATH}` +
     `?location=${lat},${lon}` +
-    `&modes=WALK` +
+    `&modes=${OTP_MODE}` +
     `&time=${encodeURIComponent(`${date}T09:00:00-04:00`)}` +
     `&cutoff=PT${minutes}M`;
 
@@ -66,6 +92,8 @@ async function fetchIsochrone(lat: number, lon: number, minutes: number): Promis
 }
 
 async function main() {
+  console.log(`Mode: ${MODE} (OTP mode: ${OTP_MODE})`);
+
   // Check OTP health
   try {
     const health = await fetch(`${OTP_BASE_URL}/otp/`, { signal: AbortSignal.timeout(5000) });
@@ -81,14 +109,14 @@ async function main() {
     .from("isochrones")
     .select("*", { count: "exact", head: true })
     .eq("origin_type", "subway_station")
-    .eq("travel_mode", "walk");
+    .eq("travel_mode", MODE);
 
-  console.log(`${count ?? 0} subway walk isochrones already in DB`);
+  console.log(`${count ?? 0} subway ${MODE} isochrones already in DB`);
 
   const minCutoff = 1;
   const maxCutoff = 30;
   const totalExpected = SUBWAY_STATIONS.length * (maxCutoff - minCutoff + 1);
-  console.log(`Generating ${minCutoff}-${maxCutoff} min walk isochrones for ${SUBWAY_STATIONS.length} stations (${totalExpected} total)`);
+  console.log(`Generating ${minCutoff}-${maxCutoff} min ${MODE} isochrones for ${SUBWAY_STATIONS.length} stations (${totalExpected} total)`);
 
   let generated = 0;
   let skipped = 0;
@@ -98,12 +126,14 @@ async function main() {
   for (let si = 0; si < SUBWAY_STATIONS.length; si++) {
     const station = SUBWAY_STATIONS[si];
 
-    // Check which cutoffs already exist for this station
+    // Check which cutoffs already exist for this specific station (by name + lat/lon)
     const { data: existing } = await supabase
       .from("isochrones")
       .select("cutoff_minutes")
       .eq("origin_name", station.name)
-      .eq("travel_mode", "walk")
+      .eq("origin_lat", station.lat)
+      .eq("origin_lon", station.lon)
+      .eq("travel_mode", MODE)
       .eq("origin_type", "subway_station");
 
     const existingCutoffs = new Set((existing ?? []).map(r => r.cutoff_minutes));
@@ -125,11 +155,11 @@ async function main() {
         origin_lat: station.lat,
         origin_lon: station.lon,
         origin_type: "subway_station",
-        travel_mode: "walk",
+        travel_mode: MODE,
         cutoff_minutes: minutes,
         polygon: JSON.stringify(polygon),
-        otp_params: { mode: "WALK", cutoff: `PT${minutes}M` },
-      }, { onConflict: "origin_name,travel_mode,cutoff_minutes" });
+        otp_params: { mode: OTP_MODE, cutoff: `PT${minutes}M` },
+      }, { onConflict: "origin_name,origin_lat,origin_lon,travel_mode,cutoff_minutes" });
 
       if (error) {
         console.warn(`  DB error for ${station.name} @ ${minutes}min: ${error.message}`);

@@ -24,6 +24,7 @@ interface SwipeCardProps {
     photo_urls: string[];
     source: string;
     url: string;
+    year_built?: number | null;
     [key: string]: unknown;
   };
   onSwipe: (direction: 'left' | 'right' | 'up' | 'down') => void;
@@ -368,13 +369,19 @@ export default function SwipeCard({
           className="flex items-center gap-3 mt-3 text-sm"
           style={{ color: '#e1e4e8' }}
         >
-          <span>{listing.beds} bd</span>
+          <span>{listing.beds === 0 ? 'Studio' : `${listing.beds} bd`}</span>
           <span style={{ color: '#30363d' }}>|</span>
           <span>{listing.baths != null ? listing.baths : '--'} ba</span>
           {listing.sqft != null && (
             <>
               <span style={{ color: '#30363d' }}>|</span>
               <span>{listing.sqft.toLocaleString()} sqft</span>
+            </>
+          )}
+          {listing.year_built != null && (
+            <>
+              <span style={{ color: '#30363d' }}>|</span>
+              <span>Built {listing.year_built}</span>
             </>
           )}
         </div>

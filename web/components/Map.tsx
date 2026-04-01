@@ -1,7 +1,12 @@
 'use client';
 
+'use client';
+
 import dynamic from 'next/dynamic';
+import type React from 'react';
 import type { Database } from '@/lib/types';
+import type { ViewportBounds } from './MapInner';
+import type { CommuteInfo } from './ListingCard';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -27,9 +32,16 @@ interface MapProps {
   onToggleFavorite: (id: number) => void;
   onToggleWouldLive: (id: number) => void;
   onHideListing: (id: number) => void;
+  onBoundsChange?: (bounds: ViewportBounds) => void;
+  onMapMove?: (center: { lat: number; lng: number }, zoom: number) => void;
+  suppressBoundsRef?: React.MutableRefObject<boolean>;
+  initialCenter?: [number, number];
+  initialZoom?: number;
+  visible?: boolean;
+  commuteInfoMap?: Map<number, CommuteInfo>;
 }
 
-export default function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing }: MapProps) {
+export default function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, initialCenter, initialZoom, visible, commuteInfoMap }: MapProps) {
   return (
     <MapInner
       listings={listings}
@@ -41,6 +53,13 @@ export default function Map({ listings, selectedId, onMarkerClick, onSelectDetai
       onToggleFavorite={onToggleFavorite}
       onToggleWouldLive={onToggleWouldLive}
       onHideListing={onHideListing}
+      onBoundsChange={onBoundsChange}
+      onMapMove={onMapMove}
+      suppressBoundsRef={suppressBoundsRef}
+      initialCenter={initialCenter}
+      initialZoom={initialZoom}
+      visible={visible}
+      commuteInfoMap={commuteInfoMap}
     />
   );
 }

@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaf
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Database } from '@/lib/types';
+import type { CommuteInfo } from './ListingCard';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -13,8 +14,6 @@ function escapeHtml(str: string): string {
 }
 
 const TAG_COLORS: Record<string, string> = {
-  fulton: '#f97316',
-  ltrain: '#a78bfa',
   manhattan: '#38bdf8',
   brooklyn: '#4ade80',
 };
@@ -91,27 +90,35 @@ function InjectPopupStyles() {
   return null;
 }
 
-function InvalidateSize() {
+function InvalidateSize({ visible }: { visible: boolean }) {
   const map = useMap();
+
+  // On mount: initial invalidation
   useEffect(() => {
-    // Small delay to let the container finish its CSS transition
-    const timer = setTimeout(() => {
-      map.invalidateSize();
-    }, 100);
-    // Also handle resize
-    const observer = new ResizeObserver(() => {
-      map.invalidateSize();
-    });
-    observer.observe(map.getContainer());
-    return () => {
-      clearTimeout(timer);
-      observer.disconnect();
-    };
+    const timer = setTimeout(() => map.invalidateSize(), 100);
+    return () => clearTimeout(timer);
   }, [map]);
+
+  // When the container transitions from hidden→visible (e.g. mobile list→map toggle),
+  // ResizeObserver may not fire because display:none elements have no layout.
+  // Explicitly invalidate with a safe delay whenever visible becomes true.
+  useEffect(() => {
+    if (!visible) return;
+    const timer = setTimeout(() => map.invalidateSize(), 150);
+    return () => clearTimeout(timer);
+  }, [map, visible]);
+
+  // Handle container resize (e.g. window resize, browser zoom)
+  useEffect(() => {
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(map.getContainer());
+    return () => observer.disconnect();
+  }, [map]);
+
   return null;
 }
 
-function FlyToSelected({ listing }: { listing: Listing | undefined }) {
+function FlyToSelected({ listing, suppressBoundsRef }: { listing: Listing | undefined; suppressBoundsRef: React.MutableRefObject<boolean> }) {
   const map = useMap();
   const prevId = useRef<number | null>(null);
 
@@ -125,15 +132,25 @@ function FlyToSelected({ listing }: { listing: Listing | undefined }) {
       // container has no dimensions, e.g. display:none on mobile).
       const size = map.getSize();
       if (!isNaN(lat) && !isNaN(lon) && size.x > 0 && size.y > 0) {
+        // Suppress the bounds-change callback triggered by this programmatic
+        // flyTo so we don't accidentally replace the full listing set.
+        suppressBoundsRef.current = true;
         map.flyTo([lat, lon], 15, { duration: 0.8 });
       }
     }
-  }, [listing, map]);
+  }, [listing, map, suppressBoundsRef]);
 
   return null;
 }
 
-interface MapProps {
+export interface ViewportBounds {
+  latMin: number;
+  latMax: number;
+  lonMin: number;
+  lonMax: number;
+}
+
+export interface MapProps {
   listings: Listing[];
   selectedId: number | null;
   onMarkerClick: (id: number) => void;
@@ -143,12 +160,72 @@ interface MapProps {
   onToggleFavorite: (id: number) => void;
   onToggleWouldLive: (id: number) => void;
   onHideListing: (id: number) => void;
+  onBoundsChange?: (bounds: ViewportBounds) => void;
+  onMapMove?: (center: { lat: number; lng: number }, zoom: number) => void;
+  suppressBoundsRef?: React.MutableRefObject<boolean>;
+  initialCenter?: [number, number];
+  initialZoom?: number;
+  /** Whether the map container is currently visible. Used to trigger invalidateSize on show. */
+  visible?: boolean;
+  /** Per-listing commute info keyed by listing id */
+  commuteInfoMap?: Map<number, CommuteInfo>;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Viewport bounds watcher — fires onBoundsChange after 500ms idle   */
+/* ------------------------------------------------------------------ */
+function BoundsWatcher({ onBoundsChange, onMapMove, suppressBoundsRef }: { onBoundsChange: (bounds: ViewportBounds) => void; onMapMove?: (center: { lat: number; lng: number }, zoom: number) => void; suppressBoundsRef: React.MutableRefObject<boolean> }) {
+  const map = useMap();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onBoundsChangeRef = useRef(onBoundsChange);
+  onBoundsChangeRef.current = onBoundsChange;
+  const onMapMoveRef = useRef(onMapMove);
+  onMapMoveRef.current = onMapMove;
+
+  useEffect(() => {
+    const fireBounds = () => {
+      // Skip viewport reload triggered by a programmatic flyTo
+      if (suppressBoundsRef.current) {
+        suppressBoundsRef.current = false;
+        return;
+      }
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        const b = map.getBounds();
+        const latMin = b.getSouth();
+        const latMax = b.getNorth();
+        const lonMin = b.getWest();
+        const lonMax = b.getEast();
+        // Guard against degenerate bbox (map not sized yet, or immediate
+        // list→map toggle before invalidateSize completes).
+        if (latMax === latMin || Math.abs(latMax - latMin) > 5 || Math.abs(lonMax - lonMin) > 5) return;
+        onBoundsChangeRef.current({ latMin, latMax, lonMin, lonMax });
+        // Also sync map center + zoom to URL (only for user-initiated moves)
+        if (onMapMoveRef.current) {
+          const c = map.getCenter();
+          onMapMoveRef.current({ lat: c.lat, lng: c.lng }, map.getZoom());
+        }
+      }, 500);
+    };
+
+    map.on('moveend', fireBounds);
+    map.on('zoomend', fireBounds);
+
+    return () => {
+      map.off('moveend', fireBounds);
+      map.off('zoomend', fireBounds);
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [map, suppressBoundsRef]);
+
+  return null;
 }
 
 /* ------------------------------------------------------------------ */
 /*  Rich popup content builder                                         */
 /* ------------------------------------------------------------------ */
-function buildPopupContent(listing: Listing, isFavorited: boolean, isWouldLive: boolean): string {
+function buildPopupContent(listing: Listing, isFavorited: boolean, isWouldLive: boolean, commuteInfo?: CommuteInfo): string {
   const photos = listing.photo_urls ?? [];
   const hasPhoto = photos.length > 0;
   const totalPhotos = photos.length;
@@ -288,7 +365,40 @@ function buildPopupContent(listing: Listing, isFavorited: boolean, isWouldLive: 
           font-size: 11px;
           color: #8b949e;
           margin-bottom: 2px;
-        ">$${listing.beds > 0 ? Math.round(listing.price / listing.beds).toLocaleString() : '–'}/bed · ${listing.beds} bd / ${listing.baths} ba</div>
+        ">${listing.beds > 0 ? `$${Math.round(listing.price / listing.beds).toLocaleString()}/bed · ` : ''}${listing.beds === 0 ? 'Studio' : `${listing.beds} bd`} / ${listing.baths} ba</div>
+        ${commuteInfo ? `
+          <div style="
+            display: inline-flex;
+            align-items: center;
+            border-radius: 9999px;
+            padding: 3px 10px 3px ${commuteInfo.route ? '4px' : '10px'};
+            font-size: 11px;
+            font-weight: 600;
+            color: #58a6ff;
+            background: rgba(88, 166, 255, 0.08);
+            border: 1px solid rgba(88, 166, 255, 0.3);
+            gap: 4px;
+            margin-bottom: 2px;
+          ">
+            ${commuteInfo.route ? `
+              <span style="
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 14px;
+                height: 14px;
+                border-radius: 50%;
+                font-size: 9px;
+                font-weight: 800;
+                background-color: ${commuteInfo.routeColor ?? '#8b949e'};
+                color: #fff;
+                line-height: 1;
+                flex-shrink: 0;
+              ">${escapeHtml(commuteInfo.route)}</span>
+            ` : ''}
+            ~${commuteInfo.minutes} min
+          </div>
+        ` : ''}
         ${actionsHtml}
         <div data-action="open-detail-btn" data-listing-id="${listing.id}" style="
           margin-top: 6px;
@@ -305,7 +415,10 @@ function buildPopupContent(listing: Listing, isFavorited: boolean, isWouldLive: 
   `;
 }
 
-export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing }: MapProps) {
+export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap }: MapProps) {
+  // Fall back to a local ref if the caller doesn't provide one
+  const localSuppressBoundsRef = useRef(false);
+  const suppressBoundsRef = suppressBoundsRefProp ?? localSuppressBoundsRef;
   // Supabase returns numeric columns as strings — coerce to numbers
   const validListings = listings
     .map((l) => ({ ...l, lat: Number(l.lat), lon: Number(l.lon) }))
@@ -313,12 +426,16 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
 
   const selectedListing = validListings.find((l) => l.id === selectedId);
 
-  const center: [number, number] = validListings.length > 0
+  const computedCenter: [number, number] = validListings.length > 0
     ? [
         validListings.reduce((s, l) => s + l.lat, 0) / validListings.length,
         validListings.reduce((s, l) => s + l.lon, 0) / validListings.length,
       ]
     : [40.7128, -74.006];
+
+  // Use URL-provided initial position if valid, otherwise fall back to listing average
+  const center: [number, number] = initialCenter ?? computedCenter;
+  const zoom: number = initialZoom ?? 13;
 
   // Track whether each popup was opened by click (persistent) vs hover (auto-close)
   const clickedRef = useRef<Set<number>>(new Set());
@@ -542,17 +659,15 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
   }, []);
 
   const legendItems = [
-    { color: '#f97316', label: 'Fulton St' },
-    { color: '#a78bfa', label: 'L Train' },
     { color: '#38bdf8', label: 'Manhattan' },
-    { color: '#4ade80', label: 'Brooklyn 14th' },
+    { color: '#4ade80', label: 'Brooklyn' },
   ];
 
   return (
     <div style={{ position: 'relative', height: '100%', width: '100%' }}>
       <MapContainer
         center={center}
-        zoom={13}
+        zoom={zoom}
         style={{ height: '100%', width: '100%', background: '#0f1117' }}
         zoomControl={false}
       >
@@ -560,9 +675,10 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
           attribution='&copy; <a href="https://carto.com/">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
-        <InvalidateSize />
+        <InvalidateSize visible={visible} />
         <InjectPopupStyles />
-        <FlyToSelected listing={selectedListing} />
+        <FlyToSelected listing={selectedListing} suppressBoundsRef={suppressBoundsRef} />
+        {onBoundsChange && <BoundsWatcher onBoundsChange={onBoundsChange} onMapMove={onMapMove} suppressBoundsRef={suppressBoundsRef} />}
         {validListings.map((listing) => {
           const color = TAG_COLORS[listing.search_tag] ?? '#8b949e';
           const isSelected = listing.id === selectedId;
@@ -586,7 +702,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
               }}
             >
               <Popup className="dark-popup">
-                <div dangerouslySetInnerHTML={{ __html: buildPopupContent(listing, favoritedIds.has(listing.id), wouldLiveIds.has(listing.id)) }} />
+                <div dangerouslySetInnerHTML={{ __html: buildPopupContent(listing, favoritedIds.has(listing.id), wouldLiveIds.has(listing.id), commuteInfoMap?.get(listing.id)) }} />
               </Popup>
             </CircleMarker>
           );

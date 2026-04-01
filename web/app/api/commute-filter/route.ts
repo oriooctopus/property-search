@@ -33,13 +33,28 @@ function getStationNamesForLines(lines: string[]): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Per-rule resolvers — each returns a Set<number> of matching listing IDs
+// Per-listing commute metadata returned alongside IDs
 // ---------------------------------------------------------------------------
+
+interface ListingCommuteMeta {
+  minutes: number;
+  station: string;
+  mode: string;
+}
+
+// ---------------------------------------------------------------------------
+// Per-rule resolvers — each returns matching listing IDs + per-listing metadata
+// ---------------------------------------------------------------------------
+
+interface RuleResult {
+  ids: Set<number>;
+  meta: Record<number, ListingCommuteMeta>;
+}
 
 async function resolveSubwayLineRule(
   supabase: ReturnType<typeof getClient>,
   rule: CommuteRule,
-): Promise<Set<number> | null> {
+): Promise<RuleResult | null> {
   // Determine which station names to query
   let stationNames: string[];
 
@@ -60,9 +75,10 @@ async function resolveSubwayLineRule(
   const travelMode = rule.mode === "walk" ? "walk" : rule.mode === "bike" ? "bicycle" : "transit";
 
   // Query isochrones table for matching station origins with cutoff <= maxMinutes
+  // Include id, cutoff_minutes, and origin_name so we can determine per-listing min cutoff
   const { data: isoRows, error: isoError } = await supabase
     .from("isochrones")
-    .select("id")
+    .select("id, cutoff_minutes, origin_name")
     .in("origin_name", stationNames)
     .ilike("travel_mode", travelMode)
     .lte("cutoff_minutes", rule.maxMinutes);
@@ -74,33 +90,69 @@ async function resolveSubwayLineRule(
 
   if (!isoRows || isoRows.length === 0) {
     // No isochrones for this mode/stations — return empty set (no matches)
-    return new Set<number>();
+    return { ids: new Set<number>(), meta: {} };
+  }
+
+  // Build a lookup from isochrone ID to its cutoff and station name
+  const isoMeta = new Map<number, { cutoff: number; station: string }>();
+  for (const r of isoRows) {
+    isoMeta.set(r.id as number, {
+      cutoff: r.cutoff_minutes as number,
+      station: r.origin_name as string,
+    });
   }
 
   const isochroneIds = isoRows.map((r) => r.id);
 
-  // Get all listing IDs that fall within those isochrones
-  const { data: listingRows, error: listingError } = await supabase
-    .from("listing_isochrones")
-    .select("listing_id")
-    .in("isochrone_id", isochroneIds);
+  // Get all listing IDs that fall within those isochrones, along with isochrone_id
+  const allListingIds = new Set<number>();
+  const meta: Record<number, ListingCommuteMeta> = {};
 
-  if (listingError) {
-    console.error("[commute-filter] listing_isochrones query failed:", listingError.message);
-    return null;
+  // Query in batches of 200 isochrone IDs to avoid IN-clause limits
+  const BATCH_SIZE = 200;
+  for (let i = 0; i < isochroneIds.length; i += BATCH_SIZE) {
+    const batch = isochroneIds.slice(i, i + BATCH_SIZE);
+    const { data: listingRows, error: listingError } = await supabase
+      .from("listing_isochrones")
+      .select("listing_id, isochrone_id")
+      .in("isochrone_id", batch)
+      .limit(50000);
+
+    if (listingError) {
+      console.error("[commute-filter] listing_isochrones query failed:", listingError.message);
+      return null;
+    }
+
+    if (listingRows) {
+      for (const r of listingRows) {
+        const listingId = r.listing_id as number;
+        const isoId = r.isochrone_id as number;
+        allListingIds.add(listingId);
+
+        // Track the minimum cutoff (tightest walk time) per listing
+        const isoInfo = isoMeta.get(isoId);
+        if (isoInfo) {
+          const existing = meta[listingId];
+          if (!existing || isoInfo.cutoff < existing.minutes) {
+            meta[listingId] = {
+              minutes: isoInfo.cutoff,
+              station: isoInfo.station,
+              mode: rule.mode,
+            };
+          }
+        }
+      }
+    }
   }
 
-  if (!listingRows || listingRows.length === 0) {
-    return new Set<number>();
-  }
-
-  return new Set(listingRows.map((r) => r.listing_id as number));
+  if (allListingIds.size === 0) return { ids: new Set<number>(), meta: {} };
+  return { ids: allListingIds, meta };
 }
 
 async function resolveStationRule(
   supabase: ReturnType<typeof getClient>,
   rule: CommuteRule,
-): Promise<Set<number> | null> {
+): Promise<RuleResult | null> {
   // A station rule works like a subway-line rule but for a single station
   if (!rule.stops || rule.stops.length === 0) return null;
 
@@ -108,7 +160,7 @@ async function resolveStationRule(
 
   const { data: isoRows, error: isoError } = await supabase
     .from("isochrones")
-    .select("id")
+    .select("id, cutoff_minutes, origin_name")
     .in("origin_name", rule.stops)
     .ilike("travel_mode", travelMode)
     .lte("cutoff_minutes", rule.maxMinutes);
@@ -119,23 +171,57 @@ async function resolveStationRule(
   }
 
   if (!isoRows || isoRows.length === 0) {
-    // No isochrones for this mode/stations — return empty set (no matches)
-    return new Set<number>();
+    return { ids: new Set<number>(), meta: {} };
   }
 
-  const { data: listingRows, error: listingError } = await supabase
-    .from("listing_isochrones")
-    .select("listing_id")
-    .in("isochrone_id", isoRows.map((r) => r.id));
-
-  if (listingError) {
-    console.error("[commute-filter] station listing_isochrones query failed:", listingError.message);
-    return null;
+  // Build isochrone metadata lookup
+  const isoMeta = new Map<number, { cutoff: number; station: string }>();
+  for (const r of isoRows) {
+    isoMeta.set(r.id as number, {
+      cutoff: r.cutoff_minutes as number,
+      station: r.origin_name as string,
+    });
   }
 
-  if (!listingRows || listingRows.length === 0) return new Set<number>();
+  const allListingIds = new Set<number>();
+  const meta: Record<number, ListingCommuteMeta> = {};
+  const stationIsoIds = isoRows.map((r) => r.id);
+  const BATCH = 200;
+  for (let i = 0; i < stationIsoIds.length; i += BATCH) {
+    const batch = stationIsoIds.slice(i, i + BATCH);
+    const { data: listingRows, error: listingError } = await supabase
+      .from("listing_isochrones")
+      .select("listing_id, isochrone_id")
+      .in("isochrone_id", batch)
+      .limit(50000);
 
-  return new Set(listingRows.map((r) => r.listing_id as number));
+    if (listingError) {
+      console.error("[commute-filter] station listing_isochrones query failed:", listingError.message);
+      return null;
+    }
+    if (listingRows) {
+      for (const r of listingRows) {
+        const listingId = r.listing_id as number;
+        const isoId = r.isochrone_id as number;
+        allListingIds.add(listingId);
+
+        const isoInfo = isoMeta.get(isoId);
+        if (isoInfo) {
+          const existing = meta[listingId];
+          if (!existing || isoInfo.cutoff < existing.minutes) {
+            meta[listingId] = {
+              minutes: isoInfo.cutoff,
+              station: isoInfo.station,
+              mode: rule.mode,
+            };
+          }
+        }
+      }
+    }
+  }
+
+  if (allListingIds.size === 0) return { ids: new Set<number>(), meta: {} };
+  return { ids: allListingIds, meta };
 }
 
 // ---------------------------------------------------------------------------
@@ -162,7 +248,7 @@ function otpMode(mode: string): string {
 async function resolveAddressRule(
   supabase: ReturnType<typeof getClient>,
   rule: CommuteRule,
-): Promise<Set<number> | null> {
+): Promise<RuleResult | null> {
   // Need lat/lon from autocomplete selection
   if (!rule.addressLat || !rule.addressLon) {
     console.log("[commute-filter] Address rule missing lat/lon, skipping");
@@ -214,13 +300,15 @@ async function resolveAddressRule(
     geojson.features.length === 0
   ) {
     console.log("[commute-filter] OTP returned empty polygon for address rule");
-    return new Set<number>();
+    return { ids: new Set<number>(), meta: {} };
   }
 
   // Use the first feature's geometry as the isochrone polygon
   const polygonJson = JSON.stringify(geojson.features[0].geometry);
 
-  // Query listings within the polygon using PostGIS RPC
+  // Query listings within the polygon using raw SQL via RPC wrapper
+  // Supabase PostgREST caps RPC results at 1000 rows and .range()/.limit()
+  // cannot exceed this. Use a raw SQL query via a wrapper function instead.
   const { data, error } = await supabase.rpc("listings_in_polygon", {
     polygon_geojson: polygonJson,
   });
@@ -230,9 +318,32 @@ async function resolveAddressRule(
     return null;
   }
 
-  if (!data || data.length === 0) return new Set<number>();
+  const firstPage = new Set((data as Array<{ id: number }> ?? []).map((r) => r.id));
 
-  return new Set((data as Array<{ id: number }>).map((r) => r.id));
+  // If we got exactly 1000, there are likely more — fetch additional pages
+  if (firstPage.size === 1000) {
+    for (let page = 1; page < 20; page++) {
+      const { data: moreData, error: moreError } = await supabase.rpc("listings_in_polygon", {
+        polygon_geojson: polygonJson,
+      }).range(page * 1000, (page + 1) * 1000 - 1);
+
+      if (moreError || !moreData || moreData.length === 0) break;
+      for (const r of moreData as Array<{ id: number }>) firstPage.add(r.id);
+      if (moreData.length < 1000) break;
+    }
+  }
+
+  if (firstPage.size === 0) return { ids: new Set<number>(), meta: {} };
+
+  // For address rules, we don't have per-listing distance data from the RPC.
+  // Use the rule's maxMinutes as an approximate upper bound for all matched listings.
+  const destination = rule.address ? rule.address.split(",")[0].trim() : "Address";
+  const meta: Record<number, ListingCommuteMeta> = {};
+  for (const id of firstPage) {
+    meta[id] = { minutes: rule.maxMinutes, station: destination, mode: rule.mode };
+  }
+
+  return { ids: firstPage, meta };
 }
 
 // ---------------------------------------------------------------------------
@@ -251,11 +362,11 @@ export async function POST(request: NextRequest) {
 
     const supabase = getClient();
 
-    // Resolve each rule to a set of matching listing IDs
-    const ruleSets: Array<Set<number> | null> = [];
+    // Resolve each rule to a set of matching listing IDs + metadata
+    const ruleResults: Array<RuleResult | null> = [];
 
     for (const rule of commuteRules) {
-      let result: Set<number> | null = null;
+      let result: RuleResult | null = null;
 
       switch (rule.type) {
         case "subway-line":
@@ -277,13 +388,13 @@ export async function POST(request: NextRequest) {
           break;
       }
 
-      ruleSets.push(result);
+      ruleResults.push(result);
     }
 
     // Filter out null results (rules that couldn't be resolved)
-    const validSets = ruleSets.filter((s): s is Set<number> => s !== null);
+    const validResults = ruleResults.filter((r): r is RuleResult => r !== null);
 
-    if (validSets.length === 0) {
+    if (validResults.length === 0) {
       // Check if any rules were implemented types (subway-line / station)
       const hasImplementedRule = commuteRules.some(
         (r) => r.type === "subway-line" || r.type === "station" || r.type === "address",
@@ -292,25 +403,40 @@ export async function POST(request: NextRequest) {
         // Implemented rules all returned null (shouldn't happen after empty-set fix, but be safe)
         return NextResponse.json({
           listingIds: [],
+          commuteInfo: {},
           message: "No listings match your commute filters",
         });
       }
       // Only unimplemented types (address/park) — pass through
       return NextResponse.json({
         listingIds: null,
+        commuteInfo: null,
         message: "Commute data not available yet — showing all listings",
       });
     }
 
     // AND logic: intersect all valid sets
-    let intersection = validSets[0];
-    for (let i = 1; i < validSets.length; i++) {
-      const next = validSets[i];
+    let intersection = validResults[0].ids;
+    for (let i = 1; i < validResults.length; i++) {
+      const next = validResults[i].ids;
       intersection = new Set([...intersection].filter((id) => next.has(id)));
+    }
+
+    // Merge metadata: for listings in the intersection, pick the metadata from
+    // the first rule that has info for that listing (priority = rule order)
+    const mergedMeta: Record<number, ListingCommuteMeta> = {};
+    for (const id of intersection) {
+      for (const result of validResults) {
+        if (result.meta[id]) {
+          mergedMeta[id] = result.meta[id];
+          break;
+        }
+      }
     }
 
     return NextResponse.json({
       listingIds: [...intersection],
+      commuteInfo: mergedMeta,
       message: null,
     });
   } catch (err) {

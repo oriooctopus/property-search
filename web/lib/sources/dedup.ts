@@ -211,7 +211,6 @@ function isSameProperty(a: ValidatedListing, b: ValidatedListing): boolean {
   // Requires beds > 0 to avoid merging unrelated commercial/retail listings.
   if (
     a.source === b.source &&
-    a.source !== "facebook" && // FB generic titles are too unreliable for this
     a.beds === b.beds &&
     a.beds > 0 &&
     priceWithinPercent(a.price, b.price, 0.03) &&

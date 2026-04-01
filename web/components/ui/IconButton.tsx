@@ -13,8 +13,8 @@ interface IconButtonProps extends ComponentPropsWithoutRef<'button'> {
 }
 
 const sizeClasses: Record<Size, string> = {
-  sm: 'h-6 w-6 text-sm',
-  md: 'h-8 w-8 text-base',
+  sm: 'h-6 w-6 text-sm min-w-[44px] min-h-[44px]',
+  md: 'h-8 w-8 text-base min-w-[44px] min-h-[44px]',
 };
 
 const variantClasses: Record<Variant, string> = {

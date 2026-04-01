@@ -15,11 +15,64 @@
 
 import type { AdapterOutput, SearchParams } from "./types";
 import { extractBaths, extractBeds, makeSearchTag, parsePrice } from "./parse-utils";
+import { createClient } from "@supabase/supabase-js";
 
-const APIFY_RUN_URL =
-  "https://api.apify.com/v2/acts/apify~facebook-marketplace-scraper/run-sync-get-dataset-items";
+// ---------------------------------------------------------------------------
+// Supabase storage client for persisting Facebook CDN photos
+// ---------------------------------------------------------------------------
 
-const TIMEOUT_MS = 45_000; // Must fit within Vercel's 60s maxDuration
+function getStorageClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
+
+/**
+ * Download a Facebook CDN photo and re-upload it to Supabase Storage.
+ * Returns the permanent public URL, or null on failure.
+ */
+async function persistPhoto(
+  cdnUrl: string,
+  listingId: string,
+  index: number,
+): Promise<string | null> {
+  try {
+    const sb = getStorageClient();
+    if (!sb) return null;
+
+    const res = await fetch(cdnUrl, { signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) return null;
+
+    const contentType = res.headers.get("content-type") ?? "image/jpeg";
+    const ext = contentType.includes("png") ? "png" : "jpg";
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const path = `facebook/${listingId}/${index}.${ext}`;
+
+    const { error } = await sb.storage
+      .from("listing-photos")
+      .upload(path, buffer, { contentType, upsert: true });
+    if (error) {
+      console.warn(`[FacebookMarketplace] Storage upload failed for ${listingId}:`, error.message);
+      return null;
+    }
+
+    const { data } = sb.storage.from("listing-photos").getPublicUrl(path);
+    return data.publicUrl;
+  } catch (err) {
+    console.warn(
+      `[FacebookMarketplace] Photo persist failed for ${listingId}:`,
+      err instanceof Error ? err.message : err,
+    );
+    return null;
+  }
+}
+
+const APIFY_START_URL =
+  "https://api.apify.com/v2/acts/apify~facebook-marketplace-scraper/runs";
+
+const POLL_INTERVAL_MS = 5_000;
+const MAX_WAIT_MS = 300_000; // 5 min max wait for actor run
 
 // Facebook Marketplace city slugs for URL construction
 const CITY_SLUGS: Record<string, string> = {
@@ -110,24 +163,62 @@ export async function fetchFacebookMarketplaceListings(
   };
 
   console.log(`[FacebookMarketplace] Starting Apify actor run for ${fbUrl.toString()}`);
-  const res = await fetch(APIFY_RUN_URL, {
+
+  // 1. Start the actor run (async)
+  const startRes = await fetch(APIFY_START_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(input),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal: AbortSignal.timeout(30_000),
   });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `Apify returned ${res.status}: ${res.statusText} — ${body.slice(0, 500)}`,
-    );
+  if (!startRes.ok) {
+    const body = await startRes.text().catch(() => "");
+    throw new Error(`Apify start failed ${startRes.status}: ${body.slice(0, 500)}`);
   }
 
-  const data = await res.json();
+  const runInfo = (await startRes.json()) as { data?: { id?: string; defaultDatasetId?: string } };
+  const runId = runInfo.data?.id;
+  const datasetId = runInfo.data?.defaultDatasetId;
+  if (!runId || !datasetId) {
+    throw new Error(`Apify run missing id/datasetId: ${JSON.stringify(runInfo).slice(0, 300)}`);
+  }
+  console.log(`[FacebookMarketplace] Run started: ${runId}, dataset: ${datasetId}`);
+
+  // 2. Poll for completion
+  const deadline = Date.now() + MAX_WAIT_MS;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!statusRes.ok) continue;
+    const statusData = (await statusRes.json()) as { data?: { status?: string } };
+    const status = statusData.data?.status;
+    console.log(`[FacebookMarketplace] Run status: ${status}`);
+    if (status === "SUCCEEDED") break;
+    if (status === "FAILED" || status === "ABORTED" || status === "TIMED-OUT") {
+      throw new Error(`Apify run ${status}`);
+    }
+  }
+
+  // 3. Fetch dataset items
+  const datasetRes = await fetch(
+    `https://api.apify.com/v2/datasets/${datasetId}/items?format=json`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(30_000),
+    },
+  );
+  if (!datasetRes.ok) {
+    throw new Error(`Apify dataset fetch failed: ${datasetRes.status}`);
+  }
+
+  const data = await datasetRes.json();
 
   if (!Array.isArray(data)) {
     throw new Error(
@@ -164,10 +255,14 @@ export async function fetchFacebookMarketplaceListings(
     // Filter by minimum beds if specified
     if (bedsMin != null && beds != null && beds > 0 && beds < bedsMin) continue;
 
-    // Photo URL from primary_listing_photo
+    // Photo URL from primary_listing_photo — persist to Supabase Storage
     const photoUrls: string[] = [];
-    if (item.primary_listing_photo?.photo_image_url) {
-      photoUrls.push(item.primary_listing_photo.photo_image_url);
+    const fbPhotoUrl = item.primary_listing_photo?.photo_image_url;
+    if (fbPhotoUrl && item.id) {
+      const permanentUrl = await persistPhoto(fbPhotoUrl, item.id, 0);
+      if (permanentUrl) {
+        photoUrls.push(permanentUrl);
+      }
     }
 
     // Location from reverse_geocode

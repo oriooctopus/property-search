@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase-browser';
 import type { Database } from '@/lib/types';
 import Map from '@/components/Map';
-import Filters, { type FiltersState, type SearchTag, type SortField, type MaxListingAge } from '@/components/Filters';
-import ListingCard from '@/components/ListingCard';
+import Filters, { type FiltersState, type SortField, type MaxListingAge } from '@/components/Filters';
+import ListingCard, { type CommuteInfo } from '@/components/ListingCard';
 import ListingDetail from '@/components/ListingDetail';
 import RadarLoader from '@/components/RadarLoader';
 import { SegmentedControl } from '@/components/ui';
@@ -31,25 +31,36 @@ interface PersonWithBio {
 // Seed data fallback (used when DB is empty)
 // ---------------------------------------------------------------------------
 const SEED_LISTINGS: Listing[] = [
-  { id: -1, address: '240 E 6th St Apt 1', area: 'East Village', price: 9995, beds: 5, baths: 2, sqft: null, lat: 40.7262, lon: -73.9858, transit_summary: '~10 min walk to 1st Ave L', photos: 18, photo_urls: [], url: 'https://www.realtor.com/rentals/details/240-E-6th-St-Apt-1_New-York_NY_10003_M95522-46041', search_tag: 'ltrain', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
-  { id: -2, address: '165 Attorney St Apt 5C', area: 'Lower East Side', price: 9450, beds: 6, baths: 2, sqft: null, lat: 40.7195, lon: -73.9845, transit_summary: '16 min J to Fulton', photos: 6, photo_urls: [], url: 'https://www.realtor.com/rentals/details/165-Attorney-St-Apt-5C_New-York_NY_10002_M94116-63343', search_tag: 'fulton', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
-  { id: -3, address: '53 Park Pl Ph 2', area: 'Tribeca', price: 9000, beds: 5, baths: 2, sqft: null, lat: 40.7141, lon: -74.0079, transit_summary: 'Tribeca / Park Place', photos: 12, photo_urls: [], url: 'https://www.realtor.com/rentals/details/53-Park-Pl-2_New-York_NY_10007_M90339-21295', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
-  { id: -4, address: '372 Bainbridge St', area: 'Stuyvesant Heights', price: 6995, beds: 5, baths: 4, sqft: null, lat: 40.6808, lon: -73.927, transit_summary: '34 min C to 14th/8th Ave', photos: 16, photo_urls: [], url: 'https://www.realtor.com/rentals/details/372-Bainbridge-St-Unit-Triplex_Brooklyn_NY_11233_M96732-47148', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
-  { id: -5, address: '171 Attorney St Unit 6A', area: 'Lower East Side', price: 11000, beds: 7, baths: 2.5, sqft: null, lat: 40.7198, lon: -73.9843, transit_summary: '16 min J to Fulton', photos: 3, photo_urls: [], url: 'https://www.realtor.com/rentals/details/171-Attorney-St-6A_New-York_NY_10002_M99751-50289', search_tag: 'fulton', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
-  { id: -6, address: '386 Stuyvesant Ave', area: 'Stuyvesant Heights', price: 12500, beds: 6, baths: 3.5, sqft: 3200, lat: 40.6838, lon: -73.9298, transit_summary: '18 min A to Fulton / 30 min to 14th', photos: 24, photo_urls: [], url: 'https://www.realtor.com/rentals/details/386-Stuyvesant-Ave_Brooklyn_NY_11233_M44801-18988', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
-  { id: -7, address: '50 Murray St Unit 2211', area: 'Tribeca', price: 10000, beds: 5, baths: 2, sqft: null, lat: 40.7143, lon: -74.0086, transit_summary: 'Tribeca / Murray St', photos: 9, photo_urls: [], url: 'https://www.realtor.com/rentals/details/50-Murray-St-2211_New-York_NY_10007_M93038-48259', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
-  { id: -8, address: '290 Jefferson Ave', area: 'Bedford-Stuyvesant', price: 10900, beds: 5, baths: 4, sqft: 3600, lat: 40.6862, lon: -73.943, transit_summary: '30 min A to 14th/8th Ave', photos: 19, photo_urls: [], url: 'https://www.realtor.com/rentals/details/290-Jefferson-Ave_Brooklyn_NY_11216_M49395-49974', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
-  { id: -9, address: '276 Halsey St #2', area: 'Bedford-Stuyvesant', price: 10750, beds: 5, baths: 3.5, sqft: null, lat: 40.6842, lon: -73.9418, transit_summary: '31 min A to 14th/8th Ave', photos: 16, photo_urls: [], url: 'https://www.realtor.com/rentals/details/276-Halsey-St-2_Brooklyn_NY_11216_M93027-20426', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
-  { id: -10, address: '53 Park Pl Apt 3E', area: 'Tribeca', price: 13500, beds: 5, baths: 3, sqft: null, lat: 40.7141, lon: -74.0079, transit_summary: 'Tribeca / Park Place', photos: 20, photo_urls: [], url: 'https://www.realtor.com/rentals/details/53-Park-Pl-Apt-3E_New-York_NY_10007_M39270-97535', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', created_at: '' },
+  { id: -1, address: '240 E 6th St Apt 1', area: 'East Village', price: 9995, beds: 5, baths: 2, sqft: null, lat: 40.7262, lon: -73.9858, transit_summary: '~10 min walk to 1st Ave L', photos: 18, photo_urls: [], url: 'https://www.realtor.com/rentals/details/240-E-6th-St-Apt-1_New-York_NY_10003_M95522-46041', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -2, address: '165 Attorney St Apt 5C', area: 'Lower East Side', price: 9450, beds: 6, baths: 2, sqft: null, lat: 40.7195, lon: -73.9845, transit_summary: '16 min J to Fulton', photos: 6, photo_urls: [], url: 'https://www.realtor.com/rentals/details/165-Attorney-St-Apt-5C_New-York_NY_10002_M94116-63343', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -3, address: '53 Park Pl Ph 2', area: 'Tribeca', price: 9000, beds: 5, baths: 2, sqft: null, lat: 40.7141, lon: -74.0079, transit_summary: 'Tribeca / Park Place', photos: 12, photo_urls: [], url: 'https://www.realtor.com/rentals/details/53-Park-Pl-2_New-York_NY_10007_M90339-21295', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -4, address: '372 Bainbridge St', area: 'Stuyvesant Heights', price: 6995, beds: 5, baths: 4, sqft: null, lat: 40.6808, lon: -73.927, transit_summary: '34 min C to 14th/8th Ave', photos: 16, photo_urls: [], url: 'https://www.realtor.com/rentals/details/372-Bainbridge-St-Unit-Triplex_Brooklyn_NY_11233_M96732-47148', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -5, address: '171 Attorney St Unit 6A', area: 'Lower East Side', price: 11000, beds: 7, baths: 2.5, sqft: null, lat: 40.7198, lon: -73.9843, transit_summary: '16 min J to Fulton', photos: 3, photo_urls: [], url: 'https://www.realtor.com/rentals/details/171-Attorney-St-6A_New-York_NY_10002_M99751-50289', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -6, address: '386 Stuyvesant Ave', area: 'Stuyvesant Heights', price: 12500, beds: 6, baths: 3.5, sqft: 3200, lat: 40.6838, lon: -73.9298, transit_summary: '18 min A to Fulton / 30 min to 14th', photos: 24, photo_urls: [], url: 'https://www.realtor.com/rentals/details/386-Stuyvesant-Ave_Brooklyn_NY_11233_M44801-18988', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -7, address: '50 Murray St Unit 2211', area: 'Tribeca', price: 10000, beds: 5, baths: 2, sqft: null, lat: 40.7143, lon: -74.0086, transit_summary: 'Tribeca / Murray St', photos: 9, photo_urls: [], url: 'https://www.realtor.com/rentals/details/50-Murray-St-2211_New-York_NY_10007_M93038-48259', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -8, address: '290 Jefferson Ave', area: 'Bedford-Stuyvesant', price: 10900, beds: 5, baths: 4, sqft: 3600, lat: 40.6862, lon: -73.943, transit_summary: '30 min A to 14th/8th Ave', photos: 19, photo_urls: [], url: 'https://www.realtor.com/rentals/details/290-Jefferson-Ave_Brooklyn_NY_11216_M49395-49974', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -9, address: '276 Halsey St #2', area: 'Bedford-Stuyvesant', price: 10750, beds: 5, baths: 3.5, sqft: null, lat: 40.6842, lon: -73.9418, transit_summary: '31 min A to 14th/8th Ave', photos: 16, photo_urls: [], url: 'https://www.realtor.com/rentals/details/276-Halsey-St-2_Brooklyn_NY_11216_M93027-20426', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -10, address: '53 Park Pl Apt 3E', area: 'Tribeca', price: 13500, beds: 5, baths: 3, sqft: null, lat: 40.7141, lon: -74.0079, transit_summary: 'Tribeca / Park Place', photos: 20, photo_urls: [], url: 'https://www.realtor.com/rentals/details/53-Park-Pl-Apt-3E_New-York_NY_10007_M39270-97535', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
 ];
 
 // ---------------------------------------------------------------------------
 // Helpers: read / write URL query params
 // ---------------------------------------------------------------------------
 const VALID_VIEWS = new Set(['list', 'map', 'swipe']);
-const VALID_TAGS = new Set<string>(['all', 'fulton', 'ltrain', 'manhattan', 'brooklyn']);
-const VALID_SORTS = new Set<string>(['pricePerBed', 'price', 'beds', 'listDate']);
+const VALID_SORTS = new Set<string>(['price', 'beds', 'listDate']);
 const VALID_LISTING_AGES = new Set<string>(['1w', '2w', '1m', '3m', '6m', '1y']);
+
+function boundsFromCenter(lat: number, lng: number, zoom: number) {
+  // Approximate degrees visible at given zoom level
+  const latSpan = 180 / Math.pow(2, zoom);
+  const lngSpan = 360 / Math.pow(2, zoom);
+  return {
+    latMin: lat - latSpan / 2,
+    latMax: lat + latSpan / 2,
+    lonMin: lng - lngSpan / 2,
+    lonMax: lng + lngSpan / 2,
+  };
+}
 
 function parseNumOrNull(v: string | null): number | null {
   if (v == null) return null;
@@ -58,40 +69,62 @@ function parseNumOrNull(v: string | null): number | null {
 }
 
 function readFiltersFromParams(params: URLSearchParams): FiltersState {
-  const tag = params.get('tag');
   const sort = params.get('sort');
   const age = params.get('maxAge');
   return {
-    searchTag: (tag && VALID_TAGS.has(tag) ? tag : 'all') as SearchTag,
-    sort: (sort && VALID_SORTS.has(sort) ? sort : 'pricePerBed') as SortField,
+    sort: (sort && VALID_SORTS.has(sort) ? sort : 'price') as SortField,
     selectedBeds: params.get('beds') ? params.get('beds')!.split(',').map(Number).filter(Number.isFinite) : null,
     minBaths: parseNumOrNull(params.get('minBaths')),
     minRent: parseNumOrNull(params.get('minRent')),
     maxRent: parseNumOrNull(params.get('maxRent')),
-    maxPricePerBed: parseNumOrNull(params.get('maxPerBed')),
     maxListingAge: (age === 'any' ? null : age && VALID_LISTING_AGES.has(age) ? age : '1m') as MaxListingAge,
     photosFirst: params.get('photosFirst') === '1',
     selectedSources: params.get('sources') ? params.get('sources')!.split(',') : null,
-    commuteRules: [],
+    minYearBuilt: parseNumOrNull(params.get('minYearBuilt')),
+    maxYearBuilt: parseNumOrNull(params.get('maxYearBuilt')),
+    minSqft: parseNumOrNull(params.get('minSqft')),
+    maxSqft: parseNumOrNull(params.get('maxSqft')),
+    excludeNoSqft: params.get('excludeNoSqft') === '1',
+    commuteRules: (() => {
+      try {
+        const raw = params.get('commute');
+        return raw ? JSON.parse(raw) : [];
+      } catch { return []; }
+    })(),
   };
 }
 
-function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatMode?: boolean, listingId?: number | null): string {
+interface MapPosition {
+  lat: number;
+  lng: number;
+  zoom: number;
+}
+
+function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatMode?: boolean, listingId?: number | null, mapPos?: MapPosition | null): string {
   const p = new URLSearchParams();
   if (listingId != null) p.set('listing', String(listingId));
   if (chatMode) p.set('chat', '1');
   if (view !== 'list') p.set('view', view);
-  if (f.searchTag !== 'all') p.set('tag', f.searchTag);
-  if (f.sort !== 'pricePerBed') p.set('sort', f.sort);
+  if (f.sort !== 'price') p.set('sort', f.sort);
   if (f.selectedBeds != null) p.set('beds', f.selectedBeds.join(','));
   if (f.minBaths != null) p.set('minBaths', String(f.minBaths));
   if (f.minRent != null) p.set('minRent', String(f.minRent));
   if (f.maxRent != null) p.set('maxRent', String(f.maxRent));
-  if (f.maxPricePerBed != null) p.set('maxPerBed', String(f.maxPricePerBed));
   if (f.maxListingAge === null) p.set('maxAge', 'any');
   else if (f.maxListingAge !== '1m') p.set('maxAge', f.maxListingAge);
   if (f.photosFirst) p.set('photosFirst', '1');
   if (f.selectedSources !== null) p.set('sources', f.selectedSources.join(','));
+  if (f.minYearBuilt != null) p.set('minYearBuilt', String(f.minYearBuilt));
+  if (f.maxYearBuilt != null) p.set('maxYearBuilt', String(f.maxYearBuilt));
+  if (f.minSqft != null) p.set('minSqft', String(f.minSqft));
+  if (f.maxSqft != null) p.set('maxSqft', String(f.maxSqft));
+  if (f.excludeNoSqft) p.set('excludeNoSqft', '1');
+  if (f.commuteRules && f.commuteRules.length > 0) p.set('commute', JSON.stringify(f.commuteRules));
+  if (mapPos != null) {
+    p.set('lat', mapPos.lat.toFixed(4));
+    p.set('lng', mapPos.lng.toFixed(4));
+    p.set('zoom', mapPos.zoom.toFixed(1));
+  }
   const qs = p.toString();
   return qs ? `?${qs}` : '/';
 }
@@ -115,10 +148,28 @@ function HomeInner() {
   const [favoritesSet, setFavoritesSet] = useState<Set<number>>(new Set());
   const [wouldLivePeopleMap, setWouldLivePeopleMap] = useState<Record<number, PersonWithBio[]>>({});
 
+  // Viewport loading state (map pan/zoom queries)
+  const [viewportLoading, setViewportLoading] = useState(false);
+  const [viewportCount, setViewportCount] = useState<number | null>(null);
+  const viewportRequestRef = useRef(0);
+  // Pending bounds from map pan/zoom — shown as "Search this area" button
+  const [pendingBounds, setPendingBounds] = useState<{ latMin: number; latMax: number; lonMin: number; lonMax: number } | null>(null);
+  const hasInitialViewportLoad = useRef(false);
+  // Shared ref: BoundsWatcher skips one callback when FlyToSelected sets this
+  const suppressBoundsRef = useRef(false);
+
+  // Viewport version counter — triggers commute filter re-run after viewport loads
+  const [viewportVersion, setViewportVersion] = useState(0);
+
   // Commute filter state
   const [commuteMatchIds, setCommuteMatchIds] = useState<Set<number> | null>(null);
+  const [commuteInfoMap, setCommuteInfoMap] = useState<globalThis.Map<number, CommuteInfo> | null>(null);
   const [commuteMessage, setCommuteMessage] = useState<string | null>(null);
   const [commuteLoading, setCommuteLoading] = useState(false);
+
+  // Filter-changing overlay state
+  const [filterChanging, setFilterChanging] = useState(false);
+  const filterMountedRef = useRef(false);
 
   // Hidden listings — persisted in localStorage
   const [hiddenIds, setHiddenIds] = useState<Set<number>>(() => {
@@ -138,6 +189,62 @@ function HomeInner() {
       localStorage.setItem('dwelligence_hidden_listings', JSON.stringify([...ids]));
     } catch { /* quota exceeded — silently ignore */ }
   }, []);
+
+  const loadForViewport = useCallback(async (bounds: { latMin: number; latMax: number; lonMin: number; lonMax: number }) => {
+    const requestId = ++viewportRequestRef.current;
+    setViewportLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('*')
+        .gte('lat', bounds.latMin)
+        .lte('lat', bounds.latMax)
+        .gte('lon', bounds.lonMin)
+        .lte('lon', bounds.lonMax)
+        .order('last_update_date', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false })
+        .limit(500);
+      // Discard stale responses from superseded requests
+      if (requestId !== viewportRequestRef.current) return;
+      if (error) {
+        console.error('[viewport] query error:', error.message);
+        return;
+      }
+      if (data) {
+        const newListings = (data as unknown as Listing[]).map((l) => ({
+          ...l,
+          lat: l.lat != null ? Number(l.lat) : null,
+          lon: l.lon != null ? Number(l.lon) : null,
+          baths: l.baths != null ? Number(l.baths) : null,
+          sqft: l.sqft != null ? Number(l.sqft) : null,
+          price: Number(l.price),
+          beds: Number(l.beds),
+          photos: Number(l.photos),
+          photo_urls: l.photo_urls ?? [],
+        }));
+        // Only replace listings if results were found; keep existing pins when
+        // panning to empty areas (parks, water, outside city).
+        if (newListings.length > 0) {
+          setListings(newListings);
+          setViewportVersion(v => v + 1);
+          // Null out viewport count so the badge falls back to the accurate
+          // filtered count (client-side filters have not been applied to
+          // newListings yet at this point).
+          setViewportCount(null);
+        } else {
+          // Empty area — keep existing listings but show "0 rentals" in badge
+          setViewportCount(0);
+        }
+      }
+    } catch (err) {
+      console.error('[viewport] fetch failed:', err);
+    } finally {
+      if (requestId === viewportRequestRef.current) {
+        setViewportLoading(false);
+        setPendingBounds(null);
+      }
+    }
+  }, [supabase]);
 
   const handleHideListing = useCallback((listingId: number) => {
     // Start fade-out animation
@@ -189,6 +296,25 @@ function HomeInner() {
     readFiltersFromParams(searchParams),
   );
 
+  // Map position — read initial values from URL params if present and valid
+  const [mapPosition, setMapPosition] = useState<MapPosition | null>(() => {
+    const latStr = searchParams.get('lat');
+    const lngStr = searchParams.get('lng');
+    const zoomStr = searchParams.get('zoom');
+    if (latStr == null || lngStr == null) return null;
+    const lat = Number(latStr);
+    const lng = Number(lngStr);
+    const zoom = zoomStr != null ? Number(zoomStr) : 13;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    if (!Number.isFinite(zoom) || zoom < 1 || zoom > 20) return null;
+    return { lat, lng, zoom };
+  });
+
+  const initialCenter: [number, number] | undefined = mapPosition != null
+    ? [mapPosition.lat, mapPosition.lng]
+    : undefined;
+  const initialZoom: number | undefined = mapPosition?.zoom;
+
   // -----------------------------------------------------------------------
   // Chat mode hooks
   // -----------------------------------------------------------------------
@@ -202,7 +328,7 @@ function HomeInner() {
   });
 
   const { conversations, invalidate: invalidateConversations } = useConversations();
-  const { savedSearches, saveSearch: saveSavedSearch, deleteSearch: deleteSavedSearch } = useSavedSearches(userId);
+  const { savedSearches, saveSearch: saveSavedSearch, deleteSearch: deleteSavedSearch, updateSearch: updateSavedSearch } = useSavedSearches(userId);
 
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(chatMode);
@@ -214,6 +340,11 @@ function HomeInner() {
     }
   }, [chatMode]);
 
+  // Called by BoundsWatcher when the user pans/zooms the map
+  const handleMapMove = useCallback((center: { lat: number; lng: number }, zoom: number) => {
+    setMapPosition({ lat: center.lat, lng: center.lng, zoom });
+  }, []);
+
   // Sync state changes to URL via history.replaceState (avoids Next.js
   // navigation overhead and unnecessary re-renders).
   const isFirstRender = useRef(true);
@@ -222,8 +353,19 @@ function HomeInner() {
       isFirstRender.current = false;
       return;
     }
-    window.history.replaceState(null, '', buildQueryString(mobileView, filters, chatMode, detailListing?.id ?? null));
-  }, [mobileView, filters, chatMode, detailListing]);
+    window.history.replaceState(null, '', buildQueryString(mobileView, filters, chatMode, detailListing?.id ?? null, mapPosition));
+  }, [mobileView, filters, chatMode, detailListing, mapPosition]);
+
+  // Show filter-loading overlay whenever filters change (skip initial mount)
+  useEffect(() => {
+    if (!filterMountedRef.current) {
+      filterMountedRef.current = true;
+      return;
+    }
+    setFilterChanging(true);
+    const timer = setTimeout(() => setFilterChanging(false), 400);
+    return () => clearTimeout(timer);
+  }, [filters]);
 
   // -----------------------------------------------------------------------
   // Fetch data
@@ -238,11 +380,35 @@ function HomeInner() {
       const uid = user?.id ?? null;
       setUserId(uid);
 
-      // Fetch listings
-      const { data: dbListings } = await supabase
-        .from('listings')
-        .select('*')
-        .order('price', { ascending: true });
+      // Fetch listings — if URL has a saved map position, scope the initial
+      // query to those bounds so we don't load listings from the wrong area.
+      const initLat = searchParams.get('lat');
+      const initLng = searchParams.get('lng');
+      const initZoom = searchParams.get('zoom');
+      const hasUrlPosition = initLat != null && initLng != null && Number.isFinite(Number(initLat)) && Number.isFinite(Number(initLng));
+
+      let listingsQuery = supabase.from('listings').select('*');
+
+      if (hasUrlPosition) {
+        const urlBounds = boundsFromCenter(
+          Number(initLat),
+          Number(initLng),
+          initZoom != null && Number.isFinite(Number(initZoom)) ? Number(initZoom) : 13,
+        );
+        listingsQuery = listingsQuery
+          .gte('lat', urlBounds.latMin)
+          .lte('lat', urlBounds.latMax)
+          .gte('lon', urlBounds.lonMin)
+          .lte('lon', urlBounds.lonMax)
+          .order('last_update_date', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false })
+          .limit(500);
+        hasInitialViewportLoad.current = true;
+      } else {
+        listingsQuery = listingsQuery.order('price', { ascending: true });
+      }
+
+      const { data: dbListings } = await listingsQuery;
 
       // Supabase returns Postgres `numeric` columns as strings.
       // Coerce lat, lon, baths (and sqft just in case) to real numbers
@@ -349,6 +515,7 @@ function HomeInner() {
     const rules = filters.commuteRules;
     if (!rules || rules.length === 0) {
       setCommuteMatchIds(null);
+      setCommuteInfoMap(null);
       setCommuteMessage(null);
       setCommuteLoading(false);
       return;
@@ -356,6 +523,33 @@ function HomeInner() {
 
     let cancelled = false;
     setCommuteLoading(true);
+
+    // NYC subway line colors for commute badges
+    const SUBWAY_COLORS: Record<string, string> = {
+      '1': '#EE352E', '2': '#EE352E', '3': '#EE352E',
+      '4': '#00933C', '5': '#00933C', '6': '#00933C',
+      '7': '#B933AD',
+      'A': '#0039A6', 'C': '#0039A6', 'E': '#0039A6',
+      'B': '#FF6319', 'D': '#FF6319', 'F': '#FF6319', 'M': '#FF6319',
+      'G': '#6CBE45',
+      'J': '#996633', 'Z': '#996633',
+      'L': '#A7A9AC',
+      'N': '#FCCC0A', 'Q': '#FCCC0A', 'R': '#FCCC0A', 'W': '#FCCC0A',
+      'S': '#808183',
+    };
+
+    // Determine the route letter and color from the commute rules
+    // Use the first subway-line or station rule's first line
+    let routeLetter: string | undefined;
+    let routeColor: string | undefined;
+    let destination: string | undefined;
+    for (const rule of rules) {
+      if ((rule.type === 'subway-line' || rule.type === 'station') && rule.lines && rule.lines.length > 0) {
+        routeLetter = rule.lines[0];
+        routeColor = SUBWAY_COLORS[routeLetter] ?? '#8b949e';
+        break;
+      }
+    }
 
     (async () => {
       try {
@@ -371,14 +565,36 @@ function HomeInner() {
         if (data.listingIds != null) {
           setCommuteMatchIds(new Set(data.listingIds as number[]));
           setCommuteMessage(null);
+
+          // Build CommuteInfo map from API response
+          // Use globalThis.Map because the local `Map` import shadows the global Map constructor
+          const infoMap: globalThis.Map<number, CommuteInfo> = new globalThis.Map();
+          const apiMeta = data.commuteInfo as Record<string, { minutes: number; station: string; mode: string }> | null;
+          if (apiMeta) {
+            for (const [idStr, meta] of Object.entries(apiMeta)) {
+              const id = Number(idStr);
+              // Determine destination: use station name from API
+              destination = meta.station;
+
+              infoMap.set(id, {
+                minutes: meta.minutes,
+                route: routeLetter,
+                routeColor,
+                destination,
+              });
+            }
+          }
+          setCommuteInfoMap(infoMap.size > 0 ? infoMap : null);
         } else {
           setCommuteMatchIds(null);
+          setCommuteInfoMap(null);
           setCommuteMessage(data.message ?? null);
         }
       } catch (err) {
         if (!cancelled) {
           console.error('[commute-filter] fetch failed:', err);
           setCommuteMatchIds(null);
+          setCommuteInfoMap(null);
           setCommuteMessage('Failed to apply commute filter');
         }
       } finally {
@@ -387,6 +603,7 @@ function HomeInner() {
     })();
 
     return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.commuteRules]);
 
   // -----------------------------------------------------------------------
@@ -450,12 +667,6 @@ function HomeInner() {
     // Scam filter: remove per-room listings (price per bedroom below $800)
     result = result.filter((l) => l.beds === 0 || l.price / l.beds >= 800);
 
-    if (filters.searchTag !== 'all') {
-      result = result.filter((l) => l.search_tag === filters.searchTag);
-    }
-    if (filters.maxPricePerBed !== null) {
-      result = result.filter((l) => l.price / l.beds <= filters.maxPricePerBed!);
-    }
     if (filters.selectedBeds !== null && filters.selectedBeds.length > 0) {
       result = result.filter((l) => {
         // If 7 is selected, include listings with 7+ beds
@@ -489,6 +700,30 @@ function HomeInner() {
       });
     }
 
+    // Bathroom filter
+    if (filters.minBaths !== null) {
+      result = result.filter((l) => (l.baths ?? 0) >= filters.minBaths!);
+    }
+
+    // Year built filter
+    if (filters.minYearBuilt !== null) {
+      result = result.filter((l) => (l.year_built ?? 0) >= filters.minYearBuilt!);
+    }
+    if (filters.maxYearBuilt !== null) {
+      result = result.filter((l) => (l.year_built ?? new Date().getFullYear()) <= filters.maxYearBuilt!);
+    }
+
+    // Sqft filter
+    if (filters.excludeNoSqft) {
+      result = result.filter((l) => l.sqft != null);
+    }
+    if (filters.minSqft !== null) {
+      result = result.filter((l) => l.sqft != null && l.sqft >= filters.minSqft!);
+    }
+    if (filters.maxSqft !== null) {
+      result = result.filter((l) => l.sqft != null && l.sqft <= filters.maxSqft!);
+    }
+
     // Source filter
     if (filters.selectedSources !== null) {
       const srcSet = new Set(filters.selectedSources);
@@ -507,8 +742,6 @@ function HomeInner() {
         if (aHasPhotos !== bHasPhotos) return aHasPhotos - bHasPhotos;
       }
       switch (filters.sort) {
-        case 'pricePerBed':
-          return a.price / a.beds - b.price / b.beds;
         case 'price':
           return a.price - b.price;
         case 'beds':
@@ -611,6 +844,7 @@ function HomeInner() {
           wouldLiveThere={wouldLiveSet.has(listing.id)}
           wouldLivePeople={wouldLivePeopleMap[listing.id] ?? []}
           isHiding={hidingId === listing.id}
+          commuteInfo={commuteInfoMap?.get(listing.id)}
           onClick={() => setSelectedId(listing.id)}
           onToggleWouldLive={() => handleToggleWouldLive(listing.id)}
           onToggleFavorite={() => handleToggleFavorite(listing.id)}
@@ -619,18 +853,13 @@ function HomeInner() {
         />
       ))}
 
-      {commuteLoading && filters.commuteRules.length > 0 && (
-        <div className="text-center py-8 text-sm" style={{ color: '#8b949e' }}>
-          Applying commute filter…
-        </div>
-      )}
-      {commuteMessage && !commuteLoading && (
+{commuteMessage && !commuteLoading && (
         <div className="text-center py-4 text-xs" style={{ color: '#f0883e' }}>
           {commuteMessage}
         </div>
       )}
       {filteredListings.length === 0 && !commuteLoading && (
-        <div className="text-center py-12 text-sm" style={{ color: '#8b949e' }}>
+        <div className="col-span-full flex items-center justify-center min-h-[200px] text-center text-sm" style={{ color: '#8b949e' }}>
           No listings match your filters.
         </div>
       )}
@@ -649,8 +878,10 @@ function HomeInner() {
     />
   );
 
+  const isMapView = mobileView === 'map';
+
   const mapPanel = (
-    <div className={`flex-1 ${mobileView === 'list' ? 'hidden lg:block' : mobileView === 'map' ? 'block' : 'hidden lg:block'}`} style={{ minHeight: 'calc(100vh - 56px - 42px)' }}>
+    <div className={`flex-1 relative ${mobileView === 'list' ? 'hidden lg:block' : mobileView === 'map' ? 'block' : 'hidden lg:block'}`} style={{ minHeight: 'calc(100vh - 60px - 42px)' }}>
       <Map
         listings={filteredListings}
         selectedId={selectedId}
@@ -660,6 +891,22 @@ function HomeInner() {
         onToggleWouldLive={handleToggleWouldLive}
         onHideListing={handleHideListing}
         onSelectDetail={(listing) => setDetailListing(listing)}
+        commuteInfoMap={commuteInfoMap ?? undefined}
+        onBoundsChange={(bounds) => {
+          // First bounds event: auto-load to populate the initial view
+          if (!hasInitialViewportLoad.current) {
+            hasInitialViewportLoad.current = true;
+            loadForViewport(bounds);
+          } else {
+            // Subsequent moves: show "Search this area" button
+            setPendingBounds(bounds);
+          }
+        }}
+        onMapMove={handleMapMove}
+        suppressBoundsRef={suppressBoundsRef}
+        initialCenter={initialCenter}
+        initialZoom={initialZoom}
+        visible={isMapView}
         onMarkerClick={(id) => {
           setSelectedId(id);
           if (window.innerWidth >= 1024) {
@@ -670,6 +917,52 @@ function HomeInner() {
           }
         }}
       />
+
+      {/* Map overlay: "Search this area" button or loading spinner */}
+      {(viewportLoading || pendingBounds) && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500]">
+          {viewportLoading ? (
+            <div
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium pointer-events-none"
+              style={{
+                backgroundColor: '#1c2028',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: '#8b949e',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" strokeLinecap="round"
+                style={{ animation: 'spin 0.7s linear infinite', flexShrink: 0 }}>
+                <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.12)" strokeWidth="2.5" />
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" stroke="#38bdf8" strokeWidth="2.5" />
+              </svg>
+              Searching...
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                if (pendingBounds) {
+                  loadForViewport(pendingBounds);
+                  setPendingBounds(null);
+                }
+              }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium"
+              style={{
+                backgroundColor: '#1c2028',
+                border: '1px solid rgba(255,255,255,0.15)',
+                color: '#e1e4e8',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
+                cursor: 'pointer',
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+              </svg>
+              Search this area
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 
@@ -707,6 +1000,7 @@ function HomeInner() {
       wouldLiveThere={wouldLiveSet.has(detailListing.id)}
       isFavorited={favoritesSet.has(detailListing.id)}
       wouldLivePeople={wouldLivePeopleMap[detailListing.id] ?? []}
+      commuteRules={filters.commuteRules}
       onToggleWouldLive={() => handleToggleWouldLive(detailListing.id)}
       onToggleFavorite={() => handleToggleFavorite(detailListing.id)}
       onHide={() => handleHideListing(detailListing.id)}
@@ -814,7 +1108,7 @@ function HomeInner() {
   // Chat drawer slides over from right when opened
   // -----------------------------------------------------------------------
   return (
-    <div className="flex flex-col lg:flex-row" style={{ height: 'calc(100vh - 56px)' }}>
+    <div className="flex flex-col lg:flex-row" style={{ height: 'calc(100vh - 60px)' }}>
       {/* Sidebar: AI search bar + filters + listing cards */}
       <div
         className={`w-full lg:w-[480px] shrink-0 flex flex-col ${mobileView === 'map' ? 'max-lg:shrink max-lg:flex-none' : ''}`}
@@ -836,29 +1130,111 @@ function HomeInner() {
             viewToggle={viewToggle}
             userId={userId}
             savedSearches={savedSearches}
-            onSaveSearch={(name) => saveSavedSearch(name, filters)}
+            onSaveSearch={async (name) => saveSavedSearch(name, filters)}
             onDeleteSearch={deleteSavedSearch}
             onLoadSearch={setFilters}
+            onUpdateSearch={updateSavedSearch}
+            onLoginRequired={() => router.push('/auth/login')}
           />
         </div>
 
-        {mobileView === 'swipe' ? (
-          <SwipeView
-            listings={filteredListings}
-            userId={userId}
-            favoritesSet={favoritesSet}
-            wouldLiveSet={wouldLiveSet}
-            onToggleFavorite={handleToggleFavorite}
-            onToggleWouldLive={handleToggleWouldLive}
-            onHideListing={handleHideListing}
-            onExpandDetail={(listing) => { setSelectedId(listing.id); setDetailListing(filteredListings.find(l => l.id === listing.id) ?? null); }}
-            onSwitchView={() => setMobileView('list')}
-          />
-        ) : (
-          <div className={`flex-1 overflow-y-auto min-h-0 px-3 py-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 relative z-0 ${mobileView === 'map' ? 'hidden lg:grid' : ''}`}>
-            {listingCards}
-          </div>
-        )}
+        <div className="relative flex-1 min-h-0 flex flex-col">
+          {mobileView === 'swipe' ? (
+            <SwipeView
+              listings={filteredListings}
+              userId={userId}
+              favoritesSet={favoritesSet}
+              wouldLiveSet={wouldLiveSet}
+              onToggleFavorite={handleToggleFavorite}
+              onToggleWouldLive={handleToggleWouldLive}
+              onHideListing={handleHideListing}
+              onExpandDetail={(listing) => { setSelectedId(listing.id); setDetailListing(filteredListings.find(l => l.id === listing.id) ?? null); }}
+              onSwitchView={() => setMobileView('list')}
+            />
+          ) : (
+            <div
+              className={`flex-1 overflow-y-auto dark-scrollbar min-h-0 px-3 py-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 relative z-0 ${mobileView === 'map' ? 'hidden lg:grid' : ''}`}
+              style={{ opacity: (filterChanging || commuteLoading) ? 0.35 : 1, transition: 'opacity 150ms' }}
+            >
+              {listingCards}
+            </div>
+          )}
+
+          {/* Filter-changing overlay — uses pointer-events-none + fixed centering scoped to sidebar */}
+          {(filterChanging || commuteLoading) && mobileView !== 'swipe' && (
+            <div
+              className={mobileView === 'map' ? 'hidden lg:block' : 'block'}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 10,
+                pointerEvents: 'none',
+              }}
+            >
+              {/* Sticky inner: stays centered in the visible viewport slice */}
+              <div
+                style={{
+                  position: 'sticky',
+                  top: 0,
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'column',
+                  gap: 10,
+                  background: 'rgba(15, 17, 23, 0.65)',
+                }}
+              >
+                {/* Mini radar animation */}
+                <div style={{ position: 'relative', width: 90, height: 90 }}>
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M3 10.5L12 3l9 7.5V21H15v-6H9v6H3V10.5z" fill="#58a6ff" fillOpacity="0.9" />
+                    </svg>
+                  </div>
+                  {[
+                    { r: 18, dur: '1.2s', delay: '0s', size: 5 },
+                    { r: 26, dur: '1.8s', delay: '-0.4s', size: 4 },
+                    { r: 34, dur: '2.4s', delay: '-0.9s', size: 5 },
+                    { r: 40, dur: '3.0s', delay: '-1.5s', size: 3 },
+                    { r: 44, dur: '3.6s', delay: '-2.1s', size: 4 },
+                  ].map((dot, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        width: dot.size,
+                        height: dot.size,
+                        marginTop: -dot.size / 2,
+                        marginLeft: -dot.size / 2,
+                        borderRadius: '50%',
+                        background: '#58a6ff',
+                        animation: `filterOrbit${dot.r} ${dot.dur} linear infinite`,
+                        animationDelay: dot.delay,
+                        transformOrigin: '50% 50%',
+                      }}
+                    />
+                  ))}
+                </div>
+                <span style={{ color: '#8b949e', fontSize: 12, fontWeight: 500, letterSpacing: '0.03em' }}>
+                  {commuteLoading ? 'Applying commute filter…' : 'Filtering…'}
+                </span>
+                <style>{`
+                  @keyframes filterOrbit18 { from { transform: rotate(0deg) translateX(18px); } to { transform: rotate(360deg) translateX(18px); } }
+                  @keyframes filterOrbit26 { from { transform: rotate(0deg) translateX(26px); } to { transform: rotate(360deg) translateX(26px); } }
+                  @keyframes filterOrbit34 { from { transform: rotate(0deg) translateX(34px); } to { transform: rotate(360deg) translateX(34px); } }
+                  @keyframes filterOrbit40 { from { transform: rotate(0deg) translateX(40px); } to { transform: rotate(360deg) translateX(40px); } }
+                  @keyframes filterOrbit44 { from { transform: rotate(0deg) translateX(44px); } to { transform: rotate(360deg) translateX(44px); } }
+                `}</style>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Map */}
