@@ -121,6 +121,9 @@ const PRICE_SLIDER_STEP = 500;
 
 const BEDROOM_OPTIONS = [
   { value: null, label: 'Any' },
+  { value: 0, label: 'Studio' },
+  { value: 1, label: '1' },
+  { value: 2, label: '2' },
   { value: 3, label: '3' },
   { value: 4, label: '4' },
   { value: 5, label: '5' },
@@ -234,7 +237,7 @@ function bedsBathsLabel(selectedBeds: number[] | null, minBaths: number | null):
     const labels = selectedBeds
       .slice()
       .sort((a, b) => a - b)
-      .map((b) => (b === 7 ? '7+' : String(b)));
+      .map((b) => (b === 0 ? 'Studio' : b === 7 ? '7+' : String(b)));
     parts.push(`${labels.join(', ')} Beds`);
   }
   if (minBaths !== null) parts.push(`${minBaths}+ Baths`);
