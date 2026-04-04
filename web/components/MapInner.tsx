@@ -433,7 +433,15 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
     return (e: L.LeafletEvent) => {
       const popup = (e as unknown as { popup: L.Popup }).popup;
       const container = popup?.getElement?.();
-      if (!container) return;
+      console.log(`[popup] popupopen fired for listing #${listing.id}`, {
+        hasContainer: !!container,
+        hasPopup: !!popup,
+        isClicked: clickedRef.current.has(listing.id),
+      });
+      if (!container) {
+        console.warn(`[popup] NO CONTAINER for listing #${listing.id} — handlers will NOT be wired`);
+        return;
+      }
 
       // Track popup element for hover detection
       popupElRef.current.set(listing.id, container);
@@ -464,20 +472,29 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
       // Wire handlers immediately if DOM is ready, AND on next frame as fallback.
       // This eliminates the race condition where a fast click arrives before
       // requestAnimationFrame fires, leaving handlers unwired.
-      wirePopupHandlers(container);
+      wirePopupHandlers(container, listing.id);
       requestAnimationFrame(() => {
-        wirePopupHandlers(container);
+        console.log(`[popup] rAF callback for listing #${listing.id} — retrying wirePopupHandlers`);
+        wirePopupHandlers(container, listing.id);
       });
     };
   }, []);
 
-  const wirePopupHandlers = useCallback((container: HTMLElement) => {
+  const wirePopupHandlers = useCallback((container: HTMLElement, listingId?: number) => {
+      const logId = listingId ?? '?';
       // Guard: skip if already wired (called twice for race-condition safety)
-      if (container.getAttribute('data-handlers-wired') === '1') return;
+      if (container.getAttribute('data-handlers-wired') === '1') {
+        console.log(`[popup] wirePopupHandlers #${logId} — SKIPPED (already wired)`);
+        return;
+      }
       // Only mark as wired if child elements are actually in the DOM
       const hasContent = container.querySelector('[data-action="open-detail"]');
-      if (!hasContent) return; // DOM not ready yet — requestAnimationFrame will retry
+      if (!hasContent) {
+        console.log(`[popup] wirePopupHandlers #${logId} — SKIPPED (DOM not ready, no [data-action="open-detail"] found)`);
+        return; // DOM not ready yet — requestAnimationFrame will retry
+      }
       container.setAttribute('data-handlers-wired', '1');
+      console.log(`[popup] wirePopupHandlers #${logId} — WIRING handlers now`);
 
       // Prevent clicks inside the popup from propagating to the map
       // (which would trigger Leaflet's closeOnClick and close the popup
@@ -485,6 +502,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
       const contentWrapper = container.querySelector('.leaflet-popup-content') as HTMLElement | null;
       if (contentWrapper) {
         L.DomEvent.disableClickPropagation(contentWrapper);
+        console.log(`[popup] wirePopupHandlers #${logId} — disableClickPropagation applied`);
       }
 
       // Wire up action buttons
@@ -580,37 +598,57 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
 
       // Wire up clickable card -> open detail
       const detailCard = container.querySelector('[data-action="open-detail"]') as HTMLElement | null;
+      console.log(`[popup] wirePopupHandlers #${logId} — detailCard found: ${!!detailCard}`);
       if (detailCard) {
         const openDetail = (ev: MouseEvent | TouchEvent) => {
           // Don't open detail if clicking buttons inside
           const target = ev.target as HTMLElement;
-          if (target.closest('[data-action="would-live"]') || target.closest('[data-action="favorite"]') || target.closest('[data-action="photo-prev"]') || target.closest('[data-action="photo-next"]') || target.closest('[data-action="open-detail-btn"]')) return;
+          const closestAction = target.closest('[data-action]') as HTMLElement | null;
+          if (closestAction && closestAction !== detailCard) {
+            console.log(`[popup] card click #${logId} — BLOCKED by nested action: ${closestAction.getAttribute('data-action')}`);
+            return;
+          }
           const id = Number(detailCard.getAttribute('data-listing-id'));
           const listing = listingsMapRef.current.get(id);
-          if (listing) onSelectDetailRef.current(listing);
+          console.log(`[popup] card click #${logId} — id=${id}, listingFound=${!!listing}, listingsMapSize=${listingsMapRef.current.size}`);
+          if (listing) {
+            console.log(`[popup] card click #${logId} — calling onSelectDetail`);
+            onSelectDetailRef.current(listing);
+          } else {
+            console.warn(`[popup] card click #${logId} — LISTING NOT FOUND in listingsMap! id=${id}`);
+          }
         };
         detailCard.onclick = openDetail;
         // Ensure touch taps work reliably on mobile
         detailCard.addEventListener('touchend', (ev) => {
           const target = ev.target as HTMLElement;
-          if (target.closest('[data-action="would-live"]') || target.closest('[data-action="favorite"]') || target.closest('[data-action="photo-prev"]') || target.closest('[data-action="photo-next"]') || target.closest('[data-action="open-detail-btn"]')) return;
+          const closestAction = target.closest('[data-action]') as HTMLElement | null;
+          if (closestAction && closestAction !== detailCard) return;
           ev.preventDefault();
           const id = Number(detailCard.getAttribute('data-listing-id'));
           const listing = listingsMapRef.current.get(id);
+          console.log(`[popup] card touchend #${logId} — id=${id}, listingFound=${!!listing}`);
           if (listing) onSelectDetailRef.current(listing);
         });
       }
 
       // Wire up the explicit "View details" button
       const detailBtn = container.querySelector('[data-action="open-detail-btn"]') as HTMLElement | null;
+      console.log(`[popup] wirePopupHandlers #${logId} — detailBtn found: ${!!detailBtn}`);
       if (detailBtn) {
         const openFromBtn = () => {
           const id = Number(detailBtn.getAttribute('data-listing-id'));
           const listing = listingsMapRef.current.get(id);
-          if (listing) onSelectDetailRef.current(listing);
+          console.log(`[popup] "View details" click #${logId} — id=${id}, listingFound=${!!listing}, listingsMapSize=${listingsMapRef.current.size}`);
+          if (listing) {
+            console.log(`[popup] "View details" click #${logId} — calling onSelectDetail`);
+            onSelectDetailRef.current(listing);
+          } else {
+            console.warn(`[popup] "View details" click #${logId} — LISTING NOT FOUND in listingsMap! id=${id}`);
+          }
         };
         detailBtn.onclick = (ev) => { ev.stopPropagation(); openFromBtn(); };
-        detailBtn.addEventListener('touchend', (ev) => { ev.preventDefault(); ev.stopPropagation(); openFromBtn(); });
+        detailBtn.addEventListener('touchend', (ev) => { ev.preventDefault(); ev.stopPropagation(); console.log(`[popup] "View details" touchend #${logId}`); openFromBtn(); });
       }
   }, []);
 
@@ -648,6 +686,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
 
   const handleClick = useCallback((listing: Listing) => {
     return (e: L.LeafletMouseEvent) => {
+      console.log(`[popup] marker CLICK #${listing.id} — opening popup`);
       clickedRef.current.add(listing.id);
       e.target.openPopup();
       onMarkerClick(listing.id);
@@ -656,6 +695,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
 
   const handlePopupClose = useCallback((listing: Listing) => {
     return () => {
+      console.log(`[popup] popupclose #${listing.id} — cleaning up refs, data-handlers-wired will reset on next open`);
       clickedRef.current.delete(listing.id);
       popupElRef.current.delete(listing.id);
       const timer = closeTimerRef.current.get(listing.id);

@@ -890,7 +890,7 @@ function HomeInner() {
         onToggleFavorite={handleToggleFavorite}
         onToggleWouldLive={handleToggleWouldLive}
         onHideListing={handleHideListing}
-        onSelectDetail={(listing) => setDetailListing(listing)}
+        onSelectDetail={(listing) => { console.log(`[page] onSelectDetail called for listing #${listing.id} "${listing.address}"`); setDetailListing(listing); }}
         commuteInfoMap={commuteInfoMap ?? undefined}
         onBoundsChange={(bounds) => {
           // First bounds event: auto-load to populate the initial view
