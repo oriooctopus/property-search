@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import type { CommuteRule } from "@/components/Filters";
 import SUBWAY_STATIONS from "@/lib/isochrone/subway-stations";
+import { PARK_COORDS } from "@/lib/park-coords";
 
 const OTP_BASE_URL = process.env.OTP_BASE_URL ?? "http://localhost:9090";
 
@@ -153,15 +154,21 @@ async function resolveStationRule(
   supabase: ReturnType<typeof getClient>,
   rule: CommuteRule,
 ): Promise<RuleResult | null> {
-  // A station rule works like a subway-line rule but for a single station
-  if (!rule.stops || rule.stops.length === 0) return null;
+  // Station rules use stationName (single station) from the UI.
+  // Convert to stops array for consistent downstream handling.
+  const stationNames: string[] = rule.stops && rule.stops.length > 0
+    ? rule.stops
+    : rule.stationName
+      ? [rule.stationName]
+      : [];
+  if (stationNames.length === 0) return null;
 
   const travelMode = rule.mode === "walk" ? "walk" : rule.mode === "bike" ? "bicycle" : "transit";
 
   const { data: isoRows, error: isoError } = await supabase
     .from("isochrones")
     .select("id, cutoff_minutes, origin_name")
-    .in("origin_name", rule.stops)
+    .in("origin_name", stationNames)
     .ilike("travel_mode", travelMode)
     .lte("cutoff_minutes", rule.maxMinutes);
 
@@ -245,22 +252,19 @@ function otpMode(mode: string): string {
   }
 }
 
-async function resolveAddressRule(
+async function resolveOtpIsochroneRule(
   supabase: ReturnType<typeof getClient>,
+  lat: number,
+  lon: number,
   rule: CommuteRule,
+  destinationLabel: string,
 ): Promise<RuleResult | null> {
-  // Need lat/lon from autocomplete selection
-  if (!rule.addressLat || !rule.addressLon) {
-    console.log("[commute-filter] Address rule missing lat/lon, skipping");
-    return null;
-  }
-
   // Build OTP TravelTime isochrone URL
   const date = nextWeekday();
   const isoTime = `${date}T09:00:00-04:00`;
   const url =
     `${OTP_BASE_URL}/otp/traveltime/isochrone` +
-    `?location=${rule.addressLat},${rule.addressLon}` +
+    `?location=${lat},${lon}` +
     `&modes=${otpMode(rule.mode)}` +
     `&time=${encodeURIComponent(isoTime)}` +
     // Add 15% buffer to transit times — OTP uses worst-case wait times
@@ -286,7 +290,7 @@ async function resolveAddressRule(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("ECONNREFUSED") || msg.includes("fetch failed")) {
-      console.error("[commute-filter] OTP not running, skipping address rule");
+      console.error("[commute-filter] OTP not running, skipping rule");
     } else {
       console.error("[commute-filter] OTP fetch error:", msg);
     }
@@ -299,7 +303,7 @@ async function resolveAddressRule(
     !Array.isArray(geojson.features) ||
     geojson.features.length === 0
   ) {
-    console.log("[commute-filter] OTP returned empty polygon for address rule");
+    console.log("[commute-filter] OTP returned empty polygon for rule");
     return { ids: new Set<number>(), meta: {} };
   }
 
@@ -335,15 +339,41 @@ async function resolveAddressRule(
 
   if (firstPage.size === 0) return { ids: new Set<number>(), meta: {} };
 
-  // For address rules, we don't have per-listing distance data from the RPC.
-  // Use the rule's maxMinutes as an approximate upper bound for all matched listings.
-  const destination = rule.address ? rule.address.split(",")[0].trim() : "Address";
+  // Use maxMinutes as an approximate upper bound for all matched listings
   const meta: Record<number, ListingCommuteMeta> = {};
   for (const id of firstPage) {
-    meta[id] = { minutes: rule.maxMinutes, station: destination, mode: rule.mode };
+    meta[id] = { minutes: rule.maxMinutes, station: destinationLabel, mode: rule.mode };
   }
 
   return { ids: firstPage, meta };
+}
+
+async function resolveAddressRule(
+  supabase: ReturnType<typeof getClient>,
+  rule: CommuteRule,
+): Promise<RuleResult | null> {
+  if (!rule.addressLat || !rule.addressLon) {
+    console.log("[commute-filter] Address rule missing lat/lon, skipping");
+    return null;
+  }
+  const destination = rule.address ? rule.address.split(",")[0].trim() : "Address";
+  return resolveOtpIsochroneRule(supabase, rule.addressLat, rule.addressLon, rule, destination);
+}
+
+async function resolveParkRule(
+  supabase: ReturnType<typeof getClient>,
+  rule: CommuteRule,
+): Promise<RuleResult | null> {
+  if (!rule.parkName) {
+    console.log("[commute-filter] Park rule missing parkName, skipping");
+    return null;
+  }
+  const coords = PARK_COORDS[rule.parkName];
+  if (!coords) {
+    console.log(`[commute-filter] Unknown park "${rule.parkName}", skipping`);
+    return null;
+  }
+  return resolveOtpIsochroneRule(supabase, coords.lat, coords.lon, rule, rule.parkName);
 }
 
 // ---------------------------------------------------------------------------
@@ -382,9 +412,7 @@ export async function POST(request: NextRequest) {
           break;
 
         case "park":
-          // TODO: Park isochrones haven't been generated yet — return null for now
-          console.log("[commute-filter] Park rule not yet implemented, skipping");
-          result = null;
+          result = await resolveParkRule(supabase, rule);
           break;
       }
 
@@ -397,7 +425,7 @@ export async function POST(request: NextRequest) {
     if (validResults.length === 0) {
       // Check if any rules were implemented types (subway-line / station)
       const hasImplementedRule = commuteRules.some(
-        (r) => r.type === "subway-line" || r.type === "station" || r.type === "address",
+        (r) => r.type === "subway-line" || r.type === "station" || r.type === "address" || r.type === "park",
       );
       if (hasImplementedRule) {
         // Implemented rules all returned null (shouldn't happen after empty-set fix, but be safe)
@@ -407,7 +435,7 @@ export async function POST(request: NextRequest) {
           message: "No listings match your commute filters",
         });
       }
-      // Only unimplemented types (address/park) — pass through
+      // Only non-resolvable rules — pass through
       return NextResponse.json({
         listingIds: null,
         commuteInfo: null,

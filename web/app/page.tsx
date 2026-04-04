@@ -919,9 +919,9 @@ function HomeInner() {
       />
 
       {/* Map overlay: "Search this area" button or loading spinner */}
-      {(viewportLoading || pendingBounds) && (
+      {(viewportLoading || commuteLoading || pendingBounds) && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500]">
-          {viewportLoading ? (
+          {(viewportLoading || commuteLoading) ? (
             <div
               className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium pointer-events-none"
               style={{

@@ -366,39 +366,7 @@ function buildPopupContent(listing: Listing, isFavorited: boolean, isWouldLive: 
           color: #8b949e;
           margin-bottom: 2px;
         ">${listing.beds > 0 ? `$${Math.round(listing.price / listing.beds).toLocaleString()}/bed · ` : ''}${listing.beds === 0 ? 'Studio' : `${listing.beds} bd`} / ${listing.baths} ba</div>
-        ${commuteInfo ? `
-          <div style="
-            display: inline-flex;
-            align-items: center;
-            border-radius: 9999px;
-            padding: 3px 10px 3px ${commuteInfo.route ? '4px' : '10px'};
-            font-size: 11px;
-            font-weight: 600;
-            color: #58a6ff;
-            background: rgba(88, 166, 255, 0.08);
-            border: 1px solid rgba(88, 166, 255, 0.3);
-            gap: 4px;
-            margin-bottom: 2px;
-          ">
-            ${commuteInfo.route ? `
-              <span style="
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                width: 14px;
-                height: 14px;
-                border-radius: 50%;
-                font-size: 9px;
-                font-weight: 800;
-                background-color: ${commuteInfo.routeColor ?? '#8b949e'};
-                color: #fff;
-                line-height: 1;
-                flex-shrink: 0;
-              ">${escapeHtml(commuteInfo.route)}</span>
-            ` : ''}
-            ~${commuteInfo.minutes} min
-          </div>
-        ` : ''}
+        ${'' /* Commute badge removed — inaccurate for OTP polygon filters */}
         ${actionsHtml}
         <div data-action="open-detail-btn" data-listing-id="${listing.id}" style="
           margin-top: 6px;
@@ -493,9 +461,10 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
       container.addEventListener('mouseenter', onPopupMouseEnter);
       container.addEventListener('mouseleave', onPopupMouseLeave);
 
-      // React hasn't rendered the dangerouslySetInnerHTML content yet when
-      // Leaflet fires popupopen. Defer handler wiring until the next frame
-      // so the DOM is populated.
+      // Wire handlers immediately if DOM is ready, AND on next frame as fallback.
+      // This eliminates the race condition where a fast click arrives before
+      // requestAnimationFrame fires, leaving handlers unwired.
+      wirePopupHandlers(container);
       requestAnimationFrame(() => {
         wirePopupHandlers(container);
       });
@@ -503,6 +472,13 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
   }, []);
 
   const wirePopupHandlers = useCallback((container: HTMLElement) => {
+      // Guard: skip if already wired (called twice for race-condition safety)
+      if (container.getAttribute('data-handlers-wired') === '1') return;
+      // Only mark as wired if child elements are actually in the DOM
+      const hasContent = container.querySelector('[data-action="open-detail"]');
+      if (!hasContent) return; // DOM not ready yet — requestAnimationFrame will retry
+      container.setAttribute('data-handlers-wired', '1');
+
       // Prevent clicks inside the popup from propagating to the map
       // (which would trigger Leaflet's closeOnClick and close the popup
       // before our detail handler runs).
