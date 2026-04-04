@@ -497,6 +497,12 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
           const id = Number(wouldLiveBtn.getAttribute('data-listing-id'));
           onToggleWouldLiveRef.current(id);
         };
+        wouldLiveBtn.addEventListener('touchend', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const id = Number(wouldLiveBtn.getAttribute('data-listing-id'));
+          onToggleWouldLiveRef.current(id);
+        });
       }
       if (favoriteBtn) {
         favoriteBtn.onclick = (ev) => {
@@ -504,6 +510,12 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
           const id = Number(favoriteBtn.getAttribute('data-listing-id'));
           onToggleFavoriteRef.current(id);
         };
+        favoriteBtn.addEventListener('touchend', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const id = Number(favoriteBtn.getAttribute('data-listing-id'));
+          onToggleFavoriteRef.current(id);
+        });
       }
       const dislikeBtn = container.querySelector('[data-action="dislike"]') as HTMLElement | null;
       if (dislikeBtn) {
@@ -512,6 +524,12 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
           const id = Number(dislikeBtn.getAttribute('data-listing-id'));
           onHideListingRef.current(id);
         };
+        dislikeBtn.addEventListener('touchend', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const id = Number(dislikeBtn.getAttribute('data-listing-id'));
+          onHideListingRef.current(id);
+        });
       }
 
       // Wire up photo prev/next arrows
@@ -538,6 +556,12 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
             idx = (idx - 1 + total) % total;
             updatePhoto();
           };
+          photoPrev.addEventListener('touchend', (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            idx = (idx - 1 + total) % total;
+            updatePhoto();
+          });
         }
         if (photoNext) {
           photoNext.onclick = (ev) => {
@@ -545,6 +569,12 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
             idx = (idx + 1) % total;
             updatePhoto();
           };
+          photoNext.addEventListener('touchend', (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            idx = (idx + 1) % total;
+            updatePhoto();
+          });
         }
       }
 
@@ -586,6 +616,8 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
 
   const handleMouseOver = useCallback((listing: Listing) => {
     return (e: L.LeafletMouseEvent) => {
+      // Skip synthetic mouseover events on touch devices
+      if (e.originalEvent && 'touches' in (e.originalEvent as unknown as object)) return;
       // Cancel any pending close timer for this marker
       const timer = closeTimerRef.current.get(listing.id);
       if (timer) {

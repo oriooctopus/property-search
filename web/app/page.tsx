@@ -1034,6 +1034,8 @@ function HomeInner() {
           backgroundColor: '#0f1117',
           borderLeft: '1px solid #2d333b',
           boxShadow: '-8px 0 24px rgba(0,0,0,0.4)',
+          paddingTop: 'env(safe-area-inset-top)',
+          paddingBottom: 'env(safe-area-inset-bottom)',
         }}
       >
         {/* Drawer header */}
