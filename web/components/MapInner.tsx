@@ -694,9 +694,17 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
   }, [onMarkerClick]);
 
   const handlePopupClose = useCallback((listing: Listing) => {
-    return () => {
-      console.log(`[popup] popupclose #${listing.id} — cleaning up refs, data-handlers-wired will reset on next open`);
+    return (e: L.LeafletEvent) => {
+      console.log(`[popup] popupclose #${listing.id} — cleaning up refs + resetting data-handlers-wired`);
       clickedRef.current.delete(listing.id);
+      // Reset data-handlers-wired so handlers are re-attached on next open.
+      // Leaflet reuses the container but re-renders inner content, so old
+      // handlers point to stale DOM nodes.
+      const popup = (e as unknown as { popup: L.Popup }).popup;
+      const container = popup?.getElement?.();
+      if (container) {
+        container.removeAttribute('data-handlers-wired');
+      }
       popupElRef.current.delete(listing.id);
       const timer = closeTimerRef.current.get(listing.id);
       if (timer) {
