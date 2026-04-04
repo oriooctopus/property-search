@@ -469,188 +469,78 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
       container.addEventListener('mouseenter', onPopupMouseEnter);
       container.addEventListener('mouseleave', onPopupMouseLeave);
 
-      // Wire handlers immediately if DOM is ready, AND on next frame as fallback.
-      // This eliminates the race condition where a fast click arrives before
-      // requestAnimationFrame fires, leaving handlers unwired.
-      wirePopupHandlers(container, listing.id);
-      requestAnimationFrame(() => {
-        console.log(`[popup] rAF callback for listing #${listing.id} — retrying wirePopupHandlers`);
-        wirePopupHandlers(container, listing.id);
-      });
+      // Use event delegation on the container — works immediately regardless
+      // of when child elements render. No need to wait for rAF or query children.
+      if (!container.getAttribute('data-delegated')) {
+        container.setAttribute('data-delegated', '1');
+        L.DomEvent.disableClickPropagation(container);
+
+        const handleAction = (ev: Event) => {
+          const target = ev.target as HTMLElement;
+          const actionEl = target.closest('[data-action]') as HTMLElement | null;
+          if (!actionEl) return;
+
+          const action = actionEl.getAttribute('data-action');
+          const id = Number(actionEl.getAttribute('data-listing-id') || '0');
+          ev.stopPropagation();
+          if (ev.type === 'touchend') (ev as TouchEvent).preventDefault();
+
+          console.log(`[popup] delegated ${ev.type} — action="${action}" listing=#${id}`);
+
+          switch (action) {
+            case 'would-live':
+              onToggleWouldLiveRef.current(id);
+              break;
+            case 'favorite':
+              onToggleFavoriteRef.current(id);
+              break;
+            case 'dislike':
+              onHideListingRef.current(id);
+              break;
+            case 'photo-prev':
+            case 'photo-next': {
+              const img = container.querySelector('[data-photo-img]') as HTMLImageElement | null;
+              const counter = container.querySelector('[data-photo-counter]') as HTMLElement | null;
+              if (img) {
+                let urls: string[] = [];
+                try { urls = JSON.parse(img.getAttribute('data-photo-urls') || '[]'); } catch { /* ignore */ }
+                let idx = Number(img.getAttribute('data-photo-index') || '0');
+                const total = urls.length;
+                if (total > 0) {
+                  idx = action === 'photo-prev' ? (idx - 1 + total) % total : (idx + 1) % total;
+                  img.src = urls[idx];
+                  img.setAttribute('data-photo-index', String(idx));
+                  if (counter) counter.textContent = `${idx + 1}/${total}`;
+                }
+              }
+              break;
+            }
+            case 'open-detail-btn': {
+              const foundListing = listingsMapRef.current.get(id);
+              console.log(`[popup] "View details" — id=${id}, found=${!!foundListing}`);
+              if (foundListing) onSelectDetailRef.current(foundListing);
+              break;
+            }
+            case 'open-detail': {
+              // Card area click — only if target isn't a nested action button
+              const nestedAction = target.closest('[data-action]:not([data-action="open-detail"])') as HTMLElement | null;
+              if (nestedAction) return;
+              const foundListing = listingsMapRef.current.get(id);
+              console.log(`[popup] card click — id=${id}, found=${!!foundListing}`);
+              if (foundListing) onSelectDetailRef.current(foundListing);
+              break;
+            }
+          }
+        };
+
+        container.addEventListener('click', handleAction);
+        container.addEventListener('touchend', handleAction);
+        console.log(`[popup] event delegation attached to container for listing #${listing.id}`);
+      }
     };
   }, []);
 
-  const wirePopupHandlers = useCallback((container: HTMLElement, listingId?: number) => {
-      const logId = listingId ?? '?';
-      // Guard: skip if already wired (called twice for race-condition safety)
-      if (container.getAttribute('data-handlers-wired') === '1') {
-        console.log(`[popup] wirePopupHandlers #${logId} — SKIPPED (already wired)`);
-        return;
-      }
-      // Only mark as wired if child elements are actually in the DOM
-      const hasContent = container.querySelector('[data-action="open-detail"]');
-      if (!hasContent) {
-        console.log(`[popup] wirePopupHandlers #${logId} — SKIPPED (DOM not ready, no [data-action="open-detail"] found)`);
-        return; // DOM not ready yet — requestAnimationFrame will retry
-      }
-      container.setAttribute('data-handlers-wired', '1');
-      console.log(`[popup] wirePopupHandlers #${logId} — WIRING handlers now`);
-
-      // Prevent clicks inside the popup from propagating to the map
-      // (which would trigger Leaflet's closeOnClick and close the popup
-      // before our detail handler runs).
-      const contentWrapper = container.querySelector('.leaflet-popup-content') as HTMLElement | null;
-      if (contentWrapper) {
-        L.DomEvent.disableClickPropagation(contentWrapper);
-        console.log(`[popup] wirePopupHandlers #${logId} — disableClickPropagation applied`);
-      }
-
-      // Wire up action buttons
-      const wouldLiveBtn = container.querySelector('[data-action="would-live"]') as HTMLElement | null;
-      const favoriteBtn = container.querySelector('[data-action="favorite"]') as HTMLElement | null;
-
-      if (wouldLiveBtn) {
-        wouldLiveBtn.onclick = (ev) => {
-          ev.stopPropagation();
-          const id = Number(wouldLiveBtn.getAttribute('data-listing-id'));
-          onToggleWouldLiveRef.current(id);
-        };
-        wouldLiveBtn.addEventListener('touchend', (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          const id = Number(wouldLiveBtn.getAttribute('data-listing-id'));
-          onToggleWouldLiveRef.current(id);
-        });
-      }
-      if (favoriteBtn) {
-        favoriteBtn.onclick = (ev) => {
-          ev.stopPropagation();
-          const id = Number(favoriteBtn.getAttribute('data-listing-id'));
-          onToggleFavoriteRef.current(id);
-        };
-        favoriteBtn.addEventListener('touchend', (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          const id = Number(favoriteBtn.getAttribute('data-listing-id'));
-          onToggleFavoriteRef.current(id);
-        });
-      }
-      const dislikeBtn = container.querySelector('[data-action="dislike"]') as HTMLElement | null;
-      if (dislikeBtn) {
-        dislikeBtn.onclick = (ev) => {
-          ev.stopPropagation();
-          const id = Number(dislikeBtn.getAttribute('data-listing-id'));
-          onHideListingRef.current(id);
-        };
-        dislikeBtn.addEventListener('touchend', (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          const id = Number(dislikeBtn.getAttribute('data-listing-id'));
-          onHideListingRef.current(id);
-        });
-      }
-
-      // Wire up photo prev/next arrows
-      const photoPrev = container.querySelector('[data-action="photo-prev"]') as HTMLElement | null;
-      const photoNext = container.querySelector('[data-action="photo-next"]') as HTMLElement | null;
-      const photoImg = container.querySelector('[data-photo-img]') as HTMLImageElement | null;
-      const photoCounter = container.querySelector('[data-photo-counter]') as HTMLElement | null;
-
-      if (photoImg && (photoPrev || photoNext)) {
-        let urls: string[] = [];
-        try { urls = JSON.parse(photoImg.getAttribute('data-photo-urls') || '[]'); } catch { /* ignore */ }
-        let idx = Number(photoImg.getAttribute('data-photo-index') || '0');
-        const total = urls.length;
-
-        const updatePhoto = () => {
-          photoImg.src = urls[idx];
-          photoImg.setAttribute('data-photo-index', String(idx));
-          if (photoCounter) photoCounter.textContent = `${idx + 1}/${total}`;
-        };
-
-        if (photoPrev) {
-          photoPrev.onclick = (ev) => {
-            ev.stopPropagation();
-            idx = (idx - 1 + total) % total;
-            updatePhoto();
-          };
-          photoPrev.addEventListener('touchend', (ev) => {
-            ev.preventDefault();
-            ev.stopPropagation();
-            idx = (idx - 1 + total) % total;
-            updatePhoto();
-          });
-        }
-        if (photoNext) {
-          photoNext.onclick = (ev) => {
-            ev.stopPropagation();
-            idx = (idx + 1) % total;
-            updatePhoto();
-          };
-          photoNext.addEventListener('touchend', (ev) => {
-            ev.preventDefault();
-            ev.stopPropagation();
-            idx = (idx + 1) % total;
-            updatePhoto();
-          });
-        }
-      }
-
-      // Wire up clickable card -> open detail
-      const detailCard = container.querySelector('[data-action="open-detail"]') as HTMLElement | null;
-      console.log(`[popup] wirePopupHandlers #${logId} — detailCard found: ${!!detailCard}`);
-      if (detailCard) {
-        const openDetail = (ev: MouseEvent | TouchEvent) => {
-          // Don't open detail if clicking buttons inside
-          const target = ev.target as HTMLElement;
-          const closestAction = target.closest('[data-action]') as HTMLElement | null;
-          if (closestAction && closestAction !== detailCard) {
-            console.log(`[popup] card click #${logId} — BLOCKED by nested action: ${closestAction.getAttribute('data-action')}`);
-            return;
-          }
-          const id = Number(detailCard.getAttribute('data-listing-id'));
-          const listing = listingsMapRef.current.get(id);
-          console.log(`[popup] card click #${logId} — id=${id}, listingFound=${!!listing}, listingsMapSize=${listingsMapRef.current.size}`);
-          if (listing) {
-            console.log(`[popup] card click #${logId} — calling onSelectDetail`);
-            onSelectDetailRef.current(listing);
-          } else {
-            console.warn(`[popup] card click #${logId} — LISTING NOT FOUND in listingsMap! id=${id}`);
-          }
-        };
-        detailCard.onclick = openDetail;
-        // Ensure touch taps work reliably on mobile
-        detailCard.addEventListener('touchend', (ev) => {
-          const target = ev.target as HTMLElement;
-          const closestAction = target.closest('[data-action]') as HTMLElement | null;
-          if (closestAction && closestAction !== detailCard) return;
-          ev.preventDefault();
-          const id = Number(detailCard.getAttribute('data-listing-id'));
-          const listing = listingsMapRef.current.get(id);
-          console.log(`[popup] card touchend #${logId} — id=${id}, listingFound=${!!listing}`);
-          if (listing) onSelectDetailRef.current(listing);
-        });
-      }
-
-      // Wire up the explicit "View details" button
-      const detailBtn = container.querySelector('[data-action="open-detail-btn"]') as HTMLElement | null;
-      console.log(`[popup] wirePopupHandlers #${logId} — detailBtn found: ${!!detailBtn}`);
-      if (detailBtn) {
-        const openFromBtn = () => {
-          const id = Number(detailBtn.getAttribute('data-listing-id'));
-          const listing = listingsMapRef.current.get(id);
-          console.log(`[popup] "View details" click #${logId} — id=${id}, listingFound=${!!listing}, listingsMapSize=${listingsMapRef.current.size}`);
-          if (listing) {
-            console.log(`[popup] "View details" click #${logId} — calling onSelectDetail`);
-            onSelectDetailRef.current(listing);
-          } else {
-            console.warn(`[popup] "View details" click #${logId} — LISTING NOT FOUND in listingsMap! id=${id}`);
-          }
-        };
-        detailBtn.onclick = (ev) => { ev.stopPropagation(); openFromBtn(); };
-        detailBtn.addEventListener('touchend', (ev) => { ev.preventDefault(); ev.stopPropagation(); console.log(`[popup] "View details" touchend #${logId}`); openFromBtn(); });
-      }
-  }, []);
+  // wirePopupHandlers removed — replaced by event delegation in handlePopupOpen
 
   const handleMouseOver = useCallback((listing: Listing) => {
     return (e: L.LeafletMouseEvent) => {
@@ -694,17 +584,11 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
   }, [onMarkerClick]);
 
   const handlePopupClose = useCallback((listing: Listing) => {
-    return (e: L.LeafletEvent) => {
-      console.log(`[popup] popupclose #${listing.id} — cleaning up refs + resetting data-handlers-wired`);
+    return () => {
+      console.log(`[popup] popupclose #${listing.id} — cleaning up refs`);
       clickedRef.current.delete(listing.id);
-      // Reset data-handlers-wired so handlers are re-attached on next open.
-      // Leaflet reuses the container but re-renders inner content, so old
-      // handlers point to stale DOM nodes.
-      const popup = (e as unknown as { popup: L.Popup }).popup;
-      const container = popup?.getElement?.();
-      if (container) {
-        container.removeAttribute('data-handlers-wired');
-      }
+      // No need to reset data-delegated — the delegated click/touchend listener
+      // on the container works regardless of child re-rendering.
       popupElRef.current.delete(listing.id);
       const timer = closeTimerRef.current.get(listing.id);
       if (timer) {
