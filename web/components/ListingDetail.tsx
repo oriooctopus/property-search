@@ -182,7 +182,7 @@ export default function ListingDetail({
       }}
     >
       <div
-        className="relative rounded-xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto"
+        className="relative rounded-xl w-full max-w-lg mx-4 max-h-[85dvh] overflow-y-auto"
         style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b' }}
       >
         {/* Photo carousel */}
