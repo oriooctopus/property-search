@@ -353,36 +353,8 @@ export default function ListingCard({
               {SOURCE_LABELS[src] ?? src}
             </span>
           ))}
-          {/* Commute time tag */}
-          {commuteInfo && (
-            <span
-              className="inline-flex items-center rounded-full h-[22px] text-[11px] font-semibold cursor-default"
-              style={{
-                padding: '3px 10px 3px 4px',
-                color: '#58a6ff',
-                background: 'rgba(88, 166, 255, 0.08)',
-                border: '1px solid rgba(88, 166, 255, 0.3)',
-                gap: 4,
-              }}
-            >
-              {commuteInfo.route && (
-                <span
-                  className="inline-flex items-center justify-center rounded-full shrink-0 font-extrabold"
-                  style={{
-                    width: 14,
-                    height: 14,
-                    fontSize: 9,
-                    backgroundColor: commuteInfo.routeColor ?? '#8b949e',
-                    color: '#fff',
-                    lineHeight: 1,
-                  }}
-                >
-                  {commuteInfo.route}
-                </span>
-              )}
-              ~{commuteInfo.minutes} min
-            </span>
-          )}
+          {/* Commute time badge removed — inaccurate for OTP polygon filters.
+             Users see actual commute details in the listing detail panel. */}
         </div>
 
         <div className="flex items-center gap-1">

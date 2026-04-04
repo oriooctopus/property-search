@@ -742,7 +742,6 @@ const CommuteRuleEditor = memo(function CommuteRuleEditor({
           }}
         >
           <option value="subway-line">Subway Line</option>
-          <option value="station">Station</option>
           <option value="address">Address</option>
           <option value="park">Park</option>
         </select>

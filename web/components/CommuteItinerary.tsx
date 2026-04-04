@@ -295,6 +295,7 @@ interface CommuteItineraryProps {
   destinationLat: number;
   destinationLon: number;
   destinationName: string;
+  mode?: string;              // OTP mode string — e.g. "WALK", "BICYCLE", "TRANSIT,WALK"
 }
 
 export default function CommuteItinerary({
@@ -303,6 +304,7 @@ export default function CommuteItinerary({
   destinationLat,
   destinationLon,
   destinationName,
+  mode,
 }: CommuteItineraryProps) {
   const [itinerary, setItinerary] = useState<TripItinerary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -321,6 +323,7 @@ export default function CommuteItinerary({
           fromLon: String(listingLon),
           toLat: String(destinationLat),
           toLon: String(destinationLon),
+          ...(mode ? { mode } : {}),
         });
 
         const res = await fetch(`/api/trip-plan?${params}`);
@@ -353,7 +356,7 @@ export default function CommuteItinerary({
 
     fetchTrip();
     return () => { cancelled = true; };
-  }, [listingLat, listingLon, destinationLat, destinationLon]);
+  }, [listingLat, listingLon, destinationLat, destinationLon, mode]);
 
   return (
     <div className="mb-6">

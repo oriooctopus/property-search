@@ -8,6 +8,7 @@ import DetailMap from './DetailMap';
 import CommuteItinerary from './CommuteItinerary';
 import type { CommuteRule } from '@/components/Filters';
 import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
+import { PARK_COORDS } from '@/lib/park-coords';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -35,30 +36,78 @@ interface Person {
   bio: string | null;
 }
 
+/** Map user-facing mode to OTP mode string. */
+function commuteOtpMode(mode: 'walk' | 'transit' | 'bike'): string {
+  switch (mode) {
+    case 'walk': return 'WALK';
+    case 'bike': return 'BICYCLE';
+    case 'transit': return 'TRANSIT,WALK';
+  }
+}
+
 /** Resolve the first commute destination from active rules. */
-function getCommuteDestination(rules: CommuteRule[]): {
+function getCommuteDestination(
+  rules: CommuteRule[],
+  listingLat?: number | null,
+  listingLon?: number | null,
+): {
   lat: number;
   lon: number;
   name: string;
+  mode: 'walk' | 'transit' | 'bike';
 } | null {
   for (const rule of rules) {
     // Address rules have explicit lat/lon
     if (rule.type === 'address' && rule.addressLat && rule.addressLon) {
       const shortName = rule.address ? rule.address.split(',')[0].trim() : 'Destination';
-      return { lat: rule.addressLat, lon: rule.addressLon, name: shortName };
+      return { lat: rule.addressLat, lon: rule.addressLon, name: shortName, mode: rule.mode };
     }
-    // Station rules — look up station coordinates
-    if (rule.type === 'station' && rule.stops && rule.stops.length > 0) {
-      const station = SUBWAY_STATIONS.find((s) => s.name === rule.stops![0]);
-      if (station) {
-        return { lat: station.lat, lon: station.lon, name: station.name };
+    // Station rules — check stationName first (set by UI), then stops
+    if (rule.type === 'station') {
+      const name = rule.stationName || (rule.stops && rule.stops[0]);
+      if (name) {
+        const station = SUBWAY_STATIONS.find((s) => s.name === name);
+        if (station) {
+          return { lat: station.lat, lon: station.lon, name: station.name, mode: rule.mode };
+        }
       }
     }
-    // Subway-line rules with specific stops selected
-    if (rule.type === 'subway-line' && rule.stops && rule.stops.length > 0) {
-      const station = SUBWAY_STATIONS.find((s) => s.name === rule.stops![0]);
-      if (station) {
-        return { lat: station.lat, lon: station.lon, name: station.name };
+    // Subway-line rules — destination is a station, so use walk/bike mode directly
+    if (rule.type === 'subway-line') {
+      // If specific stops selected, use the first one
+      if (rule.stops && rule.stops.length > 0) {
+        const station = SUBWAY_STATIONS.find((s) => s.name === rule.stops![0]);
+        if (station) {
+          return { lat: station.lat, lon: station.lon, name: station.name, mode: rule.mode };
+        }
+      }
+      // Otherwise pick nearest station on the selected lines to the listing
+      if (rule.lines && rule.lines.length > 0) {
+        if (listingLat != null && listingLon != null) {
+          const lineSet = new Set(rule.lines);
+          const lineStations = SUBWAY_STATIONS.filter(s => s.lines.some(l => lineSet.has(l)));
+          if (lineStations.length > 0) {
+            let nearest = lineStations[0];
+            let minDist = (nearest.lat - listingLat) ** 2 + (nearest.lon - listingLon) ** 2;
+            for (const s of lineStations) {
+              const d = (s.lat - listingLat) ** 2 + (s.lon - listingLon) ** 2;
+              if (d < minDist) { nearest = s; minDist = d; }
+            }
+            return { lat: nearest.lat, lon: nearest.lon, name: nearest.name, mode: rule.mode };
+          }
+        }
+        // Fallback if no listing coords: pick first station on first line
+        const station = SUBWAY_STATIONS.find((s) => s.lines.includes(rule.lines![0]));
+        if (station) {
+          return { lat: station.lat, lon: station.lon, name: station.name, mode: rule.mode };
+        }
+      }
+    }
+    // Park rules — look up park centroid coordinates
+    if (rule.type === 'park' && rule.parkName) {
+      const coords = PARK_COORDS[rule.parkName];
+      if (coords) {
+        return { lat: coords.lat, lon: coords.lon, name: rule.parkName, mode: rule.mode };
       }
     }
   }
@@ -95,7 +144,7 @@ export default function ListingDetail({
   const photos = listing.photo_urls ?? [];
   const pricePerBed = listing.beds > 0 ? Math.round(listing.price / listing.beds) : null;
   const tagColor = TAG_COLORS[listing.search_tag] ?? '#8b949e';
-  const commuteDest = getCommuteDestination(commuteRules);
+  const commuteDest = getCommuteDestination(commuteRules, listing.lat, listing.lon);
 
   const scrollToPhoto = (index: number) => {
     const clamped = Math.max(0, Math.min(index, photos.length - 1));
@@ -420,6 +469,7 @@ export default function ListingDetail({
               destinationLat={commuteDest.lat}
               destinationLon={commuteDest.lon}
               destinationName={commuteDest.name}
+              mode={commuteOtpMode(commuteDest.mode)}
             />
           )}
 
