@@ -316,10 +316,7 @@ export default function SwipeView({
 
   return (
     <div className="flex flex-col h-full relative">
-      {/* Onboarding overlay */}
-      {showOnboarding && (
-        <SwipeOnboarding onDismiss={() => setShowOnboarding(false)} />
-      )}
+      {/* Onboarding overlay disabled — more confusing than helpful on mobile */}
 
       {/* Card area */}
       <div className="flex-1 relative flex items-center justify-center px-4 pt-3 pb-2 overflow-hidden">
