@@ -58,7 +58,7 @@ export default function Navbar() {
 
   return (
     <nav
-      className="fixed top-0 left-0 right-0 z-[1200] flex items-center justify-between px-6 py-3"
+      className="fixed top-0 left-0 right-0 z-[1200] flex items-center justify-between px-3 sm:px-6 py-3"
       style={{
         backgroundColor: "#0f1117",
         borderBottom: "1px solid #2d333b",
@@ -66,7 +66,7 @@ export default function Navbar() {
     >
       <Link
         href="/"
-        className="group flex items-center gap-2 text-lg font-semibold transition-opacity hover:opacity-80"
+        className="group flex items-center gap-2 text-base sm:text-lg font-semibold transition-opacity hover:opacity-80 flex-shrink-0"
         style={{ color: "#e1e4e8" }}
       >
         <span className="relative inline-flex items-center justify-center" style={{ width: 30, height: 30 }}>
@@ -127,7 +127,7 @@ export default function Navbar() {
         Dwelligence
       </Link>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4 flex-shrink min-w-0">
         {loading ? (
           <div className="h-8 w-8" />
         ) : user ? (
@@ -204,14 +204,14 @@ export default function Navbar() {
           <>
             <Link
               href="/auth/login"
-              className="text-sm transition-colors hover:opacity-80"
+              className="hidden sm:inline text-sm transition-colors hover:opacity-80"
               style={{ color: "#8b949e" }}
             >
               Log in
             </Link>
             <PrimaryButton
               onClick={() => router.push("/auth/signup")}
-              className="rounded-md px-4 py-2 text-sm"
+              className="rounded-md px-2 py-1 text-xs sm:px-4 sm:py-2 sm:text-sm"
             >
               Sign up
             </PrimaryButton>

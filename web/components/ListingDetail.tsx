@@ -302,7 +302,7 @@ export default function ListingDetail({
           </IconButton>
         </div>
 
-        <div className="p-6 pb-10">
+        <div className="p-4 pb-8 sm:p-6 sm:pb-10">
           {/* Header */}
           <div className="mb-4">
             <h2 className="text-lg font-bold" style={{ color: '#e1e4e8' }}>
@@ -409,7 +409,7 @@ export default function ListingDetail({
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-2 mb-6">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-6">
             <ActionButton
               variant="dislike"
               active={false}
@@ -417,18 +417,21 @@ export default function ListingDetail({
                 onHide();
                 onClose();
               }}
+              className="px-2 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm"
               label="Dislike"
             />
             <ActionButton
               variant="wouldLive"
               active={wouldLiveThere}
               onClick={onToggleWouldLive}
-              label={wouldLiveThere ? 'I Would Live There!' : 'I Would Live There'}
+              className="px-2 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm whitespace-nowrap"
+              label={wouldLiveThere ? 'Would Live!' : 'Would Live'}
             />
             <ActionButton
               variant="like"
               active={isFavorited}
               onClick={onToggleFavorite}
+              className="px-2 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm"
               label={isFavorited ? 'Liked' : 'Like'}
             />
           </div>
