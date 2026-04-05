@@ -9,11 +9,10 @@ export type SortField = 'price' | 'beds' | 'listDate';
 
 export type MaxListingAge = '1w' | '2w' | '1m' | '3m' | '6m' | '1y' | null;
 
-export const ALL_SOURCES = ['realtor', 'craigslist', 'streeteasy', 'facebook'] as const;
+export const ALL_SOURCES = ['craigslist', 'streeteasy', 'facebook'] as const;
 export type ListingSource = (typeof ALL_SOURCES)[number];
 
 export const SOURCE_LABELS: Record<ListingSource, string> = {
-  realtor: 'Realtor.com',
   craigslist: 'Craigslist',
   streeteasy: 'StreetEasy',
   facebook: 'Facebook',
@@ -1299,7 +1298,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
       style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}
     >
       {/* Row 1 (always visible): Area tabs + listing count + Filters button + Sort + View toggle */}
-      <div className="flex items-center h-8 gap-3">
+      <div className="flex items-center min-h-[36px] gap-1.5 sm:gap-3 overflow-visible">
         {/* Saved search tabs — horizontally scrollable, hidden scrollbar */}
         <div
           className="flex items-center flex-1 min-w-0 overflow-x-auto"

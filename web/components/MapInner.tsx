@@ -598,11 +598,6 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
     };
   }, []);
 
-  const legendItems = [
-    { color: '#38bdf8', label: 'Manhattan' },
-    { color: '#4ade80', label: 'Brooklyn' },
-  ];
-
   return (
     <div style={{ position: 'relative', height: '100%', width: '100%' }}>
       <MapContainer
@@ -648,51 +643,6 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
           );
         })}
       </MapContainer>
-
-      {/* Legend overlay */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 24,
-          right: 12,
-          zIndex: 1000,
-          background: '#1c2028',
-          border: '1px solid #2d333b',
-          borderRadius: 8,
-          padding: '12px 16px',
-          fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-        }}
-      >
-        <div
-          style={{
-            fontSize: 10,
-            fontWeight: 600,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase' as const,
-            color: '#8b949e',
-            marginBottom: 8,
-          }}
-        >
-          Search
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {legendItems.map((item) => (
-            <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span
-                style={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: '50%',
-                  background: item.color,
-                  flexShrink: 0,
-                  display: 'inline-block',
-                }}
-              />
-              <span style={{ fontSize: 12, color: '#e1e4e8' }}>{item.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
