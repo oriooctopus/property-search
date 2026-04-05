@@ -16,6 +16,8 @@ const geistMono = Geist_Mono({
 
 export const dynamic = "force-dynamic";
 
+const BUILD_TIME = new Date().toISOString();
+
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
@@ -41,6 +43,9 @@ export default function RootLayout({
         <Providers>
           <Navbar />
           <main className="pt-0 lg:pt-[60px]">{children}</main>
+          <footer className="text-center py-2 text-[10px]" style={{ color: '#484f58' }}>
+            Built {BUILD_TIME}
+          </footer>
         </Providers>
       </body>
     </html>
