@@ -576,10 +576,9 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
 
   const handleClick = useCallback((listing: Listing) => {
     return (e: L.LeafletMouseEvent) => {
-      console.log(`[popup] marker CLICK #${listing.id} — opening popup`);
-      clickedRef.current.add(listing.id);
-      e.target.openPopup();
+      console.log(`[popup] marker CLICK #${listing.id} — opening detail view`);
       onMarkerClick(listing.id);
+      onSelectDetailRef.current(listing);
     };
   }, [onMarkerClick]);
 
