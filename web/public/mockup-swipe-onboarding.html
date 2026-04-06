@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Swipe Mode Onboarding — 4 Design Options</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0a;
+      color: #e1e4e8;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      padding: 48px 24px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 22px;
+      font-weight: 700;
+      color: #e1e4e8;
+      margin-bottom: 8px;
+      letter-spacing: -0.3px;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 14px;
+      color: #6e7681;
+      margin-bottom: 56px;
+    }
+
+    .option-section {
+      margin-bottom: 80px;
+    }
+
+    .option-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: #3b82f6;
+      margin-bottom: 6px;
+    }
+    .option-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #e1e4e8;
+      margin-bottom: 4px;
+    }
+    .option-desc {
+      font-size: 13px;
+      color: #6e7681;
+      margin-bottom: 24px;
+    }
+
+    /* ====== SHARED CARD SHELL ====== */
+    .phone-frame {
+      width: 375px;
+      height: 700px;
+      background: #0a0a0a;
+      border-radius: 44px;
+      overflow: hidden;
+      position: relative;
+      border: 1.5px solid #2d333b;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04);
+      margin: 0 auto;
+    }
+
+    /* The background listing card visible behind all overlays */
+    .listing-card {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      inset: 0;
+      background: #161b22;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .listing-photo {
+      width: 100%;
+      height: 320px;
+      background: linear-gradient(160deg, #1a2535 0%, #0f1922 40%, #1c1530 100%);
+      position: relative;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    /* Simulated window lights on building */
+    .building-sim {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    .building-block {
+      position: absolute;
+      bottom: 0;
+      background: #1a2535;
+    }
+    .win {
+      position: absolute;
+      width: 10px;
+      height: 14px;
+      background: #f5c842;
+      border-radius: 1px;
+      opacity: 0.85;
+    }
+    .win.off { background: #1e2a3a; opacity: 1; }
+    .win.dim { background: #c49a2a; opacity: 0.5; }
+
+    .listing-photo-gradient {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 120px;
+      background: linear-gradient(to top, rgba(22,27,34,1) 0%, transparent 100%);
+    }
+
+    .listing-price-tag {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      font-size: 26px;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.5px;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+
+    .listing-badge {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: rgba(59,130,246,0.9);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.4px;
+      backdrop-filter: blur(4px);
+    }
+
+    .listing-dots {
+      position: absolute;
+      bottom: 48px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 5px;
+    }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.35); }
+    .dot.active { background: #fff; width: 18px; border-radius: 3px; }
+
+    .listing-info {
+      padding: 16px 20px 20px;
+      flex: 1;
+    }
+    .listing-address {
+      font-size: 16px;
+      font-weight: 700;
+      color: #e1e4e8;
+      margin-bottom: 4px;
+    }
+    .listing-neighborhood {
+      font-size: 13px;
+      color: #8b949e;
+      margin-bottom: 14px;
+    }
+    .listing-chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .chip {
+      background: #21262d;
+      border: 1px solid #2d333b;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      color: #c9d1d9;
+      font-weight: 500;
+    }
+    .listing-meta {
+      display: flex;
+      gap: 16px;
+    }
+    .meta-item {
+      font-size: 12px;
+      color: #6e7681;
+    }
+    .meta-item strong { color: #8b949e; font-weight: 600; }
+
+    /* ====== OPTION A: Minimal Edge Hints ====== */
+
+    .overlay-a {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.42);
+      border-radius: 44px;
+      z-index: 10;
+    }
+
+    .hint-pill {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 14px;
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.1px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid;
+      white-space: nowrap;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+
+    .hint-left {
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(239, 68, 68, 0.18);
+      border-color: rgba(239, 68, 68, 0.45);
+      color: #f87171;
+    }
+    .hint-right {
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(234, 179, 8, 0.18);
+      border-color: rgba(234, 179, 8, 0.45);
+      color: #fbbf24;
+    }
+    .hint-top {
+      top: 72px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(249, 115, 22, 0.18);
+      border-color: rgba(249, 115, 22, 0.45);
+      color: #fb923c;
+      flex-direction: column;
+      gap: 4px;
+      padding: 10px 16px;
+    }
+    .hint-top .arrow { font-size: 18px; }
+    .hint-top .label { font-size: 11px; letter-spacing: 0.3px; }
+
+    .hint-arrow {
+      font-size: 16px;
+      line-height: 1;
+    }
+
+    .overlay-a-bottom {
+      position: absolute;
+      bottom: 44px;
+      left: 0; right: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .tap-hint {
+      font-size: 13px;
+      color: rgba(255,255,255,0.55);
+      letter-spacing: 0.2px;
+    }
+
+    .got-it-btn-a {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 10px 32px;
+      border-radius: 100px;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      letter-spacing: 0.1px;
+    }
+
+    /* Arrow pulse animation */
+    @keyframes pulse-left {
+      0%, 100% { transform: translateX(0) translateY(-50%); opacity: 1; }
+      50% { transform: translateX(-5px) translateY(-50%); opacity: 0.7; }
+    }
+    @keyframes pulse-right {
+      0%, 100% { transform: translateX(0) translateY(-50%); opacity: 1; }
+      50% { transform: translateX(5px) translateY(-50%); opacity: 0.7; }
+    }
+    @keyframes pulse-up {
+      0%, 100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+      50% { transform: translateX(-50%) translateY(-5px); opacity: 0.7; }
+    }
+    .hint-left { animation: pulse-left 2s ease-in-out infinite; }
+    .hint-right { animation: pulse-right 2s ease-in-out infinite; }
+    .hint-top { animation: pulse-up 2s ease-in-out infinite; }
+
+    /* ====== OPTION B: Animated Hand Demo ====== */
+
+    .overlay-b {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.72);
+      border-radius: 44px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .hand-demo-area {
+      width: 220px;
+      height: 220px;
+      position: relative;
+      margin-bottom: 24px;
+    }
+
+    /* The animated hand icon */
+    .hand-icon {
+      font-size: 52px;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+      z-index: 2;
+    }
+
+    /* Gesture trail */
+    .gesture-trail {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1;
+    }
+
+    /* Step cycling via animation */
+    /* Steps: 0-2s left, 2-4s right, 4-6s up, 6-8s all, repeats */
+    @keyframes step-swipe-left {
+      0%   { transform: translate(-50%, -50%); opacity: 1; }
+      20%  { transform: translate(calc(-50% - 60px), -50%); opacity: 1; }
+      30%  { transform: translate(calc(-50% - 60px), -50%); opacity: 0; }
+      31%  { transform: translate(-50%, -50%); opacity: 0; }
+      35%  { opacity: 1; transform: translate(-50%, -50%); }
+      100% { transform: translate(-50%, -50%); opacity: 1; }
+    }
+
+    @keyframes step-swipe-right {
+      0%   { transform: translate(-50%, -50%); opacity: 0; }
+      30%  { opacity: 0; transform: translate(-50%, -50%); }
+      35%  { opacity: 1; transform: translate(-50%, -50%); }
+      55%  { transform: translate(calc(-50% + 60px), -50%); opacity: 1; }
+      65%  { transform: translate(calc(-50% + 60px), -50%); opacity: 0; }
+      66%  { transform: translate(-50%, -50%); opacity: 0; }
+      70%  { opacity: 1; transform: translate(-50%, -50%); }
+      100% { opacity: 0; }
+    }
+
+    @keyframes step-swipe-up {
+      0%   { transform: translate(-50%, -50%); opacity: 0; }
+      65%  { opacity: 0; transform: translate(-50%, -50%); }
+      70%  { opacity: 1; transform: translate(-50%, -50%); }
+      88%  { transform: translate(-50%, calc(-50% - 60px)); opacity: 1; }
+      95%  { transform: translate(-50%, calc(-50% - 60px)); opacity: 0; }
+      100% { opacity: 0; }
+    }
+
+    .hand-step-left  { animation: step-swipe-left  6s ease-in-out infinite; }
+    .hand-step-right { animation: step-swipe-right 6s ease-in-out infinite; }
+    .hand-step-up    { animation: step-swipe-up    6s ease-in-out infinite; }
+
+    /* Action label under hand */
+    .action-label-b {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      text-align: center;
+      height: 32px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    @keyframes label-left-show {
+      0%   { opacity: 1; transform: translateY(0); }
+      25%  { opacity: 1; transform: translateY(0); }
+      30%  { opacity: 0; transform: translateY(-16px); }
+      100% { opacity: 0; }
+    }
+    @keyframes label-right-show {
+      0%   { opacity: 0; }
+      30%  { opacity: 0; transform: translateY(16px); }
+      35%  { opacity: 1; transform: translateY(0); }
+      60%  { opacity: 1; transform: translateY(0); }
+      65%  { opacity: 0; transform: translateY(-16px); }
+      100% { opacity: 0; }
+    }
+    @keyframes label-up-show {
+      0%   { opacity: 0; }
+      65%  { opacity: 0; transform: translateY(16px); }
+      70%  { opacity: 1; transform: translateY(0); }
+      95%  { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    .lbl-left  { position: absolute; left: 0; right: 0; color: #f87171; animation: label-left-show  6s ease-in-out infinite; }
+    .lbl-right { position: absolute; left: 0; right: 0; color: #fbbf24; animation: label-right-show 6s ease-in-out infinite; }
+    .lbl-up    { position: absolute; left: 0; right: 0; color: #fb923c; animation: label-up-show    6s ease-in-out infinite; }
+
+    .sub-label-b {
+      font-size: 13px;
+      color: #6e7681;
+      margin-top: 6px;
+      text-align: center;
+      height: 20px;
+      position: relative;
+    }
+    .sub-lbl-left  { position: absolute; left: 0; right: 0; animation: label-left-show  6s ease-in-out infinite; }
+    .sub-lbl-right { position: absolute; left: 0; right: 0; animation: label-right-show 6s ease-in-out infinite; }
+    .sub-lbl-up    { position: absolute; left: 0; right: 0; animation: label-up-show    6s ease-in-out infinite; }
+
+    .progress-dots-b {
+      display: flex;
+      gap: 8px;
+      margin-top: 20px;
+    }
+    .prog-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #2d333b;
+      transition: all 0.3s;
+    }
+
+    @keyframes pd1 {
+      0%, 29%  { background: #3b82f6; transform: scale(1.2); }
+      30%, 100%{ background: #2d333b; transform: scale(1); }
+    }
+    @keyframes pd2 {
+      0%, 29%  { background: #2d333b; transform: scale(1); }
+      30%, 64% { background: #fbbf24; transform: scale(1.2); }
+      65%, 100%{ background: #2d333b; transform: scale(1); }
+    }
+    @keyframes pd3 {
+      0%, 64%  { background: #2d333b; transform: scale(1); }
+      65%, 100%{ background: #fb923c; transform: scale(1.2); }
+    }
+    .pd1 { animation: pd1 6s ease-in-out infinite; }
+    .pd2 { animation: pd2 6s ease-in-out infinite; }
+    .pd3 { animation: pd3 6s ease-in-out infinite; }
+
+    .got-it-btn-b {
+      margin-top: 28px;
+      background: #3b82f6;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 13px 48px;
+      border-radius: 100px;
+      cursor: pointer;
+      border: none;
+      letter-spacing: 0.1px;
+      box-shadow: 0 4px 24px rgba(59,130,246,0.4);
+    }
+
+    /* ====== OPTION C: Bottom Sheet ====== */
+
+    .overlay-c {
+      position: absolute;
+      inset: 0;
+      border-radius: 44px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      /* subtle darkening only at bottom */
+      background: linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.3) 100%);
+    }
+
+    .bottom-sheet {
+      background: rgba(22, 27, 34, 0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(255,255,255,0.08);
+      border-radius: 24px 24px 44px 44px;
+      padding: 20px 24px 40px;
+    }
+
+    .sheet-handle {
+      width: 36px;
+      height: 4px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
+      margin: 0 auto 20px;
+    }
+
+    .sheet-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #e1e4e8;
+      margin-bottom: 4px;
+      letter-spacing: -0.2px;
+    }
+    .sheet-subtitle {
+      font-size: 12px;
+      color: #6e7681;
+      margin-bottom: 20px;
+    }
+
+    .gesture-row {
+      display: flex;
+      align-items: center;
+      padding: 13px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      gap: 14px;
+    }
+    .gesture-row:last-of-type {
+      border-bottom: none;
+    }
+
+    .gesture-icon-wrap {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .icon-red    { background: rgba(239,68,68,0.15); }
+    .icon-gold   { background: rgba(234,179,8,0.15); }
+    .icon-orange { background: rgba(249,115,22,0.15); }
+
+    .gesture-arrow-wrap {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      flex-shrink: 0;
+    }
+    .arrow-red    { background: rgba(239,68,68,0.1);  color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+    .arrow-gold   { background: rgba(234,179,8,0.1);  color: #fbbf24; border: 1px solid rgba(234,179,8,0.3); }
+    .arrow-orange { background: rgba(249,115,22,0.1); color: #fb923c; border: 1px solid rgba(249,115,22,0.3); }
+
+    .gesture-text {
+      flex: 1;
+    }
+    .gesture-action {
+      font-size: 14px;
+      font-weight: 700;
+      color: #e1e4e8;
+      margin-bottom: 2px;
+    }
+    .gesture-desc {
+      font-size: 11px;
+      color: #6e7681;
+    }
+
+    .start-btn-c {
+      width: 100%;
+      background: #3b82f6;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 14px;
+      border-radius: 14px;
+      cursor: pointer;
+      border: none;
+      margin-top: 20px;
+      letter-spacing: 0.1px;
+      box-shadow: 0 4px 20px rgba(59,130,246,0.35);
+    }
+
+    /* ====== OPTION D: Card Stamps Preview ====== */
+
+    .overlay-d {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.25);
+      border-radius: 44px;
+      z-index: 10;
+    }
+
+    /* Stamp elements */
+    .stamp {
+      position: absolute;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      border-width: 2.5px;
+      border-style: solid;
+      pointer-events: none;
+    }
+
+    .stamp-nope {
+      top: 42%;
+      left: 20px;
+      color: #ef4444;
+      border-color: #ef4444;
+      transform: rotate(-18deg);
+      background: rgba(239,68,68,0.08);
+      box-shadow: 0 0 20px rgba(239,68,68,0.2), inset 0 0 12px rgba(239,68,68,0.05);
+      animation: stamp-appear 1.2s ease-out forwards;
+    }
+
+    .stamp-fave {
+      top: 42%;
+      right: 20px;
+      color: #f59e0b;
+      border-color: #f59e0b;
+      transform: rotate(15deg);
+      background: rgba(245,158,11,0.08);
+      box-shadow: 0 0 20px rgba(245,158,11,0.2), inset 0 0 12px rgba(245,158,11,0.05);
+      animation: stamp-appear 1.2s ease-out 0.2s forwards;
+      opacity: 0;
+    }
+
+    .stamp-live {
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #f97316;
+      border-color: #f97316;
+      background: rgba(249,115,22,0.08);
+      box-shadow: 0 0 20px rgba(249,115,22,0.2), inset 0 0 12px rgba(249,115,22,0.05);
+      animation: stamp-appear 1.2s ease-out 0.4s forwards;
+      opacity: 0;
+      white-space: nowrap;
+    }
+
+    @keyframes stamp-appear {
+      0%   { opacity: 0; transform: rotate(-18deg) scale(1.3); }
+      60%  { opacity: 1; transform: rotate(-18deg) scale(0.96); }
+      75%  { transform: rotate(-18deg) scale(1.02); }
+      100% { opacity: 1; transform: rotate(-18deg) scale(1); }
+    }
+    .stamp-fave { animation-name: stamp-appear-right; }
+    @keyframes stamp-appear-right {
+      0%   { opacity: 0; transform: rotate(15deg) scale(1.3); }
+      60%  { opacity: 1; transform: rotate(15deg) scale(0.96); }
+      75%  { transform: rotate(15deg) scale(1.02); }
+      100% { opacity: 1; transform: rotate(15deg) scale(1); }
+    }
+    .stamp-live { animation-name: stamp-appear-up; }
+    @keyframes stamp-appear-up {
+      0%   { opacity: 0; transform: translateX(-50%) scale(1.3); }
+      60%  { opacity: 1; transform: translateX(-50%) scale(0.96); }
+      75%  { transform: translateX(-50%) scale(1.02); }
+      100% { opacity: 1; transform: translateX(-50%) scale(1); }
+    }
+
+    /* Direction arrows on stamps */
+    .stamp-arrow {
+      position: absolute;
+      font-size: 22px;
+      font-weight: 900;
+      opacity: 0.9;
+    }
+    .arr-left  { top: 40%; left: 80px;  color: #ef4444; animation: bounce-left  1.4s ease-in-out 1.5s infinite; }
+    .arr-right { top: 40%; right: 80px; color: #f59e0b; animation: bounce-right 1.4s ease-in-out 1.7s infinite; }
+    .arr-up    { top: 130px; left: 50%; transform: translateX(-50%); color: #f97316; animation: bounce-up 1.4s ease-in-out 1.9s infinite; }
+
+    @keyframes bounce-left  { 0%,100%{transform:translateX(0)}50%{transform:translateX(-8px)} }
+    @keyframes bounce-right { 0%,100%{transform:translateX(0)}50%{transform:translateX(8px)} }
+    @keyframes bounce-up    { 0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-8px)} }
+
+    .overlay-d-bottom {
+      position: absolute;
+      bottom: 44px;
+      left: 0; right: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+    .swipe-hint-text {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 0.3px;
+    }
+    .got-it-btn-d {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.18);
+      color: rgba(255,255,255,0.8);
+      font-size: 14px;
+      font-weight: 600;
+      padding: 10px 32px;
+      border-radius: 100px;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      letter-spacing: 0.1px;
+    }
+
+    /* Layout helpers */
+    .frame-row {
+      display: flex;
+      justify-content: center;
+    }
+    .divider {
+      width: 100%;
+      height: 1px;
+      background: #1c2028;
+      margin: 60px 0;
+    }
+
+    /* Building SVG simulation */
+    .sky-grad {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, #0c1824 0%, #1a2535 60%, #1f1a2e 100%);
+    }
+    .bldg {
+      position: absolute;
+      bottom: 0;
+      background: linear-gradient(180deg, #1e2d3d 0%, #152030 100%);
+      border-top: 1px solid #253545;
+    }
+    .bldg-windows {
+      position: absolute;
+      inset: 0;
+      padding: 8px 6px;
+      display: grid;
+      gap: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Swipe Mode Onboarding</h1>
+  <p class="subtitle">4 design options for the gesture tutorial overlay — Dwelligence</p>
+
+  <!-- ==================== OPTION A ==================== -->
+  <div class="option-section">
+    <div class="option-label">Option A</div>
+    <div class="option-title">Minimal Gesture Hints</div>
+    <div class="option-desc">Floating edge pills directly on the real card. Light overlay (40%). Game-tutorial feel. Pills pulse toward their swipe direction.</div>
+    <div class="frame-row">
+      <div class="phone-frame">
+        <!-- Real listing card (background) -->
+        <div class="listing-card">
+          <div class="listing-photo">
+            <div class="sky-grad"></div>
+            <!-- Buildings -->
+            <div class="bldg" style="left:0;width:60px;height:200px;">
+              <div style="position:absolute;top:10px;left:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px 6px;">
+                <div class="win"></div><div class="win off"></div>
+                <div class="win dim"></div><div class="win"></div>
+                <div class="win"></div><div class="win"></div>
+                <div class="win off"></div><div class="win dim"></div>
+                <div class="win"></div><div class="win off"></div>
+                <div class="win dim"></div><div class="win"></div>
+                <div class="win"></div><div class="win"></div>
+                <div class="win off"></div><div class="win"></div>
+              </div>
+            </div>
+            <div class="bldg" style="left:50px;width:90px;height:260px;">
+              <div style="position:absolute;top:10px;left:8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px 6px;">
+                <div class="win"></div><div class="win off"></div><div class="win"></div>
+                <div class="win dim"></div><div class="win"></div><div class="win dim"></div>
+                <div class="win"></div><div class="win"></div><div class="win off"></div>
+                <div class="win off"></div><div class="win dim"></div><div class="win"></div>
+                <div class="win"></div><div class="win off"></div><div class="win"></div>
+                <div class="win dim"></div><div class="win"></div><div class="win dim"></div>
+                <div class="win"></div><div class="win"></div><div class="win off"></div>
+                <div class="win off"></div><div class="win dim"></div><div class="win"></div>
+              </div>
+            </div>
+            <div class="bldg" style="right:0;width:80px;height:230px;">
+              <div style="position:absolute;top:10px;left:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px 8px;">
+                <div class="win dim"></div><div class="win"></div>
+                <div class="win"></div><div class="win off"></div>
+                <div class="win off"></div><div class="win"></div>
+                <div class="win"></div><div class="win dim"></div>
+                <div class="win off"></div><div class="win"></div>
+                <div class="win dim"></div><div class="win off"></div>
+                <div class="win"></div><div class="win"></div>
+                <div class="win off"></div><div class="win dim"></div>
+              </div>
+            </div>
+            <div class="bldg" style="right:70px;width:50px;height:180px;">
+              <div style="position:absolute;top:10px;left:5px;display:grid;grid-template-columns:1fr 1fr;gap:5px 5px;">
+                <div class="win"></div><div class="win off"></div>
+                <div class="win dim"></div><div class="win"></div>
+                <div class="win"></div><div class="win"></div>
+                <div class="win off"></div><div class="win dim"></div>
+                <div class="win"></div><div class="win off"></div>
+                <div class="win dim"></div><div class="win"></div>
+              </div>
+            </div>
+            <div class="listing-photo-gradient"></div>
+            <div class="listing-badge">New today</div>
+            <div class="listing-dots">
+              <div class="dot active"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+            </div>
+            <div class="listing-price-tag">$3,200/mo</div>
+          </div>
+          <div class="listing-info">
+            <div class="listing-address">247 Wythe Avenue, Apt 4C</div>
+            <div class="listing-neighborhood">Williamsburg, Brooklyn</div>
+            <div class="listing-chips">
+              <span class="chip">2 bed</span>
+              <span class="chip">1 bath</span>
+              <span class="chip">875 sqft</span>
+              <span class="chip">Pets OK</span>
+            </div>
+            <div class="listing-meta">
+              <span class="meta-item"><strong>Avail.</strong> Apr 1</span>
+              <span class="meta-item"><strong>Floor</strong> 4 of 6</span>
+              <span class="meta-item"><strong>Laundry</strong> In-unit</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Option A Overlay -->
+        <div class="overlay-a">
+          <!-- Left: Skip -->
+          <div class="hint-pill hint-left">
+            <span class="hint-arrow">&#8592;</span>
+            <span>Skip</span>
+          </div>
+          <!-- Right: Favorite -->
+          <div class="hint-pill hint-right">
+            <span>Favorite</span>
+            <span class="hint-arrow">&#8594;</span>
+          </div>
+          <!-- Top: Would live here -->
+          <div class="hint-pill hint-top">
+            <span class="arrow">&#8593;</span>
+            <span class="label">Would live here</span>
+          </div>
+          <!-- Bottom CTA -->
+          <div class="overlay-a-bottom">
+            <span class="tap-hint">Tap to start swiping</span>
+            <button class="got-it-btn-a">Got it!</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ==================== OPTION B ==================== -->
+  <div class="option-section">
+    <div class="option-label">Option B</div>
+    <div class="option-title">Animated Hand Demo</div>
+    <div class="option-desc">CSS-animated finger demonstrates each gesture in a 6-second loop. Left → Right → Up. Label and progress dots cycle in sync. Darker overlay (70%).</div>
+    <div class="frame-row">
+      <div class="phone-frame">
+        <!-- Real listing card (background) -->
+        <div class="listing-card">
+          <div class="listing-photo">
+            <div class="sky-grad"></div>
+            <div class="bldg" style="left:0;width:60px;height:200px;">
+              <div style="position:absolute;top:10px;left:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px 6px;">
+                <div class="win"></div><div class="win off"></div>
+                <div class="win dim"></div><div class="win"></div>
+                <div class="win"></div><div class="win"></div>
+                <div class="win off"></div><div class="win dim"></div>
+              </div>
+            </div>
+            <div class="bldg" style="left:50px;width:90px;height:260px;">
+              <div style="position:absolute;top:10px;left:8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px 6px;">
+                <div class="win"></div><div class="win off"></div><div class="win"></div>
+                <div class="win dim"></div><div class="win"></div><div class="win dim"></div>
+                <div class="win"></div><div class="win"></div><div class="win off"></div>
+                <div class="win off"></div><div class="win dim"></div><div class="win"></div>
+              </div>
+            </div>
+            <div class="bldg" style="right:0;width:80px;height:230px;">
+              <div style="position:absolute;top:10px;left:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px 8px;">
+                <div class="win dim"></div><div class="win"></div>
+                <div class="win"></div><div class="win off"></div>
+                <div class="win off"></div><div class="win"></div>
+                <div class="win"></div><div class="win dim"></div>
+              </div>
+            </div>
+            <div class="listing-photo-gradient"></div>
+            <div class="listing-badge">New today</div>
+            <div class="listing-price-tag">$3,200/mo</div>
+          </div>
+          <div class="listing-info">
+            <div class="listing-address">247 Wythe Avenue, Apt 4C</div>
+            <div class="listing-neighborhood">Williamsburg, Brooklyn</div>
+            <div class="listing-chips">
+              <span class="chip">2 bed</span>
+              <span class="chip">1 bath</span>
+              <span class="chip">875 sqft</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Option B Overlay -->
+        <div class="overlay-b">
+          <div style="font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#6e7681;margin-bottom:20px;">How to swipe</div>
+
+          <div class="hand-demo-area">
+            <!-- Left swipe hand -->
+            <span class="hand-icon hand-step-left" style="color:#f87171;">&#9758;</span>
+            <!-- Right swipe hand (separate element cycling in) -->
+            <span class="hand-icon hand-step-right" style="color:#fbbf24;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);">&#9758;</span>
+            <!-- Up swipe hand -->
+            <span class="hand-icon hand-step-up" style="color:#fb923c;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);transform:translate(-50%,-50%) rotate(-90deg);">&#9758;</span>
+
+            <!-- Swipe direction arrows (trail) -->
+            <div class="gesture-trail" style="color:#f87171;font-size:30px;">
+              <span class="hand-step-left" style="position:absolute;top:50%;left:calc(50% - 80px);transform:translateY(-50%);">&#8592;&#8592;</span>
+            </div>
+            <div class="gesture-trail" style="color:#fbbf24;font-size:30px;">
+              <span class="hand-step-right" style="position:absolute;top:50%;left:calc(50% + 20px);transform:translateY(-50%);">&#8594;&#8594;</span>
+            </div>
+            <div class="gesture-trail" style="color:#fb923c;font-size:30px;">
+              <span class="hand-step-up" style="position:absolute;top:calc(50% - 60px);left:50%;transform:translateX(-50%);">&#8593;&#8593;</span>
+            </div>
+          </div>
+
+          <div class="action-label-b">
+            <span class="lbl-left">Swipe Left — Skip</span>
+            <span class="lbl-right">Swipe Right — Favorite</span>
+            <span class="lbl-up">Swipe Up — Would Live Here</span>
+          </div>
+
+          <div class="sub-label-b">
+            <span class="sub-lbl-left" style="color:#6e7681;">Hide this listing</span>
+            <span class="sub-lbl-right" style="color:#6e7681;">Save for later</span>
+            <span class="sub-lbl-up" style="color:#6e7681;">Top pick — you'd actually live here</span>
+          </div>
+
+          <div class="progress-dots-b">
+            <div class="prog-dot pd1"></div>
+            <div class="prog-dot pd2"></div>
+            <div class="prog-dot pd3"></div>
+          </div>
+
+          <button class="got-it-btn-b">Got it!</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ==================== OPTION C ==================== -->
+  <div class="option-section">
+    <div class="option-label">Option C</div>
+    <div class="option-title">Bottom Sheet Tutorial</div>
+    <div class="option-desc">No full-screen overlay. A frosted glass bottom sheet slides up over the visible card. Clean rows, icon + gesture + label. Premium feel.</div>
+    <div class="frame-row">
+      <div class="phone-frame">
+        <!-- Real listing card (background, fully visible) -->
+        <div class="listing-card">
+          <div class="listing-photo">
+            <div class="sky-grad"></div>
+            <div class="bldg" style="left:0;width:60px;height:200px;">
+              <div style="position:absolute;top:10px;left:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px 6px;">
+                <div class="win"></div><div class="win off"></div>
+                <div class="win dim"></div><div class="win"></div>
+                <div class="win"></div><div class="win"></div>
+                <div class="win off"></div><div class="win dim"></div>
+                <div class="win"></div><div class="win off"></div>
+                <div class="win dim"></div><div class="win"></div>
+                <div class="win"></div><div class="win"></div>
+                <div class="win off"></div><div class="win"></div>
+              </div>
+            </div>
+            <div class="bldg" style="left:50px;width:90px;height:260px;">
+              <div style="position:absolute;top:10px;left:8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px 6px;">
+                <div class="win"></div><div class="win off"></div><div class="win"></div>
+                <div class="win dim"></div><div class="win"></div><div class="win dim"></div>
+                <div class="win"></div><div class="win"></div><div class="win off"></div>
+                <div class="win off"></div><div class="win dim"></div><div class="win"></div>
+                <div class="win"></div><div class="win off"></div><div class="win"></div>
+                <div class="win dim"></div><div class="win"></div><div class="win dim"></div>
+                <div class="win"></div><div class="win"></div><div class="win off"></div>
+                <div class="win off"></div><div class="win dim"></div><div class="win"></div>
+              </div>
+            </div>
+            <div class="bldg" style="right:0;width:80px;height:230px;">
+              <div style="position:absolute;top:10px;left:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px 8px;">
+                <div class="win dim"></div><div class="win"></div>
+                <div class="win"></div><div class="win off"></div>
+                <div class="win off"></div><div class="win"></div>
+                <div class="win"></div><div class="win dim"></div>
+                <div class="win off"></div><div class="win"></div>
+                <div class="win dim"></div><div class="win off"></div>
+                <div class="win"></div><div class="win"></div>
+                <div class="win off"></div><div class="win dim"></div>
+              </div>
+            </div>
+            <div class="bldg" style="right:70px;width:50px;height:180px;">
+              <div style="position:absolute;top:10px;left:5px;display:grid;grid-template-columns:1fr 1fr;gap:5px 5px;">
+                <div class="win"></div><div class="win off"></div>
+                <div class="win dim"></div><div class="win"></div>
+                <div class="win"></div><div class="win"></div>
+                <div class="win off"></div><div class="win dim"></div>
+              </div>
+            </div>
+            <div class="listing-photo-gradient"></div>
+            <div class="listing-badge">New today</div>
+            <div class="listing-dots">
+              <div class="dot active"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+            </div>
+            <div class="listing-price-tag">$3,200/mo</div>
+          </div>
+          <div class="listing-info">
+            <div class="listing-address">247 Wythe Avenue, Apt 4C</div>
+            <div class="listing-neighborhood">Williamsburg, Brooklyn</div>
+            <div class="listing-chips">
+              <span class="chip">2 bed</span>
+              <span class="chip">1 bath</span>
+              <span class="chip">875 sqft</span>
+              <span class="chip">Pets OK</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Option C Overlay: Bottom Sheet -->
+        <div class="overlay-c">
+          <div class="bottom-sheet">
+            <div class="sheet-handle"></div>
+            <div class="sheet-title">Swipe to browse listings</div>
+            <div class="sheet-subtitle">Three gestures, that's all you need</div>
+
+            <div class="gesture-row">
+              <div class="gesture-icon-wrap icon-red" style="font-size:18px;">&#10005;</div>
+              <div class="gesture-arrow-wrap arrow-red">&#8592;</div>
+              <div class="gesture-text">
+                <div class="gesture-action" style="color:#f87171;">Swipe left to skip</div>
+                <div class="gesture-desc">Hide this listing from your feed</div>
+              </div>
+            </div>
+
+            <div class="gesture-row">
+              <div class="gesture-icon-wrap icon-gold" style="font-size:18px;">&#9733;</div>
+              <div class="gesture-arrow-wrap arrow-gold">&#8594;</div>
+              <div class="gesture-text">
+                <div class="gesture-action" style="color:#fbbf24;">Swipe right to favorite</div>
+                <div class="gesture-desc">Save to your favorites list</div>
+              </div>
+            </div>
+
+            <div class="gesture-row">
+              <div class="gesture-icon-wrap icon-orange" style="font-size:18px;">&#8962;</div>
+              <div class="gesture-arrow-wrap arrow-orange">&#8593;</div>
+              <div class="gesture-text">
+                <div class="gesture-action" style="color:#fb923c;">Swipe up — would live here</div>
+                <div class="gesture-desc">Your top picks, places you'd actually move into</div>
+              </div>
+            </div>
+
+            <button class="start-btn-c">Start swiping</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ==================== OPTION D ==================== -->
+  <div class="option-section">
+    <div class="option-label">Option D</div>
+    <div class="option-title">Card Stamps Preview</div>
+    <div class="option-desc">All three Tinder-style stamps visible simultaneously with direction arrows. Stamps animate in on load. Minimal overlay — feels like part of the actual UI.</div>
+    <div class="frame-row">
+      <div class="phone-frame">
+        <!-- Real listing card (background) -->
+        <div class="listing-card">
+          <div class="listing-photo">
+            <div class="sky-grad"></div>
+            <div class="bldg" style="left:0;width:60px;height:200px;">
+              <div style="position:absolute;top:10px;left:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px 6px;">
+                <div class="win"></div><div class="win off"></div>
+                <div class="win dim"></div><div class="win"></div>
+                <div class="win"></div><div class="win"></div>
+                <div class="win off"></div><div class="win dim"></div>
+                <div class="win"></div><div class="win off"></div>
+                <div class="win dim"></div><div class="win"></div>
+                <div class="win"></div><div class="win"></div>
+                <div class="win off"></div><div class="win"></div>
+              </div>
+            </div>
+            <div class="bldg" style="left:50px;width:90px;height:260px;">
+              <div style="position:absolute;top:10px;left:8px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px 6px;">
+                <div class="win"></div><div class="win off"></div><div class="win"></div>
+                <div class="win dim"></div><div class="win"></div><div class="win dim"></div>
+                <div class="win"></div><div class="win"></div><div class="win off"></div>
+                <div class="win off"></div><div class="win dim"></div><div class="win"></div>
+                <div class="win"></div><div class="win off"></div><div class="win"></div>
+                <div class="win dim"></div><div class="win"></div><div class="win dim"></div>
+                <div class="win"></div><div class="win"></div><div class="win off"></div>
+                <div class="win off"></div><div class="win dim"></div><div class="win"></div>
+              </div>
+            </div>
+            <div class="bldg" style="right:0;width:80px;height:230px;">
+              <div style="position:absolute;top:10px;left:6px;display:grid;grid-template-columns:1fr 1fr;gap:5px 8px;">
+                <div class="win dim"></div><div class="win"></div>
+                <div class="win"></div><div class="win off"></div>
+                <div class="win off"></div><div class="win"></div>
+                <div class="win"></div><div class="win dim"></div>
+                <div class="win off"></div><div class="win"></div>
+                <div class="win dim"></div><div class="win off"></div>
+                <div class="win"></div><div class="win"></div>
+                <div class="win off"></div><div class="win dim"></div>
+              </div>
+            </div>
+            <div class="bldg" style="right:70px;width:50px;height:180px;">
+              <div style="position:absolute;top:10px;left:5px;display:grid;grid-template-columns:1fr 1fr;gap:5px 5px;">
+                <div class="win"></div><div class="win off"></div>
+                <div class="win dim"></div><div class="win"></div>
+                <div class="win"></div><div class="win"></div>
+                <div class="win off"></div><div class="win dim"></div>
+              </div>
+            </div>
+            <div class="listing-photo-gradient"></div>
+            <div class="listing-badge">New today</div>
+            <div class="listing-dots">
+              <div class="dot active"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+            </div>
+            <div class="listing-price-tag">$3,200/mo</div>
+          </div>
+          <div class="listing-info">
+            <div class="listing-address">247 Wythe Avenue, Apt 4C</div>
+            <div class="listing-neighborhood">Williamsburg, Brooklyn</div>
+            <div class="listing-chips">
+              <span class="chip">2 bed</span>
+              <span class="chip">1 bath</span>
+              <span class="chip">875 sqft</span>
+              <span class="chip">Pets OK</span>
+            </div>
+            <div class="listing-meta">
+              <span class="meta-item"><strong>Avail.</strong> Apr 1</span>
+              <span class="meta-item"><strong>Floor</strong> 4 of 6</span>
+              <span class="meta-item"><strong>Laundry</strong> In-unit</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Option D Overlay: Stamps -->
+        <div class="overlay-d">
+          <!-- NOPE stamp (left) -->
+          <div class="stamp stamp-nope">NOPE</div>
+          <!-- FAVE stamp (right) -->
+          <div class="stamp stamp-fave">FAVE &#9733;</div>
+          <!-- LIVE HERE stamp (top center) -->
+          <div class="stamp stamp-live">LIVE HERE</div>
+
+          <!-- Direction arrows -->
+          <div class="stamp-arrow arr-left">&#8592;</div>
+          <div class="stamp-arrow arr-right">&#8594;</div>
+          <div class="stamp-arrow arr-up">&#8593;</div>
+
+          <!-- Bottom CTA -->
+          <div class="overlay-d-bottom">
+            <span class="swipe-hint-text">Swipe in any direction to get started</span>
+            <button class="got-it-btn-d">Got it!</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

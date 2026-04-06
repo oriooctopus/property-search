@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dwelligence — Commute Empty State Options</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --card: #1c2028;
+      --card2: #181e26;
+      --border: #2d333b;
+      --text: #e1e4e8;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #7ee787;
+      --red: #f85149;
+    }
+
+    body {
+      background: #0d1117;
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .page-header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 32px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .page-header h1 { font-size: 20px; font-weight: 700; }
+    .page-header p { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+    /* ── LAYOUT: 2 columns top row, 2 columns bottom row ── */
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-top: none;
+    }
+
+    .option-col {
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .option-col:nth-child(2) { border-right: none; }
+    .option-col:nth-child(4) { border-right: none; }
+
+    .option-header {
+      padding: 18px 24px 14px;
+      border-bottom: 1px solid var(--border);
+      background: #14181f;
+    }
+    .option-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+    }
+    .option-badge {
+      background: var(--accent);
+      color: #0a0a0a;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .option-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .option-desc {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 3px;
+      line-height: 1.5;
+    }
+
+    .option-body {
+      padding: 24px;
+    }
+
+    /* ── Sub-section labels ── */
+    .sub-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sub-section {
+      margin-bottom: 32px;
+    }
+    .sub-section:last-child { margin-bottom: 0; }
+
+    /* ── Shared: the filter panel shell ── */
+    .filter-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      width: 280px;
+      max-width: 100%;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-header-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+    }
+
+    .panel-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      border-top: 1px solid var(--border);
+      background: #14181f;
+    }
+
+    /* ── Shared: existing rule card ── */
+    .rule-card {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 2px;
+    }
+    .rule-icon {
+      width: 30px; height: 30px;
+      border-radius: 6px;
+      background: rgba(88,166,255,0.1);
+      border: 1px solid rgba(88,166,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .rule-main { flex: 1; min-width: 0; }
+    .rule-dest {
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .rule-meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 1px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .rule-delete {
+      width: 20px; height: 20px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 14px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .transit-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      font-size: 9px;
+      font-weight: 800;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .tb-l  { background: #888; }
+    .tb-a  { background: #0039a6; }
+    .tb-6  { background: #00933c; }
+    .tb-n  { background: #fccc0a; color: #000; }
+
+    /* ────────────────────────────────────────────
+       OPTION A: Minimal text link
+    ──────────────────────────────────────────── */
+
+    .opt-a-empty {
+      padding: 8px 16px 12px;
+    }
+    .opt-a-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .opt-a-link-plus {
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 1;
+    }
+    .opt-a-hint {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 5px;
+      padding-left: 2px;
+    }
+
+    .opt-a-footer-reset {
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .opt-a-footer-reset:hover { color: var(--text); }
+    .opt-a-footer-done {
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* with-rule state for A */
+    .opt-a-rules-list {
+      padding: 10px 16px 6px;
+    }
+    .opt-a-add-more {
+      padding: 0 16px 12px;
+      margin-top: 6px;
+    }
+
+    /* ────────────────────────────────────────────
+       OPTION B: Compact prompt card
+    ──────────────────────────────────────────── */
+
+    .opt-b-empty {
+      padding: 10px 16px 14px;
+    }
+    .opt-b-prompt-card {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .opt-b-icon {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: rgba(88,166,255,0.08);
+      border: 1px solid rgba(88,166,255,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .opt-b-text { flex: 1; min-width: 0; }
+    .opt-b-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+    }
+    .opt-b-add-btn {
+      background: rgba(88,166,255,0.12);
+      border: 1px solid rgba(88,166,255,0.3);
+      color: var(--accent);
+      border-radius: 6px;
+      padding: 5px 11px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .opt-b-footer-reset {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .opt-b-footer-done {
+      background: var(--accent);
+      color: #0a0a0a;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 6px;
+      padding: 5px 14px;
+      cursor: pointer;
+    }
+
+    /* with-rule state for B */
+    .opt-b-rules-list {
+      padding: 10px 16px 4px;
+    }
+    .opt-b-add-another {
+      padding: 4px 16px 12px;
+    }
+    .opt-b-add-another-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    /* ────────────────────────────────────────────
+       OPTION C: Inline builder prompt
+    ──────────────────────────────────────────── */
+
+    .opt-c-prompt {
+      padding: 10px 16px 14px;
+    }
+    .opt-c-question {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .opt-c-input-row {
+      display: flex;
+      gap: 6px;
+    }
+    .opt-c-search-field {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--accent);
+      border-radius: 7px;
+      padding: 7px 10px 7px 28px;
+      font-size: 12px;
+      color: var(--muted);
+      min-width: 0;
+      position: relative;
+    }
+    .opt-c-field-wrap {
+      flex: 1;
+      position: relative;
+      min-width: 0;
+    }
+    .opt-c-field-icon {
+      position: absolute;
+      left: 9px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 12px;
+      pointer-events: none;
+    }
+    .opt-c-go-btn {
+      background: var(--accent);
+      color: #0a0a0a;
+      border-radius: 7px;
+      padding: 7px 13px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .opt-c-hint {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+    .opt-c-suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 8px;
+    }
+    .opt-c-sugg-chip {
+      background: rgba(139,148,158,0.08);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 3px 9px;
+      font-size: 11px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .opt-c-footer-skip {
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .opt-c-footer-done {
+      background: var(--accent);
+      color: #0a0a0a;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 6px;
+      padding: 5px 14px;
+      cursor: pointer;
+    }
+
+    /* with-rule state for C */
+    .opt-c-rule-plus-builder {
+      padding: 10px 16px 14px;
+    }
+    .opt-c-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 8px 0 12px;
+    }
+    .opt-c-add-another-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    /* ────────────────────────────────────────────
+       OPTION D: Icon + single button
+    ──────────────────────────────────────────── */
+
+    .opt-d-empty {
+      padding: 20px 16px 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 12px;
+    }
+    .opt-d-icon-wrap {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      background: rgba(88,166,255,0.08);
+      border: 1px solid rgba(88,166,255,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+    .opt-d-add-btn {
+      background: rgba(88,166,255,0.12);
+      border: 1px solid rgba(88,166,255,0.3);
+      color: var(--accent);
+      border-radius: 7px;
+      padding: 7px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .opt-d-add-plus {
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 1;
+    }
+
+    .opt-d-footer-reset {
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .opt-d-footer-done {
+      background: var(--accent);
+      color: #0a0a0a;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 6px;
+      padding: 5px 14px;
+      cursor: pointer;
+    }
+
+    /* with-rule state for D */
+    .opt-d-rules {
+      padding: 10px 16px 6px;
+    }
+    .opt-d-add-row {
+      padding: 6px 16px 14px;
+      display: flex;
+      justify-content: center;
+    }
+    .opt-d-add-small {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="page-header">
+    <h1>Commute Filter — Empty State Options</h1>
+    <p>4 alternatives to the dashed-border box. Each option shows empty state (left) and with-rule state (right).</p>
+  </div>
+
+  <div class="options-grid">
+
+    <!-- ══════════════════════════════════════════════════════════════
+         OPTION A — Minimal text link
+    ══════════════════════════════════════════════════════════════ -->
+    <div class="option-col">
+      <div class="option-header">
+        <div class="option-label">
+          <span class="option-badge">Option A</span>
+          <span class="option-title">Minimal text link</span>
+        </div>
+        <div class="option-desc">No box at all — just a plain blue link with a subtle hint below it. Reset/Done become small text buttons instead of pills.</div>
+      </div>
+      <div class="option-body">
+
+        <div class="sub-section">
+          <div class="sub-label">Empty state</div>
+          <div class="filter-panel">
+            <div class="panel-header">
+              <span class="panel-header-title">Commute Rules</span>
+            </div>
+            <div class="opt-a-empty">
+              <a class="opt-a-link">
+                <span class="opt-a-link-plus">+</span>
+                Add commute rule
+              </a>
+              <div class="opt-a-hint">Filter by travel time to a location</div>
+            </div>
+            <div class="panel-footer">
+              <span class="opt-a-footer-reset">Reset</span>
+              <span class="opt-a-footer-done">Done</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="sub-section">
+          <div class="sub-label">With one rule added</div>
+          <div class="filter-panel">
+            <div class="panel-header">
+              <span class="panel-header-title">Commute Rules</span>
+            </div>
+            <div class="opt-a-rules-list">
+              <div class="rule-card">
+                <div class="rule-icon">&#x1F5FA;</div>
+                <div class="rule-main">
+                  <div class="rule-dest">Midtown Manhattan</div>
+                  <div class="rule-meta">
+                    under 30 min &middot;
+                    <span class="transit-badge tb-l">L</span>
+                    <span class="transit-badge tb-a">A</span>
+                  </div>
+                </div>
+                <div class="rule-delete">&times;</div>
+              </div>
+            </div>
+            <div class="opt-a-add-more">
+              <a class="opt-a-link">
+                <span class="opt-a-link-plus">+</span>
+                Add another rule
+              </a>
+            </div>
+            <div class="panel-footer">
+              <span class="opt-a-footer-reset">Reset</span>
+              <span class="opt-a-footer-done">Done</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         OPTION B — Compact prompt card
+    ══════════════════════════════════════════════════════════════ -->
+    <div class="option-col">
+      <div class="option-header">
+        <div class="option-label">
+          <span class="option-badge">Option B</span>
+          <span class="option-title">Compact prompt card</span>
+        </div>
+        <div class="option-desc">A small, solid card (no dashed border) with a transit icon and inline "Add rule" button. Feels like a todo-app empty state.</div>
+      </div>
+      <div class="option-body">
+
+        <div class="sub-section">
+          <div class="sub-label">Empty state</div>
+          <div class="filter-panel">
+            <div class="panel-header">
+              <span class="panel-header-title">Commute Rules</span>
+            </div>
+            <div class="opt-b-empty">
+              <div class="opt-b-prompt-card">
+                <div class="opt-b-icon">&#x1F687;</div>
+                <div class="opt-b-text">
+                  <div class="opt-b-label">No commute rules yet</div>
+                </div>
+                <div class="opt-b-add-btn">Add rule</div>
+              </div>
+            </div>
+            <div class="panel-footer">
+              <span class="opt-b-footer-reset">Reset</span>
+              <div class="opt-b-footer-done">Done</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sub-section">
+          <div class="sub-label">With one rule added</div>
+          <div class="filter-panel">
+            <div class="panel-header">
+              <span class="panel-header-title">Commute Rules</span>
+            </div>
+            <div class="opt-b-rules-list">
+              <div class="rule-card">
+                <div class="rule-icon">&#x1F5FA;</div>
+                <div class="rule-main">
+                  <div class="rule-dest">Midtown Manhattan</div>
+                  <div class="rule-meta">
+                    under 30 min &middot;
+                    <span class="transit-badge tb-l">L</span>
+                    <span class="transit-badge tb-a">A</span>
+                  </div>
+                </div>
+                <div class="rule-delete">&times;</div>
+              </div>
+            </div>
+            <div class="opt-b-add-another">
+              <div class="opt-b-add-another-btn">
+                <span style="font-size:15px;font-weight:400;line-height:1">+</span>
+                Add another rule
+              </div>
+            </div>
+            <div class="panel-footer">
+              <span class="opt-b-footer-reset">Reset</span>
+              <div class="opt-b-footer-done">Done</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         OPTION C — Inline builder prompt
+    ══════════════════════════════════════════════════════════════ -->
+    <div class="option-col">
+      <div class="option-header">
+        <div class="option-label">
+          <span class="option-badge">Option C</span>
+          <span class="option-title">Inline builder prompt</span>
+        </div>
+        <div class="option-desc">No empty state — immediately shows the first step. "Where do you commute to?" with a pre-focused search field. Feels ready to use.</div>
+      </div>
+      <div class="option-body">
+
+        <div class="sub-section">
+          <div class="sub-label">Empty state (first step shown)</div>
+          <div class="filter-panel">
+            <div class="panel-header">
+              <span class="panel-header-title">Commute Rules</span>
+            </div>
+            <div class="opt-c-prompt">
+              <div class="opt-c-question">Where do you commute to?</div>
+              <div class="opt-c-input-row">
+                <div class="opt-c-field-wrap">
+                  <span class="opt-c-field-icon">&#x2315;</span>
+                  <div class="opt-c-search-field">e.g. Flatiron District...</div>
+                </div>
+                <div class="opt-c-go-btn">Go</div>
+              </div>
+              <div class="opt-c-suggestions">
+                <div class="opt-c-sugg-chip">Midtown</div>
+                <div class="opt-c-sugg-chip">Downtown Brooklyn</div>
+                <div class="opt-c-sugg-chip">FiDi</div>
+                <div class="opt-c-sugg-chip">Hudson Yards</div>
+              </div>
+            </div>
+            <div class="panel-footer">
+              <span class="opt-c-footer-skip">Skip</span>
+              <div class="opt-c-footer-done">Done</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sub-section">
+          <div class="sub-label">With one rule added</div>
+          <div class="filter-panel">
+            <div class="panel-header">
+              <span class="panel-header-title">Commute Rules</span>
+            </div>
+            <div class="opt-c-rule-plus-builder">
+              <div class="rule-card" style="margin-bottom:0">
+                <div class="rule-icon">&#x1F5FA;</div>
+                <div class="rule-main">
+                  <div class="rule-dest">Midtown Manhattan</div>
+                  <div class="rule-meta">
+                    under 30 min &middot;
+                    <span class="transit-badge tb-l">L</span>
+                    <span class="transit-badge tb-a">A</span>
+                  </div>
+                </div>
+                <div class="rule-delete">&times;</div>
+              </div>
+              <div class="opt-c-divider"></div>
+              <div class="opt-c-add-another-label">Add another destination?</div>
+              <div class="opt-c-input-row">
+                <div class="opt-c-field-wrap">
+                  <span class="opt-c-field-icon">&#x2315;</span>
+                  <div class="opt-c-search-field" style="border-color:var(--border);color:var(--muted)">Search location...</div>
+                </div>
+                <div class="opt-c-go-btn">Go</div>
+              </div>
+            </div>
+            <div class="panel-footer">
+              <span class="opt-c-footer-skip">Reset</span>
+              <div class="opt-c-footer-done">Done</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════
+         OPTION D — Icon + single button
+    ══════════════════════════════════════════════════════════════ -->
+    <div class="option-col">
+      <div class="option-header">
+        <div class="option-label">
+          <span class="option-badge">Option D</span>
+          <span class="option-title">Icon + single button</span>
+        </div>
+        <div class="option-desc">A small transit icon centered above a single compact button. Very minimal — almost just a well-spaced button with visual anchor.</div>
+      </div>
+      <div class="option-body">
+
+        <div class="sub-section">
+          <div class="sub-label">Empty state</div>
+          <div class="filter-panel">
+            <div class="panel-header">
+              <span class="panel-header-title">Commute Rules</span>
+            </div>
+            <div class="opt-d-empty">
+              <div class="opt-d-icon-wrap">&#x1F687;</div>
+              <div class="opt-d-add-btn">
+                <span class="opt-d-add-plus">+</span>
+                Add commute filter
+              </div>
+            </div>
+            <div class="panel-footer">
+              <span class="opt-d-footer-reset">Reset</span>
+              <div class="opt-d-footer-done">Done</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sub-section">
+          <div class="sub-label">With one rule added</div>
+          <div class="filter-panel">
+            <div class="panel-header">
+              <span class="panel-header-title">Commute Rules</span>
+            </div>
+            <div class="opt-d-rules">
+              <div class="rule-card">
+                <div class="rule-icon">&#x1F5FA;</div>
+                <div class="rule-main">
+                  <div class="rule-dest">Midtown Manhattan</div>
+                  <div class="rule-meta">
+                    under 30 min &middot;
+                    <span class="transit-badge tb-l">L</span>
+                    <span class="transit-badge tb-a">A</span>
+                  </div>
+                </div>
+                <div class="rule-delete">&times;</div>
+              </div>
+            </div>
+            <div class="opt-d-add-row">
+              <div class="opt-d-add-small">
+                <span style="font-size:15px;font-weight:400;line-height:1">+</span>
+                Add another
+              </div>
+            </div>
+            <div class="panel-footer">
+              <span class="opt-d-footer-reset">Reset</span>
+              <div class="opt-d-footer-done">Done</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /options-grid -->
+
+</body>
+</html>

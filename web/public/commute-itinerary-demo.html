@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Commute Itinerary Feature Demo</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f1117;
+    color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    padding: 48px 24px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #58a6ff, #3fb950);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    font-size: 15px;
+    color: #8b949e;
+    margin-bottom: 48px;
+    line-height: 1.5;
+  }
+  .step {
+    margin-bottom: 56px;
+  }
+  .step-number {
+    display: inline-block;
+    background: rgba(88, 166, 255, 0.15);
+    color: #58a6ff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+  .step h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #e6edf3;
+  }
+  .step p {
+    font-size: 14px;
+    color: #8b949e;
+    margin-bottom: 16px;
+    line-height: 1.6;
+  }
+  .step img {
+    max-width: 100%;
+    border-radius: 12px;
+    border: 1px solid #30363d;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+  .highlight {
+    color: #58a6ff;
+    font-weight: 500;
+  }
+  .tag {
+    display: inline-block;
+    background: rgba(63, 185, 80, 0.15);
+    color: #3fb950;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid #21262d;
+    font-size: 13px;
+    color: #484f58;
+  }
+</style>
+</head>
+<body>
+
+<h1>Commute Itinerary Feature Demo</h1>
+<p class="subtitle">
+  Dwelligence calculates real transit commute times for every listing using OpenTripPlanner.
+  When you set a commute filter, each listing's detail view shows a step-by-step itinerary
+  with walking legs, subway rides, and total travel time.
+</p>
+
+<div class="step">
+  <span class="step-number">STEP 1</span>
+  <h2>Filtered Listing View <span class="tag">COMMUTE ACTIVE</span></h2>
+  <p>
+    After applying a commute filter (L train, 14 St-Union Sq, within 20 min walk),
+    the listing view shows only apartments that match. The <span class="highlight">Filters 1</span>
+    badge indicates an active filter. Map pins cluster near L train stops in Brooklyn and Manhattan.
+  </p>
+  <img src="commute-demo-1-filtered.png" alt="Filtered listing view with commute filter active">
+</div>
+
+<div class="step">
+  <span class="step-number">STEP 2</span>
+  <h2>Commute Filter Configuration</h2>
+  <p>
+    The commute filter dropdown lets you pick a <span class="highlight">subway line</span>,
+    select specific <span class="highlight">stops</span>, set a <span class="highlight">max walk time</span>
+    (1-20 min), and choose walk or bike mode. All NYC subway lines are available with their official
+    MTA colors. You can also filter by station name, street address, or park.
+  </p>
+  <img src="commute-demo-3-filter-config.png" alt="Commute filter configuration showing subway line selector">
+</div>
+
+<div class="step">
+  <span class="step-number">STEP 3</span>
+  <h2>Commute Itinerary Timeline</h2>
+  <p>
+    Each listing's detail modal includes a <span class="highlight">Commute</span> section with a
+    vertical timeline showing the complete door-to-door journey. This example shows a route from
+    a Williamsburg apartment to 14 St-Union Sq: an 18-minute walk to Montrose Av station,
+    an 11-minute L train ride, and a 4-minute walk to the destination.
+    The <span class="highlight">total travel time (33 min)</span> is prominently displayed.
+  </p>
+  <img src="commute-demo-2-itinerary.png" alt="Commute itinerary timeline showing walk-transit-walk legs">
+</div>
+
+<div class="step">
+  <span class="step-number">STEP 4</span>
+  <h2>Full Detail Modal in Context</h2>
+  <p>
+    The commute itinerary sits alongside listing details like price, bedrooms, year built,
+    a <span class="highlight">location map</span>, reaction buttons (Dislike / I Would Live There / Like),
+    and the source link. This gives renters everything they need to evaluate a listing's
+    commute viability at a glance.
+  </p>
+  <img src="commute-demo-4-full-detail.png" alt="Full detail modal showing listing info, map, and commute section">
+</div>
+
+<footer>
+  Dwelligence &mdash; NYC Apartment Search with Real Commute Data
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dwelligence — Subway Station Toggle Mockup</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d1117;
+      color: #e1e4e8;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: #0f1117;
+      border-bottom: 1px solid #2d333b;
+      flex-shrink: 0;
+      z-index: 20;
+    }
+    .topbar-logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: #58a6ff;
+      letter-spacing: -0.5px;
+    }
+    .topbar-search {
+      flex: 1;
+      max-width: 420px;
+      background: #1c2028;
+      border: 1px solid #2d333b;
+      border-radius: 8px;
+      padding: 7px 12px;
+      color: #e1e4e8;
+      font-size: 14px;
+      outline: none;
+    }
+    .topbar-search::placeholder { color: #4b5563; }
+    .topbar-filters {
+      display: flex;
+      gap: 8px;
+    }
+    .filter-chip {
+      background: #1c2028;
+      border: 1px solid #2d333b;
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 13px;
+      color: #8b949e;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .filter-chip.active {
+      border-color: #388bfd;
+      color: #58a6ff;
+      background: rgba(56,139,253,0.1);
+    }
+
+    /* ── Main layout ── */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 340px;
+      flex-shrink: 0;
+      background: #0f1117;
+      border-right: 1px solid #2d333b;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .sidebar-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid #2d333b;
+      font-size: 13px;
+      color: #8b949e;
+    }
+    .sidebar-header span {
+      color: #e1e4e8;
+      font-weight: 600;
+    }
+    .listing-list {
+      overflow-y: auto;
+      flex: 1;
+    }
+    .listing-card {
+      padding: 12px 16px;
+      border-bottom: 1px solid #1c2028;
+      cursor: pointer;
+      transition: background 150ms;
+    }
+    .listing-card:hover { background: #161b22; }
+    .listing-card.selected { background: #1c2028; border-left: 3px solid #388bfd; }
+    .listing-addr {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e1e4e8;
+      margin-bottom: 4px;
+    }
+    .listing-meta {
+      font-size: 12px;
+      color: #8b949e;
+      display: flex;
+      gap: 10px;
+    }
+    .listing-price {
+      font-size: 15px;
+      font-weight: 700;
+      color: #7ee787;
+      margin-top: 4px;
+    }
+    .listing-tags {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+    .tag {
+      background: rgba(56,139,253,0.12);
+      color: #58a6ff;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 11px;
+    }
+    .tag.subway {
+      background: rgba(126,231,135,0.12);
+      color: #7ee787;
+    }
+
+    /* ── Map area ── */
+    .map-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+      background: #161b22;
+    }
+
+    /* Fake map grid */
+    .map-bg {
+      position: absolute;
+      inset: 0;
+      background-color: #1a2030;
+      background-image:
+        linear-gradient(rgba(56,139,253,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(56,139,253,0.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* Street lines */
+    .map-streets {
+      position: absolute;
+      inset: 0;
+    }
+    .map-streets svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ── Toolbar (top-right) ── */
+    .map-toolbar {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 10;
+    }
+    .toolbar-btn {
+      background: #1c2028;
+      border: 1px solid #2d333b;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #8b949e;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+      transition: background 150ms, border-color 150ms, color 150ms;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .toolbar-btn:hover {
+      background: #2d333b;
+      color: #e1e4e8;
+    }
+    .toolbar-btn.active {
+      background: rgba(56,139,253,0.15);
+      border-color: #388bfd;
+      color: #58a6ff;
+    }
+    .toolbar-btn .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #388bfd;
+      flex-shrink: 0;
+    }
+    .toolbar-btn.active .dot {
+      background: #58a6ff;
+      box-shadow: 0 0 6px #388bfd;
+    }
+
+    /* ── Legend panel ── */
+    .legend-panel {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: rgba(28,32,40,0.95);
+      border: 1px solid #2d333b;
+      border-radius: 10px;
+      padding: 12px 14px;
+      z-index: 10;
+      backdrop-filter: blur(4px);
+      min-width: 160px;
+    }
+    .legend-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 8px;
+    }
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+      font-size: 12px;
+      color: #e1e4e8;
+    }
+    .legend-swatch {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    /* ── Subway route lines ── */
+    .subway-routes {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    /* ── Station markers ── */
+    .station-group {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .station-marker {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      pointer-events: all;
+      cursor: pointer;
+    }
+    .station-circle {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 7px;
+      font-weight: 800;
+      color: #fff;
+      transition: transform 150ms, box-shadow 150ms, border-color 150ms;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+      opacity: 0.75;
+    }
+    .station-marker:hover .station-circle {
+      transform: scale(1.5);
+      box-shadow: 0 0 10px rgba(255,255,255,0.4);
+      border-color: rgba(255,255,255,0.9);
+      opacity: 1;
+    }
+    .station-marker.active .station-circle {
+      transform: scale(1.6);
+      border-color: #fff;
+      box-shadow: 0 0 14px rgba(255,255,255,0.5);
+      opacity: 1;
+    }
+
+    /* ── Popup ── */
+    .station-popup {
+      position: absolute;
+      background: #1c2028;
+      border: 1px solid #2d333b;
+      border-radius: 10px;
+      padding: 12px 14px;
+      z-index: 20;
+      min-width: 200px;
+      max-width: 260px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 200ms, transform 200ms;
+    }
+    .station-popup.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: all;
+    }
+    .popup-arrow {
+      position: absolute;
+      bottom: -7px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 12px;
+      height: 12px;
+      background: #1c2028;
+      border-right: 1px solid #2d333b;
+      border-bottom: 1px solid #2d333b;
+      transform: translateX(-50%) rotate(45deg);
+    }
+    .popup-station-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: #e1e4e8;
+      margin-bottom: 8px;
+    }
+    .popup-lines {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+    .popup-line-badge {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 800;
+      color: #fff;
+    }
+    .popup-walk {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #7ee787;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .popup-close {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 20px;
+      height: 20px;
+      background: none;
+      border: none;
+      color: #8b949e;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: color 150ms, background 150ms;
+      pointer-events: all;
+    }
+    .popup-close:hover { color: #e1e4e8; background: #2d333b; }
+
+    /* ── Toggle indicator ── */
+    .stations-hidden .station-group { display: none; }
+    .stations-hidden .subway-routes { display: none; }
+
+    /* ── Property pins ── */
+    .property-pin {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      cursor: pointer;
+    }
+    .pin-bubble {
+      background: #1c2028;
+      border: 1.5px solid #2d333b;
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #7ee787;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+      transition: background 150ms, border-color 150ms, transform 150ms;
+    }
+    .pin-bubble:hover, .property-pin.selected .pin-bubble {
+      background: #388bfd;
+      border-color: #58a6ff;
+      color: #fff;
+      transform: scale(1.05);
+    }
+    .pin-tail {
+      width: 0; height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid #2d333b;
+      margin: 0 auto;
+    }
+    .property-pin.selected .pin-tail { border-top-color: #58a6ff; }
+
+    /* ── Commute filter bar ── */
+    .commute-bar {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(28,32,40,0.95);
+      border: 1px solid #2d333b;
+      border-radius: 12px;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 10;
+      backdrop-filter: blur(4px);
+      font-size: 13px;
+      color: #8b949e;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+    .commute-label { color: #8b949e; font-size: 12px; }
+    .commute-value { color: #e1e4e8; font-weight: 600; }
+    .commute-sep { color: #2d333b; }
+
+    /* ── Subway line colors ── */
+    .line-123 { background: #ee352e; }
+    .line-456 { background: #00933c; }
+    .line-7   { background: #b933ad; }
+    .line-ace { background: #2850ad; }
+    .line-bdfm { background: #ff6319; }
+    .line-jz  { background: #996633; }
+    .line-l   { background: #a7a9ac; }
+    .line-nqrw { background: #fccc0a; color: #000 !important; }
+    .line-g   { background: #6cbe45; }
+    .line-s   { background: #808183; }
+
+    /* ── Zoom controls ── */
+    .zoom-controls {
+      position: absolute;
+      bottom: 80px;
+      right: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      z-index: 10;
+    }
+    .zoom-btn {
+      width: 32px;
+      height: 32px;
+      background: #1c2028;
+      border: 1px solid #2d333b;
+      color: #8b949e;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: color 150ms, background 150ms;
+    }
+    .zoom-btn:first-child { border-radius: 6px 6px 0 0; }
+    .zoom-btn:last-child { border-radius: 0 0 6px 6px; }
+    .zoom-btn:hover { background: #2d333b; color: #e1e4e8; }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar-logo">Dwelligence</div>
+  <input class="topbar-search" type="text" placeholder="Search neighborhoods, addresses..." value="Upper West Side, Manhattan" />
+  <div class="topbar-filters">
+    <div class="filter-chip">Price</div>
+    <div class="filter-chip">Beds</div>
+    <div class="filter-chip active">Commute</div>
+    <div class="filter-chip">Filters</div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main" id="mainLayout">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      Showing <span>24 listings</span> near Upper West Side
+    </div>
+    <div class="listing-list">
+      <!-- Listing 1 -->
+      <div class="listing-card selected">
+        <div class="listing-addr">245 W 72nd St, Apt 8B</div>
+        <div class="listing-meta">
+          <span>2 bed</span><span>1 bath</span><span>850 sqft</span>
+        </div>
+        <div class="listing-price">$3,200/mo</div>
+        <div class="listing-tags">
+          <span class="tag">No Fee</span>
+          <span class="tag subway">3 min to 72nd St</span>
+        </div>
+      </div>
+      <!-- Listing 2 -->
+      <div class="listing-card">
+        <div class="listing-addr">310 W 79th St, Apt 4A</div>
+        <div class="listing-meta">
+          <span>1 bed</span><span>1 bath</span><span>620 sqft</span>
+        </div>
+        <div class="listing-price">$2,650/mo</div>
+        <div class="listing-tags">
+          <span class="tag subway">5 min to 79th St</span>
+        </div>
+      </div>
+      <!-- Listing 3 -->
+      <div class="listing-card">
+        <div class="listing-addr">175 Riverside Dr, Apt 12C</div>
+        <div class="listing-meta">
+          <span>2 bed</span><span>2 bath</span><span>1,100 sqft</span>
+        </div>
+        <div class="listing-price">$4,100/mo</div>
+        <div class="listing-tags">
+          <span class="tag">Doorman</span>
+          <span class="tag">Gym</span>
+          <span class="tag subway">7 min to 79th St</span>
+        </div>
+      </div>
+      <!-- Listing 4 -->
+      <div class="listing-card">
+        <div class="listing-addr">40 W 86th St, Apt 3F</div>
+        <div class="listing-meta">
+          <span>Studio</span><span>1 bath</span><span>480 sqft</span>
+        </div>
+        <div class="listing-price">$2,100/mo</div>
+        <div class="listing-tags">
+          <span class="tag subway">4 min to 86th St</span>
+        </div>
+      </div>
+      <!-- Listing 5 -->
+      <div class="listing-card">
+        <div class="listing-addr">525 W 91st St, Apt 6D</div>
+        <div class="listing-meta">
+          <span>2 bed</span><span>1 bath</span><span>920 sqft</span>
+        </div>
+        <div class="listing-price">$3,450/mo</div>
+        <div class="listing-tags">
+          <span class="tag">No Fee</span>
+          <span class="tag">Laundry</span>
+        </div>
+      </div>
+      <!-- Listing 6 -->
+      <div class="listing-card">
+        <div class="listing-addr">200 Riverside Dr, Apt 18A</div>
+        <div class="listing-meta">
+          <span>3 bed</span><span>2 bath</span><span>1,400 sqft</span>
+        </div>
+        <div class="listing-price">$5,800/mo</div>
+        <div class="listing-tags">
+          <span class="tag">Doorman</span>
+          <span class="tag">Views</span>
+          <span class="tag subway">9 min to 96th St</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div class="map-container" id="mapContainer">
+    <div class="map-bg"></div>
+
+    <!-- Fake streets SVG -->
+    <div class="map-streets">
+      <svg viewBox="0 0 900 700" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Major avenues (vertical) -->
+        <line x1="120" y1="0" x2="120" y2="700" stroke="#2d333b" stroke-width="8" />
+        <line x1="240" y1="0" x2="240" y2="700" stroke="#2d333b" stroke-width="8" />
+        <line x1="360" y1="0" x2="360" y2="700" stroke="#2d333b" stroke-width="8" />
+        <line x1="480" y1="0" x2="480" y2="700" stroke="#2d333b" stroke-width="8" />
+        <line x1="600" y1="0" x2="600" y2="700" stroke="#2d333b" stroke-width="8" />
+        <line x1="720" y1="0" x2="720" y2="700" stroke="#2d333b" stroke-width="8" />
+        <line x1="820" y1="0" x2="820" y2="700" stroke="#2d333b" stroke-width="5" />
+        <!-- Cross streets (horizontal) -->
+        <line x1="0" y1="100" x2="900" y2="100" stroke="#232a35" stroke-width="3" />
+        <line x1="0" y1="180" x2="900" y2="180" stroke="#2d333b" stroke-width="5" />
+        <line x1="0" y1="260" x2="900" y2="260" stroke="#232a35" stroke-width="3" />
+        <line x1="0" y1="340" x2="900" y2="340" stroke="#2d333b" stroke-width="5" />
+        <line x1="0" y1="420" x2="900" y2="420" stroke="#232a35" stroke-width="3" />
+        <line x1="0" y1="500" x2="900" y2="500" stroke="#2d333b" stroke-width="5" />
+        <line x1="0" y1="580" x2="900" y2="580" stroke="#232a35" stroke-width="3" />
+        <line x1="0" y1="640" x2="900" y2="640" stroke="#2d333b" stroke-width="5" />
+        <!-- Park outline (Central Park suggestion) -->
+        <rect x="610" y="60" width="180" height="420" rx="8" fill="rgba(46,80,46,0.25)" stroke="#2a4a2a" stroke-width="2" />
+        <text x="700" y="280" text-anchor="middle" fill="rgba(126,231,135,0.25)" font-size="13" font-family="sans-serif" font-style="italic">Central Park</text>
+        <!-- Riverside park suggestion -->
+        <rect x="0" y="0" width="55" height="700" rx="0" fill="rgba(30,55,40,0.3)" />
+        <text x="27" y="360" text-anchor="middle" fill="rgba(126,231,135,0.18)" font-size="10" font-family="sans-serif" font-style="italic" transform="rotate(-90,27,360)">Riverside Park</text>
+        <!-- Avenue labels -->
+        <text x="120" y="16" text-anchor="middle" fill="#3d4856" font-size="10" font-family="sans-serif">Riverside Dr</text>
+        <text x="240" y="16" text-anchor="middle" fill="#3d4856" font-size="10" font-family="sans-serif">West End Ave</text>
+        <text x="360" y="16" text-anchor="middle" fill="#3d4856" font-size="10" font-family="sans-serif">Broadway</text>
+        <text x="480" y="16" text-anchor="middle" fill="#3d4856" font-size="10" font-family="sans-serif">Amsterdam Ave</text>
+        <text x="600" y="16" text-anchor="middle" fill="#3d4856" font-size="10" font-family="sans-serif">Columbus Ave</text>
+        <text x="720" y="16" text-anchor="middle" fill="#3d4856" font-size="10" font-family="sans-serif">Central Park W</text>
+        <!-- Cross street labels -->
+        <text x="870" y="184" fill="#3d4856" font-size="10" font-family="sans-serif">72nd St</text>
+        <text x="870" y="264" fill="#3d4856" font-size="10" font-family="sans-serif">79th St</text>
+        <text x="870" y="344" fill="#3d4856" font-size="10" font-family="sans-serif">86th St</text>
+        <text x="870" y="424" fill="#3d4856" font-size="10" font-family="sans-serif">91st St</text>
+        <text x="870" y="504" fill="#3d4856" font-size="10" font-family="sans-serif">96th St</text>
+        <!-- Subway line (1/2/3) suggestion under Broadway -->
+        <line x1="360" y1="0" x2="360" y2="700" stroke="rgba(238,53,46,0.18)" stroke-width="4" stroke-dasharray="none" />
+      </svg>
+    </div>
+
+    <!-- Property pins -->
+    <div class="property-pin selected" style="left: 290px; top: 180px;">
+      <div class="pin-bubble">$3,200</div>
+      <div class="pin-tail"></div>
+    </div>
+    <div class="property-pin" style="left: 200px; top: 260px;">
+      <div class="pin-bubble">$2,650</div>
+      <div class="pin-tail"></div>
+    </div>
+    <div class="property-pin" style="left: 130px; top: 245px;">
+      <div class="pin-bubble">$4,100</div>
+      <div class="pin-tail"></div>
+    </div>
+    <div class="property-pin" style="left: 430px; top: 330px;">
+      <div class="pin-bubble">$2,100</div>
+      <div class="pin-tail"></div>
+    </div>
+    <div class="property-pin" style="left: 310px; top: 410px;">
+      <div class="pin-bubble">$3,450</div>
+      <div class="pin-tail"></div>
+    </div>
+    <div class="property-pin" style="left: 160px; top: 480px;">
+      <div class="pin-bubble">$5,800</div>
+      <div class="pin-tail"></div>
+    </div>
+
+    <!-- Subway route lines -->
+    <svg class="subway-routes" viewBox="0 0 1000 700" preserveAspectRatio="none">
+      <!-- Line 1/2/3 (Red) — vertical on west side -->
+      <line x1="360" y1="100" x2="360" y2="500" stroke="#ee352e" stroke-width="5" opacity="0.35" stroke-linecap="round"/>
+
+      <!-- Line 4/5/6 (Green) — vertical on east side -->
+      <line x1="750" y1="340" x2="750" y2="340" stroke="#00933c" stroke-width="5" opacity="0.35" stroke-linecap="round"/>
+
+      <!-- Line A/C/E (Blue) — diagonal from upper left to lower right -->
+      <line x1="720" y1="295" x2="720" y2="500" stroke="#2850ad" stroke-width="5" opacity="0.35" stroke-linecap="round"/>
+    </svg>
+
+    <!-- Subway station markers (togglable group) -->
+    <div class="station-group" id="stationGroup">
+
+      <!-- 72nd St (1/2/3) -->
+      <div class="station-marker" style="left: 360px; top: 180px;"
+           data-name="72nd Street" data-lines="1,2,3" data-walk="3 min walk from nearest listings"
+           onclick="openPopup(this)">
+        <div class="station-circle line-123">1</div>
+      </div>
+
+      <!-- 79th St (1) -->
+      <div class="station-marker" style="left: 360px; top: 260px;"
+           data-name="79th Street" data-lines="1" data-walk="5 min walk from nearest listings"
+           onclick="openPopup(this)">
+        <div class="station-circle line-123">1</div>
+      </div>
+
+      <!-- 86th St (1) -->
+      <div class="station-marker" style="left: 360px; top: 340px;"
+           data-name="86th Street" data-lines="1" data-walk="4 min walk from nearest listings"
+           onclick="openPopup(this)">
+        <div class="station-circle line-123">1</div>
+      </div>
+
+      <!-- 86th St (4/5/6 — cross-town) -->
+      <div class="station-marker" style="left: 750px; top: 340px;"
+           data-name="86th Street (Lexington Ave)" data-lines="4,5,6" data-walk="12 min walk"
+           onclick="openPopup(this)">
+        <div class="station-circle line-456">4</div>
+      </div>
+
+      <!-- 96th St (1/2/3) -->
+      <div class="station-marker" style="left: 360px; top: 500px;"
+           data-name="96th Street" data-lines="1,2,3" data-walk="8 min walk from nearest listings"
+           onclick="openPopup(this)">
+        <div class="station-circle line-123">2</div>
+      </div>
+
+      <!-- 72nd St (2/3 express) — Broadway -->
+      <div class="station-marker" style="left: 360px; top: 178px;"
+           data-name="72nd Street (Express)" data-lines="2,3" data-walk="3 min walk"
+           onclick="openPopup(this)" style="left:368px; top:190px;">
+        <!-- merged with above for clarity, shown as local marker -->
+      </div>
+
+      <!-- 81st St (B/C) -->
+      <div class="station-marker" style="left: 720px; top: 295px;"
+           data-name="81st St–Museum of Natural History" data-lines="B,C" data-walk="6 min walk"
+           onclick="openPopup(this)">
+        <div class="station-circle line-ace">B</div>
+      </div>
+
+      <!-- 86th St (B/C) -->
+      <div class="station-marker" style="left: 720px; top: 340px;"
+           data-name="86th Street (Central Park West)" data-lines="B,C" data-walk="11 min walk"
+           onclick="openPopup(this)">
+        <div class="station-circle line-ace">C</div>
+      </div>
+
+      <!-- 96th St (B/C) -->
+      <div class="station-marker" style="left: 720px; top: 500px;"
+           data-name="96th Street (Central Park West)" data-lines="B,C" data-walk="14 min walk"
+           onclick="openPopup(this)">
+        <div class="station-circle line-ace">B</div>
+      </div>
+
+      <!-- 66th St Lincoln Center (1) -->
+      <div class="station-marker" style="left: 360px; top: 100px;"
+           data-name="66th St–Lincoln Center" data-lines="1" data-walk="10 min walk"
+           onclick="openPopup(this)">
+        <div class="station-circle line-123">1</div>
+      </div>
+
+    </div>
+
+    <!-- Popup (shown on station click) -->
+    <div class="station-popup" id="stationPopup">
+      <button class="popup-close" onclick="closePopup()">&#x2715;</button>
+      <div class="popup-station-name" id="popupName">72nd Street</div>
+      <div class="popup-lines" id="popupLines"></div>
+      <div class="popup-walk" id="popupWalk">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#7ee787" stroke-width="2.5"><circle cx="12" cy="5" r="2"/><path d="M12 7v7l-3 4M12 14l3 4M9 11h6"/></svg>
+        3 min walk from nearest listings
+      </div>
+    </div>
+
+    <!-- Map toolbar (top right) -->
+    <div class="map-toolbar">
+      <button class="toolbar-btn active" id="stationsBtn" onclick="toggleStations()">
+        <span>&#x1F687;</span>
+        <span id="stationsBtnLabel">Stations</span>
+        <div class="dot"></div>
+      </button>
+      <button class="toolbar-btn" id="commuteBtn" onclick="this.classList.toggle('active')">
+        <span>&#x23F1;</span>
+        Commute
+      </button>
+      <button class="toolbar-btn" id="legendBtn" onclick="toggleLegend()">
+        <span>&#x2261;</span>
+        Legend
+      </button>
+    </div>
+
+    <!-- Subway line legend -->
+    <div class="legend-panel" id="legendPanel" style="display:none;">
+      <div class="legend-title">Subway Lines</div>
+      <div class="legend-row">
+        <div class="legend-swatch line-123">1</div>
+        <span>1 / 2 / 3 — Broadway-7th Ave</span>
+      </div>
+      <div class="legend-row">
+        <div class="legend-swatch line-456">4</div>
+        <span>4 / 5 / 6 — Lexington Ave</span>
+      </div>
+      <div class="legend-row">
+        <div class="legend-swatch line-ace">A</div>
+        <span>A / C / E — 8th Ave</span>
+      </div>
+      <div class="legend-row">
+        <div class="legend-swatch line-ace" style="background:#2850ad;">B</div>
+        <span>B / C — Central Park West</span>
+      </div>
+      <div class="legend-row">
+        <div class="legend-swatch line-bdfm">D</div>
+        <span>B / D / F / M — 6th Ave</span>
+      </div>
+      <div class="legend-row">
+        <div class="legend-swatch line-nqrw" style="color:#000;">N</div>
+        <span>N / Q / R / W — Broadway</span>
+      </div>
+      <div class="legend-row">
+        <div class="legend-swatch line-7">7</div>
+        <span>7 — Flushing</span>
+      </div>
+      <div class="legend-row">
+        <div class="legend-swatch line-l">L</div>
+        <span>L — 14th St–Canarsie</span>
+      </div>
+    </div>
+
+    <!-- Zoom controls -->
+    <div class="zoom-controls">
+      <button class="zoom-btn">+</button>
+      <button class="zoom-btn">&#x2212;</button>
+    </div>
+
+    <!-- Commute info bar -->
+    <div class="commute-bar">
+      <span class="commute-label">Commute to</span>
+      <span class="commute-value">Midtown (42nd St)</span>
+      <span class="commute-sep">|</span>
+      <span class="commute-label">Transit</span>
+      <span class="commute-value">20–28 min</span>
+      <span class="commute-sep">|</span>
+      <span class="commute-label">Walk</span>
+      <span class="commute-value">38 min</span>
+    </div>
+
+  </div><!-- /map-container -->
+</div><!-- /main -->
+
+<script>
+  var stationsVisible = true;
+
+  function toggleStations() {
+    stationsVisible = !stationsVisible;
+    var group = document.getElementById('stationGroup');
+    var btn = document.getElementById('stationsBtn');
+    var label = document.getElementById('stationsBtnLabel');
+    if (stationsVisible) {
+      group.style.display = '';
+      btn.classList.add('active');
+      label.textContent = 'Stations';
+    } else {
+      group.style.display = 'none';
+      btn.classList.remove('active');
+      label.textContent = 'Stations';
+      closePopup();
+    }
+  }
+
+  function toggleLegend() {
+    var panel = document.getElementById('legendPanel');
+    var btn = document.getElementById('legendBtn');
+    if (panel.style.display === 'none') {
+      panel.style.display = '';
+      btn.classList.add('active');
+    } else {
+      panel.style.display = 'none';
+      btn.classList.remove('active');
+    }
+  }
+
+  var lineColors = {
+    '1': 'line-123', '2': 'line-123', '3': 'line-123',
+    '4': 'line-456', '5': 'line-456', '6': 'line-456',
+    '7': 'line-7',
+    'A': 'line-ace', 'C': 'line-ace', 'E': 'line-ace',
+    'B': 'line-ace', 'D': 'line-bdfm', 'F': 'line-bdfm', 'M': 'line-bdfm',
+    'J': 'line-jz', 'Z': 'line-jz',
+    'L': 'line-l',
+    'N': 'line-nqrw', 'Q': 'line-nqrw', 'R': 'line-nqrw', 'W': 'line-nqrw',
+    'G': 'line-g', 'S': 'line-s'
+  };
+
+  var activeMarker = null;
+
+  function openPopup(markerEl) {
+    // deactivate previous
+    if (activeMarker) activeMarker.classList.remove('active');
+    activeMarker = markerEl;
+    markerEl.classList.add('active');
+
+    var name = markerEl.getAttribute('data-name');
+    var linesStr = markerEl.getAttribute('data-lines');
+    var walk = markerEl.getAttribute('data-walk');
+    var lines = linesStr.split(',');
+
+    document.getElementById('popupName').textContent = name;
+    document.getElementById('popupWalk').querySelector('svg').nextSibling.textContent = ' ' + walk;
+
+    var linesEl = document.getElementById('popupLines');
+    linesEl.innerHTML = '';
+    lines.forEach(function(line) {
+      line = line.trim();
+      var badge = document.createElement('div');
+      badge.className = 'popup-line-badge ' + (lineColors[line] || 'line-s');
+      // NQR needs dark text
+      if (['N','Q','R','W'].indexOf(line) !== -1) badge.style.color = '#000';
+      badge.textContent = line;
+      linesEl.appendChild(badge);
+    });
+
+    // Position popup above the marker
+    var popup = document.getElementById('stationPopup');
+    var mapRect = document.getElementById('mapContainer').getBoundingClientRect();
+    var markerRect = markerEl.getBoundingClientRect();
+    var left = markerRect.left - mapRect.left + 11; // center of 22px circle
+    var top = markerRect.top - mapRect.top - 8;
+
+    // clamp horizontally
+    var popupW = 220;
+    left = Math.max(8, Math.min(left - popupW / 2, mapRect.width - popupW - 8));
+    popup.style.left = left + 'px';
+    popup.style.top = (top - 100) + 'px'; // above marker
+
+    popup.classList.add('visible');
+  }
+
+  function closePopup() {
+    document.getElementById('stationPopup').classList.remove('visible');
+    if (activeMarker) {
+      activeMarker.classList.remove('active');
+      activeMarker = null;
+    }
+  }
+
+  // Close popup on map background click
+  document.getElementById('mapContainer').addEventListener('click', function(e) {
+    if (!e.target.closest('.station-marker') && !e.target.closest('.station-popup')) {
+      closePopup();
+    }
+  });
+</script>
+</body>
+</html>

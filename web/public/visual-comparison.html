@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dwelligence Visual History</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0a;
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+    }
+
+    .sticky-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(10, 10, 10, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid #222;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .sticky-header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+    }
+    .sticky-nav {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .sticky-nav a {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 6px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #aaa;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .sticky-nav a:hover {
+      background: #252525;
+      color: #fff;
+      border-color: #555;
+    }
+    .sticky-nav a.active {
+      background: #1d4ed8;
+      border-color: #3b82f6;
+      color: #fff;
+    }
+
+    .intro {
+      max-width: 900px;
+      margin: 40px auto 20px;
+      padding: 0 24px;
+    }
+    .intro h2 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    .intro p {
+      color: #888;
+      font-size: 15px;
+    }
+
+    .section {
+      max-width: 1500px;
+      margin: 0 auto;
+      padding: 40px 24px 60px;
+      border-top: 1px solid #1a1a1a;
+    }
+    .section:first-of-type {
+      border-top: none;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .section-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #1d4ed8;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .section-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .section-meta {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .meta-tag {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-weight: 500;
+    }
+    .meta-commit {
+      background: #1a1a2e;
+      color: #818cf8;
+      border: 1px solid #2d2d5e;
+    }
+    .meta-date {
+      background: #1a2e1a;
+      color: #6ee7b7;
+      border: 1px solid #2d5e2d;
+    }
+
+    .screenshot-container {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #222;
+      background: #111;
+      margin-bottom: 20px;
+    }
+    .screenshot-container img {
+      width: 100%;
+      display: block;
+    }
+
+    .changes-note {
+      background: #111;
+      border: 1px solid #222;
+      border-left: 3px solid #f59e0b;
+      border-radius: 0 8px 8px 0;
+      padding: 16px 20px;
+      margin-top: 16px;
+    }
+    .changes-note h4 {
+      color: #f59e0b;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .changes-note ul {
+      list-style: none;
+      padding: 0;
+    }
+    .changes-note li {
+      padding: 4px 0;
+      color: #bbb;
+      font-size: 14px;
+    }
+    .changes-note li::before {
+      content: "\2192  ";
+      color: #f59e0b;
+    }
+
+    .observer-target {
+      height: 1px;
+    }
+  </style>
+</head>
+<body>
+  <header class="sticky-header">
+    <h1>Dwelligence Visual History</h1>
+    <nav class="sticky-nav">
+      <a href="#commit-1" data-index="1">1. Segmented Control</a>
+      <a href="#commit-2" data-index="2">2. Conversational Search</a>
+      <a href="#commit-3" data-index="3">3. AI Search + Photos First</a>
+      <a href="#commit-4" data-index="4">4. Map Fix</a>
+      <a href="#commit-5" data-index="5">5. Current (Card Redesign)</a>
+    </nav>
+  </header>
+
+  <div class="intro">
+    <h2>48 Hours of Iteration</h2>
+    <p>Visual snapshots of the Dwelligence apartment search app from Sunday night Mar 22 through Monday Mar 24, 2026. Each screenshot is taken at 1440x900 viewport from a running dev server at that commit.</p>
+  </div>
+
+  <!-- Commit 1 -->
+  <div class="section" id="commit-1">
+    <div class="observer-target" data-index="1"></div>
+    <div class="section-header">
+      <span class="section-number">1</span>
+      <span class="section-title">Add segmented control, price sliders</span>
+    </div>
+    <div class="section-meta">
+      <span class="meta-tag meta-commit">aa90eb1</span>
+      <span class="meta-tag meta-date">Sun Mar 22, 11:36 PM</span>
+    </div>
+    <div class="screenshot-container">
+      <img src="compare-1-aa90eb1.png" alt="Screenshot at commit aa90eb1" loading="lazy">
+    </div>
+    <div class="changes-note">
+      <h4>What's here</h4>
+      <ul>
+        <li>Split-panel layout: listing cards on the left, map on the right</li>
+        <li>Filter row with Price, Beds/Baths, Price (per bedroom) dropdowns</li>
+        <li>Search area segmented control: All, Fulton St, L Train, Manhattan, Brooklyn 14th</li>
+        <li>Sort by Price/Bedroom dropdown</li>
+        <li>"109 listings" count visible</li>
+        <li>Map in bottom-right corner with search legend (partially visible)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Commit 2 -->
+  <div class="section" id="commit-2">
+    <div class="observer-target" data-index="2"></div>
+    <div class="section-header">
+      <span class="section-number">2</span>
+      <span class="section-title">Add conversational search, hidden listings, UI improvements</span>
+    </div>
+    <div class="section-meta">
+      <span class="meta-tag meta-commit">6228633</span>
+      <span class="meta-tag meta-date">Mon Mar 23, 1:43 AM</span>
+    </div>
+    <div class="screenshot-container">
+      <img src="compare-2-6228633.png" alt="Screenshot at commit 6228633" loading="lazy">
+    </div>
+    <div class="changes-note">
+      <h4>What changed from previous</h4>
+      <ul>
+        <li>New "Within 1 Month" green filter chip added to filter row</li>
+        <li>"Hidden" link added to navbar (alongside Search, Favorites)</li>
+        <li>"Listed yesterday" timestamp now appears on listing cards</li>
+        <li>Listing count dropped from 109 to 54 (the time filter is active by default)</li>
+        <li>Sort label now lowercase: "SORT BY:" changed to match same style</li>
+        <li>Map still not rendering pins (empty dark area on the right)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Commit 3 -->
+  <div class="section" id="commit-3">
+    <div class="observer-target" data-index="3"></div>
+    <div class="section-header">
+      <span class="section-number">3</span>
+      <span class="section-title">Add AI search bar, Photos first, multi-source search</span>
+    </div>
+    <div class="section-meta">
+      <span class="meta-tag meta-commit">d40f61d + 7535727</span>
+      <span class="meta-tag meta-date">Mon Mar 23, 10:06 AM</span>
+    </div>
+    <div class="screenshot-container">
+      <img src="compare-3-d40f61d.png" alt="Screenshot at commits d40f61d/7535727" loading="lazy">
+    </div>
+    <div class="changes-note">
+      <h4>What changed from previous</h4>
+      <ul>
+        <li>New AI search bar at top: "Search apartments with AI..." input field</li>
+        <li>"Photos first" filter chip added next to "Within 1 Month"</li>
+        <li>Source badge "via Craigslist" now shown on listing cards</li>
+        <li>"View listing" link now says "View on Craigslist" (multi-source support)</li>
+        <li>Sort label restyled to "Sort by: Price/Bedroom" (sentence case)</li>
+        <li>Map still shows empty dark area (no pins rendering)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Commit 4 -->
+  <div class="section" id="commit-4">
+    <div class="observer-target" data-index="4"></div>
+    <div class="section-header">
+      <span class="section-number">4</span>
+      <span class="section-title">Fix map centered in Atlantic Ocean</span>
+    </div>
+    <div class="section-meta">
+      <span class="meta-tag meta-commit">3fb4e12</span>
+      <span class="meta-tag meta-date">Mon Mar 23, 10:51 AM</span>
+    </div>
+    <div class="screenshot-container">
+      <img src="compare-4-3fb4e12.png" alt="Screenshot at commit 3fb4e12" loading="lazy">
+    </div>
+    <div class="changes-note">
+      <h4>What changed from previous</h4>
+      <ul>
+        <li>Map now renders correctly! Shows NYC area with colored pins</li>
+        <li>Map pins color-coded by search area (orange=Fulton St, purple=L Train, blue=Manhattan, green=Brooklyn 14th)</li>
+        <li>Zero-coordinate listings filtered out so map centers on actual NYC data</li>
+        <li>Left panel and filters are identical to previous commit</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Commit 5 -->
+  <div class="section" id="commit-5">
+    <div class="observer-target" data-index="5"></div>
+    <div class="section-header">
+      <span class="section-number">5</span>
+      <span class="section-title">Current state (card redesign + swipe actions)</span>
+    </div>
+    <div class="section-meta">
+      <span class="meta-tag meta-commit">4d57f18 (HEAD)</span>
+      <span class="meta-tag meta-date">Mon Mar 24 (today)</span>
+    </div>
+    <div class="screenshot-container">
+      <img src="compare-5-current.png" alt="Screenshot at current HEAD" loading="lazy">
+    </div>
+    <div class="changes-note">
+      <h4>What changed from previous</h4>
+      <ul>
+        <li>Listing cards redesigned: photo takes full card width, text below</li>
+        <li>"CRAIGSLIST" source badge now overlaid on the photo (top-left)</li>
+        <li>Price shown as "$4,000/mo" instead of "$4,000" with "$800/bed" sub-text</li>
+        <li>Bed/bath format changed: "5 bed | 0 bath" instead of "5 bd 0 ba"</li>
+        <li>Swipe action buttons at bottom: red X (hide), yellow star (favorite), orange house (visit)</li>
+        <li>"1 of 54" counter at bottom right</li>
+        <li>Cards now show one at a time (card stack UX) vs scrollable list</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // Intersection observer to highlight active nav link
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const index = entry.target.dataset.index;
+          document.querySelectorAll('.sticky-nav a').forEach(a => {
+            a.classList.toggle('active', a.dataset.index === index);
+          });
+        }
+      });
+    }, {
+      rootMargin: '-80px 0px -60% 0px',
+      threshold: 0
+    });
+
+    document.querySelectorAll('.observer-target').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>

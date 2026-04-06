@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Commute Filter Empty States — Animated Options</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #0a0a0a;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #e1e4e8;
+      min-height: 100vh;
+      padding: 48px 24px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #8b949e;
+      margin-bottom: 48px;
+    }
+
+    .options-grid {
+      display: flex;
+      gap: 32px;
+      justify-content: center;
+      flex-wrap: wrap;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* ============================================================
+       SHARED CARD STRUCTURE
+    ============================================================ */
+
+    .card {
+      background: #1c2028;
+      border: 1px solid #2d333b;
+      border-radius: 16px;
+      width: 300px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 16px 20px 14px;
+      border-bottom: 1px solid #2d333b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-header-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #8b949e;
+    }
+
+    .option-badge {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #58a6ff;
+      background: rgba(88, 166, 255, 0.1);
+      border: 1px solid rgba(88, 166, 255, 0.2);
+      border-radius: 4px;
+      padding: 2px 7px;
+    }
+
+    .card-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 36px 24px 28px;
+      gap: 18px;
+    }
+
+    .card-footer {
+      padding: 14px 16px;
+      border-top: 1px solid #2d333b;
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-reset {
+      flex: 1;
+      padding: 9px 0;
+      background: transparent;
+      border: 1px solid #2d333b;
+      border-radius: 8px;
+      color: #8b949e;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .btn-done {
+      flex: 1;
+      padding: 9px 0;
+      background: #58a6ff;
+      border: none;
+      border-radius: 8px;
+      color: #0a0a0a;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .add-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 18px;
+      background: rgba(88, 166, 255, 0.12);
+      border: 1px solid rgba(88, 166, 255, 0.3);
+      border-radius: 8px;
+      color: #58a6ff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .empty-label {
+      font-size: 13px;
+      color: #8b949e;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    /* ============================================================
+       OPTION A — Animated subway train
+    ============================================================ */
+
+    .track-scene {
+      position: relative;
+      width: 220px;
+      height: 80px;
+      overflow: hidden;
+    }
+
+    /* The track line */
+    .track-line {
+      position: absolute;
+      bottom: 18px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #2d333b;
+      border-radius: 1px;
+    }
+
+    /* Sleepers / ties on the track */
+    .track-ties {
+      position: absolute;
+      bottom: 14px;
+      left: 0;
+      right: 0;
+      display: flex;
+      gap: 14px;
+      padding: 0 4px;
+    }
+
+    .tie {
+      width: 4px;
+      height: 8px;
+      background: #2d333b;
+      border-radius: 1px;
+      flex-shrink: 0;
+    }
+
+    /* Train SVG wrapper */
+    .train-wrapper {
+      position: absolute;
+      bottom: 20px;
+      /* Start off screen left, slide to center, then stay */
+      animation: trainSlide 1.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both,
+                 trainBob 2.4s ease-in-out 2.2s infinite;
+    }
+
+    @keyframes trainSlide {
+      from { left: -90px; }
+      to   { left: 50%; transform: translateX(-50%); }
+    }
+
+    @keyframes trainBob {
+      0%, 100% { transform: translateX(-50%) translateY(0px); }
+      50%       { transform: translateX(-50%) translateY(-3px); }
+    }
+
+    .train-svg {
+      display: block;
+    }
+
+    /* Station dots — little lights on the track */
+    .station-dot {
+      position: absolute;
+      bottom: 15px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #2d333b;
+      border: 1.5px solid #3d4450;
+    }
+
+    .station-dot.left  { left: 20px; }
+    .station-dot.right { right: 20px; }
+
+    /* ============================================================
+       OPTION B — Pulsing pin on mini map
+    ============================================================ */
+
+    .map-scene {
+      position: relative;
+      width: 200px;
+      height: 140px;
+      border-radius: 12px;
+      background: #141820;
+      border: 1px solid #2d333b;
+      overflow: hidden;
+    }
+
+    /* Grid lines suggesting streets */
+    .map-scene::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(#2d333b 1px, transparent 1px),
+        linear-gradient(90deg, #2d333b 1px, transparent 1px);
+      background-size: 28px 28px;
+      opacity: 0.5;
+    }
+
+    /* Diagonal "avenue" lines */
+    .map-road {
+      position: absolute;
+      background: #252d38;
+    }
+
+    .map-road.h1 { top: 35px;  left: 0; right: 0; height: 7px; }
+    .map-road.h2 { top: 83px;  left: 0; right: 0; height: 7px; }
+    .map-road.v1 { left: 60px; top: 0; bottom: 0; width: 7px; }
+    .map-road.v2 { left: 134px; top: 0; bottom: 0; width: 7px; }
+
+    .pin-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -60%);
+    }
+
+    /* Outer sonar rings */
+    .ring {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      border-radius: 50%;
+      border: 1.5px solid rgba(88, 166, 255, 0.5);
+      animation: sonar 2.4s ease-out infinite;
+    }
+
+    .ring:nth-child(1) { animation-delay: 0s;    width: 28px; height: 28px; margin: -14px 0 0 -14px; }
+    .ring:nth-child(2) { animation-delay: 0.6s;  width: 28px; height: 28px; margin: -14px 0 0 -14px; }
+    .ring:nth-child(3) { animation-delay: 1.2s;  width: 28px; height: 28px; margin: -14px 0 0 -14px; }
+
+    @keyframes sonar {
+      0%   { transform: scale(1);   opacity: 0.8; }
+      100% { transform: scale(3.6); opacity: 0; }
+    }
+
+    .pin-icon {
+      position: relative;
+      z-index: 2;
+      animation: pinPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pinPulse {
+      0%, 100% { transform: scale(1);    filter: drop-shadow(0 0 4px rgba(88,166,255,0.4)); }
+      50%       { transform: scale(1.12); filter: drop-shadow(0 0 10px rgba(88,166,255,0.8)); }
+    }
+
+    /* ============================================================
+       OPTION C — Walking person with dotted path
+    ============================================================ */
+
+    .path-scene {
+      position: relative;
+      width: 220px;
+      height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Person icon on left */
+    .person-icon {
+      flex-shrink: 0;
+      animation: personWalk 0.5s steps(2) infinite;
+    }
+
+    @keyframes personWalk {
+      0%   { transform: translateY(0px); }
+      50%  { transform: translateY(-2px); }
+      100% { transform: translateY(0px); }
+    }
+
+    /* House icon on right */
+    .house-icon {
+      flex-shrink: 0;
+      animation: houseGlow 3s ease-in-out infinite;
+    }
+
+    @keyframes houseGlow {
+      0%, 100% { filter: drop-shadow(0 0 2px rgba(88,166,255,0)); }
+      50%       { filter: drop-shadow(0 0 8px rgba(88,166,255,0.6)); }
+    }
+
+    /* Dotted path between person and house */
+    .dots-track {
+      flex: 1;
+      margin: 0 10px;
+      position: relative;
+      height: 4px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #58a6ff;
+      flex-shrink: 0;
+      animation: dotAppear 3s ease-in-out infinite;
+    }
+
+    /* Stagger each dot so they appear left to right then reset */
+    .dot:nth-child(1)  { animation-delay: 0.00s; }
+    .dot:nth-child(2)  { animation-delay: 0.15s; }
+    .dot:nth-child(3)  { animation-delay: 0.30s; }
+    .dot:nth-child(4)  { animation-delay: 0.45s; }
+    .dot:nth-child(5)  { animation-delay: 0.60s; }
+    .dot:nth-child(6)  { animation-delay: 0.75s; }
+    .dot:nth-child(7)  { animation-delay: 0.90s; }
+    .dot:nth-child(8)  { animation-delay: 1.05s; }
+    .dot:nth-child(9)  { animation-delay: 1.20s; }
+    .dot:nth-child(10) { animation-delay: 1.35s; }
+    .dot:nth-child(11) { animation-delay: 1.50s; }
+    .dot:nth-child(12) { animation-delay: 1.65s; }
+
+    @keyframes dotAppear {
+      0%      { opacity: 0;   transform: scale(0.4); }
+      10%     { opacity: 1;   transform: scale(1); }
+      55%     { opacity: 1;   transform: scale(1); }
+      70%     { opacity: 0.2; transform: scale(0.8); }
+      100%    { opacity: 0;   transform: scale(0.4); }
+    }
+
+    .path-label {
+      font-size: 15px;
+      font-weight: 700;
+      color: #e1e4e8;
+      text-align: center;
+      letter-spacing: -0.01em;
+    }
+
+    .path-sub {
+      font-size: 12px;
+      color: #8b949e;
+      text-align: center;
+    }
+
+  </style>
+</head>
+<body>
+
+  <h1>Commute Filter — Animated Empty States</h1>
+
+  <div class="options-grid">
+
+    <!-- ============================================================
+         OPTION A: Animated subway train
+    ============================================================ -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-header-title">Commute Rules</span>
+        <span class="option-badge">Option A</span>
+      </div>
+
+      <div class="card-body">
+
+        <div class="track-scene">
+          <!-- Track ties -->
+          <div class="track-ties">
+            <div class="tie"></div><div class="tie"></div><div class="tie"></div>
+            <div class="tie"></div><div class="tie"></div><div class="tie"></div>
+            <div class="tie"></div><div class="tie"></div><div class="tie"></div>
+            <div class="tie"></div><div class="tie"></div><div class="tie"></div>
+            <div class="tie"></div><div class="tie"></div>
+          </div>
+
+          <!-- Track line -->
+          <div class="track-line"></div>
+
+          <!-- Station dots -->
+          <div class="station-dot left"></div>
+          <div class="station-dot right"></div>
+
+          <!-- Train -->
+          <div class="train-wrapper">
+            <svg class="train-svg" width="72" height="38" viewBox="0 0 72 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Train body -->
+              <rect x="2" y="8" width="68" height="26" rx="5" fill="#252d38" stroke="#3d4450" stroke-width="1.5"/>
+              <!-- Nose -->
+              <path d="M60 8 Q70 8 70 20 Q70 34 60 34" fill="#2d3748" stroke="#3d4450" stroke-width="1.5"/>
+              <!-- Stripe -->
+              <rect x="2" y="8" width="68" height="5" rx="3" fill="#58a6ff" opacity="0.7"/>
+              <!-- Windows -->
+              <rect x="8"  y="16" width="10" height="9" rx="2" fill="#1a2535" stroke="#58a6ff" stroke-width="1" opacity="0.9"/>
+              <rect x="24" y="16" width="10" height="9" rx="2" fill="#1a2535" stroke="#58a6ff" stroke-width="1" opacity="0.9"/>
+              <rect x="40" y="16" width="10" height="9" rx="2" fill="#1a2535" stroke="#58a6ff" stroke-width="1" opacity="0.9"/>
+              <!-- Window glints -->
+              <rect x="10" y="18" width="2" height="2" rx="1" fill="#58a6ff" opacity="0.5"/>
+              <rect x="26" y="18" width="2" height="2" rx="1" fill="#58a6ff" opacity="0.5"/>
+              <rect x="42" y="18" width="2" height="2" rx="1" fill="#58a6ff" opacity="0.5"/>
+              <!-- Front light -->
+              <circle cx="65" cy="20" r="3" fill="#7ee787" opacity="0.85"/>
+              <circle cx="65" cy="20" r="1.5" fill="#fff" opacity="0.7"/>
+              <!-- Wheels -->
+              <circle cx="14" cy="36" r="4" fill="#1c2028" stroke="#3d4450" stroke-width="1.5"/>
+              <circle cx="14" cy="36" r="1.5" fill="#3d4450"/>
+              <circle cx="36" cy="36" r="4" fill="#1c2028" stroke="#3d4450" stroke-width="1.5"/>
+              <circle cx="36" cy="36" r="1.5" fill="#3d4450"/>
+              <circle cx="58" cy="36" r="4" fill="#1c2028" stroke="#3d4450" stroke-width="1.5"/>
+              <circle cx="58" cy="36" r="1.5" fill="#3d4450"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="empty-label">Where do you commute?</div>
+
+        <div class="add-btn">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M6.5 1v11M1 6.5h11" stroke="#58a6ff" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          Add commute filter
+        </div>
+
+      </div>
+
+      <div class="card-footer">
+        <div class="btn-reset">Reset</div>
+        <div class="btn-done">Done</div>
+      </div>
+    </div>
+
+
+    <!-- ============================================================
+         OPTION B: Pulsing pin on mini map
+    ============================================================ -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-header-title">Commute Rules</span>
+        <span class="option-badge">Option B</span>
+      </div>
+
+      <div class="card-body">
+
+        <div class="map-scene">
+          <!-- Road overlays -->
+          <div class="map-road h1"></div>
+          <div class="map-road h2"></div>
+          <div class="map-road v1"></div>
+          <div class="map-road v2"></div>
+
+          <!-- Pin + rings -->
+          <div class="pin-container">
+            <div class="ring"></div>
+            <div class="ring"></div>
+            <div class="ring"></div>
+
+            <div class="pin-icon">
+              <svg width="28" height="36" viewBox="0 0 28 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Drop shadow blob -->
+                <ellipse cx="14" cy="34" rx="5" ry="2" fill="rgba(0,0,0,0.5)"/>
+                <!-- Pin body -->
+                <path d="M14 2C8.477 2 4 6.477 4 12c0 7.5 10 22 10 22s10-14.5 10-22C24 6.477 19.523 2 14 2z" fill="#58a6ff"/>
+                <!-- Pin shine -->
+                <path d="M14 2C8.477 2 4 6.477 4 12c0 1.8.4 3.6 1.1 5.1C8 12 11.2 8 14 6.5c2.8 1.5 6 5.5 8.9 10.6.7-1.5 1.1-3.3 1.1-5.1C24 6.477 19.523 2 14 2z" fill="rgba(255,255,255,0.15)"/>
+                <!-- Inner circle -->
+                <circle cx="14" cy="12" r="4.5" fill="#0f1822"/>
+                <circle cx="14" cy="12" r="2.5" fill="#58a6ff" opacity="0.7"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="empty-label">Set your commute destination</div>
+
+        <div class="add-btn">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M6.5 1v11M1 6.5h11" stroke="#58a6ff" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          Add filter
+        </div>
+
+      </div>
+
+      <div class="card-footer">
+        <div class="btn-reset">Reset</div>
+        <div class="btn-done">Done</div>
+      </div>
+    </div>
+
+
+    <!-- ============================================================
+         OPTION C: Walking person with dotted path
+    ============================================================ -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-header-title">Commute Rules</span>
+        <span class="option-badge">Option C</span>
+      </div>
+
+      <div class="card-body">
+
+        <div class="path-scene">
+
+          <!-- Person (walking stick figure as SVG) -->
+          <div class="person-icon">
+            <svg width="32" height="52" viewBox="0 0 32 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Head -->
+              <circle cx="16" cy="7" r="6" fill="#58a6ff" opacity="0.9"/>
+              <!-- Body -->
+              <line x1="16" y1="13" x2="16" y2="30" stroke="#58a6ff" stroke-width="3" stroke-linecap="round"/>
+              <!-- Arms (mid-stride position) -->
+              <line x1="16" y1="18" x2="6"  y2="25" stroke="#58a6ff" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="16" y1="18" x2="26" y2="22" stroke="#58a6ff" stroke-width="2.5" stroke-linecap="round"/>
+              <!-- Legs (walking) -->
+              <line x1="16" y1="30" x2="9"  y2="44" stroke="#58a6ff" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="16" y1="30" x2="22" y2="44" stroke="#58a6ff" stroke-width="2.5" stroke-linecap="round"/>
+              <!-- Feet -->
+              <line x1="9"  y1="44" x2="4"  y2="48" stroke="#58a6ff" stroke-width="2" stroke-linecap="round"/>
+              <line x1="22" y1="44" x2="27" y2="47" stroke="#58a6ff" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+
+          <!-- Dots track -->
+          <div class="dots-track">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+          </div>
+
+          <!-- House icon on right -->
+          <div class="house-icon">
+            <svg width="38" height="42" viewBox="0 0 38 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Roof -->
+              <path d="M19 3L2 17h34L19 3z" fill="#252d38" stroke="#58a6ff" stroke-width="1.5" stroke-linejoin="round"/>
+              <!-- Body -->
+              <rect x="5" y="17" width="28" height="22" rx="1" fill="#252d38" stroke="#3d4450" stroke-width="1.5"/>
+              <!-- Door -->
+              <rect x="14" y="26" width="10" height="13" rx="2" fill="#1c2028" stroke="#58a6ff" stroke-width="1"/>
+              <circle cx="22.5" cy="33" r="1.2" fill="#58a6ff" opacity="0.7"/>
+              <!-- Windows -->
+              <rect x="7"  y="20" width="7" height="6" rx="1.5" fill="#1a2535" stroke="#58a6ff" stroke-width="1" opacity="0.8"/>
+              <rect x="24" y="20" width="7" height="6" rx="1.5" fill="#1a2535" stroke="#58a6ff" stroke-width="1" opacity="0.8"/>
+              <!-- Window glints -->
+              <rect x="8.5" y="21.5" width="2" height="2" rx="1" fill="#58a6ff" opacity="0.4"/>
+              <rect x="25.5" y="21.5" width="2" height="2" rx="1" fill="#58a6ff" opacity="0.4"/>
+            </svg>
+          </div>
+
+        </div>
+
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+          <div class="path-label">How far is too far?</div>
+          <div class="path-sub">Tell us your commute limits</div>
+        </div>
+
+        <div class="add-btn">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M6.5 1v11M1 6.5h11" stroke="#58a6ff" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          Add commute filter
+        </div>
+
+      </div>
+
+      <div class="card-footer">
+        <div class="btn-reset">Reset</div>
+        <div class="btn-done">Done</div>
+      </div>
+    </div>
+
+  </div>
+
+</body>
+</html>

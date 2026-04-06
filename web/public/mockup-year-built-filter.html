@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dwelligence — Year Built Filter (Option A)</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* ---- Top Nav ---- */
+    .nav {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 0 20px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-logo {
+      font-size: 17px;
+      font-weight: 700;
+      color: #388bfd;
+      letter-spacing: -0.3px;
+    }
+    .nav-search {
+      flex: 1;
+      max-width: 420px;
+      margin: 0 24px;
+    }
+    .nav-search input {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      color: #e6edf3;
+      font-size: 13px;
+      padding: 7px 12px;
+      outline: none;
+    }
+    .nav-search input::placeholder { color: #8b949e; }
+    .nav-avatar {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      background: #1f6feb;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 600; color: #fff;
+    }
+
+    /* ---- Filter Bar ---- */
+    .filter-bar {
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      position: relative;
+    }
+    .filter-bar::-webkit-scrollbar { display: none; }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid #30363d;
+      background: transparent;
+      color: #e6edf3;
+      font-size: 13px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      user-select: none;
+    }
+    .chip:hover { border-color: #8b949e; }
+    .chip.active {
+      border-color: #388bfd;
+      background: rgba(31, 111, 235, 0.12);
+      color: #79c0ff;
+    }
+    .chip-arrow {
+      font-size: 10px;
+      color: #8b949e;
+      margin-left: 2px;
+    }
+    .chip.active .chip-arrow { color: #79c0ff; }
+
+    /* ---- Dropdown Panel ---- */
+    .dropdown-wrapper {
+      position: relative;
+      z-index: 50;
+    }
+
+    .dropdown {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      width: 320px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      overflow: hidden;
+    }
+
+    .dropdown-header {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid #30363d;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .dropdown-header h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e6edf3;
+    }
+    .dropdown-clear {
+      font-size: 12px;
+      color: #388bfd;
+      cursor: pointer;
+    }
+    .dropdown-clear:hover { text-decoration: underline; }
+
+    .era-list {
+      padding: 8px;
+    }
+
+    .era-option {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .era-option:hover { background: rgba(255,255,255,0.05); }
+    .era-option.selected { background: rgba(31, 111, 235, 0.12); }
+
+    .era-radio {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      border: 2px solid #30363d;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .era-option.selected .era-radio {
+      border-color: #388bfd;
+      background: #388bfd;
+    }
+    .era-radio-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #fff;
+      display: none;
+    }
+    .era-option.selected .era-radio-dot { display: block; }
+
+    .era-info { flex: 1; }
+    .era-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #e6edf3;
+    }
+    .era-option.selected .era-label { color: #79c0ff; }
+    .era-sublabel {
+      font-size: 11px;
+      color: #8b949e;
+      margin-top: 1px;
+    }
+
+    .era-badge {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.06);
+      color: #8b949e;
+    }
+    .era-option.selected .era-badge {
+      background: rgba(31, 111, 235, 0.2);
+      color: #79c0ff;
+    }
+
+    /* Custom range section */
+    .custom-divider {
+      border: none;
+      border-top: 1px solid #30363d;
+      margin: 4px 8px;
+    }
+    .custom-section {
+      padding: 10px 10px 4px;
+    }
+    .custom-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #8b949e;
+      margin-bottom: 8px;
+    }
+    .custom-inputs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .custom-input-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .custom-input-wrap label {
+      font-size: 11px;
+      color: #8b949e;
+    }
+    .custom-input-wrap input {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 7px;
+      color: #e6edf3;
+      font-size: 13px;
+      padding: 7px 10px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .custom-input-wrap input:focus { border-color: #388bfd; }
+    .custom-input-wrap input::placeholder { color: #484f58; }
+    .custom-dash { color: #8b949e; margin-top: 16px; }
+
+    .dropdown-footer {
+      padding: 10px 16px 14px;
+      display: flex;
+      gap: 8px;
+    }
+    .btn-apply {
+      flex: 1;
+      padding: 8px 0;
+      border-radius: 8px;
+      border: none;
+      background: #1f6feb;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .btn-apply:hover { background: #388bfd; }
+    .btn-cancel {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid #30363d;
+      background: transparent;
+      color: #8b949e;
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .btn-cancel:hover { border-color: #8b949e; color: #e6edf3; }
+
+    /* ---- Map / Results area ---- */
+    .main-area {
+      display: flex;
+      height: calc(100vh - 52px - 53px);
+    }
+    .results-panel {
+      width: 420px;
+      flex-shrink: 0;
+      overflow-y: auto;
+      border-right: 1px solid #30363d;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .results-count {
+      font-size: 12px;
+      color: #8b949e;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #30363d;
+    }
+    .results-count span { color: #e6edf3; font-weight: 600; }
+
+    .listing-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .listing-card:hover { border-color: #8b949e; }
+
+    .listing-img {
+      height: 130px;
+      background: linear-gradient(135deg, #1c2128 0%, #21262d 100%);
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .listing-img-placeholder {
+      color: #484f58;
+      font-size: 12px;
+    }
+    .listing-badge {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background: rgba(13, 17, 23, 0.85);
+      border: 1px solid #30363d;
+      border-radius: 5px;
+      padding: 2px 7px;
+      font-size: 11px;
+      color: #8b949e;
+    }
+    .listing-body { padding: 10px 12px 12px; }
+    .listing-price { font-size: 17px; font-weight: 700; color: #e6edf3; }
+    .listing-addr { font-size: 12px; color: #8b949e; margin-top: 2px; }
+    .listing-stats {
+      margin-top: 8px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .listing-stat {
+      font-size: 11px;
+      color: #8b949e;
+      background: rgba(255,255,255,0.04);
+      border-radius: 4px;
+      padding: 2px 7px;
+    }
+    .listing-stat.highlight {
+      color: #79c0ff;
+      background: rgba(31,111,235,0.12);
+    }
+
+    .map-area {
+      flex: 1;
+      background: #0d1117;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #484f58;
+      font-size: 13px;
+      position: relative;
+    }
+    .map-placeholder-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(48,54,61,0.3) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(48,54,61,0.3) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .map-center-label {
+      position: relative;
+      text-align: center;
+    }
+    .map-center-label p { margin-top: 6px; font-size: 12px; }
+
+    /* ---- Label banner ---- */
+    .mockup-label {
+      background: #1f6feb;
+      color: #fff;
+      text-align: center;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="mockup-label">Mockup 1 — Year Built Filter (Dwelligence)</div>
+
+<!-- Nav -->
+<nav class="nav">
+  <div class="nav-logo">Dwelligence</div>
+  <div class="nav-search">
+    <input type="text" value="Manhattan, NY" readonly>
+  </div>
+  <div class="nav-avatar">O</div>
+</nav>
+
+<!-- Filter Bar -->
+<div class="filter-bar" id="filterBar">
+  <div class="chip active" onclick="toggleChip(this)">
+    Under $6K <span class="chip-arrow">&#9660;</span>
+  </div>
+  <div class="chip active" onclick="toggleChip(this)">
+    3 Beds, 1.5+ Baths <span class="chip-arrow">&#9660;</span>
+  </div>
+  <div class="chip active" onclick="toggleChip(this)">
+    Within 1 Month <span class="chip-arrow">&#9660;</span>
+  </div>
+  <div class="chip" onclick="toggleChip(this)">
+    Source <span class="chip-arrow">&#9660;</span>
+  </div>
+  <div class="chip" onclick="toggleChip(this)">
+    Commute <span class="chip-arrow">&#9660;</span>
+  </div>
+
+  <!-- Year Built chip with dropdown -->
+  <div class="dropdown-wrapper" id="yearBuiltWrapper">
+    <div class="chip active" id="yearBuiltChip" onclick="toggleYearBuilt(event)">
+      Pre-war <span class="chip-arrow" id="yearBuiltArrow">&#9660;</span>
+    </div>
+    <div class="dropdown" id="yearBuiltDropdown" style="display:none;">
+      <div class="dropdown-header">
+        <h3>Year Built</h3>
+        <span class="dropdown-clear" onclick="clearYearBuilt()">Clear</span>
+      </div>
+      <div class="era-list">
+
+        <div class="era-option selected" onclick="selectEra(this, 'Pre-war')">
+          <div class="era-radio"><div class="era-radio-dot"></div></div>
+          <div class="era-info">
+            <div class="era-label">Pre-war</div>
+            <div class="era-sublabel">Built before 1940</div>
+          </div>
+          <div class="era-badge">23 listings</div>
+        </div>
+
+        <div class="era-option" onclick="selectEra(this, 'Post-war')">
+          <div class="era-radio"><div class="era-radio-dot"></div></div>
+          <div class="era-info">
+            <div class="era-label">Post-war</div>
+            <div class="era-sublabel">Built 1940 – 1970</div>
+          </div>
+          <div class="era-badge">41 listings</div>
+        </div>
+
+        <div class="era-option" onclick="selectEra(this, 'Modern')">
+          <div class="era-radio"><div class="era-radio-dot"></div></div>
+          <div class="era-info">
+            <div class="era-label">Modern</div>
+            <div class="era-sublabel">Built 1970 – 2000</div>
+          </div>
+          <div class="era-badge">38 listings</div>
+        </div>
+
+        <div class="era-option" onclick="selectEra(this, 'New Construction')">
+          <div class="era-radio"><div class="era-radio-dot"></div></div>
+          <div class="era-info">
+            <div class="era-label">New Construction</div>
+            <div class="era-sublabel">Built 2000 or later</div>
+          </div>
+          <div class="era-badge">17 listings</div>
+        </div>
+
+      </div>
+
+      <hr class="custom-divider">
+
+      <div class="custom-section">
+        <div class="custom-label">Custom range</div>
+        <div class="custom-inputs">
+          <div class="custom-input-wrap">
+            <label>From</label>
+            <input type="number" placeholder="e.g. 1900" min="1800" max="2025" id="yearMin">
+          </div>
+          <div class="custom-dash">–</div>
+          <div class="custom-input-wrap">
+            <label>To</label>
+            <input type="number" placeholder="e.g. 2025" min="1800" max="2025" id="yearMax">
+          </div>
+        </div>
+      </div>
+
+      <div class="dropdown-footer">
+        <button class="btn-cancel" onclick="closeYearBuilt()">Cancel</button>
+        <button class="btn-apply" onclick="applyYearBuilt()">Apply filter</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="chip" onclick="toggleChip(this)">
+    Photos first <span class="chip-arrow">&#9660;</span>
+  </div>
+</div>
+
+<!-- Main area -->
+<div class="main-area">
+  <!-- Results panel -->
+  <div class="results-panel">
+    <div class="listing-card">
+      <div class="listing-img">
+        <div class="listing-img-placeholder">Photo</div>
+        <div class="listing-badge">StreetEasy</div>
+      </div>
+      <div class="listing-body">
+        <div class="listing-price">$3,200/mo</div>
+        <div class="listing-addr">245 East 13th St #4B · East Village</div>
+        <div class="listing-stats">
+          <span class="listing-stat">3 bd</span>
+          <span class="listing-stat">2 ba</span>
+          <span class="listing-stat">850 sqft</span>
+          <span class="listing-stat highlight">Built 1925</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="listing-card">
+      <div class="listing-img">
+        <div class="listing-img-placeholder">Photo</div>
+        <div class="listing-badge">Realtor.com</div>
+      </div>
+      <div class="listing-body">
+        <div class="listing-price">$4,100/mo</div>
+        <div class="listing-addr">88 Morningside Ave #2D · Harlem</div>
+        <div class="listing-stats">
+          <span class="listing-stat">2 bd</span>
+          <span class="listing-stat">1 ba</span>
+          <span class="listing-stat">720 sqft</span>
+          <span class="listing-stat highlight">Built 1912</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="listing-card">
+      <div class="listing-img">
+        <div class="listing-img-placeholder">Photo</div>
+        <div class="listing-badge">Craigslist</div>
+      </div>
+      <div class="listing-body">
+        <div class="listing-price">$2,800/mo</div>
+        <div class="listing-addr">310 Riverside Dr #7C · Upper West Side</div>
+        <div class="listing-stats">
+          <span class="listing-stat">1 bd</span>
+          <span class="listing-stat">1 ba</span>
+          <span class="listing-stat">620 sqft</span>
+          <span class="listing-stat highlight">Built 1931</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="listing-card">
+      <div class="listing-img">
+        <div class="listing-img-placeholder">Photo</div>
+        <div class="listing-badge">StreetEasy</div>
+      </div>
+      <div class="listing-body">
+        <div class="listing-price">$5,600/mo</div>
+        <div class="listing-addr">44 West 77th St #11E · Upper West Side</div>
+        <div class="listing-stats">
+          <span class="listing-stat">4 bd</span>
+          <span class="listing-stat">2.5 ba</span>
+          <span class="listing-stat">1,240 sqft</span>
+          <span class="listing-stat highlight">Built 1906</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Map -->
+  <div class="map-area">
+    <div class="map-placeholder-grid"></div>
+    <div class="map-center-label">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#484f58" stroke-width="1.5">
+        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      <p>Map view</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  function toggleChip(el) {
+    el.classList.toggle('active');
+  }
+
+  let yearBuiltOpen = false;
+
+  function toggleYearBuilt(e) {
+    e.stopPropagation();
+    yearBuiltOpen = !yearBuiltOpen;
+    document.getElementById('yearBuiltDropdown').style.display = yearBuiltOpen ? 'block' : 'none';
+    document.getElementById('yearBuiltArrow').innerHTML = yearBuiltOpen ? '&#9650;' : '&#9660;';
+  }
+
+  function closeYearBuilt() {
+    yearBuiltOpen = false;
+    document.getElementById('yearBuiltDropdown').style.display = 'none';
+    document.getElementById('yearBuiltArrow').innerHTML = '&#9660;';
+  }
+
+  function selectEra(el, label) {
+    document.querySelectorAll('.era-option').forEach(o => o.classList.remove('selected'));
+    el.classList.add('selected');
+    // Clear custom inputs when a preset is picked
+    document.getElementById('yearMin').value = '';
+    document.getElementById('yearMax').value = '';
+  }
+
+  function applyYearBuilt() {
+    const selected = document.querySelector('.era-option.selected');
+    const min = document.getElementById('yearMin').value;
+    const max = document.getElementById('yearMax').value;
+    let label = 'Year Built';
+    if (min || max) {
+      label = (min || '?') + ' – ' + (max || '?');
+    } else if (selected) {
+      label = selected.querySelector('.era-label').textContent;
+    }
+    document.getElementById('yearBuiltChip').childNodes[0].textContent = label + ' ';
+    document.getElementById('yearBuiltChip').classList.add('active');
+    closeYearBuilt();
+  }
+
+  function clearYearBuilt() {
+    document.querySelectorAll('.era-option').forEach(o => o.classList.remove('selected'));
+    document.getElementById('yearMin').value = '';
+    document.getElementById('yearMax').value = '';
+    document.getElementById('yearBuiltChip').childNodes[0].textContent = 'Year Built ';
+    document.getElementById('yearBuiltChip').classList.remove('active');
+    closeYearBuilt();
+  }
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!document.getElementById('yearBuiltWrapper').contains(e.target)) {
+      closeYearBuilt();
+    }
+  });
+</script>
+</body>
+</html>

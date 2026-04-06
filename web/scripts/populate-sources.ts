@@ -11,7 +11,7 @@
 import { fetchApartmentsListings } from "../lib/sources/apartments";
 import { fetchCraigslistListings } from "../lib/sources/craigslist";
 import { fetchRentHopListings } from "../lib/sources/renthop";
-import { fetchRealtorListings } from "../lib/sources/realtor";
+import { fetchRealtorListings } from "../lib/sources/realtor-apify";
 import { fetchStreetEasyListings } from "../lib/sources/streeteasy";
 import { fetchZillowListings } from "../lib/sources/zillow";
 import { fetchFacebookMarketplaceListings } from "../lib/sources/facebook-marketplace";
@@ -91,18 +91,19 @@ async function main() {
   const allRaw: AdapterOutput[] = [];
   const qualitySummaries: QualitySummary[] = [];
 
-  // Per-city searches (Realtor + Apartments)
+  // Per-city searches (Apartments only - Realtor disabled)
   for (const search of SEARCHES) {
     console.error(`\n=== ${search.label} ===`);
 
-    const realtor = await fetchSource(
-      `realtor_${search.tag}`,
-      () => fetchRealtorListings(search.params, RAPIDAPI_KEY),
-      search.tag,
-    );
-    runs.push(realtor.run);
-    allRaw.push(...realtor.listings);
-    await new Promise((r) => setTimeout(r, 1000));
+    // Realtor disabled 2026-04-05
+    // const realtor = await fetchSource(
+    //   `realtor_${search.tag}`,
+    //   () => fetchRealtorListings(search.params),
+    //   search.tag,
+    // );
+    // runs.push(realtor.run);
+    // allRaw.push(...realtor.listings);
+    // await new Promise((r) => setTimeout(r, 1000));
 
     const apartments = await fetchSource(
       `apartments_${search.tag}`,

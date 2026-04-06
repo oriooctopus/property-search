@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dwelligence — Swipe Mode Map Options</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --card: #1c2028;
+      --border: #2d333b;
+      --text: #e1e4e8;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #7ee787;
+      --red: #f85149;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ── PAGE STRUCTURE ── */
+    .page-header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 32px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .page-header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .page-header p {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+
+    .option-section {
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .option-section:nth-child(2n) { border-right: none; }
+
+    .option-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      background: #14181f;
+    }
+    .option-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .option-badge {
+      background: var(--accent);
+      color: #0f1117;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .option-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .option-desc {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .device-pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      padding: 24px;
+    }
+
+    .device-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+    }
+
+    /* ── SHARED CARD ELEMENTS ── */
+    .photo-area {
+      background: linear-gradient(160deg, #2a3441 0%, #1c2a38 50%, #1a2535 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    .photo-area::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.5) 100%);
+    }
+    .photo-overlay {
+      position: absolute;
+      bottom: 8px;
+      left: 10px;
+      z-index: 2;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+    }
+    .photo-label {
+      position: absolute;
+      top: 8px;
+      left: 10px;
+      z-index: 2;
+      background: rgba(0,0,0,0.45);
+      color: #fff;
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .photo-dots {
+      position: absolute;
+      bottom: 8px;
+      right: 10px;
+      z-index: 2;
+      display: flex;
+      gap: 3px;
+    }
+    .dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.4);
+    }
+    .dot.active { background: #fff; }
+
+    .fake-img-grid {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: 2px;
+      opacity: 0.25;
+    }
+    .fake-img-cell { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+    .card-info {
+      background: var(--card);
+      padding: 10px 12px;
+    }
+    .card-price {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .card-address {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .card-tags {
+      display: flex;
+      gap: 5px;
+      margin-top: 7px;
+      flex-wrap: wrap;
+    }
+    .tag {
+      background: rgba(88,166,255,0.12);
+      color: var(--accent);
+      border: 1px solid rgba(88,166,255,0.25);
+      border-radius: 4px;
+      font-size: 10px;
+      padding: 2px 6px;
+      font-weight: 500;
+    }
+    .tag.green {
+      background: rgba(126,231,135,0.1);
+      color: var(--green);
+      border-color: rgba(126,231,135,0.2);
+    }
+
+    .swipe-actions {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      padding: 8px 0 6px;
+      background: var(--card);
+    }
+    .action-btn {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 1.5px solid var(--border);
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .action-btn.pass { border-color: rgba(248,81,73,0.4); }
+    .action-btn.save { border-color: rgba(88,166,255,0.4); }
+    .action-btn.like { border-color: rgba(126,231,135,0.4); }
+
+    /* ── MAP PLACEHOLDER ── */
+    .map-placeholder {
+      background: #0d1520;
+      position: relative;
+      overflow: hidden;
+    }
+    .map-grid-lines {
+      position: absolute;
+      inset: 0;
+    }
+    .map-grid-lines::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(45,51,59,0.6) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(45,51,59,0.6) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    .map-roads {
+      position: absolute;
+      inset: 0;
+    }
+    .road-h {
+      position: absolute;
+      left: 0; right: 0;
+      background: #1e2a38;
+      border-top: 1px solid #2a3a4d;
+      border-bottom: 1px solid #2a3a4d;
+    }
+    .road-v {
+      position: absolute;
+      top: 0; bottom: 0;
+      background: #1e2a38;
+      border-left: 1px solid #2a3a4d;
+      border-right: 1px solid #2a3a4d;
+    }
+    .map-block {
+      position: absolute;
+      background: rgba(30, 40, 55, 0.7);
+      border-radius: 2px;
+    }
+    .map-pin {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .map-pin-bubble {
+      background: var(--accent);
+      color: #0f1117;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 5px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    .map-pin-stem {
+      width: 2px;
+      height: 6px;
+      background: var(--accent);
+    }
+    .map-pin-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 6px rgba(88,166,255,0.6);
+    }
+    .map-grey-pin {
+      position: absolute;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #4a5568;
+      transform: translate(-50%, -50%);
+    }
+    .map-attribution {
+      position: absolute;
+      bottom: 3px;
+      right: 6px;
+      font-size: 9px;
+      color: rgba(139,148,158,0.6);
+    }
+
+    /* ─────────────────────────────────────────────────────────────────
+       OPTION A — Mini map strip below
+    ───────────────────────────────────────────────────────────────── */
+    /* desktop */
+    .opt-a-desktop-card {
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      width: 220px;
+      margin: 0 auto;
+    }
+    .opt-a-desktop-card .photo-area { height: 130px; }
+    .opt-a-mini-map { height: 64px; }
+
+    /* mobile */
+    .opt-a-mobile-card {
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      width: 140px;
+      margin: 0 auto;
+    }
+    .opt-a-mobile-card .photo-area { height: 85px; }
+    .opt-a-mobile-card .card-info { padding: 7px 9px; }
+    .opt-a-mobile-card .card-price { font-size: 13px; }
+    .opt-a-mobile-card .card-address { font-size: 10px; }
+    .opt-a-mobile-mini-map { height: 46px; }
+    .opt-a-mobile-card .card-tags { display: none; }
+    .opt-a-mobile-card .swipe-actions { gap: 8px; padding: 5px 0; }
+    .opt-a-mobile-card .action-btn { width: 28px; height: 28px; font-size: 12px; }
+
+    /* ─────────────────────────────────────────────────────────────────
+       OPTION B — Split view
+    ───────────────────────────────────────────────────────────────── */
+    .opt-b-desktop {
+      display: flex;
+      gap: 0;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      height: 280px;
+    }
+    .opt-b-card-side {
+      width: 50%;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+    }
+    .opt-b-card-side .photo-area { flex: 1; }
+    .opt-b-map-side {
+      width: 50%;
+    }
+
+    .opt-b-mobile {
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      width: 140px;
+      margin: 0 auto;
+    }
+    .opt-b-mobile-card { }
+    .opt-b-mobile-card .photo-area { height: 70px; }
+    .opt-b-mobile-card .card-info { padding: 6px 8px; }
+    .opt-b-mobile-card .card-price { font-size: 13px; }
+    .opt-b-mobile-card .card-address { font-size: 10px; }
+    .opt-b-mobile-card .card-tags { display: none; }
+    .opt-b-mobile-card .swipe-actions { gap: 8px; padding: 4px 0; }
+    .opt-b-mobile-card .action-btn { width: 26px; height: 26px; font-size: 11px; }
+    .opt-b-mobile-map { height: 70px; }
+
+    /* ─────────────────────────────────────────────────────────────────
+       OPTION C — Map toggle / card flip
+    ───────────────────────────────────────────────────────────────── */
+    .opt-c-desktop-card {
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      width: 230px;
+      margin: 0 auto;
+      position: relative;
+    }
+    .opt-c-desktop-card .photo-area { height: 148px; }
+
+    .opt-c-flip-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 20;
+      background: rgba(15,17,23,0.75);
+      border: 1px solid rgba(88,166,255,0.4);
+      color: var(--accent);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      backdrop-filter: blur(4px);
+    }
+    .pin-icon { font-size: 12px; }
+
+    .opt-c-map-card {
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid rgba(88,166,255,0.4);
+      box-shadow: 0 4px 20px rgba(88,166,255,0.15);
+      width: 230px;
+      margin: 0 auto;
+      position: relative;
+    }
+    .opt-c-map-card .map-placeholder { height: 200px; }
+
+    .opt-c-map-info-bar {
+      background: var(--card);
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid var(--border);
+    }
+    .opt-c-map-address {
+      font-size: 12px;
+      color: var(--text);
+      font-weight: 500;
+    }
+    .opt-c-map-price {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .opt-c-flip-back {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 20;
+      background: rgba(15,17,23,0.75);
+      border: 1px solid rgba(88,166,255,0.4);
+      color: var(--accent);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      backdrop-filter: blur(4px);
+    }
+
+    .opt-c-mobile-card {
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      width: 140px;
+      margin: 0 auto;
+      position: relative;
+    }
+    .opt-c-mobile-card .photo-area { height: 90px; }
+    .opt-c-mobile-card .card-info { padding: 7px 9px; }
+    .opt-c-mobile-card .card-price { font-size: 13px; }
+    .opt-c-mobile-card .card-address { font-size: 10px; }
+    .opt-c-mobile-card .card-tags { display: none; }
+    .opt-c-mobile-card .swipe-actions { padding: 5px 0; gap: 8px; }
+    .opt-c-mobile-card .action-btn { width: 28px; height: 28px; font-size: 12px; }
+    .opt-c-flip-btn-sm {
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      z-index: 20;
+      background: rgba(15,17,23,0.75);
+      border: 1px solid rgba(88,166,255,0.4);
+      color: var(--accent);
+      border-radius: 5px;
+      padding: 2px 5px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+
+    /* ─────────────────────────────────────────────────────────────────
+       OPTION D — Background map peek
+    ───────────────────────────────────────────────────────────────── */
+    .opt-d-desktop {
+      position: relative;
+      height: 300px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .opt-d-fullmap {
+      position: absolute;
+      inset: 0;
+    }
+    .opt-d-floating-card {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 220px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+      z-index: 10;
+    }
+    .opt-d-floating-card .photo-area { height: 120px; }
+
+    .opt-d-top-bar {
+      position: absolute;
+      top: 10px;
+      left: 0; right: 0;
+      display: flex;
+      justify-content: center;
+      z-index: 20;
+    }
+    .opt-d-counter {
+      background: rgba(15,17,23,0.8);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 11px;
+      color: var(--muted);
+      backdrop-filter: blur(4px);
+    }
+
+    .opt-d-mobile {
+      position: relative;
+      height: 240px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      width: 160px;
+      margin: 0 auto;
+    }
+    .opt-d-mobile-floating {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 128px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.7);
+      z-index: 10;
+    }
+    .opt-d-mobile-floating .photo-area { height: 75px; }
+    .opt-d-mobile-floating .card-info { padding: 6px 8px; }
+    .opt-d-mobile-floating .card-price { font-size: 12px; }
+    .opt-d-mobile-floating .card-address { font-size: 10px; }
+    .opt-d-mobile-floating .card-tags { display: none; }
+    .opt-d-mobile-floating .swipe-actions { gap: 8px; padding: 4px 0; }
+    .opt-d-mobile-floating .action-btn { width: 26px; height: 26px; font-size: 11px; }
+
+    /* ── SCREEN CHROME ── */
+    .device-screen {
+      background: var(--bg);
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .device-topbar {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .device-topbar-logo {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .device-topbar-counter {
+      font-size: 10px;
+      color: var(--muted);
+    }
+    .device-content {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Swipe Mode — Map Integration Options</h1>
+  <p>Dwelligence apartment search — showing listing location while swiping. Each option includes desktop and mobile layouts.</p>
+</div>
+
+<div class="options-grid">
+
+  <!-- ═══════════════════════════════════════════════════════
+       OPTION A — Mini map strip below the card
+  ═══════════════════════════════════════════════════════ -->
+  <div class="option-section">
+    <div class="option-header">
+      <div class="option-label">
+        <span class="option-badge">Option A</span>
+        <span class="option-title">Mini map strip below the card</span>
+      </div>
+      <div class="option-desc">Photo 55% / info 25% / map strip 20%. Compact, always visible, but tight on mobile.</div>
+    </div>
+    <div class="device-pair">
+
+      <!-- Desktop -->
+      <div>
+        <div class="device-label">Desktop</div>
+        <div class="device-screen">
+          <div class="device-topbar">
+            <span class="device-topbar-logo">Dwelligence</span>
+            <span class="device-topbar-counter">12 of 47 listings</span>
+          </div>
+          <div class="device-content">
+            <div class="opt-a-desktop-card">
+              <div class="photo-area" style="height:130px;">
+                <div class="fake-img-grid">
+                  <div class="fake-img-cell"></div><div class="fake-img-cell"></div><div class="fake-img-cell"></div>
+                  <div class="fake-img-cell"></div><div class="fake-img-cell"></div><div class="fake-img-cell"></div>
+                </div>
+                <div class="photo-label">1 of 8</div>
+                <div class="photo-overlay">Williamsburg, Brooklyn</div>
+                <div class="photo-dots">
+                  <div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+                </div>
+              </div>
+              <div class="card-info">
+                <div class="card-price">$2,850/mo</div>
+                <div class="card-address">247 Bedford Ave, Apt 3R</div>
+                <div class="card-tags">
+                  <span class="tag">2 bed</span>
+                  <span class="tag">1 bath</span>
+                  <span class="tag green">No fee</span>
+                  <span class="tag">Pets ok</span>
+                </div>
+              </div>
+              <div class="opt-a-mini-map map-placeholder" style="height:64px;">
+                <div class="map-roads">
+                  <div class="road-h" style="top:30%;height:4px;"></div>
+                  <div class="road-h" style="top:58%;height:3px;"></div>
+                  <div class="road-v" style="left:25%;width:3px;"></div>
+                  <div class="road-v" style="left:55%;width:4px;"></div>
+                  <div class="road-v" style="left:80%;width:3px;"></div>
+                </div>
+                <div class="map-block" style="top:10%;left:5%;width:18%;height:16%;"></div>
+                <div class="map-block" style="top:10%;left:28%;width:24%;height:16%;"></div>
+                <div class="map-block" style="top:38%;left:5%;width:18%;height:17%;"></div>
+                <div class="map-block" style="top:38%;left:28%;width:24%;height:17%;"></div>
+                <div class="map-block" style="top:38%;left:58%;width:19%;height:17%;"></div>
+                <div class="map-pin" style="top:42%;left:50%;">
+                  <div class="map-pin-bubble">$2,850</div>
+                  <div class="map-pin-stem"></div>
+                  <div class="map-pin-dot"></div>
+                </div>
+                <div class="map-attribution">OpenStreetMap</div>
+              </div>
+              <div class="swipe-actions">
+                <div class="action-btn pass">✕</div>
+                <div class="action-btn save">★</div>
+                <div class="action-btn like">♥</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile -->
+      <div>
+        <div class="device-label">Mobile</div>
+        <div class="device-screen">
+          <div class="device-topbar">
+            <span class="device-topbar-logo">Dwelligence</span>
+            <span class="device-topbar-counter">12/47</span>
+          </div>
+          <div class="device-content" style="padding:12px;">
+            <div class="opt-a-mobile-card">
+              <div class="photo-area" style="height:85px;">
+                <div class="fake-img-grid">
+                  <div class="fake-img-cell"></div><div class="fake-img-cell"></div><div class="fake-img-cell"></div>
+                  <div class="fake-img-cell"></div><div class="fake-img-cell"></div><div class="fake-img-cell"></div>
+                </div>
+                <div class="photo-overlay" style="font-size:9px;">Williamsburg</div>
+              </div>
+              <div class="card-info" style="padding:6px 8px;">
+                <div class="card-price" style="font-size:13px;">$2,850/mo</div>
+                <div class="card-address" style="font-size:10px;">247 Bedford Ave, Apt 3R</div>
+              </div>
+              <div class="map-placeholder" style="height:46px;">
+                <div class="map-roads">
+                  <div class="road-h" style="top:35%;height:3px;"></div>
+                  <div class="road-h" style="top:65%;height:2px;"></div>
+                  <div class="road-v" style="left:30%;width:3px;"></div>
+                  <div class="road-v" style="left:60%;width:3px;"></div>
+                </div>
+                <div class="map-pin" style="top:40%;left:48%;">
+                  <div class="map-pin-bubble" style="font-size:8px;">$2,850</div>
+                  <div class="map-pin-stem" style="height:4px;"></div>
+                  <div class="map-pin-dot" style="width:5px;height:5px;"></div>
+                </div>
+              </div>
+              <div class="swipe-actions" style="gap:8px;padding:5px 0;">
+                <div class="action-btn pass" style="width:28px;height:28px;font-size:12px;">✕</div>
+                <div class="action-btn save" style="width:28px;height:28px;font-size:12px;">★</div>
+                <div class="action-btn like" style="width:28px;height:28px;font-size:12px;">♥</div>
+              </div>
+            </div>
+            <div style="margin-top:8px;background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.25);border-radius:5px;padding:5px 8px;font-size:10px;color:#f85149;text-align:center;">
+              Tight on mobile — consider Option B or D
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       OPTION B — Split view
+  ═══════════════════════════════════════════════════════ -->
+  <div class="option-section">
+    <div class="option-header">
+      <div class="option-label">
+        <span class="option-badge">Option B</span>
+        <span class="option-title">Split view — card + map side by side</span>
+      </div>
+      <div class="option-desc">Desktop: 50/50 split. Mobile: card top 60%, map bottom 40%. Map updates on each swipe.</div>
+    </div>
+    <div class="device-pair">
+
+      <!-- Desktop -->
+      <div>
+        <div class="device-label">Desktop</div>
+        <div class="device-screen">
+          <div class="device-topbar">
+            <span class="device-topbar-logo">Dwelligence</span>
+            <span class="device-topbar-counter">12 of 47 listings</span>
+          </div>
+          <div class="device-content" style="padding:16px;">
+            <div class="opt-b-desktop">
+              <div class="opt-b-card-side">
+                <div class="photo-area" style="flex:1;">
+                  <div class="fake-img-grid">
+                    <div class="fake-img-cell"></div><div class="fake-img-cell"></div><div class="fake-img-cell"></div>
+                    <div class="fake-img-cell"></div><div class="fake-img-cell"></div><div class="fake-img-cell"></div>
+                  </div>
+                  <div class="photo-label">1 of 8</div>
+                  <div class="photo-dots">
+                    <div class="dot active"></div><div class="dot"></div><div class="dot"></div>
+                  </div>
+                </div>
+                <div class="card-info">
+                  <div class="card-price">$2,850/mo</div>
+                  <div class="card-address">247 Bedford Ave, Apt 3R</div>
+                  <div class="card-tags">
+                    <span class="tag">2 bed</span>
+                    <span class="tag">1 bath</span>
+                    <span class="tag green">No fee</span>
+                  </div>
+                </div>
+                <div class="swipe-actions">
+                  <div class="action-btn pass">✕</div>
+                  <div class="action-btn save">★</div>
+                  <div class="action-btn like">♥</div>
+                </div>
+              </div>
+              <div class="opt-b-map-side map-placeholder">
+                <div class="map-roads">
+                  <div class="road-h" style="top:20%;height:5px;"></div>
+                  <div class="road-h" style="top:45%;height:4px;"></div>
+                  <div class="road-h" style="top:70%;height:3px;"></div>
+                  <div class="road-v" style="left:20%;width:4px;"></div>
+                  <div class="road-v" style="left:50%;width:5px;"></div>
+                  <div class="road-v" style="left:75%;width:3px;"></div>
+                </div>
+                <div class="map-block" style="top:5%;left:5%;width:12%;height:12%;"></div>
+                <div class="map-block" style="top:5%;left:25%;width:22%;height:12%;"></div>
+                <div class="map-block" style="top:28%;left:5%;width:12%;height:14%;"></div>
+                <div class="map-block" style="top:28%;left:25%;width:22%;height:14%;"></div>
+                <div class="map-block" style="top:28%;left:54%;width:18%;height:14%;"></div>
+                <div class="map-block" style="top:55%;left:5%;width:12%;height:12%;"></div>
+                <div class="map-block" style="top:55%;left:25%;width:22%;height:12%;"></div>
+                <div class="map-grey-pin" style="top:22%;left:35%;"></div>
+                <div class="map-grey-pin" style="top:65%;left:62%;"></div>
+                <div class="map-grey-pin" style="top:80%;left:28%;"></div>
+                <div class="map-pin" style="top:52%;left:55%;">
+                  <div class="map-pin-bubble">$2,850</div>
+                  <div class="map-pin-stem"></div>
+                  <div class="map-pin-dot"></div>
+                </div>
+                <div class="map-attribution">OpenStreetMap</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile -->
+      <div>
+        <div class="device-label">Mobile — card top / map bottom</div>
+        <div class="device-screen">
+          <div class="device-topbar">
+            <span class="device-topbar-logo">Dwelligence</span>
+            <span class="device-topbar-counter">12/47</span>
+          </div>
+          <div class="device-content" style="padding:12px;">
+            <div class="opt-b-mobile">
+              <div class="opt-b-mobile-card">
+                <div class="photo-area" style="height:70px;">
+                  <div class="fake-img-grid">
+                    <div class="fake-img-cell"></div><div class="fake-img-cell"></div><div class="fake-img-cell"></div>
+                    <div class="fake-img-cell"></div><div class="fake-img-cell"></div><div class="fake-img-cell"></div>
+                  </div>
+                  <div class="photo-overlay" style="font-size:9px;">Williamsburg</div>
+                </div>
+                <div class="card-info" style="padding:6px 8px;">
+                  <div class="card-price" style="font-size:13px;">$2,850/mo</div>
+                  <div class="card-address" style="font-size:10px;">247 Bedford Ave</div>
+                </div>
+                <div class="swipe-actions" style="gap:8px;padding:4px 0;border-bottom:1px solid var(--border);">
+                  <div class="action-btn pass" style="width:26px;height:26px;font-size:11px;">✕</div>
+                  <div class="action-btn save" style="width:26px;height:26px;font-size:11px;">★</div>
+                  <div class="action-btn like" style="width:26px;height:26px;font-size:11px;">♥</div>
+                </div>
+              </div>
+              <div class="opt-b-mobile-map map-placeholder" style="height:70px;">
+                <div class="map-roads">
+                  <div class="road-h" style="top:35%;height:3px;"></div>
+                  <div class="road-h" style="top:65%;height:2px;"></div>
+                  <div class="road-v" style="left:30%;width:3px;"></div>
+                  <div class="road-v" style="left:60%;width:3px;"></div>
+                </div>
+                <div class="map-grey-pin" style="top:25%;left:25%;"></div>
+                <div class="map-grey-pin" style="top:70%;left:72%;"></div>
+                <div class="map-pin" style="top:45%;left:52%;">
+                  <div class="map-pin-bubble" style="font-size:8px;">$2,850</div>
+                  <div class="map-pin-stem" style="height:4px;"></div>
+                  <div class="map-pin-dot" style="width:5px;height:5px;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       OPTION C — Map toggle / card flip
+  ═══════════════════════════════════════════════════════ -->
+  <div class="option-section">
+    <div class="option-header">
+      <div class="option-label">
+        <span class="option-badge">Option C</span>
+        <span class="option-title">Map toggle — card flip on demand</span>
+      </div>
+      <div class="option-desc">Floating "Map" button on card. Tap to flip to map view. Saves vertical space; on-demand only.</div>
+    </div>
+    <div class="device-pair">
+
+      <!-- Desktop — two states side by side -->
+      <div>
+        <div class="device-label">Desktop — front &amp; flipped</div>
+        <div style="display:flex;gap:12px;justify-content:center;">
+          <!-- Front state -->
+          <div>
+            <div style="font-size:10px;color:var(--muted);text-align:center;margin-bottom:6px;">Default</div>
+            <div class="opt-c-desktop-card">
+              <div class="photo-area" style="height:148px;">
+                <div class="fake-img-grid">
+                  <div class="fake-img-cell"></div><div class="fake-img-cell"></div><div class="fake-img-cell"></div>
+                  <div class="fake-img-cell"></div><div class="fake-img-cell"></div><div class="fake-img-cell"></div>
+                </div>
+                <div class="photo-label">1 of 8</div>
+                <div class="photo-overlay">Williamsburg</div>
+                <div class="opt-c-flip-btn">
+                  <span class="pin-icon">📍</span> Map
+                </div>
+              </div>
+              <div class="card-info">
+                <div class="card-price">$2,850/mo</div>
+                <div class="card-address">247 Bedford Ave, Apt 3R</div>
+                <div class="card-tags">
+                  <span class="tag">2 bed</span>
+                  <span class="tag">1 bath</span>
+                  <span class="tag green">No fee</span>
+                </div>
+              </div>
+              <div class="swipe-actions">
+                <div class="action-btn pass">✕</div>
+                <div class="action-btn save">★</div>
+                <div class="action-btn like">♥</div>
+              </div>
+            </div>
+          </div>
+          <!-- Flipped state -->
+          <div>
+            <div style="font-size:10px;color:var(--muted);text-align:center;margin-bottom:6px;">Flipped to map</div>
+            <div class="opt-c-map-card">
+              <div class="map-placeholder" style="height:200px;">
+                <div class="map-roads">
+                  <div class="road-h" style="top:25%;height:5px;"></div>
+                  <div class="road-h" style="top:52%;height:4px;"></div>
+                  <div class="road-h" style="top:74%;height:3px;"></div>
+                  <div class="road-v" style="left:22%;width:4px;"></div>
+                  <div class="road-v" style="left:52%;width:5px;"></div>
+                  <div class="road-v" style="left:78%;width:3px;"></div>
+                </div>
+                <div class="map-block" style="top:5%;left:5%;width:14%;height:16%;"></div>
+                <div class="map-block" style="top:5%;left:27%;width:22%;height:16%;"></div>
+                <div class="map-block" style="top:32%;left:5%;width:14%;height:17%;"></div>
+                <div class="map-block" style="top:32%;left:27%;width:22%;height:17%;"></div>
+                <div class="map-block" style="top:32%;left:57%;width:18%;height:17%;"></div>
+                <div class="map-block" style="top:57%;left:5%;width:14%;height:15%;"></div>
+                <div class="map-grey-pin" style="top:20%;left:42%;"></div>
+                <div class="map-grey-pin" style="top:68%;left:70%;"></div>
+                <div class="map-pin" style="top:56%;left:56%;">
+                  <div class="map-pin-bubble">$2,850</div>
+                  <div class="map-pin-stem"></div>
+                  <div class="map-pin-dot"></div>
+                </div>
+                <div class="opt-c-flip-back">← Back</div>
+                <div class="map-attribution">OpenStreetMap</div>
+              </div>
+              <div class="opt-c-map-info-bar">
+                <div>
+                  <div class="opt-c-map-address">247 Bedford Ave, Apt 3R</div>
+                  <div style="font-size:11px;color:var(--muted);">Williamsburg, Brooklyn</div>
+                </div>
+                <div class="opt-c-map-price">$2,850</div>
+              </div>
+              <div class="swipe-actions">
+                <div class="action-btn pass">✕</div>
+                <div class="action-btn save">★</div>
+                <div class="action-btn like">♥</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile -->
+      <div>
+        <div class="device-label">Mobile — default &amp; flipped</div>
+        <div style="display:flex;gap:10px;justify-content:center;">
+          <div>
+            <div style="font-size:10px;color:var(--muted);text-align:center;margin-bottom:6px;">Default</div>
+            <div class="opt-c-mobile-card">
+              <div class="photo-area" style="height:90px;">
+                <div class="fake-img-grid">
+                  <div class="fake-img-cell"></div><div class="fake-img-cell"></div><div class="fake-img-cell"></div>
+                  <div class="fake-img-cell"></div><div class="fake-img-cell"></div><div class="fake-img-cell"></div>
+                </div>
+                <div class="opt-c-flip-btn-sm">📍 Map</div>
+              </div>
+              <div class="card-info" style="padding:6px 8px;">
+                <div style="font-size:13px;font-weight:700;">$2,850/mo</div>
+                <div style="font-size:10px;color:var(--muted);">247 Bedford Ave</div>
+              </div>
+              <div class="swipe-actions" style="gap:8px;padding:5px 0;">
+                <div class="action-btn pass" style="width:28px;height:28px;font-size:12px;">✕</div>
+                <div class="action-btn save" style="width:28px;height:28px;font-size:12px;">★</div>
+                <div class="action-btn like" style="width:28px;height:28px;font-size:12px;">♥</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--muted);text-align:center;margin-bottom:6px;">Map view</div>
+            <div style="border-radius:10px;overflow:hidden;border:1px solid rgba(88,166,255,0.4);width:140px;">
+              <div class="map-placeholder" style="height:128px;position:relative;">
+                <div class="map-roads">
+                  <div class="road-h" style="top:35%;height:3px;"></div>
+                  <div class="road-h" style="top:65%;height:2px;"></div>
+                  <div class="road-v" style="left:30%;width:3px;"></div>
+                  <div class="road-v" style="left:60%;width:3px;"></div>
+                </div>
+                <div class="map-grey-pin" style="top:25%;left:25%;"></div>
+                <div class="map-pin" style="top:48%;left:52%;">
+                  <div class="map-pin-bubble" style="font-size:8px;">$2,850</div>
+                  <div class="map-pin-stem" style="height:4px;"></div>
+                  <div class="map-pin-dot" style="width:5px;height:5px;"></div>
+                </div>
+                <div style="position:absolute;top:6px;right:6px;background:rgba(15,17,23,0.75);border:1px solid rgba(88,166,255,0.4);color:var(--accent);border-radius:4px;padding:2px 5px;font-size:9px;font-weight:600;">← Back</div>
+              </div>
+              <div style="background:var(--card);padding:5px 8px;border-top:1px solid var(--border);">
+                <div style="font-size:11px;color:var(--text);font-weight:600;">$2,850/mo</div>
+                <div style="font-size:9px;color:var(--muted);">247 Bedford Ave</div>
+              </div>
+              <div class="swipe-actions" style="gap:8px;padding:4px 0;">
+                <div class="action-btn pass" style="width:26px;height:26px;font-size:11px;">✕</div>
+                <div class="action-btn save" style="width:26px;height:26px;font-size:11px;">★</div>
+                <div class="action-btn like" style="width:26px;height:26px;font-size:11px;">♥</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       OPTION D — Background map peek
+  ═══════════════════════════════════════════════════════ -->
+  <div class="option-section" style="border-right:none;">
+    <div class="option-header">
+      <div class="option-label">
+        <span class="option-badge">Option D</span>
+        <span class="option-title">Background map peek — card floats above</span>
+      </div>
+      <div class="option-desc">Full-screen map underneath. Card floats in center. Blue pin = current listing, grey = others. Most immersive.</div>
+    </div>
+    <div class="device-pair">
+
+      <!-- Desktop -->
+      <div>
+        <div class="device-label">Desktop</div>
+        <div class="device-screen">
+          <div class="device-topbar">
+            <span class="device-topbar-logo">Dwelligence</span>
+            <span class="device-topbar-counter">12 of 47</span>
+          </div>
+          <div class="device-content" style="padding:12px;">
+            <div class="opt-d-desktop">
+              <div class="opt-d-fullmap map-placeholder">
+                <div class="map-roads">
+                  <div class="road-h" style="top:18%;height:6px;"></div>
+                  <div class="road-h" style="top:42%;height:5px;"></div>
+                  <div class="road-h" style="top:65%;height:4px;"></div>
+                  <div class="road-h" style="top:82%;height:3px;"></div>
+                  <div class="road-v" style="left:15%;width:5px;"></div>
+                  <div class="road-v" style="left:38%;width:6px;"></div>
+                  <div class="road-v" style="left:62%;width:5px;"></div>
+                  <div class="road-v" style="left:82%;width:3px;"></div>
+                </div>
+                <div class="map-block" style="top:3%;left:2%;width:11%;height:12%;"></div>
+                <div class="map-block" style="top:3%;left:18%;width:18%;height:12%;"></div>
+                <div class="map-block" style="top:3%;left:44%;width:15%;height:12%;"></div>
+                <div class="map-block" style="top:3%;left:65%;width:14%;height:12%;"></div>
+                <div class="map-block" style="top:25%;left:2%;width:11%;height:14%;"></div>
+                <div class="map-block" style="top:25%;left:18%;width:18%;height:14%;"></div>
+                <div class="map-block" style="top:25%;left:44%;width:15%;height:14%;"></div>
+                <div class="map-block" style="top:25%;left:65%;width:14%;height:14%;"></div>
+                <div class="map-block" style="top:48%;left:2%;width:11%;height:13%;"></div>
+                <div class="map-block" style="top:48%;left:18%;width:18%;height:13%;"></div>
+                <div class="map-block" style="top:70%;left:44%;width:15%;height:11%;"></div>
+                <div class="map-grey-pin" style="top:15%;left:30%;width:10px;height:10px;"></div>
+                <div class="map-grey-pin" style="top:55%;left:72%;width:10px;height:10px;"></div>
+                <div class="map-grey-pin" style="top:75%;left:20%;width:10px;height:10px;"></div>
+                <div class="map-grey-pin" style="top:32%;left:85%;width:10px;height:10px;"></div>
+              </div>
+              <div class="opt-d-top-bar">
+                <div class="opt-d-counter">12 of 47 listings</div>
+              </div>
+              <div class="opt-d-floating-card">
+                <div class="photo-area" style="height:120px;">
+                  <div class="fake-img-grid">
+                    <div class="fake-img-cell"></div><div class="fake-img-cell"></div><div class="fake-img-cell"></div>
+                    <div class="fake-img-cell"></div><div class="fake-img-cell"></div><div class="fake-img-cell"></div>
+                  </div>
+                  <div class="photo-label">1 of 8</div>
+                  <div class="photo-overlay" style="font-size:11px;">Williamsburg</div>
+                  <div class="photo-dots">
+                    <div class="dot active"></div><div class="dot"></div><div class="dot"></div>
+                  </div>
+                </div>
+                <div class="card-info">
+                  <div class="card-price">$2,850/mo</div>
+                  <div class="card-address">247 Bedford Ave, Apt 3R</div>
+                  <div class="card-tags">
+                    <span class="tag">2 bed</span>
+                    <span class="tag">1 bath</span>
+                    <span class="tag green">No fee</span>
+                  </div>
+                </div>
+                <div class="swipe-actions">
+                  <div class="action-btn pass">✕</div>
+                  <div class="action-btn save">★</div>
+                  <div class="action-btn like">♥</div>
+                </div>
+              </div>
+              <!-- Blue pin on map at listing location -->
+              <div class="map-pin" style="position:absolute;top:56%;left:52%;z-index:5;">
+                <div class="map-pin-bubble">$2,850</div>
+                <div class="map-pin-stem"></div>
+                <div class="map-pin-dot"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile -->
+      <div>
+        <div class="device-label">Mobile</div>
+        <div class="device-screen">
+          <div class="device-topbar">
+            <span class="device-topbar-logo">Dwelligence</span>
+            <span class="device-topbar-counter">12/47</span>
+          </div>
+          <div class="device-content" style="padding:12px;">
+            <div class="opt-d-mobile">
+              <div style="position:absolute;inset:0;" class="map-placeholder">
+                <div class="map-roads">
+                  <div class="road-h" style="top:22%;height:4px;"></div>
+                  <div class="road-h" style="top:48%;height:3px;"></div>
+                  <div class="road-h" style="top:72%;height:3px;"></div>
+                  <div class="road-v" style="left:22%;width:3px;"></div>
+                  <div class="road-v" style="left:52%;width:4px;"></div>
+                  <div class="road-v" style="left:78%;width:3px;"></div>
+                </div>
+                <div class="map-block" style="top:5%;left:3%;width:16%;height:14%;"></div>
+                <div class="map-block" style="top:5%;left:27%;width:22%;height:14%;"></div>
+                <div class="map-block" style="top:28%;left:3%;width:16%;height:16%;"></div>
+                <div class="map-block" style="top:28%;left:27%;width:22%;height:16%;"></div>
+                <div class="map-block" style="top:56%;left:3%;width:16%;height:13%;"></div>
+                <div class="map-grey-pin" style="top:18%;left:72%;width:8px;height:8px;"></div>
+                <div class="map-grey-pin" style="top:75%;left:65%;width:8px;height:8px;"></div>
+              </div>
+              <div style="position:absolute;top:6px;left:50%;transform:translateX(-50%);z-index:20;">
+                <div class="opt-d-counter" style="font-size:9px;padding:3px 8px;">12 of 47</div>
+              </div>
+              <div class="opt-d-mobile-floating">
+                <div class="photo-area" style="height:75px;">
+                  <div class="fake-img-grid">
+                    <div class="fake-img-cell"></div><div class="fake-img-cell"></div><div class="fake-img-cell"></div>
+                    <div class="fake-img-cell"></div><div class="fake-img-cell"></div><div class="fake-img-cell"></div>
+                  </div>
+                  <div class="photo-overlay" style="font-size:9px;">Williamsburg</div>
+                </div>
+                <div class="card-info" style="padding:5px 7px;">
+                  <div style="font-size:12px;font-weight:700;">$2,850/mo</div>
+                  <div style="font-size:9px;color:var(--muted);">247 Bedford Ave</div>
+                </div>
+                <div class="swipe-actions" style="gap:7px;padding:4px 0;">
+                  <div class="action-btn pass" style="width:24px;height:24px;font-size:10px;">✕</div>
+                  <div class="action-btn save" style="width:24px;height:24px;font-size:10px;">★</div>
+                  <div class="action-btn like" style="width:24px;height:24px;font-size:10px;">♥</div>
+                </div>
+              </div>
+              <!-- Blue pin -->
+              <div class="map-pin" style="position:absolute;top:55%;left:56%;z-index:5;">
+                <div class="map-pin-bubble" style="font-size:8px;">$2,850</div>
+                <div class="map-pin-stem" style="height:4px;"></div>
+                <div class="map-pin-dot" style="width:6px;height:6px;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

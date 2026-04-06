@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Source Badge Design Options</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f1117; color: #e1e4e8;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    padding: 0 0 80px;
+  }
+
+  /* Sticky header */
+  .page-header {
+    position: sticky; top: 0; z-index: 100;
+    background: #1c2028; border-bottom: 1px solid #2d333b;
+    padding: 16px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .page-header h1 { font-size: 18px; font-weight: 700; color: #58a6ff; }
+  .page-header .nav-links { display: flex; gap: 16px; }
+  .page-header .nav-links a {
+    color: #8b949e; text-decoration: none; font-size: 13px;
+    padding: 4px 12px; border-radius: 16px; border: 1px solid #2d333b;
+    transition: all 0.15s;
+  }
+  .page-header .nav-links a:hover { color: #e1e4e8; border-color: #58a6ff; }
+
+  /* Section */
+  .section {
+    max-width: 1100px; margin: 0 auto; padding: 40px 32px 0;
+  }
+  .section-label {
+    display: inline-block; background: #58a6ff; color: #0f1117;
+    font-size: 12px; font-weight: 700; padding: 3px 10px;
+    border-radius: 4px; margin-bottom: 8px; letter-spacing: 0.5px;
+  }
+  .section h2 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+  .section p.desc { font-size: 14px; color: #8b949e; margin-bottom: 24px; line-height: 1.5; }
+  .divider {
+    max-width: 1100px; margin: 40px auto 0;
+    border: none; border-top: 1px solid #2d333b;
+  }
+
+  /* Card grid */
+  .card-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+  }
+
+  /* === Shared card base === */
+  .card {
+    background: #1c2028; border: 1px solid #2d333b; border-radius: 12px;
+    overflow: hidden; transition: border-color 0.15s;
+  }
+  .card:hover { border-color: #444c56; }
+
+  /* Photo placeholder */
+  .card-photo {
+    position: relative; width: 100%; height: 180px;
+    background: linear-gradient(135deg, #2d333b 0%, #1c2028 100%);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .card-photo .photo-placeholder {
+    font-size: 48px; opacity: 0.15;
+  }
+  /* Carousel dots */
+  .card-photo .dots {
+    position: absolute; bottom: 8px; right: 10px;
+    display: flex; gap: 4px;
+  }
+  .card-photo .dots span {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: rgba(255,255,255,0.35);
+  }
+  .card-photo .dots span:first-child { background: rgba(255,255,255,0.9); }
+
+  /* Card body */
+  .card-body { padding: 14px 16px 16px; }
+  .card-body .price { font-size: 18px; font-weight: 700; color: #58a6ff; }
+  .card-body .price .period { font-size: 13px; font-weight: 400; color: #8b949e; }
+  .card-body .address { font-size: 14px; font-weight: 600; margin-top: 4px; }
+  .card-body .neighborhood { font-size: 12px; color: #8b949e; margin-top: 2px; }
+  .card-body .meta-row {
+    display: flex; gap: 14px; margin-top: 10px;
+    font-size: 13px; color: #8b949e;
+  }
+  .card-body .meta-row span { white-space: nowrap; }
+  .card-body .meta-row .na { color: #484f58; font-style: italic; }
+
+  /* Tags row */
+  .tags-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .tag {
+    font-size: 11px; font-weight: 600; padding: 3px 9px;
+    border-radius: 12px; background: #262c36; color: #8b949e;
+    white-space: nowrap;
+  }
+
+  /* ============================================
+     OPTION A: Photo badge
+     ============================================ */
+  .photo-badge {
+    position: absolute; bottom: 8px; left: 8px;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+    padding: 3px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; color: #e1e4e8;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .photo-badge .badge-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+
+  /* ============================================
+     OPTION B: Colored dot in metadata
+     ============================================ */
+  .source-line {
+    display: flex; align-items: center; gap: 6px;
+    margin-top: 8px; font-size: 12px; color: #8b949e;
+  }
+  .source-dot {
+    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  }
+
+  /* ============================================
+     OPTION C: Icon in header
+     ============================================ */
+  .address-with-icon {
+    display: flex; align-items: center; gap: 6px;
+  }
+  .source-icon {
+    width: 18px; height: 18px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; flex-shrink: 0;
+  }
+
+  /* ============================================
+     OPTION D: Source tag chip
+     ============================================ */
+  .source-chip {
+    font-size: 11px; font-weight: 600; padding: 3px 9px;
+    border-radius: 12px; white-space: nowrap;
+  }
+
+  /* Source colors */
+  .src-realtor    { --src-color: #4a9eff; }
+  .src-craigslist { --src-color: #a78bfa; }
+  .src-renthop    { --src-color: #f59e42; }
+  .src-apartments { --src-color: #34d399; }
+
+  .src-realtor .badge-dot,    .src-realtor .source-dot    { background: #4a9eff; }
+  .src-craigslist .badge-dot, .src-craigslist .source-dot { background: #a78bfa; }
+  .src-renthop .badge-dot,    .src-renthop .source-dot    { background: #f59e42; }
+  .src-apartments .badge-dot, .src-apartments .source-dot { background: #34d399; }
+
+  .src-realtor .source-icon    { background: rgba(74,158,255,0.15); color: #4a9eff; }
+  .src-craigslist .source-icon { background: rgba(167,139,250,0.15); color: #a78bfa; }
+  .src-renthop .source-icon    { background: rgba(245,158,66,0.15); color: #f59e42; }
+  .src-apartments .source-icon { background: rgba(52,211,153,0.15); color: #34d399; }
+
+  .src-realtor .source-chip    { background: rgba(74,158,255,0.12); color: #4a9eff; border: 1px solid rgba(74,158,255,0.25); }
+  .src-craigslist .source-chip { background: rgba(167,139,250,0.12); color: #a78bfa; border: 1px solid rgba(167,139,250,0.25); }
+  .src-renthop .source-chip    { background: rgba(245,158,66,0.12); color: #f59e42; border: 1px solid rgba(245,158,66,0.25); }
+  .src-apartments .source-chip { background: rgba(52,211,153,0.12); color: #34d399; border: 1px solid rgba(52,211,153,0.25); }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>PropertySearch</h1>
+  <div class="nav-links">
+    <a href="#option-a">Option A</a>
+    <a href="#option-b">Option B</a>
+    <a href="#option-c">Option C</a>
+    <a href="#option-d">Option D</a>
+  </div>
+</div>
+
+<!-- =============================================
+     OPTION A: Small badge on photo
+     ============================================= -->
+<div class="section" id="option-a">
+  <span class="section-label">OPTION A</span>
+  <h2>Small Badge on Photo</h2>
+  <p class="desc">Semi-transparent badge in the bottom-left corner of the photo. Minimal footprint, visible at a glance without cluttering metadata.</p>
+
+  <div class="card-grid">
+    <!-- Realtor.com -->
+    <div class="card src-realtor">
+      <div class="card-photo">
+        <span class="photo-placeholder">&#127968;</span>
+        <div class="photo-badge"><span class="badge-dot"></span> Realtor.com</div>
+        <div class="dots"><span></span><span></span><span></span></div>
+      </div>
+      <div class="card-body">
+        <div class="price">$2,800 <span class="period">/mo</span></div>
+        <div class="address">372 Bainbridge St, Apt 2</div>
+        <div class="neighborhood">Stuyvesant Heights, Brooklyn</div>
+        <div class="meta-row">
+          <span>3 bed</span> <span>1 bath</span> <span>1,100 sqft</span>
+        </div>
+        <div class="tags-row">
+          <span class="tag">Brooklyn</span>
+          <span class="tag">A/C Train</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Craigslist - missing data -->
+    <div class="card src-craigslist">
+      <div class="card-photo">
+        <span class="photo-placeholder">&#127960;</span>
+        <div class="photo-badge"><span class="badge-dot"></span> Craigslist</div>
+        <div class="dots"><span></span><span></span></div>
+      </div>
+      <div class="card-body">
+        <div class="price">$1,950 <span class="period">/mo</span></div>
+        <div class="address">814 Halsey St, #3R</div>
+        <div class="neighborhood">Bushwick, Brooklyn</div>
+        <div class="meta-row">
+          <span>2 bed</span> <span class="na">Baths: --</span> <span class="na">Sqft: N/A</span>
+        </div>
+        <div class="tags-row">
+          <span class="tag">Brooklyn</span>
+          <span class="tag">L Train</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RentHop -->
+    <div class="card src-renthop">
+      <div class="card-photo">
+        <span class="photo-placeholder">&#127970;</span>
+        <div class="photo-badge"><span class="badge-dot"></span> RentHop</div>
+        <div class="dots"><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div class="card-body">
+        <div class="price">$3,450 <span class="period">/mo</span></div>
+        <div class="address">55 Willoughby Ave, Unit 4A</div>
+        <div class="neighborhood">Fort Greene, Brooklyn</div>
+        <div class="meta-row">
+          <span>2 bed</span> <span>1 bath</span> <span>900 sqft</span>
+        </div>
+        <div class="tags-row">
+          <span class="tag">Brooklyn</span>
+          <span class="tag">G Train</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Apartments.com - missing data -->
+    <div class="card src-apartments">
+      <div class="card-photo">
+        <span class="photo-placeholder">&#127963;</span>
+        <div class="photo-badge"><span class="badge-dot"></span> Apartments.com</div>
+        <div class="dots"><span></span><span></span><span></span></div>
+      </div>
+      <div class="card-body">
+        <div class="price">$2,200 <span class="period">/mo</span></div>
+        <div class="address">190 Lewis Ave, Apt 1</div>
+        <div class="neighborhood">Bed-Stuy, Brooklyn</div>
+        <div class="meta-row">
+          <span>1 bed</span> <span>1 bath</span> <span class="na">Sqft: N/A</span>
+        </div>
+        <div class="tags-row">
+          <span class="tag">Brooklyn</span>
+          <span class="tag">J/Z Train</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- =============================================
+     OPTION B: Colored dot + source name
+     ============================================= -->
+<div class="section" id="option-b">
+  <span class="section-label">OPTION B</span>
+  <h2>Colored Dot + Source Name in Metadata</h2>
+  <p class="desc">A small colored dot and source name below the beds/baths row. Each source has a distinct color for quick scanning.</p>
+
+  <div class="card-grid">
+    <!-- Realtor.com -->
+    <div class="card src-realtor">
+      <div class="card-photo">
+        <span class="photo-placeholder">&#127968;</span>
+        <div class="dots"><span></span><span></span><span></span></div>
+      </div>
+      <div class="card-body">
+        <div class="price">$2,800 <span class="period">/mo</span></div>
+        <div class="address">372 Bainbridge St, Apt 2</div>
+        <div class="neighborhood">Stuyvesant Heights, Brooklyn</div>
+        <div class="meta-row">
+          <span>3 bed</span> <span>1 bath</span> <span>1,100 sqft</span>
+        </div>
+        <div class="source-line"><span class="source-dot"></span> Realtor.com</div>
+        <div class="tags-row">
+          <span class="tag">Brooklyn</span>
+          <span class="tag">A/C Train</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Craigslist - missing data -->
+    <div class="card src-craigslist">
+      <div class="card-photo">
+        <span class="photo-placeholder">&#127960;</span>
+        <div class="dots"><span></span><span></span></div>
+      </div>
+      <div class="card-body">
+        <div class="price">$1,950 <span class="period">/mo</span></div>
+        <div class="address">814 Halsey St, #3R</div>
+        <div class="neighborhood">Bushwick, Brooklyn</div>
+        <div class="meta-row">
+          <span>2 bed</span> <span class="na">Baths: --</span> <span class="na">Sqft: N/A</span>
+        </div>
+        <div class="source-line"><span class="source-dot"></span> Craigslist</div>
+        <div class="tags-row">
+          <span class="tag">Brooklyn</span>
+          <span class="tag">L Train</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RentHop -->
+    <div class="card src-renthop">
+      <div class="card-photo">
+        <span class="photo-placeholder">&#127970;</span>
+        <div class="dots"><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div class="card-body">
+        <div class="price">$3,450 <span class="period">/mo</span></div>
+        <div class="address">55 Willoughby Ave, Unit 4A</div>
+        <div class="neighborhood">Fort Greene, Brooklyn</div>
+        <div class="meta-row">
+          <span>2 bed</span> <span>1 bath</span> <span>900 sqft</span>
+        </div>
+        <div class="source-line"><span class="source-dot"></span> RentHop</div>
+        <div class="tags-row">
+          <span class="tag">Brooklyn</span>
+          <span class="tag">G Train</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Apartments.com - missing data -->
+    <div class="card src-apartments">
+      <div class="card-photo">
+        <span class="photo-placeholder">&#127963;</span>
+        <div class="dots"><span></span><span></span><span></span></div>
+      </div>
+      <div class="card-body">
+        <div class="price">$2,200 <span class="period">/mo</span></div>
+        <div class="address">190 Lewis Ave, Apt 1</div>
+        <div class="neighborhood">Bed-Stuy, Brooklyn</div>
+        <div class="meta-row">
+          <span>1 bed</span> <span>1 bath</span> <span class="na">Sqft: N/A</span>
+        </div>
+        <div class="source-line"><span class="source-dot"></span> Apartments.com</div>
+        <div class="tags-row">
+          <span class="tag">Brooklyn</span>
+          <span class="tag">J/Z Train</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- =============================================
+     OPTION C: Source icon in card header
+     ============================================= -->
+<div class="section" id="option-c">
+  <span class="section-label">OPTION C</span>
+  <h2>Source Icon in Card Header</h2>
+  <p class="desc">A small favicon-style icon next to the address. Each source gets a distinct icon to build visual familiarity.</p>
+
+  <div class="card-grid">
+    <!-- Realtor.com -->
+    <div class="card src-realtor">
+      <div class="card-photo">
+        <span class="photo-placeholder">&#127968;</span>
+        <div class="dots"><span></span><span></span><span></span></div>
+      </div>
+      <div class="card-body">
+        <div class="price">$2,800 <span class="period">/mo</span></div>
+        <div class="address-with-icon">
+          <span class="source-icon">R</span>
+          <span class="address">372 Bainbridge St, Apt 2</span>
+        </div>
+        <div class="neighborhood">Stuyvesant Heights, Brooklyn</div>
+        <div class="meta-row">
+          <span>3 bed</span> <span>1 bath</span> <span>1,100 sqft</span>
+        </div>
+        <div class="tags-row">
+          <span class="tag">Brooklyn</span>
+          <span class="tag">A/C Train</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Craigslist - missing data -->
+    <div class="card src-craigslist">
+      <div class="card-photo">
+        <span class="photo-placeholder">&#127960;</span>
+        <div class="dots"><span></span><span></span></div>
+      </div>
+      <div class="card-body">
+        <div class="price">$1,950 <span class="period">/mo</span></div>
+        <div class="address-with-icon">
+          <span class="source-icon">CL</span>
+          <span class="address">814 Halsey St, #3R</span>
+        </div>
+        <div class="neighborhood">Bushwick, Brooklyn</div>
+        <div class="meta-row">
+          <span>2 bed</span> <span class="na">Baths: --</span> <span class="na">Sqft: N/A</span>
+        </div>
+        <div class="tags-row">
+          <span class="tag">Brooklyn</span>
+          <span class="tag">L Train</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RentHop -->
+    <div class="card src-renthop">
+      <div class="card-photo">
+        <span class="photo-placeholder">&#127970;</span>
+        <div class="dots"><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div class="card-body">
+        <div class="price">$3,450 <span class="period">/mo</span></div>
+        <div class="address-with-icon">
+          <span class="source-icon">RH</span>
+          <span class="address">55 Willoughby Ave, Unit 4A</span>
+        </div>
+        <div class="neighborhood">Fort Greene, Brooklyn</div>
+        <div class="meta-row">
+          <span>2 bed</span> <span>1 bath</span> <span>900 sqft</span>
+        </div>
+        <div class="tags-row">
+          <span class="tag">Brooklyn</span>
+          <span class="tag">G Train</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Apartments.com - missing data -->
+    <div class="card src-apartments">
+      <div class="card-photo">
+        <span class="photo-placeholder">&#127963;</span>
+        <div class="dots"><span></span><span></span><span></span></div>
+      </div>
+      <div class="card-body">
+        <div class="price">$2,200 <span class="period">/mo</span></div>
+        <div class="address-with-icon">
+          <span class="source-icon">A</span>
+          <span class="address">190 Lewis Ave, Apt 1</span>
+        </div>
+        <div class="neighborhood">Bed-Stuy, Brooklyn</div>
+        <div class="meta-row">
+          <span>1 bed</span> <span>1 bath</span> <span class="na">Sqft: N/A</span>
+        </div>
+        <div class="tags-row">
+          <span class="tag">Brooklyn</span>
+          <span class="tag">J/Z Train</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- =============================================
+     OPTION D: Source tag chip
+     ============================================= -->
+<div class="section" id="option-d">
+  <span class="section-label">OPTION D</span>
+  <h2>Source Tag Chip</h2>
+  <p class="desc">A "via Source" pill styled differently from location tags. Lives in the same tag row but stands out with a source-specific tinted color.</p>
+
+  <div class="card-grid">
+    <!-- Realtor.com -->
+    <div class="card src-realtor">
+      <div class="card-photo">
+        <span class="photo-placeholder">&#127968;</span>
+        <div class="dots"><span></span><span></span><span></span></div>
+      </div>
+      <div class="card-body">
+        <div class="price">$2,800 <span class="period">/mo</span></div>
+        <div class="address">372 Bainbridge St, Apt 2</div>
+        <div class="neighborhood">Stuyvesant Heights, Brooklyn</div>
+        <div class="meta-row">
+          <span>3 bed</span> <span>1 bath</span> <span>1,100 sqft</span>
+        </div>
+        <div class="tags-row">
+          <span class="tag">Brooklyn</span>
+          <span class="tag">A/C Train</span>
+          <span class="source-chip">via Realtor.com</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Craigslist - missing data -->
+    <div class="card src-craigslist">
+      <div class="card-photo">
+        <span class="photo-placeholder">&#127960;</span>
+        <div class="dots"><span></span><span></span></div>
+      </div>
+      <div class="card-body">
+        <div class="price">$1,950 <span class="period">/mo</span></div>
+        <div class="address">814 Halsey St, #3R</div>
+        <div class="neighborhood">Bushwick, Brooklyn</div>
+        <div class="meta-row">
+          <span>2 bed</span> <span class="na">Baths: --</span> <span class="na">Sqft: N/A</span>
+        </div>
+        <div class="tags-row">
+          <span class="tag">Brooklyn</span>
+          <span class="tag">L Train</span>
+          <span class="source-chip">via Craigslist</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- RentHop -->
+    <div class="card src-renthop">
+      <div class="card-photo">
+        <span class="photo-placeholder">&#127970;</span>
+        <div class="dots"><span></span><span></span><span></span><span></span></div>
+      </div>
+      <div class="card-body">
+        <div class="price">$3,450 <span class="period">/mo</span></div>
+        <div class="address">55 Willoughby Ave, Unit 4A</div>
+        <div class="neighborhood">Fort Greene, Brooklyn</div>
+        <div class="meta-row">
+          <span>2 bed</span> <span>1 bath</span> <span>900 sqft</span>
+        </div>
+        <div class="tags-row">
+          <span class="tag">Brooklyn</span>
+          <span class="tag">G Train</span>
+          <span class="source-chip">via RentHop</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Apartments.com - missing data -->
+    <div class="card src-apartments">
+      <div class="card-photo">
+        <span class="photo-placeholder">&#127963;</span>
+        <div class="dots"><span></span><span></span><span></span></div>
+      </div>
+      <div class="card-body">
+        <div class="price">$2,200 <span class="period">/mo</span></div>
+        <div class="address">190 Lewis Ave, Apt 1</div>
+        <div class="neighborhood">Bed-Stuy, Brooklyn</div>
+        <div class="meta-row">
+          <span>1 bed</span> <span>1 bath</span> <span class="na">Sqft: N/A</span>
+        </div>
+        <div class="tags-row">
+          <span class="tag">Brooklyn</span>
+          <span class="tag">J/Z Train</span>
+          <span class="source-chip">via Apartments.com</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

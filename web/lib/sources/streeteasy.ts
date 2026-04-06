@@ -46,7 +46,6 @@ const SE_QUERY = `query GetListingRental($input: SearchRentalsInput!) {
           areaName
           bedroomCount
           buildingType
-          yearBuilt
           fullBathroomCount
           halfBathroomCount
           geoPoint { latitude longitude }

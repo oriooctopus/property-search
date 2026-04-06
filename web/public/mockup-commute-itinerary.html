@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Commute Itinerary Breakdown — Options A, B, C</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0f1117;
+      color: #e1e4e8;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 32px 16px 64px;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #e1e4e8;
+      margin-bottom: 8px;
+    }
+    .page-subtitle {
+      color: #8b949e;
+      font-size: 13px;
+      margin-bottom: 48px;
+    }
+
+    /* ---- Option label ---- */
+    .option-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #58a6ff;
+      margin-bottom: 6px;
+    }
+    .option-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #e1e4e8;
+      margin-bottom: 4px;
+    }
+    .option-desc {
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 20px;
+    }
+    .option-section {
+      margin-bottom: 56px;
+    }
+
+    /* ---- Panel shell (simulates listing detail sidebar) ---- */
+    .panel {
+      background: #1c2028;
+      border: 1px solid #2d333b;
+      border-radius: 12px;
+      max-width: 480px;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid #2d333b;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .panel-header-left { flex: 1; min-width: 0; }
+    .panel-listing-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: #e1e4e8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .panel-listing-sub {
+      font-size: 12px;
+      color: #8b949e;
+    }
+    .total-badge {
+      background: #1f3a5f;
+      border: 1px solid #2d5a9e;
+      color: #58a6ff;
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* ---- Subway line bullets ---- */
+    .bullet {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 900;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .bullet-sm {
+      width: 18px;
+      height: 18px;
+      font-size: 10px;
+    }
+    /* NYC line colors */
+    .line-1, .line-2, .line-3 { background: #EE352E; }
+    .line-4, .line-5, .line-6 { background: #00933C; }
+    .line-7 { background: #B933AD; }
+    .line-a, .line-c, .line-e { background: #0039A6; }
+    .line-b, .line-d, .line-f, .line-m { background: #FF6319; }
+    .line-g { background: #6CBE45; }
+    .line-j, .line-z { background: #996633; }
+    .line-l { background: #A7A9AC; }
+    .line-n, .line-q, .line-r, .line-w { background: #FCCC0A; color: #000; }
+    .line-s { background: #808183; }
+
+    /* ---- Icons (inline SVG via background) ---- */
+    .icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .icon svg { display: block; }
+
+    /* ================================================================
+       OPTION A — VERTICAL TIMELINE
+       ================================================================ */
+    .timeline { padding: 16px; display: flex; flex-direction: column; gap: 0; }
+
+    .tl-row {
+      display: flex;
+      gap: 12px;
+      position: relative;
+    }
+
+    .tl-spine {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-shrink: 0;
+      width: 28px;
+    }
+    .tl-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #58a6ff;
+      border: 2px solid #1c2028;
+      flex-shrink: 0;
+      z-index: 1;
+      margin-top: 3px;
+    }
+    .tl-dot-walk { background: #8b949e; }
+    .tl-dot-transfer { background: #f0a500; }
+
+    .tl-line {
+      width: 2px;
+      flex: 1;
+      min-height: 20px;
+      margin: 2px 0;
+    }
+    .tl-line-walk {
+      background: repeating-linear-gradient(
+        to bottom,
+        #8b949e 0px, #8b949e 4px,
+        transparent 4px, transparent 8px
+      );
+    }
+    .tl-line-subway-2 { background: #EE352E; }
+    .tl-line-subway-1 { background: #EE352E; }
+    .tl-line-transfer { background: repeating-linear-gradient(
+        to bottom,
+        #f0a500 0px, #f0a500 4px,
+        transparent 4px, transparent 8px
+    ); }
+
+    .tl-content { flex: 1; padding-bottom: 18px; }
+    .tl-content-last { padding-bottom: 0; }
+
+    .tl-leg-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-top: 0;
+    }
+    .tl-leg-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e1e4e8;
+      flex: 1;
+    }
+    .tl-leg-duration {
+      font-size: 12px;
+      color: #8b949e;
+      white-space: nowrap;
+    }
+    .tl-leg-sub {
+      font-size: 12px;
+      color: #8b949e;
+      margin-top: 2px;
+      padding-left: 0;
+    }
+
+    .stops-toggle {
+      background: none;
+      border: none;
+      color: #58a6ff;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 4px 0 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-family: inherit;
+    }
+    .stops-toggle:hover { color: #79b8ff; }
+    .stops-toggle .chevron {
+      display: inline-block;
+      transition: transform 0.2s;
+      font-size: 10px;
+    }
+    .stops-toggle.open .chevron { transform: rotate(180deg); }
+
+    .stops-list {
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 6px;
+      padding-left: 0;
+    }
+    .stops-list.visible { display: flex; }
+    .stop-item {
+      font-size: 12px;
+      color: #8b949e;
+      padding: 3px 10px;
+      border-left: 2px solid #EE352E;
+      display: flex;
+      justify-content: space-between;
+    }
+    .stop-item.final-stop { color: #e1e4e8; font-weight: 500; }
+
+    .tl-destination-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #7ee787;
+      border: 2px solid #1c2028;
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
+
+    .tl-total-row {
+      border-top: 1px solid #2d333b;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .tl-total-label { font-size: 13px; color: #8b949e; }
+    .tl-total-val { font-size: 16px; font-weight: 700; color: #58a6ff; }
+
+    /* ================================================================
+       OPTION B — HORIZONTAL JOURNEY BAR
+       ================================================================ */
+    .hbar-container { padding: 16px; }
+
+    .hbar-destination-line {
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 12px;
+    }
+    .hbar-destination-line span { color: #e1e4e8; font-weight: 500; }
+
+    .hbar-total-row {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .hbar-total-num { font-size: 28px; font-weight: 800; color: #58a6ff; }
+    .hbar-total-unit { font-size: 14px; color: #8b949e; }
+    .hbar-total-via { font-size: 13px; color: #8b949e; margin-left: 4px; }
+
+    .hbar-wrap {
+      display: flex;
+      height: 28px;
+      border-radius: 6px;
+      overflow: hidden;
+      gap: 2px;
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .hbar-seg {
+      height: 100%;
+      position: relative;
+      transition: filter 0.15s;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      min-width: 24px;
+    }
+    .hbar-seg:first-child { border-radius: 5px 0 0 5px; }
+    .hbar-seg:last-child { border-radius: 0 5px 5px 0; }
+    .hbar-seg:hover { filter: brightness(1.2); }
+    .hbar-seg-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.85);
+      pointer-events: none;
+      white-space: nowrap;
+      overflow: hidden;
+      padding: 0 4px;
+    }
+    .hbar-seg.walk { background: #3a3f4b; }
+    .hbar-seg.subway-2 { background: #EE352E; }
+    .hbar-seg.subway-1 { background: #CC2020; }
+    .hbar-seg.transfer { background: #f0a500; }
+
+    /* Tooltip */
+    .hbar-tooltip-area {
+      position: relative;
+      height: 0;
+    }
+    .hbar-tooltip {
+      display: none;
+      position: absolute;
+      top: 4px;
+      left: 0;
+      background: #252b36;
+      border: 1px solid #2d333b;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 12px;
+      color: #e1e4e8;
+      white-space: nowrap;
+      z-index: 10;
+      pointer-events: none;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+    .hbar-tooltip.active { display: block; }
+    .hbar-tooltip-title { font-weight: 600; margin-bottom: 3px; }
+    .hbar-tooltip-sub { color: #8b949e; }
+
+    /* Legend */
+    .hbar-legend {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .hbar-legend-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 10px;
+      background: #151820;
+      border-radius: 8px;
+    }
+    .hbar-legend-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .hbar-legend-text { font-size: 12px; color: #8b949e; flex: 1; }
+    .hbar-legend-dur { font-size: 12px; color: #e1e4e8; font-weight: 600; }
+
+    /* ================================================================
+       OPTION C — CARD STACK
+       ================================================================ */
+    .cards-container { padding: 14px 14px 0; }
+
+    .leg-card {
+      background: #151820;
+      border: 1px solid #2d333b;
+      border-radius: 10px;
+      margin-bottom: 4px;
+      overflow: hidden;
+    }
+    .leg-card-inner {
+      padding: 12px 14px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .leg-card-icon-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding-top: 2px;
+    }
+    .leg-card-body { flex: 1; min-width: 0; }
+    .leg-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 2px;
+    }
+    .leg-card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e1e4e8;
+    }
+    .leg-card-duration {
+      font-size: 13px;
+      font-weight: 700;
+      color: #e1e4e8;
+      flex-shrink: 0;
+    }
+    .leg-card-sub {
+      font-size: 12px;
+      color: #8b949e;
+      line-height: 1.4;
+    }
+    .leg-card-stops-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+    }
+    .leg-card-stops-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px;
+    }
+    .stop-chip {
+      background: #1c2028;
+      border: 1px solid #2d333b;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 11px;
+      color: #8b949e;
+    }
+    .stop-chip.highlight { color: #e1e4e8; border-color: #3d444d; }
+
+    /* Transfer separator card */
+    .transfer-sep {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 14px;
+      margin-bottom: 4px;
+    }
+    .transfer-sep-line { flex: 1; height: 1px; background: #2d333b; }
+    .transfer-sep-label {
+      font-size: 11px;
+      color: #f0a500;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+
+    /* C total footer */
+    .cards-footer {
+      border-top: 1px solid #2d333b;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .cards-footer-label { font-size: 13px; color: #8b949e; }
+    .cards-footer-val { font-size: 18px; font-weight: 800; color: #58a6ff; }
+
+    .cards-toggle-btn {
+      background: none;
+      border: none;
+      color: #58a6ff;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-family: inherit;
+      padding: 0;
+    }
+    .cards-toggle-btn:hover { color: #79b8ff; }
+    .cards-toggle-btn .chevron { font-size: 10px; transition: transform 0.2s; }
+    .cards-toggle-btn.open .chevron { transform: rotate(180deg); }
+
+    .c-stops-list {
+      display: none;
+      padding: 0 14px 10px 14px;
+      border-top: 1px solid #2d333b;
+    }
+    .c-stops-list.visible { display: block; }
+    .c-stop-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 0;
+      font-size: 12px;
+      color: #8b949e;
+      border-bottom: 1px solid #1c2028;
+    }
+    .c-stop-row:last-child { border-bottom: none; }
+    .c-stop-row.endpoint { color: #e1e4e8; font-weight: 500; }
+    .c-stop-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #8b949e;
+      flex-shrink: 0;
+    }
+    .c-stop-dot.endpoint { background: #EE352E; width: 8px; height: 8px; }
+
+    /* Utility */
+    .mt4 { margin-top: 4px; }
+    .flex-center { display: flex; align-items: center; gap: 6px; }
+  </style>
+</head>
+<body>
+
+  <h1>Commute Itinerary Breakdown</h1>
+  <p class="page-subtitle">Three layout options for showing the full commute itinerary in the listing detail panel. Listing: 225 W 108th St — Destination: Chess Forum (29 min total)</p>
+
+  <!-- ================================================================
+       OPTION A — VERTICAL TIMELINE
+       ================================================================ -->
+  <div class="option-section">
+    <div class="option-label">Option A</div>
+    <div class="option-title">Vertical Timeline</div>
+    <div class="option-desc">Each leg is a row with a colored spine line. Transit legs use line color, walk legs use a dotted gray line. Stop names inline, collapsible.</div>
+
+    <div class="panel">
+      <!-- Panel header -->
+      <div class="panel-header">
+        <div class="panel-header-left">
+          <div class="panel-listing-name">225 W 108th St, Apt 3B</div>
+          <div class="panel-listing-sub">Upper West Side · $3,200/mo</div>
+        </div>
+        <div class="total-badge">29 min</div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="timeline">
+
+        <!-- Leg 1: Walk to 110th St -->
+        <div class="tl-row">
+          <div class="tl-spine">
+            <div class="tl-dot tl-dot-walk"></div>
+            <div class="tl-line tl-line-walk"></div>
+          </div>
+          <div class="tl-content">
+            <div class="tl-leg-header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M13 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="#8b949e" stroke="none"/>
+                <path d="M7 17l2-5 3 2 2-6" />
+                <path d="M9 21l1-4" />
+              </svg>
+              <span class="tl-leg-label">Walk to 110th St station</span>
+              <span class="tl-leg-duration">5 min</span>
+            </div>
+            <div class="tl-leg-sub">~0.3 mi heading south</div>
+          </div>
+        </div>
+
+        <!-- Leg 2: 2 train -->
+        <div class="tl-row">
+          <div class="tl-spine">
+            <div class="tl-dot" style="background:#EE352E;"></div>
+            <div class="tl-line tl-line-subway-2"></div>
+          </div>
+          <div class="tl-content">
+            <div class="tl-leg-header">
+              <span class="bullet line-2">2</span>
+              <span class="tl-leg-label">2 train toward Flatbush Av</span>
+              <span class="tl-leg-duration">15 min</span>
+            </div>
+            <div class="tl-leg-sub">5 stops · 110th St → Chambers St</div>
+            <button class="stops-toggle" id="toggleA1" onclick="toggleStops('stopsA1','toggleA1')">
+              Show stops <span class="chevron">▼</span>
+            </button>
+            <div class="stops-list" id="stopsA1">
+              <div class="stop-item">96th St</div>
+              <div class="stop-item">72nd St</div>
+              <div class="stop-item">42nd St – Times Sq</div>
+              <div class="stop-item">14th St</div>
+              <div class="stop-item final-stop">Chambers St</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Leg 3: Transfer -->
+        <div class="tl-row">
+          <div class="tl-spine">
+            <div class="tl-dot tl-dot-transfer"></div>
+            <div class="tl-line tl-line-transfer"></div>
+          </div>
+          <div class="tl-content">
+            <div class="tl-leg-header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f0a500" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                <path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+              </svg>
+              <span class="tl-leg-label" style="color:#f0a500;">Transfer to 1 train</span>
+              <span class="tl-leg-duration">1 min</span>
+            </div>
+            <div class="tl-leg-sub">Same station · Chambers St</div>
+          </div>
+        </div>
+
+        <!-- Leg 4: 1 train -->
+        <div class="tl-row">
+          <div class="tl-spine">
+            <div class="tl-dot" style="background:#EE352E;"></div>
+            <div class="tl-line tl-line-subway-1"></div>
+          </div>
+          <div class="tl-content">
+            <div class="tl-leg-header">
+              <span class="bullet line-1">1</span>
+              <span class="tl-leg-label">1 train toward South Ferry</span>
+              <span class="tl-leg-duration">3 min</span>
+            </div>
+            <div class="tl-leg-sub">1 stop · Chambers St → Christopher St</div>
+            <button class="stops-toggle" id="toggleA2" onclick="toggleStops('stopsA2','toggleA2')">
+              Show stops <span class="chevron">▼</span>
+            </button>
+            <div class="stops-list" id="stopsA2">
+              <div class="stop-item" style="border-left-color:#EE352E;">Rector St</div>
+              <div class="stop-item final-stop" style="border-left-color:#EE352E;">Christopher St – Sheridan Sq</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Leg 5: Walk to Chess Forum -->
+        <div class="tl-row">
+          <div class="tl-spine">
+            <div class="tl-dot tl-dot-walk"></div>
+            <div class="tl-line tl-line-walk"></div>
+          </div>
+          <div class="tl-content">
+            <div class="tl-leg-header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M13 4a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="#8b949e" stroke="none"/>
+                <path d="M7 17l2-5 3 2 2-6"/>
+                <path d="M9 21l1-4"/>
+              </svg>
+              <span class="tl-leg-label">Walk to Chess Forum</span>
+              <span class="tl-leg-duration">5 min</span>
+            </div>
+            <div class="tl-leg-sub">~0.3 mi · 219 Thompson St</div>
+          </div>
+        </div>
+
+        <!-- Destination -->
+        <div class="tl-row">
+          <div class="tl-spine">
+            <div class="tl-destination-dot"></div>
+          </div>
+          <div class="tl-content tl-content-last" style="padding-bottom:4px;">
+            <div class="tl-leg-header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="#7ee787" stroke="none">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+              </svg>
+              <span class="tl-leg-label" style="color:#7ee787;">Chess Forum</span>
+            </div>
+            <div class="tl-leg-sub">219 Thompson St, New York, NY 10012</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Total footer -->
+      <div class="tl-total-row">
+        <span class="tl-total-label">Total commute</span>
+        <span class="tl-total-val">~29 min</span>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ================================================================
+       OPTION B — HORIZONTAL JOURNEY BAR
+       ================================================================ -->
+  <div class="option-section">
+    <div class="option-label">Option B</div>
+    <div class="option-title">Horizontal Journey Bar</div>
+    <div class="option-desc">Proportional colored bar divided into leg segments. Hover to see details. Compact summary above, legend list below.</div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-header-left">
+          <div class="panel-listing-name">225 W 108th St, Apt 3B</div>
+          <div class="panel-listing-sub">Upper West Side · $3,200/mo</div>
+        </div>
+        <div class="total-badge">29 min</div>
+      </div>
+
+      <div class="hbar-container">
+        <div class="hbar-destination-line">To <span>Chess Forum</span> via 2, 1 trains</div>
+
+        <div class="hbar-total-row">
+          <span class="hbar-total-num">29</span>
+          <span class="hbar-total-unit">min</span>
+          <span class="hbar-total-via">from your front door</span>
+        </div>
+
+        <!-- The bar: total 29 min. Widths as percentages -->
+        <!-- Walk(5) 17.2% | Subway-2(15) 51.7% | Transfer(1) 3.4% | Subway-1(3) 10.3% | Walk(5) 17.2% -->
+        <div class="hbar-wrap"
+             onmouseleave="clearBarTooltip()">
+          <div class="hbar-seg walk" style="flex:5;"
+               onmouseenter="showBarTooltip(event,'Walk','5 min · ~0.3 mi to 110th St station','1')">
+            <span class="hbar-seg-label">Walk</span>
+          </div>
+          <div class="hbar-seg subway-2" style="flex:15;"
+               onmouseenter="showBarTooltip(event,'2 Train','15 min · 5 stops · 110th St → Chambers St','2')">
+            <span class="hbar-seg-label">2</span>
+          </div>
+          <div class="hbar-seg transfer" style="flex:1;"
+               onmouseenter="showBarTooltip(event,'Transfer','1 min · Chambers St · 2 → 1','3')">
+            <span class="hbar-seg-label"></span>
+          </div>
+          <div class="hbar-seg subway-1" style="flex:3;"
+               onmouseenter="showBarTooltip(event,'1 Train','3 min · 1 stop · Chambers St → Christopher St','4')">
+            <span class="hbar-seg-label">1</span>
+          </div>
+          <div class="hbar-seg walk" style="flex:5;"
+               onmouseenter="showBarTooltip(event,'Walk','5 min · ~0.3 mi to Chess Forum','5')">
+            <span class="hbar-seg-label">Walk</span>
+          </div>
+        </div>
+
+        <!-- Tooltip slot -->
+        <div class="hbar-tooltip-area" style="height:60px; position:relative;">
+          <div class="hbar-tooltip" id="barTooltip">
+            <div class="hbar-tooltip-title" id="barTooltipTitle"></div>
+            <div class="hbar-tooltip-sub" id="barTooltipSub"></div>
+          </div>
+        </div>
+
+        <!-- Legend list -->
+        <div class="hbar-legend" style="margin-top:8px;">
+          <div class="hbar-legend-row">
+            <div class="hbar-legend-swatch" style="background:#3a3f4b;"></div>
+            <span class="hbar-legend-text">Walk · 110th St station</span>
+            <span class="hbar-legend-dur">5 min</span>
+          </div>
+          <div class="hbar-legend-row">
+            <div class="hbar-legend-swatch" style="background:#EE352E;"></div>
+            <div style="flex:1;">
+              <div class="hbar-legend-text" style="display:flex;align-items:center;gap:6px;">
+                <span class="bullet bullet-sm line-2">2</span>
+                <span>2 train · 110th St → Chambers St</span>
+              </div>
+              <div style="font-size:11px;color:#8b949e;margin-top:2px;">5 stops: 96th, 72nd, 42nd, 14th, Chambers</div>
+            </div>
+            <span class="hbar-legend-dur">15 min</span>
+          </div>
+          <div class="hbar-legend-row">
+            <div class="hbar-legend-swatch" style="background:#f0a500;"></div>
+            <span class="hbar-legend-text">Transfer · 2 → 1 · Chambers St</span>
+            <span class="hbar-legend-dur">1 min</span>
+          </div>
+          <div class="hbar-legend-row">
+            <div class="hbar-legend-swatch" style="background:#CC2020;"></div>
+            <div style="flex:1;">
+              <div class="hbar-legend-text" style="display:flex;align-items:center;gap:6px;">
+                <span class="bullet bullet-sm line-1">1</span>
+                <span>1 train · Chambers → Christopher St</span>
+              </div>
+            </div>
+            <span class="hbar-legend-dur">3 min</span>
+          </div>
+          <div class="hbar-legend-row">
+            <div class="hbar-legend-swatch" style="background:#3a3f4b;"></div>
+            <span class="hbar-legend-text">Walk · Chess Forum</span>
+            <span class="hbar-legend-dur">5 min</span>
+          </div>
+        </div>
+        <div style="height:14px;"></div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ================================================================
+       OPTION C — CARD STACK
+       ================================================================ -->
+  <div class="option-section">
+    <div class="option-label">Option C</div>
+    <div class="option-title">Card Stack</div>
+    <div class="option-desc">Each leg is a mini-card. Transit cards show the subway bullet and route. Walk cards show distance and direction. Transfer is a thin divider. Feels like Google Maps directions.</div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-header-left">
+          <div class="panel-listing-name">225 W 108th St, Apt 3B</div>
+          <div class="panel-listing-sub">Upper West Side · $3,200/mo</div>
+        </div>
+        <div class="total-badge">29 min</div>
+      </div>
+
+      <div class="cards-container">
+
+        <!-- Walk leg 1 -->
+        <div class="leg-card">
+          <div class="leg-card-inner">
+            <div class="leg-card-icon-col" style="padding-top:3px;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="4" r="1.5" fill="#8b949e" stroke="none"/>
+                <path d="M8 7l2 4 3-1.5 2.5 4.5"/>
+                <path d="M10 21l1.5-5"/>
+                <path d="M16 21l-1.5-5"/>
+              </svg>
+            </div>
+            <div class="leg-card-body">
+              <div class="leg-card-header">
+                <span class="leg-card-title">Walk</span>
+                <span class="leg-card-duration">5 min</span>
+              </div>
+              <div class="leg-card-sub">~0.3 mi · Head south on Broadway<br>to 110th St – Cathedral Pkwy station</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subway leg 1: 2 train -->
+        <div class="leg-card">
+          <div class="leg-card-inner">
+            <div class="leg-card-icon-col">
+              <span class="bullet line-2">2</span>
+            </div>
+            <div class="leg-card-body">
+              <div class="leg-card-header">
+                <span class="leg-card-title">2 train — Flatbush Av</span>
+                <span class="leg-card-duration">15 min</span>
+              </div>
+              <div class="leg-card-sub">Board at 110th St · Ride 5 stops</div>
+              <div class="leg-card-stops-row" style="margin-top:8px;">
+                <span class="leg-card-sub" style="margin-top:0;">Exit at Chambers St</span>
+                <button class="cards-toggle-btn" id="toggleC1" onclick="toggleC('cStops1','toggleC1')">
+                  5 stops <span class="chevron">▼</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="c-stops-list" id="cStops1">
+            <div class="c-stop-row endpoint">
+              <div class="c-stop-dot endpoint"></div>
+              <span>110th St – Cathedral Pkwy</span>
+            </div>
+            <div class="c-stop-row">
+              <div class="c-stop-dot"></div>
+              <span>96th St</span>
+            </div>
+            <div class="c-stop-row">
+              <div class="c-stop-dot"></div>
+              <span>72nd St</span>
+            </div>
+            <div class="c-stop-row">
+              <div class="c-stop-dot"></div>
+              <span>42nd St – Times Sq</span>
+            </div>
+            <div class="c-stop-row">
+              <div class="c-stop-dot"></div>
+              <span>14th St</span>
+            </div>
+            <div class="c-stop-row endpoint">
+              <div class="c-stop-dot endpoint"></div>
+              <span>Chambers St</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transfer separator -->
+        <div class="transfer-sep">
+          <div class="transfer-sep-line"></div>
+          <div class="transfer-sep-label">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f0a500" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+              <path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+            </svg>
+            Transfer · 1 min · Chambers St
+          </div>
+          <div class="transfer-sep-line"></div>
+        </div>
+
+        <!-- Subway leg 2: 1 train -->
+        <div class="leg-card">
+          <div class="leg-card-inner">
+            <div class="leg-card-icon-col">
+              <span class="bullet line-1">1</span>
+            </div>
+            <div class="leg-card-body">
+              <div class="leg-card-header">
+                <span class="leg-card-title">1 train — South Ferry</span>
+                <span class="leg-card-duration">3 min</span>
+              </div>
+              <div class="leg-card-sub">Board at Chambers St · Ride 1 stop</div>
+              <div class="leg-card-stops-row" style="margin-top:8px;">
+                <span class="leg-card-sub" style="margin-top:0;">Exit at Christopher St</span>
+                <button class="cards-toggle-btn" id="toggleC2" onclick="toggleC('cStops2','toggleC2')">
+                  1 stop <span class="chevron">▼</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="c-stops-list" id="cStops2">
+            <div class="c-stop-row endpoint">
+              <div class="c-stop-dot endpoint"></div>
+              <span>Chambers St</span>
+            </div>
+            <div class="c-stop-row endpoint">
+              <div class="c-stop-dot endpoint"></div>
+              <span>Christopher St – Sheridan Sq</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Walk leg 2 -->
+        <div class="leg-card">
+          <div class="leg-card-inner">
+            <div class="leg-card-icon-col" style="padding-top:3px;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8b949e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="4" r="1.5" fill="#8b949e" stroke="none"/>
+                <path d="M8 7l2 4 3-1.5 2.5 4.5"/>
+                <path d="M10 21l1.5-5"/>
+                <path d="M16 21l-1.5-5"/>
+              </svg>
+            </div>
+            <div class="leg-card-body">
+              <div class="leg-card-header">
+                <span class="leg-card-title">Walk</span>
+                <span class="leg-card-duration">5 min</span>
+              </div>
+              <div class="leg-card-sub">~0.3 mi · Head east on W 10th St<br>to Chess Forum · 219 Thompson St</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Destination card -->
+        <div class="leg-card" style="border-color:#2d5a3d; background:#0f1f14; margin-bottom:0;">
+          <div class="leg-card-inner">
+            <div class="leg-card-icon-col" style="padding-top:2px;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="#7ee787" stroke="none">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+              </svg>
+            </div>
+            <div class="leg-card-body">
+              <div class="leg-card-header">
+                <span class="leg-card-title" style="color:#7ee787;">Chess Forum</span>
+              </div>
+              <div class="leg-card-sub">219 Thompson St · West Village</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Footer -->
+      <div class="cards-footer">
+        <span class="cards-footer-label">Total commute</span>
+        <span class="cards-footer-val">~29 min</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Option A: toggle stop lists
+    function toggleStops(listId, btnId) {
+      const list = document.getElementById(listId);
+      const btn = document.getElementById(btnId);
+      const isOpen = list.classList.toggle('visible');
+      btn.classList.toggle('open', isOpen);
+      btn.querySelector('.chevron').textContent = isOpen ? '▲' : '▼';
+      btn.innerHTML = btn.innerHTML.replace(isOpen ? 'Show stops' : 'Hide stops', isOpen ? 'Hide stops' : 'Show stops');
+    }
+
+    // Option B: bar tooltip
+    function showBarTooltip(event, title, sub, id) {
+      const tooltip = document.getElementById('barTooltip');
+      document.getElementById('barTooltipTitle').textContent = title;
+      document.getElementById('barTooltipSub').textContent = sub;
+      tooltip.classList.add('active');
+
+      // position relative to hbar-wrap
+      const barWrap = event.currentTarget.parentElement;
+      const barRect = barWrap.getBoundingClientRect();
+      const segRect = event.currentTarget.getBoundingClientRect();
+      const relLeft = segRect.left - barRect.left + (segRect.width / 2) - 80;
+      tooltip.style.left = Math.max(0, relLeft) + 'px';
+    }
+    function clearBarTooltip() {
+      document.getElementById('barTooltip').classList.remove('active');
+    }
+
+    // Option C: toggle stops
+    function toggleC(listId, btnId) {
+      const list = document.getElementById(listId);
+      const btn = document.getElementById(btnId);
+      const isOpen = list.classList.toggle('visible');
+      btn.classList.toggle('open', isOpen);
+      const stopCount = list.querySelectorAll('.c-stop-row').length - 2;
+      const label = isOpen ? 'Hide' : (stopCount + ' stops');
+      btn.innerHTML = label + ' <span class="chevron">' + (isOpen ? '▲' : '▼') + '</span>';
+    }
+  </script>
+</body>
+</html>
