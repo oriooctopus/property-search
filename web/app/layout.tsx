@@ -43,9 +43,7 @@ export default function RootLayout({
         <Providers>
           <Navbar />
           <main className="pt-0 lg:pt-[60px]">{children}</main>
-          <footer className="text-center py-2 text-[10px]" style={{ color: '#484f58' }}>
-            Built {BUILD_TIME}
-          </footer>
+          <footer className="hidden" aria-hidden="true">Built {BUILD_TIME}</footer>
         </Providers>
       </body>
     </html>
