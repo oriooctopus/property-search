@@ -58,10 +58,12 @@ export default function Navbar() {
 
   return (
     <nav
-      className="relative lg:fixed top-0 left-0 right-0 z-[1200] flex items-center justify-between px-3 sm:px-6 h-[60px]"
+      className="relative lg:fixed top-0 left-0 right-0 z-[1200] flex items-center justify-between px-3 sm:px-6"
       style={{
         backgroundColor: "#0f1117",
         borderBottom: "1px solid #2d333b",
+        paddingTop: "env(safe-area-inset-top)",
+        height: "calc(60px + env(safe-area-inset-top))",
       }}
     >
       <Link

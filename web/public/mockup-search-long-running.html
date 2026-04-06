@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dwelligence — Long-Running Search UX Mockup</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --card: #111827;
+      --card2: #1a2332;
+      --border: #1f2937;
+      --border2: #374151;
+      --blue: #3b82f6;
+      --blue-dim: #1d4ed8;
+      --blue-bg: rgba(59,130,246,0.08);
+      --green: #22c55e;
+      --green-bg: rgba(34,197,94,0.08);
+      --green-dim: #15803d;
+      --orange: #f59e0b;
+      --text: #f9fafb;
+      --text2: #9ca3af;
+      --text3: #6b7280;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --radius-xs: 6px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 40px 16px 80px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    /* ── Page header ── */
+    .page-header {
+      text-align: center;
+      margin-bottom: 56px;
+    }
+    .page-header h1 {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+    .page-header p {
+      color: var(--text2);
+      font-size: 14px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+    .page-header .pill {
+      display: inline-block;
+      margin-top: 12px;
+      background: var(--blue-bg);
+      border: 1px solid rgba(59,130,246,0.3);
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 3px 10px;
+      border-radius: 999px;
+    }
+
+    /* ── Phase label ── */
+    .phase-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      margin-top: 52px;
+    }
+    .phase-label:first-of-type { margin-top: 0; }
+    .phase-num {
+      background: var(--blue);
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .phase-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* ── Card wrapper ── */
+    .mockup-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    /* ── Shared navbar ── */
+    .navbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      height: 52px;
+      background: #0d1117;
+      border-bottom: 1px solid var(--border);
+    }
+    .navbar-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logo {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .logo span { color: var(--blue); }
+    .navbar-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .nav-icon-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text2);
+      font-size: 16px;
+    }
+    .nav-icon-btn:hover { background: var(--border); color: var(--text); }
+    .avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: white;
+    }
+
+    /* ── Phase 1: Search starting ── */
+    .search-start-body {
+      padding: 24px 20px;
+    }
+    .search-query-display {
+      background: var(--card2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      margin-bottom: 16px;
+    }
+    .search-query-label {
+      font-size: 11px;
+      color: var(--text3);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .search-query-text {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .time-estimate-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: rgba(245,158,11,0.08);
+      border: 1px solid rgba(245,158,11,0.2);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      margin-bottom: 16px;
+    }
+    .time-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+    .time-estimate-banner h4 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--orange);
+      margin-bottom: 2px;
+    }
+    .time-estimate-banner p {
+      font-size: 12px;
+      color: var(--text2);
+    }
+    .sources-grid {
+      margin-bottom: 16px;
+    }
+    .sources-label {
+      font-size: 11px;
+      color: var(--text3);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .source-rows { display: flex; flex-direction: column; gap: 6px; }
+    .source-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xs);
+      padding: 8px 12px;
+    }
+    .source-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .source-name {
+      flex: 1;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .source-status {
+      font-size: 11px;
+      color: var(--text3);
+    }
+    .notif-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      margin-bottom: 16px;
+    }
+    .notif-toggle-left { display: flex; align-items: center; gap: 10px; }
+    .notif-icon { font-size: 18px; }
+    .notif-toggle h4 { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+    .notif-toggle p { font-size: 12px; color: var(--text2); }
+    .toggle {
+      width: 40px;
+      height: 22px;
+      background: var(--blue);
+      border-radius: 11px;
+      position: relative;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    .toggle::after {
+      content: '';
+      position: absolute;
+      right: 3px;
+      top: 3px;
+      width: 16px;
+      height: 16px;
+      background: white;
+      border-radius: 50%;
+    }
+    .toggle.off { background: var(--border2); }
+    .toggle.off::after { left: 3px; right: auto; }
+    .action-row { display: flex; gap: 10px; }
+    .btn {
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: var(--radius-xs);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--blue); color: white; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text2);
+      border: 1px solid var(--border2);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: var(--text3); }
+    .btn-sm {
+      padding: 7px 14px;
+      font-size: 12px;
+    }
+    .btn-danger-ghost {
+      background: transparent;
+      color: #ef4444;
+      border: 1px solid rgba(239,68,68,0.3);
+    }
+
+    /* ── Phase 2: Background — navbar badge ── */
+    .search-badge {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(59,130,246,0.1);
+      border: 1px solid rgba(59,130,246,0.25);
+      border-radius: 999px;
+      padding: 4px 10px 4px 8px;
+      cursor: pointer;
+    }
+    .search-badge-spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(59,130,246,0.3);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .search-badge-text {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--blue);
+    }
+    .phase2-content {
+      padding: 16px;
+    }
+    .listings-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .listing-thumb {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+    .listing-img {
+      height: 64px;
+      background: linear-gradient(135deg, #1e3a5f, #1e2d45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+    .listing-info { padding: 8px; }
+    .listing-price { font-size: 13px; font-weight: 700; }
+    .listing-addr { font-size: 11px; color: var(--text2); margin-top: 2px; }
+    .listing-tags {
+      display: flex;
+      gap: 4px;
+      margin-top: 5px;
+    }
+    .tag {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    .tag-default { background: var(--border); color: var(--text2); }
+    .tag-new { background: rgba(59,130,246,0.15); color: var(--blue); border: 1px solid rgba(59,130,246,0.25); }
+    .searching-hint {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px;
+      background: rgba(59,130,246,0.05);
+      border: 1px solid rgba(59,130,246,0.12);
+      border-radius: var(--radius-xs);
+      color: var(--text2);
+      font-size: 12px;
+    }
+    .mini-spinner {
+      width: 12px;
+      height: 12px;
+      border: 1.5px solid rgba(59,130,246,0.3);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+      flex-shrink: 0;
+    }
+
+    /* ── Phase 3: Tooltip expanded ── */
+    .navbar-with-tooltip {
+      position: relative;
+    }
+    .status-popover {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 16px;
+      width: 260px;
+      background: #1a2332;
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      z-index: 10;
+      overflow: hidden;
+    }
+    .popover-header {
+      padding: 12px 14px 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .popover-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .popover-close {
+      color: var(--text3);
+      font-size: 16px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .popover-sources { padding: 10px 14px; }
+    .popover-source-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .popover-source-row:last-child { border-bottom: none; }
+    .popover-source-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      background: var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .popover-source-name { flex: 1; font-size: 12px; font-weight: 500; }
+    .popover-source-status {
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .status-done { color: var(--green); }
+    .status-running { color: var(--blue); }
+    .status-queued { color: var(--text3); }
+    .progress-section {
+      padding: 10px 14px 12px;
+      border-top: 1px solid var(--border);
+    }
+    .progress-bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text2);
+      margin-bottom: 6px;
+    }
+    .progress-bar-track {
+      height: 4px;
+      background: var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--blue);
+      border-radius: 999px;
+      transition: width 0.4s ease;
+    }
+    .popover-footer {
+      padding: 8px 14px 12px;
+    }
+    .popover-footer .btn { flex: none; width: 100%; }
+
+    /* ── Phase 4: Toast notification ── */
+    .phase4-scene {
+      position: relative;
+    }
+    .phase4-content {
+      padding: 16px;
+      min-height: 220px;
+    }
+    .toast-container {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      width: 280px;
+      background: #1a2332;
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      overflow: hidden;
+    }
+    .toast-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 14px 8px;
+    }
+    .toast-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--green-bg);
+      border: 1px solid rgba(34,197,94,0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .toast-title {
+      font-size: 13px;
+      font-weight: 700;
+      flex: 1;
+    }
+    .toast-close {
+      color: var(--text3);
+      font-size: 16px;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .toast-body {
+      padding: 0 14px 12px;
+    }
+    .toast-body p {
+      font-size: 12px;
+      color: var(--text2);
+      margin-bottom: 10px;
+    }
+    .toast-actions { display: flex; gap: 8px; }
+    .toast-progress-bar {
+      height: 2px;
+      background: var(--green);
+      width: 70%;
+      animation: toast-shrink 5s linear forwards;
+    }
+    @keyframes toast-shrink { to { width: 0; } }
+    .green-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(34,197,94,0.1);
+      border: 1px solid rgba(34,197,94,0.25);
+      border-radius: 999px;
+      padding: 4px 10px 4px 8px;
+    }
+    .green-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .green-badge-text {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--green);
+    }
+    .blurred-listings {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+      filter: blur(2px);
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    /* ── Phase 5: Results integrated ── */
+    .results-banner {
+      margin: 12px 12px 0;
+      background: rgba(34,197,94,0.06);
+      border: 1px solid rgba(34,197,94,0.2);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .results-banner-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+    }
+    .results-banner-icon { font-size: 16px; flex-shrink: 0; }
+    .results-banner-text h4 {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--green);
+    }
+    .results-banner-text p {
+      font-size: 11px;
+      color: var(--text2);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .filter-chips {
+      display: flex;
+      gap: 6px;
+      padding: 10px 12px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .filter-chips::-webkit-scrollbar { display: none; }
+    .chip {
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .chip-active {
+      background: var(--blue);
+      color: white;
+    }
+    .chip-default {
+      background: var(--border);
+      color: var(--text2);
+      border: 1px solid var(--border2);
+    }
+    .listings-with-new {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      padding: 0 12px 12px;
+    }
+    .listing-card {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+    .listing-card.is-new {
+      border-color: rgba(59,130,246,0.3);
+    }
+    .listing-card-img {
+      height: 60px;
+      background: linear-gradient(135deg, #1e3a5f, #1e2d45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      position: relative;
+    }
+    .new-badge {
+      position: absolute;
+      top: 5px;
+      left: 5px;
+      background: var(--blue);
+      color: white;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .listing-card-info { padding: 7px 8px; }
+    .listing-card-price { font-size: 13px; font-weight: 700; }
+    .listing-card-addr { font-size: 10px; color: var(--text2); margin-top: 2px; }
+    .listing-card-meta { font-size: 10px; color: var(--text3); margin-top: 3px; }
+    .save-search-row {
+      padding: 10px 12px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      border-top: 1px solid var(--border);
+    }
+    .save-search-row p {
+      font-size: 12px;
+      color: var(--text2);
+    }
+
+    /* ── Phase 6: Search history ── */
+    .history-drawer {
+      padding: 16px;
+    }
+    .drawer-handle {
+      width: 32px;
+      height: 3px;
+      background: var(--border2);
+      border-radius: 999px;
+      margin: 0 auto 16px;
+    }
+    .drawer-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .drawer-subtitle {
+      font-size: 12px;
+      color: var(--text2);
+      margin-bottom: 16px;
+    }
+    .history-list { display: flex; flex-direction: column; gap: 8px; }
+    .history-item {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+    }
+    .history-item-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .history-query {
+      font-size: 13px;
+      font-weight: 600;
+      flex: 1;
+    }
+    .history-status-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+    .badge-running {
+      background: rgba(59,130,246,0.12);
+      color: var(--blue);
+      border: 1px solid rgba(59,130,246,0.25);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .badge-done {
+      background: var(--green-bg);
+      color: var(--green);
+      border: 1px solid rgba(34,197,94,0.25);
+    }
+    .badge-saved {
+      background: rgba(139,92,246,0.1);
+      color: #a78bfa;
+      border: 1px solid rgba(139,92,246,0.25);
+    }
+    .history-meta {
+      font-size: 11px;
+      color: var(--text3);
+      margin-bottom: 8px;
+    }
+    .history-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .history-count {
+      font-size: 12px;
+      color: var(--text2);
+    }
+    .history-count strong { color: var(--text); }
+    .history-actions { display: flex; gap: 6px; }
+    .history-running-bar {
+      height: 3px;
+      background: var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .history-running-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--blue), #60a5fa);
+      border-radius: 999px;
+      width: 35%;
+      animation: indeterminate 1.8s ease-in-out infinite;
+      transform-origin: left;
+    }
+    @keyframes indeterminate {
+      0%   { margin-left: 0; width: 30%; }
+      50%  { margin-left: 40%; width: 40%; }
+      100% { margin-left: 100%; width: 0%; }
+    }
+
+    /* ── Divider ── */
+    .section-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 48px 0 0;
+    }
+
+    /* ── Browser notification banner (decorative) ── */
+    .browser-notif {
+      background: #1a2332;
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .browser-notif-icon {
+      width: 28px;
+      height: 28px;
+      background: var(--green-bg);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+    .browser-notif-text {
+      flex: 1;
+    }
+    .browser-notif-text h4 {
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 1px;
+    }
+    .browser-notif-text p {
+      font-size: 11px;
+      color: var(--text2);
+    }
+    .browser-notif-time {
+      font-size: 10px;
+      color: var(--text3);
+      flex-shrink: 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+      body { padding: 24px 12px 60px; }
+      .listings-grid,
+      .listings-with-new,
+      .blurred-listings {
+        grid-template-columns: 1fr 1fr;
+      }
+      .status-popover {
+        right: 8px;
+        width: calc(100vw - 32px);
+        max-width: 280px;
+      }
+      .toast-container {
+        right: 8px;
+        left: 8px;
+        width: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Page header -->
+  <div class="page-header">
+    <h1><span style="color:var(--blue)">Dwelligence</span> — Long-Running Search UX</h1>
+    <p>Full user journey for an AI-powered apartment search that takes 2–5 minutes to complete.</p>
+    <span class="pill">6 phases · Dark theme · Mobile-first</span>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════ PHASE 1 ══ -->
+  <div class="phase-label">
+    <div class="phase-num">1</div>
+    <div class="phase-title">Search Starting — honest time estimate + background option</div>
+  </div>
+
+  <div class="mockup-card">
+    <!-- Navbar -->
+    <div class="navbar">
+      <div class="navbar-left">
+        <div class="logo">Dwelli<span>gence</span></div>
+      </div>
+      <div class="navbar-right">
+        <div class="nav-icon-btn">🔔</div>
+        <div class="avatar">OL</div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="search-start-body">
+
+      <div class="search-query-display">
+        <div class="search-query-label">Your search</div>
+        <div class="search-query-text">2BR in Brooklyn, under $3,000/mo, pet-friendly</div>
+      </div>
+
+      <div class="time-estimate-banner">
+        <div class="time-icon">⏱</div>
+        <div>
+          <h4>This search takes 2–5 minutes</h4>
+          <p>We scrape Craigslist, Realtor.com, and Apartments.com in real time — no cached results. You don't need to stay on this page.</p>
+        </div>
+      </div>
+
+      <div class="sources-grid">
+        <div class="sources-label">Sources being queried</div>
+        <div class="source-rows">
+          <div class="source-row">
+            <div class="source-dot" style="background:#f59e0b"></div>
+            <div class="source-name">Craigslist</div>
+            <div class="source-status">~150+ listings expected</div>
+          </div>
+          <div class="source-row">
+            <div class="source-dot" style="background:#3b82f6"></div>
+            <div class="source-name">Realtor.com</div>
+            <div class="source-status">~80+ listings expected</div>
+          </div>
+          <div class="source-row">
+            <div class="source-dot" style="background:#8b5cf6"></div>
+            <div class="source-name">Apartments.com</div>
+            <div class="source-status">~60+ listings expected</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="notif-toggle">
+        <div class="notif-toggle-left">
+          <div class="notif-icon">🔔</div>
+          <div>
+            <h4>Notify me when done</h4>
+            <p>Browser notification — works even if you switch tabs</p>
+          </div>
+        </div>
+        <div class="toggle"></div>
+      </div>
+
+      <div class="action-row">
+        <button class="btn btn-ghost">Cancel</button>
+        <button class="btn btn-primary">
+          <div class="mini-spinner" style="border-color:rgba(255,255,255,0.3);border-top-color:white;"></div>
+          Start search in background
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════ PHASE 2 ══ -->
+  <div class="phase-label">
+    <div class="phase-num">2</div>
+    <div class="phase-title">Background search in progress — non-intrusive navbar badge</div>
+  </div>
+
+  <div class="mockup-card">
+    <!-- Navbar with live badge -->
+    <div class="navbar">
+      <div class="navbar-left">
+        <div class="logo">Dwelli<span>gence</span></div>
+      </div>
+      <div class="navbar-right">
+        <div class="search-badge" title="Click to see search status">
+          <div class="search-badge-spinner"></div>
+          <span class="search-badge-text">1/3 sources</span>
+        </div>
+        <div class="nav-icon-btn">🔔</div>
+        <div class="avatar">OL</div>
+      </div>
+    </div>
+
+    <!-- Regular browsing content -->
+    <div class="phase2-content">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div>
+          <div style="font-size:15px;font-weight:700;">Listings</div>
+          <div style="font-size:11px;color:var(--text2);">Saved results from earlier</div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <div class="chip chip-default">Map</div>
+          <div class="chip chip-default">Filter</div>
+        </div>
+      </div>
+
+      <div class="listings-grid">
+        <div class="listing-thumb">
+          <div class="listing-img">🏢</div>
+          <div class="listing-info">
+            <div class="listing-price">$2,450/mo</div>
+            <div class="listing-addr">Williamsburg, BK</div>
+            <div class="listing-tags">
+              <span class="tag tag-default">2BR</span>
+              <span class="tag tag-default">🐾 OK</span>
+            </div>
+          </div>
+        </div>
+        <div class="listing-thumb">
+          <div class="listing-img">🏠</div>
+          <div class="listing-info">
+            <div class="listing-price">$2,800/mo</div>
+            <div class="listing-addr">Park Slope, BK</div>
+            <div class="listing-tags">
+              <span class="tag tag-default">2BR</span>
+              <span class="tag tag-default">Laundry</span>
+            </div>
+          </div>
+        </div>
+        <div class="listing-thumb">
+          <div class="listing-img">🏗</div>
+          <div class="listing-info">
+            <div class="listing-price">$2,200/mo</div>
+            <div class="listing-addr">Bushwick, BK</div>
+            <div class="listing-tags">
+              <span class="tag tag-default">2BR</span>
+              <span class="tag tag-default">Gym</span>
+            </div>
+          </div>
+        </div>
+        <div class="listing-thumb">
+          <div class="listing-img">🏙</div>
+          <div class="listing-info">
+            <div class="listing-price">$2,950/mo</div>
+            <div class="listing-addr">Cobble Hill, BK</div>
+            <div class="listing-tags">
+              <span class="tag tag-default">2BR</span>
+              <span class="tag tag-default">🐾 OK</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="searching-hint">
+        <div class="mini-spinner"></div>
+        <span>Search running in background · click the badge above to see progress</span>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════ PHASE 3 ══ -->
+  <div class="phase-label">
+    <div class="phase-num">3</div>
+    <div class="phase-title">Status tooltip expanded — per-source progress</div>
+  </div>
+
+  <div class="mockup-card">
+    <!-- Navbar -->
+    <div class="navbar navbar-with-tooltip" style="position:relative;">
+      <div class="navbar-left">
+        <div class="logo">Dwelli<span>gence</span></div>
+      </div>
+      <div class="navbar-right">
+        <div class="search-badge" style="background:rgba(59,130,246,0.18);border-color:rgba(59,130,246,0.4);">
+          <div class="search-badge-spinner"></div>
+          <span class="search-badge-text">1/3 sources</span>
+        </div>
+        <div class="nav-icon-btn">🔔</div>
+        <div class="avatar">OL</div>
+      </div>
+
+      <!-- Expanded tooltip -->
+      <div class="status-popover">
+        <div class="popover-header">
+          <span class="popover-title">Search progress</span>
+          <span class="popover-close">✕</span>
+        </div>
+        <div class="popover-sources">
+          <div class="popover-source-row">
+            <div class="popover-source-icon">📋</div>
+            <div class="popover-source-name">Craigslist</div>
+            <div class="popover-source-status status-done">38 found ✓</div>
+          </div>
+          <div class="popover-source-row">
+            <div class="popover-source-icon">🏠</div>
+            <div class="popover-source-name">Realtor.com</div>
+            <div class="popover-source-status status-running">
+              <div class="mini-spinner"></div>
+              ~2 min left
+            </div>
+          </div>
+          <div class="popover-source-row">
+            <div class="popover-source-icon">🔑</div>
+            <div class="popover-source-name">Apartments.com</div>
+            <div class="popover-source-status status-queued">Queued…</div>
+          </div>
+        </div>
+        <div class="progress-section">
+          <div class="progress-bar-label">
+            <span>1 of 3 sources complete</span>
+            <span style="color:var(--blue);">33%</span>
+          </div>
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" style="width:33%;"></div>
+          </div>
+        </div>
+        <div class="popover-footer">
+          <button class="btn btn-sm btn-danger-ghost" style="width:100%;">Cancel search</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Body spacer so tooltip is visible -->
+    <div style="height:260px;padding:16px;">
+      <div style="color:var(--text3);font-size:12px;text-align:center;margin-top:60px;">
+        — main app content blurred in background —
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════ PHASE 4 ══ -->
+  <div class="phase-label">
+    <div class="phase-num">4</div>
+    <div class="phase-title">Search complete — in-app toast + browser notification</div>
+  </div>
+
+  <div class="mockup-card">
+    <!-- Navbar with green badge -->
+    <div class="navbar">
+      <div class="navbar-left">
+        <div class="logo">Dwelli<span>gence</span></div>
+      </div>
+      <div class="navbar-right">
+        <div class="green-badge">
+          <div class="green-dot"></div>
+          <span class="green-badge-text">47 new</span>
+        </div>
+        <div class="nav-icon-btn">🔔</div>
+        <div class="avatar">OL</div>
+      </div>
+    </div>
+
+    <!-- Scene -->
+    <div class="phase4-scene">
+      <div class="phase4-content">
+        <!-- Browser notification (decorative, at top) -->
+        <div style="margin-bottom:4px;font-size:10px;color:var(--text3);text-align:right;padding-right:2px;">Browser notification</div>
+        <div class="browser-notif">
+          <div class="browser-notif-icon">✅</div>
+          <div class="browser-notif-text">
+            <h4>Dwelligence — Search complete</h4>
+            <p>Found 47 new listings for "Brooklyn 2BR &lt; $3k"</p>
+          </div>
+          <div class="browser-notif-time">now</div>
+        </div>
+
+        <div class="blurred-listings">
+          <div class="listing-thumb">
+            <div class="listing-img">🏢</div>
+            <div class="listing-info">
+              <div class="listing-price">$2,450</div>
+              <div class="listing-addr">Williamsburg</div>
+            </div>
+          </div>
+          <div class="listing-thumb">
+            <div class="listing-img">🏠</div>
+            <div class="listing-info">
+              <div class="listing-price">$2,800</div>
+              <div class="listing-addr">Park Slope</div>
+            </div>
+          </div>
+          <div class="listing-thumb">
+            <div class="listing-img">🏗</div>
+            <div class="listing-info">
+              <div class="listing-price">$2,200</div>
+              <div class="listing-addr">Bushwick</div>
+            </div>
+          </div>
+          <div class="listing-thumb">
+            <div class="listing-img">🏙</div>
+            <div class="listing-info">
+              <div class="listing-price">$2,950</div>
+              <div class="listing-addr">Cobble Hill</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toast -->
+      <div class="toast-container">
+        <div class="toast-header">
+          <div class="toast-icon">🎉</div>
+          <div style="flex:1;">
+            <div class="toast-title">Search complete!</div>
+          </div>
+          <div class="toast-close">✕</div>
+        </div>
+        <div class="toast-body">
+          <p>Found <strong style="color:var(--text);">47 new listings</strong> for "Brooklyn 2BR &lt; $3k". Results have been added to your feed.</p>
+          <div class="toast-actions">
+            <button class="btn btn-primary btn-sm" style="flex:1;">View results</button>
+            <button class="btn btn-ghost btn-sm">Dismiss</button>
+          </div>
+        </div>
+        <div class="toast-progress-bar"></div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════ PHASE 5 ══ -->
+  <div class="phase-label">
+    <div class="phase-num">5</div>
+    <div class="phase-title">Results integrated — new listings flagged + save search option</div>
+  </div>
+
+  <div class="mockup-card">
+    <!-- Navbar -->
+    <div class="navbar">
+      <div class="navbar-left">
+        <div class="logo">Dwelli<span>gence</span></div>
+      </div>
+      <div class="navbar-right">
+        <div class="green-badge">
+          <div class="green-dot"></div>
+          <span class="green-badge-text">47 new</span>
+        </div>
+        <div class="nav-icon-btn">🔔</div>
+        <div class="avatar">OL</div>
+      </div>
+    </div>
+
+    <!-- Results banner -->
+    <div class="results-banner">
+      <div class="results-banner-left">
+        <div class="results-banner-icon">✨</div>
+        <div class="results-banner-text">
+          <h4>47 new listings added</h4>
+          <p>From search: "Brooklyn 2BR &lt; $3k, pet-friendly"</p>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-sm" style="flex:none;white-space:nowrap;">Clear</button>
+    </div>
+
+    <!-- Filter chips -->
+    <div class="filter-chips">
+      <div class="chip chip-active">From this search ✕</div>
+      <div class="chip chip-default">Under $2,500</div>
+      <div class="chip chip-default">🐾 Pet-friendly</div>
+      <div class="chip chip-default">Photos</div>
+    </div>
+
+    <!-- Listings -->
+    <div class="listings-with-new">
+      <div class="listing-card is-new">
+        <div class="listing-card-img">
+          🏢
+          <div class="new-badge">New</div>
+        </div>
+        <div class="listing-card-info">
+          <div class="listing-card-price">$2,200/mo</div>
+          <div class="listing-card-addr">Bushwick, Brooklyn</div>
+          <div class="listing-card-meta">2BR · 1BA · 850 sqft</div>
+        </div>
+      </div>
+      <div class="listing-card is-new">
+        <div class="listing-card-img">
+          🏠
+          <div class="new-badge">New</div>
+        </div>
+        <div class="listing-card-info">
+          <div class="listing-card-price">$2,750/mo</div>
+          <div class="listing-card-addr">Crown Heights, BK</div>
+          <div class="listing-card-meta">2BR · 1BA · 920 sqft</div>
+        </div>
+      </div>
+      <div class="listing-card is-new">
+        <div class="listing-card-img">
+          🏗
+          <div class="new-badge">New</div>
+        </div>
+        <div class="listing-card-info">
+          <div class="listing-card-price">$2,450/mo</div>
+          <div class="listing-card-addr">Bed-Stuy, Brooklyn</div>
+          <div class="listing-card-meta">2BR · 1BA · 880 sqft</div>
+        </div>
+      </div>
+      <div class="listing-card">
+        <div class="listing-card-img">🏙</div>
+        <div class="listing-card-info">
+          <div class="listing-card-price">$2,800/mo</div>
+          <div class="listing-card-addr">Park Slope, BK</div>
+          <div class="listing-card-meta">2BR · 2BA · 1,000 sqft</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Save search -->
+    <div class="save-search-row">
+      <p>Save this search to re-run it later</p>
+      <button class="btn btn-ghost btn-sm" style="white-space:nowrap;">
+        🔖 Save search
+      </button>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════ PHASE 6 ══ -->
+  <div class="phase-label">
+    <div class="phase-num">6</div>
+    <div class="phase-title">Search history — past searches, re-run, status tracking</div>
+  </div>
+
+  <div class="mockup-card">
+    <!-- Navbar -->
+    <div class="navbar">
+      <div class="navbar-left">
+        <div class="logo">Dwelli<span>gence</span></div>
+      </div>
+      <div class="navbar-right">
+        <div class="search-badge">
+          <div class="search-badge-spinner"></div>
+          <span class="search-badge-text">Running</span>
+        </div>
+        <div class="nav-icon-btn">🔔</div>
+        <div class="avatar">OL</div>
+      </div>
+    </div>
+
+    <!-- History drawer -->
+    <div class="history-drawer">
+      <div class="drawer-handle"></div>
+      <div class="drawer-title">Search history</div>
+      <div class="drawer-subtitle">Manage and re-run past searches</div>
+
+      <div class="history-list">
+
+        <!-- Running item -->
+        <div class="history-item" style="border-color:rgba(59,130,246,0.3);">
+          <div class="history-item-header">
+            <div class="history-query">Brooklyn 2BR &lt; $3k, pet-friendly</div>
+            <div class="history-status-badge badge-running">
+              <div class="mini-spinner" style="width:9px;height:9px;border-width:1.5px;"></div>
+              Running
+            </div>
+          </div>
+          <div class="history-running-bar">
+            <div class="history-running-fill"></div>
+          </div>
+          <div class="history-meta">Started 1 min ago · Craigslist done, 2 sources remaining</div>
+          <div class="history-footer">
+            <div class="history-count"><strong>38</strong> found so far</div>
+            <div class="history-actions">
+              <button class="btn btn-ghost btn-sm btn-danger-ghost">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Completed item -->
+        <div class="history-item">
+          <div class="history-item-header">
+            <div class="history-query">Astoria 1BR under $2,200</div>
+            <div class="history-status-badge badge-done">Complete</div>
+          </div>
+          <div class="history-meta">Mar 22 · Craigslist, Realtor.com, Apartments.com</div>
+          <div class="history-footer">
+            <div class="history-count"><strong>62</strong> listings found</div>
+            <div class="history-actions">
+              <button class="btn btn-ghost btn-sm">View</button>
+              <button class="btn btn-primary btn-sm">Re-run</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Saved item -->
+        <div class="history-item">
+          <div class="history-item-header">
+            <div class="history-query">Upper West Side 2BR $2,800–$3,400</div>
+            <div class="history-status-badge badge-saved">Saved</div>
+          </div>
+          <div class="history-meta">Mar 20 · Last run 3 days ago</div>
+          <div class="history-footer">
+            <div class="history-count"><strong>29</strong> listings last time</div>
+            <div class="history-actions">
+              <button class="btn btn-ghost btn-sm">View</button>
+              <button class="btn btn-primary btn-sm">Re-run</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Completed item 2 -->
+        <div class="history-item">
+          <div class="history-item-header">
+            <div class="history-query">Jersey City studio near PATH</div>
+            <div class="history-status-badge badge-done">Complete</div>
+          </div>
+          <div class="history-meta">Mar 18 · Craigslist, Apartments.com</div>
+          <div class="history-footer">
+            <div class="history-count"><strong>41</strong> listings found</div>
+            <div class="history-actions">
+              <button class="btn btn-ghost btn-sm">View</button>
+              <button class="btn btn-primary btn-sm">Re-run</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Footer note -->
+  <div style="text-align:center;margin-top:48px;color:var(--text3);font-size:11px;line-height:1.7;">
+    Dwelligence — Long-Running Search UX Mockup<br>
+    6 phases · Dark #0a0a0a · Accent #3b82f6 · Success #22c55e
+  </div>
+
+</body>
+</html>

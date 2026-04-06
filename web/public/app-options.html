@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dwelligence Mobile App Options</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0a0a0a;
+    color: #e5e7eb;
+    line-height: 1.6;
+    padding: 0 0 80px 0;
+  }
+  a { color: #3b82f6; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #111827 0%, #1e293b 100%);
+    border-bottom: 1px solid #1f2937;
+    padding: 48px 24px;
+    text-align: center;
+  }
+  .header h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: #f9fafb;
+    margin-bottom: 8px;
+  }
+  .header h1 span { color: #3b82f6; }
+  .header p.subtitle {
+    color: #9ca3af;
+    font-size: 1.1rem;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  .badge {
+    display: inline-block;
+    background: #3b82f6;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 9999px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Container */
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* TL;DR */
+  .tldr {
+    background: linear-gradient(135deg, #1e3a5f 0%, #1a2744 100%);
+    border: 1px solid #2563eb;
+    border-radius: 12px;
+    padding: 32px;
+    margin: 40px auto;
+    max-width: 1100px;
+  }
+  .tldr h2 {
+    color: #60a5fa;
+    font-size: 1.3rem;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tldr p { color: #d1d5db; font-size: 1rem; }
+  .tldr strong { color: #f9fafb; }
+
+  /* Section titles */
+  .section-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #f9fafb;
+    margin: 48px 0 24px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #1f2937;
+  }
+
+  /* Option Cards */
+  .option-card {
+    background: #111827;
+    border: 1px solid #1f2937;
+    border-radius: 12px;
+    padding: 32px;
+    margin-bottom: 32px;
+    transition: border-color 0.2s;
+  }
+  .option-card:hover { border-color: #374151; }
+  .option-card.recommended {
+    border-color: #3b82f6;
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.1);
+  }
+  .option-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .option-letter {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #3b82f6;
+    background: rgba(59, 130, 246, 0.1);
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+  .option-title { font-size: 1.3rem; font-weight: 700; color: #f9fafb; }
+  .option-tagline { color: #9ca3af; font-size: 0.95rem; }
+  .rec-badge {
+    background: #22c55e;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Quick stats row */
+  .quick-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-box {
+    background: #0a0a0a;
+    border: 1px solid #1f2937;
+    border-radius: 8px;
+    padding: 12px 14px;
+    text-align: center;
+  }
+  .stat-label { font-size: 0.7rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .stat-value { font-size: 1rem; font-weight: 700; color: #f9fafb; }
+  .stat-value.green { color: #22c55e; }
+  .stat-value.yellow { color: #eab308; }
+  .stat-value.red { color: #ef4444; }
+  .stat-value.blue { color: #3b82f6; }
+
+  /* Description */
+  .option-desc { color: #d1d5db; margin-bottom: 20px; }
+  .option-desc h4 { color: #f9fafb; font-size: 0.95rem; margin: 16px 0 8px; }
+
+  /* Pros/Cons */
+  .pros-cons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 20px;
+  }
+  @media (max-width: 640px) { .pros-cons { grid-template-columns: 1fr; } }
+  .pros, .cons {
+    background: #0a0a0a;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .pros { border: 1px solid #166534; }
+  .cons { border: 1px solid #7f1d1d; }
+  .pros h4 { color: #22c55e; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .cons h4 { color: #ef4444; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .pros ul, .cons ul { list-style: none; padding: 0; }
+  .pros li, .cons li { padding: 4px 0; font-size: 0.9rem; color: #d1d5db; }
+  .pros li::before { content: '+ '; color: #22c55e; font-weight: 700; }
+  .cons li::before { content: '- '; color: #ef4444; font-weight: 700; }
+
+  /* Key details list */
+  .details-list { list-style: none; padding: 0; }
+  .details-list li {
+    padding: 6px 0;
+    color: #d1d5db;
+    font-size: 0.9rem;
+    border-bottom: 1px solid #1f2937;
+  }
+  .details-list li:last-child { border-bottom: none; }
+  .details-list li strong { color: #f9fafb; }
+
+  /* Comparison Table */
+  .table-wrapper { overflow-x: auto; margin: 24px 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  th {
+    background: #1f2937;
+    color: #f9fafb;
+    padding: 12px 14px;
+    text-align: left;
+    font-weight: 600;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+  }
+  td {
+    padding: 12px 14px;
+    border-bottom: 1px solid #1f2937;
+    color: #d1d5db;
+  }
+  tr:hover td { background: rgba(59, 130, 246, 0.03); }
+  .cell-green { color: #22c55e; font-weight: 600; }
+  .cell-yellow { color: #eab308; font-weight: 600; }
+  .cell-red { color: #ef4444; font-weight: 600; }
+  .cell-blue { color: #60a5fa; font-weight: 600; }
+  .highlight-row td { background: rgba(59, 130, 246, 0.06); }
+
+  /* Recommendation section */
+  .rec-section {
+    background: linear-gradient(135deg, #111827 0%, #1a2744 100%);
+    border: 1px solid #2563eb;
+    border-radius: 12px;
+    padding: 36px;
+    margin: 48px 0;
+  }
+  .rec-section h2 { color: #60a5fa; margin-bottom: 16px; font-size: 1.4rem; }
+  .rec-section h3 { color: #f9fafb; margin: 20px 0 8px; font-size: 1.1rem; }
+  .rec-section p, .rec-section li { color: #d1d5db; }
+  .rec-section ol, .rec-section ul { padding-left: 24px; }
+  .rec-section li { margin-bottom: 6px; }
+  .rec-section .phase {
+    background: #0a0a0a;
+    border: 1px solid #1f2937;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 12px 0;
+  }
+  .rec-section .phase-num {
+    color: #3b82f6;
+    font-weight: 800;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+
+  /* Map equivalents */
+  .map-table {
+    margin: 16px 0;
+    width: 100%;
+  }
+  .map-table td { padding: 8px 14px; }
+  .map-table tr:nth-child(even) td { background: #0d1117; }
+
+  /* Nav */
+  .nav {
+    background: #111827;
+    border-bottom: 1px solid #1f2937;
+    padding: 12px 24px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .nav a {
+    color: #9ca3af;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 6px;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .nav a:hover { color: #f9fafb; background: #1f2937; text-decoration: none; }
+
+  /* Current stack callout */
+  .stack-callout {
+    background: #111827;
+    border: 1px solid #1f2937;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 24px 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .stack-chip {
+    background: #1f2937;
+    color: #d1d5db;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="badge">Technical Research</div>
+  <h1><span>Dwelligence</span> Mobile App Options</h1>
+  <p class="subtitle">Every viable path from your Next.js web app to a mobile app, compared side by side.</p>
+  <div class="stack-callout" style="max-width: 700px; margin: 24px auto 0; justify-content: center;">
+    <span class="stack-chip">Next.js 15</span>
+    <span class="stack-chip">React 19</span>
+    <span class="stack-chip">Tailwind 4</span>
+    <span class="stack-chip">Supabase</span>
+    <span class="stack-chip">Leaflet Maps</span>
+    <span class="stack-chip">Framer Motion</span>
+    <span class="stack-chip">@use-gesture</span>
+    <span class="stack-chip">Vercel</span>
+  </div>
+</div>
+
+<nav class="nav">
+  <a href="#tldr">TL;DR</a>
+  <a href="#option-a">PWA</a>
+  <a href="#option-b">React Native</a>
+  <a href="#option-c">Capacitor</a>
+  <a href="#option-d">Expo</a>
+  <a href="#option-e">Native</a>
+  <a href="#option-f">Tauri</a>
+  <a href="#comparison">Comparison</a>
+  <a href="#maps">Maps</a>
+  <a href="#recommendation">Recommendation</a>
+</nav>
+
+<div class="container">
+
+<!-- TL;DR -->
+<div class="tldr" id="tldr">
+  <h2>TL;DR</h2>
+  <p>
+    <strong>Start with a PWA (Option A) now</strong> &mdash; it takes 2-3 days, costs nothing, and gets you home screen install + offline support immediately.
+    <strong>Then build with Expo (Option D)</strong> when you need App Store presence and real push notifications. Expo gives you
+    native gestures (critical for the swipe feature), file-based routing you already know from Next.js, and stays entirely in JS/TS.
+    Skip React Native bare workflow, Capacitor, and native Swift/Kotlin &mdash; they either add complexity you don't need or require languages you don't use.
+  </p>
+</div>
+
+<!-- ============================================ -->
+<!-- OPTION A: PWA -->
+<!-- ============================================ -->
+<h2 class="section-title" id="option-a">Option A: Progressive Web App (PWA)</h2>
+<div class="option-card recommended">
+  <div class="option-header">
+    <div class="option-letter">A</div>
+    <div>
+      <div class="option-title">Progressive Web App</div>
+      <div class="option-tagline">Turn your existing web app into an installable app with zero new code</div>
+    </div>
+    <span class="rec-badge">Quick Win</span>
+  </div>
+
+  <div class="quick-stats">
+    <div class="stat-box">
+      <div class="stat-label">Effort</div>
+      <div class="stat-value green">2-3 days</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Cost</div>
+      <div class="stat-value green">$0</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">App Store</div>
+      <div class="stat-value red">No*</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Push Notifications</div>
+      <div class="stat-value yellow">Partial</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Swipe Quality</div>
+      <div class="stat-value yellow">Good</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Code Reuse</div>
+      <div class="stat-value green">100%</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Maintenance</div>
+      <div class="stat-value green">Minimal</div>
+    </div>
+  </div>
+
+  <div class="option-desc">
+    <h4>What it takes</h4>
+    <ul class="details-list">
+      <li><strong>manifest.json</strong> &mdash; Add a web app manifest with name, icons (192px, 512px), theme color, display: standalone. Next.js 15 supports this natively via <code>app/manifest.ts</code>.</li>
+      <li><strong>Service Worker</strong> &mdash; Use <code>next-pwa</code> or <code>@serwist/next</code> to auto-generate a service worker. Handles caching, offline fallback pages, and asset precaching.</li>
+      <li><strong>Offline support</strong> &mdash; Cache the app shell + recently viewed listings. API calls can use a cache-then-network strategy. Supabase offline mode is limited, so focus on read-only offline viewing.</li>
+      <li><strong>Add to Home Screen</strong> &mdash; Works on Android (Chrome shows install banner automatically). On iOS Safari, users tap Share > Add to Home Screen. No browser chrome in standalone mode.</li>
+      <li><strong>Push Notifications</strong> &mdash; Web Push API works on Android Chrome and desktop. <strong>iOS Safari added web push in iOS 16.4 (2023)</strong>, but only for PWAs added to home screen. Requires user to re-open the PWA, not just visit the URL.</li>
+      <li><strong>Icons & Splash</strong> &mdash; Need Apple touch icons and meta tags for iOS splash screens. Can use <code>pwa-asset-generator</code> to auto-create these from a single source image.</li>
+    </ul>
+
+    <h4>Vercel compatibility</h4>
+    <p>PWAs work fine on Vercel. The service worker is served as a static file. No infrastructure changes needed.</p>
+  </div>
+
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>Pros</h4>
+      <ul>
+        <li>Zero new codebase &mdash; enhance what you have</li>
+        <li>Done in a weekend</li>
+        <li>No app store review process</li>
+        <li>Instant updates (no app store delay)</li>
+        <li>Same URL, SEO preserved</li>
+        <li>Your @use-gesture swipe code works as-is</li>
+        <li>Leaflet maps work as-is</li>
+        <li>Framer Motion animations preserved</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>Cons</h4>
+      <ul>
+        <li>No App Store / Play Store listing (discoverability)</li>
+        <li>iOS push notifications are janky &mdash; require home screen install, can break on iOS updates</li>
+        <li>iOS Safari quirks: no background fetch, limited storage (50MB), can be evicted after 7 days of no use</li>
+        <li>Swipe gestures are good but not native-feel (60fps vs 120fps, no haptic feedback)</li>
+        <li>No access to native APIs (haptics, contacts, NFC, etc.)</li>
+        <li>Users unfamiliar with PWA install flow</li>
+        <li>Google Play Store listing possible via TWA (Trusted Web Activity) but adds complexity</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- OPTION B: React Native -->
+<!-- ============================================ -->
+<h2 class="section-title" id="option-b">Option B: React Native (Bare Workflow)</h2>
+<div class="option-card">
+  <div class="option-header">
+    <div class="option-letter">B</div>
+    <div>
+      <div class="option-title">React Native (Bare)</div>
+      <div class="option-tagline">Separate native app with shared Supabase backend, full control over native modules</div>
+    </div>
+  </div>
+
+  <div class="quick-stats">
+    <div class="stat-box">
+      <div class="stat-label">Effort</div>
+      <div class="stat-value yellow">8-12 weeks</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Cost</div>
+      <div class="stat-value yellow">$$</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">App Store</div>
+      <div class="stat-value green">Yes</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Push Notifications</div>
+      <div class="stat-value green">Full</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Swipe Quality</div>
+      <div class="stat-value green">Excellent</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Code Reuse</div>
+      <div class="stat-value yellow">30-40%</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Maintenance</div>
+      <div class="stat-value yellow">Medium</div>
+    </div>
+  </div>
+
+  <div class="option-desc">
+    <h4>What you'd build</h4>
+    <ul class="details-list">
+      <li><strong>Supabase backend reuse</strong> &mdash; <code>@supabase/supabase-js</code> works identically in React Native. Auth, database queries, realtime subscriptions &mdash; all portable. This is the biggest win.</li>
+      <li><strong>UI rebuild</strong> &mdash; React Native uses <code>&lt;View&gt;</code>, <code>&lt;Text&gt;</code>, <code>&lt;ScrollView&gt;</code> instead of HTML divs. No Tailwind (you'd use <code>nativewind</code> or <code>StyleSheet.create</code>). Your component logic transfers but JSX does not.</li>
+      <li><strong>Maps</strong> &mdash; Replace Leaflet with <code>react-native-maps</code> (uses Apple Maps on iOS, Google Maps on Android). Better performance than web maps. Supports markers, clusters, custom overlays.</li>
+      <li><strong>Gestures</strong> &mdash; <code>react-native-gesture-handler</code> + <code>react-native-reanimated</code> give you 120fps gesture animations running on the native UI thread. This is the gold standard for swipe interactions.</li>
+      <li><strong>Navigation</strong> &mdash; <code>@react-navigation/native</code> with stack + tab navigators. Different paradigm from Next.js file routing.</li>
+      <li><strong>Push notifications</strong> &mdash; <code>react-native-firebase</code> or <code>@notifee/react-native</code> for full native push via APNs (iOS) and FCM (Android).</li>
+    </ul>
+
+    <h4>Key libraries</h4>
+    <ul class="details-list">
+      <li><code>react-native-maps</code> &mdash; Native map views</li>
+      <li><code>react-native-gesture-handler</code> &mdash; 120fps gestures on native thread</li>
+      <li><code>react-native-reanimated</code> &mdash; Performant animations</li>
+      <li><code>nativewind</code> &mdash; Tailwind for React Native (partial compatibility)</li>
+      <li><code>@supabase/supabase-js</code> &mdash; Same client you already use</li>
+      <li><code>react-native-fast-image</code> &mdash; Cached image loading</li>
+    </ul>
+
+    <h4>Cost breakdown</h4>
+    <p>Apple Developer Account: $99/year. Google Play Console: $25 one-time. No other infrastructure costs &mdash; you're still using Supabase + Vercel for the API/backend.</p>
+  </div>
+
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>Pros</h4>
+      <ul>
+        <li>Best swipe gesture quality (native thread animations)</li>
+        <li>Full App Store + Play Store presence</li>
+        <li>Native push notifications (reliable, rich)</li>
+        <li>Access to all native APIs</li>
+        <li>Same language (JS/TS) you already know</li>
+        <li>Supabase client works unchanged</li>
+        <li>Large ecosystem and community</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>Cons</h4>
+      <ul>
+        <li>UI must be completely rebuilt (no HTML/CSS)</li>
+        <li>Two codebases to maintain (web + native)</li>
+        <li>Bare workflow requires Xcode + Android Studio setup</li>
+        <li>Native module linking can break on RN upgrades</li>
+        <li>Slower iteration than web (build + deploy cycle)</li>
+        <li>Need to manage iOS/Android signing, certificates</li>
+        <li>No Framer Motion &mdash; need to learn Reanimated API</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- OPTION C: Capacitor -->
+<!-- ============================================ -->
+<h2 class="section-title" id="option-c">Option C: Capacitor (Wrap the Web App)</h2>
+<div class="option-card">
+  <div class="option-header">
+    <div class="option-letter">C</div>
+    <div>
+      <div class="option-title">Ionic Capacitor</div>
+      <div class="option-tagline">Wrap your existing Next.js app in a native WebView shell with native API access</div>
+    </div>
+  </div>
+
+  <div class="quick-stats">
+    <div class="stat-box">
+      <div class="stat-label">Effort</div>
+      <div class="stat-value green">1-2 weeks</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Cost</div>
+      <div class="stat-value green">$124</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">App Store</div>
+      <div class="stat-value green">Yes</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Push Notifications</div>
+      <div class="stat-value green">Full</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Swipe Quality</div>
+      <div class="stat-value yellow">Good</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Code Reuse</div>
+      <div class="stat-value green">95%</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Maintenance</div>
+      <div class="stat-value green">Low</div>
+    </div>
+  </div>
+
+  <div class="option-desc">
+    <h4>How it works</h4>
+    <ul class="details-list">
+      <li><strong>Concept</strong> &mdash; Capacitor creates iOS/Android projects that embed a WKWebView (iOS) or Android WebView. Your Next.js app runs inside this WebView, but with a JavaScript bridge to native APIs.</li>
+      <li><strong>Setup</strong> &mdash; Run <code>npx cap init</code>, export your Next.js app as static (<code>output: 'export'</code> in next.config.js), then <code>npx cap add ios</code> and <code>npx cap add android</code>. The exported HTML/JS/CSS gets bundled into the native app.</li>
+      <li><strong>Important limitation</strong> &mdash; Next.js <strong>server-side features don't work</strong> in Capacitor. No API routes, no SSR, no server components. You'd need to either: (a) use <code>output: 'export'</code> for a fully static build, or (b) point the WebView at your Vercel URL (live mode). Option (b) is easier but requires internet.</li>
+      <li><strong>Native plugins</strong> &mdash; <code>@capacitor/push-notifications</code> for native push, <code>@capacitor/haptics</code> for vibration feedback on swipes, <code>@capacitor/camera</code>, <code>@capacitor/geolocation</code>, etc.</li>
+      <li><strong>Maps</strong> &mdash; Leaflet continues to work inside the WebView. You could optionally use <code>@capacitor/google-maps</code> for a native map layer rendered behind the WebView (better perf, but more complex).</li>
+      <li><strong>Gestures</strong> &mdash; Your existing @use-gesture + Framer Motion swipe code works. Add <code>@capacitor/haptics</code> for tactile feedback. Gesture performance is WebView-bound (good, not native-level).</li>
+    </ul>
+
+    <h4>The SSR problem</h4>
+    <p>Your current app likely uses Next.js server components and API routes. Capacitor needs either a static export or a live URL. The pragmatic approach: point Capacitor's WebView at your production Vercel URL. The app works exactly like the web version, but wrapped in a native shell with push notification access. The downside is no offline support.</p>
+  </div>
+
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>Pros</h4>
+      <ul>
+        <li>95% code reuse &mdash; your web app IS the mobile app</li>
+        <li>Native push notifications via Capacitor plugin</li>
+        <li>App Store distribution</li>
+        <li>Haptic feedback for swipes (native plugin)</li>
+        <li>Fast to set up (days, not weeks)</li>
+        <li>Leaflet maps work unchanged</li>
+        <li>Framer Motion animations preserved</li>
+        <li>Well-maintained by Ionic team</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>Cons</h4>
+      <ul>
+        <li>WebView performance ceiling (not true native)</li>
+        <li>Apple has rejected low-effort WebView wrappers &mdash; need to add native value</li>
+        <li>Next.js SSR/API routes require live URL or architectural changes</li>
+        <li>Swipe gestures are good, not excellent (WebView thread)</li>
+        <li>Debugging WebView issues is frustrating</li>
+        <li>Two build pipelines (web + native)</li>
+        <li>Need Xcode + Android Studio for builds</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- OPTION D: Expo -->
+<!-- ============================================ -->
+<h2 class="section-title" id="option-d">Option D: Expo (Recommended Native Path)</h2>
+<div class="option-card recommended">
+  <div class="option-header">
+    <div class="option-letter">D</div>
+    <div>
+      <div class="option-title">Expo (Managed React Native)</div>
+      <div class="option-tagline">The "Next.js of mobile" &mdash; file-based routing, managed builds, OTA updates</div>
+    </div>
+    <span class="rec-badge">Recommended</span>
+  </div>
+
+  <div class="quick-stats">
+    <div class="stat-box">
+      <div class="stat-label">Effort</div>
+      <div class="stat-value yellow">6-8 weeks</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Cost</div>
+      <div class="stat-value yellow">$$</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">App Store</div>
+      <div class="stat-value green">Yes</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Push Notifications</div>
+      <div class="stat-value green">Full</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Swipe Quality</div>
+      <div class="stat-value green">Excellent</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Code Reuse</div>
+      <div class="stat-value yellow">35-45%</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Maintenance</div>
+      <div class="stat-value green">Low</div>
+    </div>
+  </div>
+
+  <div class="option-desc">
+    <h4>Why Expo is the sweet spot</h4>
+    <ul class="details-list">
+      <li><strong>Expo Router</strong> &mdash; File-based routing that works like Next.js App Router. <code>app/(tabs)/search.tsx</code>, <code>app/listing/[id].tsx</code> &mdash; you already think this way. Supports layouts, nested routes, typed routes.</li>
+      <li><strong>EAS Build</strong> &mdash; Cloud build service. No need to own a Mac for iOS builds (though having one helps for testing). Builds are submitted directly to App Store Connect and Google Play Console. Free tier: 30 builds/month.</li>
+      <li><strong>EAS Update (OTA)</strong> &mdash; Push JS bundle updates instantly without going through app store review. Like Vercel deployments but for mobile. Fix bugs in minutes, not days.</li>
+      <li><strong>Expo Notifications</strong> &mdash; <code>expo-notifications</code> handles APNs + FCM setup, token management, and rich notification content. Push service is free for reasonable volume.</li>
+      <li><strong>Gestures</strong> &mdash; Expo includes <code>react-native-gesture-handler</code> and <code>react-native-reanimated</code> by default. Your swipe card interaction would run on the native UI thread at 120fps. This is categorically better than web gestures.</li>
+      <li><strong>Maps</strong> &mdash; <code>react-native-maps</code> is in the Expo SDK. Apple Maps on iOS (free), Google Maps on Android (free up to very high usage). Native map performance far exceeds Leaflet.</li>
+      <li><strong>Dev experience</strong> &mdash; <code>npx expo start</code>, scan QR code with Expo Go, see changes instantly on your phone. Hot reload. No Xcode/Android Studio needed during development (only for custom native modules).</li>
+      <li><strong>Auth</strong> &mdash; <code>@supabase/supabase-js</code> works in Expo. Use <code>expo-secure-store</code> for token persistence (replaces browser localStorage).</li>
+    </ul>
+
+    <h4>What transfers from your current codebase</h4>
+    <ul class="details-list">
+      <li><strong>100% reusable:</strong> Supabase queries, API logic, type definitions, business logic, state management (React Query)</li>
+      <li><strong>Needs adaptation:</strong> Tailwind classes &rarr; NativeWind (similar syntax), Framer Motion &rarr; Reanimated (different API, same concepts), @use-gesture &rarr; gesture-handler</li>
+      <li><strong>Needs rebuild:</strong> JSX (div/span/p &rarr; View/Text/ScrollView), Leaflet components &rarr; react-native-maps, Next.js-specific patterns (server components, API routes)</li>
+    </ul>
+
+    <h4>Cost breakdown</h4>
+    <p>Apple Developer: $99/year. Google Play: $25 one-time. EAS Build free tier is sufficient for a solo developer. EAS Update free tier: 1,000 updates/month.</p>
+  </div>
+
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>Pros</h4>
+      <ul>
+        <li>File-based routing &mdash; familiar mental model from Next.js</li>
+        <li>120fps native gestures (best possible swipe experience)</li>
+        <li>EAS Build &mdash; no local Xcode/Android Studio needed for builds</li>
+        <li>OTA updates &mdash; deploy fixes without app store review</li>
+        <li>Native push notifications (reliable, rich)</li>
+        <li>Native maps (Apple Maps / Google Maps)</li>
+        <li>All JavaScript/TypeScript &mdash; no Swift/Kotlin needed</li>
+        <li>Huge ecosystem, excellent docs, active development</li>
+        <li>Expo Go for instant development testing</li>
+        <li>Supabase integration is first-class</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>Cons</h4>
+      <ul>
+        <li>UI needs to be rebuilt (no HTML/CSS)</li>
+        <li>6-8 weeks of work to reach parity</li>
+        <li>Two codebases to maintain long-term</li>
+        <li>Learning curve for Reanimated (replaces Framer Motion)</li>
+        <li>Some Expo SDK limitations if you need very custom native modules (can eject to bare)</li>
+        <li>React Native upgrade cycle can introduce breaking changes</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- OPTION E: Native Swift/Kotlin -->
+<!-- ============================================ -->
+<h2 class="section-title" id="option-e">Option E: Native Swift / Kotlin</h2>
+<div class="option-card">
+  <div class="option-header">
+    <div class="option-letter">E</div>
+    <div>
+      <div class="option-title">Native iOS (Swift) + Android (Kotlin)</div>
+      <div class="option-tagline">Best possible quality, highest possible cost</div>
+    </div>
+  </div>
+
+  <div class="quick-stats">
+    <div class="stat-box">
+      <div class="stat-label">Effort</div>
+      <div class="stat-value red">16-24 weeks</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Cost</div>
+      <div class="stat-value red">$$$$</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">App Store</div>
+      <div class="stat-value green">Yes</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Push Notifications</div>
+      <div class="stat-value green">Full</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Swipe Quality</div>
+      <div class="stat-value green">Perfect</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Code Reuse</div>
+      <div class="stat-value red">10-15%</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Maintenance</div>
+      <div class="stat-value red">High</div>
+    </div>
+  </div>
+
+  <div class="option-desc">
+    <h4>What this means</h4>
+    <ul class="details-list">
+      <li><strong>Two completely separate apps</strong> &mdash; iOS in Swift/SwiftUI, Android in Kotlin/Jetpack Compose. Both connect to the same Supabase backend but share zero UI code.</li>
+      <li><strong>Learning curve</strong> &mdash; As a JS/TS developer, you'd need to learn Swift (memory management, optionals, protocols, SwiftUI declarative patterns) and Kotlin (coroutines, null safety, Compose). This is months of learning, not weeks.</li>
+      <li><strong>Maps</strong> &mdash; MapKit (iOS) and Google Maps SDK (Android). Best possible map performance and platform integration.</li>
+      <li><strong>Gestures</strong> &mdash; UIKit gesture recognizers (iOS) and MotionLayout/GestureDetector (Android). Platform-perfect swipe behavior with full haptic API access.</li>
+      <li><strong>Supabase</strong> &mdash; Official Swift and Kotlin clients exist (<code>supabase-swift</code>, <code>supabase-kt</code>). They work, but the API surface differs from the JS client you know.</li>
+    </ul>
+
+    <h4>When this makes sense</h4>
+    <p>Native makes sense when: (a) you have a funded team with dedicated iOS and Android developers, (b) your app needs deep OS integration (widgets, Siri shortcuts, Android auto, etc.), or (c) performance is so critical that even React Native's bridge overhead matters (think real-time gaming or video editing). For a property search app, this is overkill.</p>
+  </div>
+
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>Pros</h4>
+      <ul>
+        <li>Best possible performance on each platform</li>
+        <li>Perfect platform-native feel and gestures</li>
+        <li>Full access to every OS API, day-one</li>
+        <li>Apple/Google love native apps in store reviews</li>
+        <li>Smallest binary sizes</li>
+        <li>No abstraction layer overhead</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>Cons</h4>
+      <ul>
+        <li>Two new languages to learn (Swift + Kotlin)</li>
+        <li>Three codebases to maintain (web + iOS + Android)</li>
+        <li>16-24 weeks of development minimum</li>
+        <li>Features must be implemented twice</li>
+        <li>Hiring native developers is expensive</li>
+        <li>Almost no code shared with web app</li>
+        <li>Massive overkill for current app complexity</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- OPTION F: Tauri -->
+<!-- ============================================ -->
+<h2 class="section-title" id="option-f">Option F: Tauri Mobile</h2>
+<div class="option-card">
+  <div class="option-header">
+    <div class="option-letter">F</div>
+    <div>
+      <div class="option-title">Tauri 2.0 (Rust + WebView)</div>
+      <div class="option-tagline">Wrap the web app in a lightweight native shell, like Capacitor but with a Rust backend</div>
+    </div>
+  </div>
+
+  <div class="quick-stats">
+    <div class="stat-box">
+      <div class="stat-label">Effort</div>
+      <div class="stat-value yellow">3-5 weeks</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Cost</div>
+      <div class="stat-value green">$124</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">App Store</div>
+      <div class="stat-value green">Yes</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Push Notifications</div>
+      <div class="stat-value yellow">Plugin*</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Swipe Quality</div>
+      <div class="stat-value yellow">Good</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Code Reuse</div>
+      <div class="stat-value green">90%</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Maintenance</div>
+      <div class="stat-value yellow">Medium</div>
+    </div>
+  </div>
+
+  <div class="option-desc">
+    <h4>How it works</h4>
+    <ul class="details-list">
+      <li><strong>Tauri 2.0</strong> &mdash; Released stable in late 2024. Uses the system WebView (WKWebView on iOS, Android WebView) to render your web app, with a Rust backend for native API access. Think Capacitor, but the native bridge is Rust instead of Java/Swift.</li>
+      <li><strong>Bundle size</strong> &mdash; Significantly smaller than Capacitor or Electron because it uses the system WebView instead of bundling Chromium. Typical app: 5-10MB vs 50-100MB.</li>
+      <li><strong>Rust knowledge</strong> &mdash; You need some Rust for custom native functionality. The plugin system uses Rust. As a JS developer, this means learning ownership, lifetimes, cargo (think npm but for Rust), and the borrow checker. The learning curve is steep but the Tauri API abstracts most of it.</li>
+      <li><strong>Mobile support maturity</strong> &mdash; Tauri mobile (iOS + Android) is production-ready as of Tauri 2.0, but the ecosystem is much smaller than Capacitor's. Fewer plugins, fewer Stack Overflow answers, smaller community for mobile specifically.</li>
+      <li><strong>Same SSR problem as Capacitor</strong> &mdash; Next.js server features don't work in a WebView. Same solution: static export or live URL.</li>
+    </ul>
+
+    <h4>Plugin ecosystem</h4>
+    <ul class="details-list">
+      <li><code>tauri-plugin-notification</code> &mdash; Local and push notifications (less mature than Capacitor's plugin)</li>
+      <li><code>tauri-plugin-geolocation</code> &mdash; GPS access</li>
+      <li><code>tauri-plugin-haptics</code> &mdash; Vibration feedback</li>
+      <li><code>tauri-plugin-http</code> &mdash; Native HTTP client (bypass CORS)</li>
+      <li>Smaller plugin library overall &mdash; may need to write Rust plugins for missing features</li>
+    </ul>
+  </div>
+
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>Pros</h4>
+      <ul>
+        <li>Tiny bundle size (5-10MB)</li>
+        <li>90% code reuse from web app</li>
+        <li>Better security model than Capacitor (Rust backend)</li>
+        <li>Multi-platform: iOS, Android, macOS, Windows, Linux from one project</li>
+        <li>Rust backend is fast for heavy computation</li>
+        <li>App Store distribution</li>
+        <li>Growing community and corporate backing</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>Cons</h4>
+      <ul>
+        <li>Rust learning curve (steep for JS developers)</li>
+        <li>Mobile ecosystem is young &mdash; fewer plugins than Capacitor</li>
+        <li>Push notification plugin is less mature</li>
+        <li>Same WebView gesture limitations as Capacitor</li>
+        <li>Same SSR/server component problems as Capacitor</li>
+        <li>Debugging can be harder (Rust + WebView + native layers)</li>
+        <li>Smaller community = fewer answers when you're stuck</li>
+        <li>Apple app review risk (WebView wrapper)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- COMPARISON TABLE -->
+<!-- ============================================ -->
+<h2 class="section-title" id="comparison">Side-by-Side Comparison</h2>
+
+<div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th>Criteria</th>
+        <th>A: PWA</th>
+        <th>B: RN Bare</th>
+        <th>C: Capacitor</th>
+        <th>D: Expo</th>
+        <th>E: Native</th>
+        <th>F: Tauri</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Time to ship</strong></td>
+        <td class="cell-green">2-3 days</td>
+        <td class="cell-yellow">8-12 wks</td>
+        <td class="cell-green">1-2 wks</td>
+        <td class="cell-yellow">6-8 wks</td>
+        <td class="cell-red">16-24 wks</td>
+        <td class="cell-yellow">3-5 wks</td>
+      </tr>
+      <tr>
+        <td><strong>Cost (year 1)</strong></td>
+        <td class="cell-green">$0</td>
+        <td class="cell-yellow">~$124</td>
+        <td class="cell-green">~$124</td>
+        <td class="cell-yellow">~$124</td>
+        <td class="cell-red">~$124 + time</td>
+        <td class="cell-green">~$124</td>
+      </tr>
+      <tr>
+        <td><strong>App Store</strong></td>
+        <td class="cell-red">No</td>
+        <td class="cell-green">Yes</td>
+        <td class="cell-green">Yes</td>
+        <td class="cell-green">Yes</td>
+        <td class="cell-green">Yes</td>
+        <td class="cell-green">Yes</td>
+      </tr>
+      <tr class="highlight-row">
+        <td><strong>Swipe gestures</strong></td>
+        <td class="cell-yellow">Good (60fps web)</td>
+        <td class="cell-green">Excellent (120fps)</td>
+        <td class="cell-yellow">Good (WebView)</td>
+        <td class="cell-green">Excellent (120fps)</td>
+        <td class="cell-green">Perfect (native)</td>
+        <td class="cell-yellow">Good (WebView)</td>
+      </tr>
+      <tr class="highlight-row">
+        <td><strong>Push notifications</strong></td>
+        <td class="cell-yellow">Partial (iOS iffy)</td>
+        <td class="cell-green">Full native</td>
+        <td class="cell-green">Full native</td>
+        <td class="cell-green">Full native</td>
+        <td class="cell-green">Full native</td>
+        <td class="cell-yellow">Plugin (newer)</td>
+      </tr>
+      <tr>
+        <td><strong>Code reuse</strong></td>
+        <td class="cell-green">100%</td>
+        <td class="cell-yellow">30-40%</td>
+        <td class="cell-green">95%</td>
+        <td class="cell-yellow">35-45%</td>
+        <td class="cell-red">10-15%</td>
+        <td class="cell-green">90%</td>
+      </tr>
+      <tr>
+        <td><strong>Map quality</strong></td>
+        <td>Leaflet (web)</td>
+        <td class="cell-green">Native maps</td>
+        <td>Leaflet (web)</td>
+        <td class="cell-green">Native maps</td>
+        <td class="cell-green">Native maps</td>
+        <td>Leaflet (web)</td>
+      </tr>
+      <tr>
+        <td><strong>Offline support</strong></td>
+        <td class="cell-yellow">Service worker</td>
+        <td class="cell-green">Full</td>
+        <td class="cell-yellow">Limited</td>
+        <td class="cell-green">Full</td>
+        <td class="cell-green">Full</td>
+        <td class="cell-yellow">Limited</td>
+      </tr>
+      <tr>
+        <td><strong>OTA updates</strong></td>
+        <td class="cell-green">Instant (web)</td>
+        <td class="cell-yellow">CodePush</td>
+        <td class="cell-green">Live URL mode</td>
+        <td class="cell-green">EAS Update</td>
+        <td class="cell-red">App store only</td>
+        <td class="cell-green">Live URL mode</td>
+      </tr>
+      <tr>
+        <td><strong>Maintenance burden</strong></td>
+        <td class="cell-green">Minimal</td>
+        <td class="cell-yellow">Medium</td>
+        <td class="cell-green">Low</td>
+        <td class="cell-green">Low</td>
+        <td class="cell-red">High (x3)</td>
+        <td class="cell-yellow">Medium</td>
+      </tr>
+      <tr>
+        <td><strong>New languages needed</strong></td>
+        <td class="cell-green">None</td>
+        <td class="cell-green">None (JS/TS)</td>
+        <td class="cell-green">None</td>
+        <td class="cell-green">None (JS/TS)</td>
+        <td class="cell-red">Swift + Kotlin</td>
+        <td class="cell-yellow">Rust (some)</td>
+      </tr>
+      <tr>
+        <td><strong>Haptic feedback</strong></td>
+        <td class="cell-red">No</td>
+        <td class="cell-green">Yes</td>
+        <td class="cell-green">Yes (plugin)</td>
+        <td class="cell-green">Yes</td>
+        <td class="cell-green">Yes</td>
+        <td class="cell-green">Yes (plugin)</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ============================================ -->
+<!-- MAPS COMPARISON -->
+<!-- ============================================ -->
+<h2 class="section-title" id="maps">Maps: Leaflet vs Native Equivalents</h2>
+<div class="option-card">
+  <div class="option-desc">
+    <p>Leaflet is web-only. Here's what replaces it in each approach, and what changes.</p>
+  </div>
+  <div class="table-wrapper">
+    <table class="map-table">
+      <thead>
+        <tr>
+          <th>Approach</th>
+          <th>Map Library</th>
+          <th>Underlying Engine</th>
+          <th>Migration Effort</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>PWA</td>
+          <td>Leaflet (unchanged)</td>
+          <td>OpenStreetMap tiles</td>
+          <td class="cell-green">Zero</td>
+          <td>Works as-is in browser</td>
+        </tr>
+        <tr>
+          <td>Capacitor</td>
+          <td>Leaflet (in WebView)</td>
+          <td>OpenStreetMap tiles</td>
+          <td class="cell-green">Zero</td>
+          <td>Optional: @capacitor/google-maps for native layer</td>
+        </tr>
+        <tr>
+          <td>Tauri</td>
+          <td>Leaflet (in WebView)</td>
+          <td>OpenStreetMap tiles</td>
+          <td class="cell-green">Zero</td>
+          <td>Same as Capacitor</td>
+        </tr>
+        <tr>
+          <td>Expo / RN</td>
+          <td>react-native-maps</td>
+          <td>Apple Maps (iOS) / Google Maps (Android)</td>
+          <td class="cell-yellow">Medium</td>
+          <td>Different component API. MapView, Marker, Callout instead of MapContainer, TileLayer, Marker. Clustering via react-native-map-clustering.</td>
+        </tr>
+        <tr>
+          <td>Native iOS</td>
+          <td>MapKit</td>
+          <td>Apple Maps</td>
+          <td class="cell-red">High</td>
+          <td>SwiftUI Map view. Complete rewrite.</td>
+        </tr>
+        <tr>
+          <td>Native Android</td>
+          <td>Google Maps SDK</td>
+          <td>Google Maps</td>
+          <td class="cell-red">High</td>
+          <td>Jetpack Compose GoogleMap. Complete rewrite.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="option-desc" style="margin-top: 16px;">
+    <h4>Map feature parity checklist</h4>
+    <ul class="details-list">
+      <li><strong>Markers with popups</strong> &mdash; Supported in all options. react-native-maps uses Callout instead of Popup.</li>
+      <li><strong>Marker clustering</strong> &mdash; Leaflet uses leaflet.markercluster. React Native uses react-native-map-clustering. Both work well.</li>
+      <li><strong>Custom tile layers</strong> &mdash; Leaflet is tile-agnostic. react-native-maps defaults to platform maps but supports custom tile overlays.</li>
+      <li><strong>Gesture interaction</strong> &mdash; All options support pan/zoom. Native maps feel smoother due to native rendering.</li>
+      <li><strong>Performance with many markers</strong> &mdash; Native maps handle 1000+ markers better than Leaflet. Leaflet can lag at 500+ without clustering.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============================================ -->
+<!-- RECOMMENDATION -->
+<!-- ============================================ -->
+<h2 class="section-title" id="recommendation">What I'd Recommend</h2>
+<div class="rec-section">
+  <h2>Two-phase approach: PWA now, Expo later</h2>
+  <p>Given your constraints (solo JS/TS developer, swipe-centric app, need push notifications, Supabase backend), here's the practical path forward.</p>
+
+  <div class="phase">
+    <div class="phase-num">Phase 1 &mdash; This week</div>
+    <h3>Ship a PWA</h3>
+    <ul>
+      <li>Add <code>manifest.ts</code> to your Next.js app (30 minutes)</li>
+      <li>Add <code>@serwist/next</code> for service worker generation (2-3 hours)</li>
+      <li>Create offline fallback page and cache strategy (2-3 hours)</li>
+      <li>Generate PWA icons from your logo (30 minutes)</li>
+      <li>Add iOS meta tags for splash screens and status bar (1 hour)</li>
+      <li>Test on Android Chrome (install prompt) and iOS Safari (Add to Home Screen)</li>
+      <li><strong>Total: 2-3 days. Cost: $0. Result: installable app on every phone, today.</strong></li>
+    </ul>
+    <p style="margin-top: 12px; color: #9ca3af;">This gets you 80% of the mobile app experience with 1% of the effort. Your swipe feature, maps, auth, everything works. Push notifications work on Android immediately and on iOS for home-screen-installed users.</p>
+  </div>
+
+  <div class="phase">
+    <div class="phase-num">Phase 2 &mdash; When you're ready to invest</div>
+    <h3>Build with Expo</h3>
+    <ul>
+      <li>Create a new Expo project alongside the web app</li>
+      <li>Set up Expo Router with the same route structure as your Next.js app</li>
+      <li>Port Supabase client, React Query hooks, and business logic (copy-paste)</li>
+      <li>Rebuild UI components with React Native + NativeWind (Tailwind syntax)</li>
+      <li>Replace @use-gesture + Framer Motion with gesture-handler + Reanimated (the big learning curve, but the payoff is 120fps swipe cards)</li>
+      <li>Replace Leaflet with react-native-maps</li>
+      <li>Add expo-notifications for native push</li>
+      <li>Submit to App Store and Play Store via EAS Build</li>
+      <li><strong>Total: 6-8 weeks. Cost: $124/year (dev accounts). Result: native app in both stores.</strong></li>
+    </ul>
+    <p style="margin-top: 12px; color: #9ca3af;">Expo is the right choice over bare React Native because: managed builds (no Xcode hell), OTA updates (deploy like web), file-based routing (you already think this way), and the Expo SDK includes everything you need out of the box. You stay 100% in TypeScript.</p>
+  </div>
+
+  <h3>Why not Capacitor?</h3>
+  <p>Capacitor is tempting (95% code reuse, 1-2 weeks), but there are two problems: (1) your swipe feature is central to the app, and WebView gestures will always feel slightly off compared to native &mdash; this matters for a Tinder-style card interface; (2) Apple has been increasingly rejecting thin WebView wrappers, and you'd need to add meaningful native functionality to pass review. If swipe quality wasn't critical, Capacitor would be the answer.</p>
+
+  <h3>Why not Tauri?</h3>
+  <p>Tauri Mobile is technically impressive (small bundles, Rust backend), but the mobile ecosystem is still young. The push notification plugin is less mature, the community is smaller, and you'd need to learn Rust for any custom native functionality. As a JS/TS developer, this adds friction that Expo doesn't. Revisit Tauri in 2027 when the mobile story is more mature.</p>
+
+  <h3>Why not Native?</h3>
+  <p>Learning Swift + Kotlin to build two separate apps for a property search tool is not a good use of your time. React Native (via Expo) gets you 95% of native quality at 30% of the effort, entirely in the language you already know. Go native when you have a team, not when you're solo.</p>
+</div>
+
+<!-- Cost summary -->
+<h2 class="section-title">Cost Summary</h2>
+<div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>PWA</th>
+        <th>Expo</th>
+        <th>Both (recommended)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Apple Developer Account</td>
+        <td>$0</td>
+        <td>$99/year</td>
+        <td>$99/year</td>
+      </tr>
+      <tr>
+        <td>Google Play Console</td>
+        <td>$0</td>
+        <td>$25 (one-time)</td>
+        <td>$25 (one-time)</td>
+      </tr>
+      <tr>
+        <td>EAS Build (free tier)</td>
+        <td>$0</td>
+        <td>$0</td>
+        <td>$0</td>
+      </tr>
+      <tr>
+        <td>Vercel (current hosting)</td>
+        <td>Current plan</td>
+        <td>Current plan</td>
+        <td>Current plan</td>
+      </tr>
+      <tr>
+        <td>Supabase (current backend)</td>
+        <td>Current plan</td>
+        <td>Current plan</td>
+        <td>Current plan</td>
+      </tr>
+      <tr>
+        <td><strong>Year 1 total (new costs)</strong></td>
+        <td class="cell-green"><strong>$0</strong></td>
+        <td class="cell-yellow"><strong>$124</strong></td>
+        <td class="cell-yellow"><strong>$124</strong></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div style="text-align: center; padding: 48px 0 0; color: #6b7280; font-size: 0.85rem;">
+  <p>Research compiled March 2026. Ecosystem maturity and pricing may change.</p>
+  <p style="margin-top: 8px;">Stack analyzed: Next.js 15 + React 19 + Tailwind 4 + Supabase + Leaflet + Framer Motion + @use-gesture</p>
+</div>
+
+</div><!-- /container -->
+</body>
+</html>

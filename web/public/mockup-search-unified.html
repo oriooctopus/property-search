@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unified Search Experience — Full Flow Mockup</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1c2028;
+    --border: #2d333b;
+    --text: #e1e4e8;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #7ee787;
+    --red: #f85149;
+    --yellow: #d29922;
+    --orange: #f0883e;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* ── Section Layout ── */
+  .phase-section {
+    border-bottom: 1px solid var(--border);
+    padding: 48px 0 56px;
+  }
+  .phase-section:last-child { border-bottom: none; }
+
+  .phase-header {
+    max-width: 900px;
+    margin: 0 auto 32px;
+    padding: 0 24px;
+  }
+  .phase-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .phase-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .phase-desc {
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .phase-body {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ── Interactive Demo Area (Phase 1) ── */
+  #demo-area {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 24px;
+    position: relative;
+  }
+
+  /* ── Search Bar ── */
+  .search-container {
+    position: relative;
+  }
+  .search-bar {
+    display: flex;
+    align-items: center;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0 16px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .search-bar:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(88,166,255,0.15);
+  }
+  .search-bar svg {
+    flex-shrink: 0;
+    color: var(--muted);
+    width: 20px; height: 20px;
+  }
+  .search-bar input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 15px;
+    padding: 14px 12px;
+    font-family: inherit;
+  }
+  .search-bar input::placeholder { color: var(--muted); }
+  .search-bar button {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.15s;
+  }
+  .search-bar button:hover { opacity: 0.85; }
+
+  /* ── Suggestions Dropdown ── */
+  .suggestions {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0; right: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    z-index: 100;
+    display: none;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .suggestions.visible { display: block; }
+  .suggestions-title {
+    padding: 12px 16px 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+  }
+  .suggestion-item {
+    padding: 10px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.12s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .suggestion-item:hover { background: rgba(88,166,255,0.08); }
+  .suggestion-item .icon { color: var(--muted); font-size: 16px; flex-shrink: 0; }
+  .suggestion-item .text { color: var(--text); }
+  .suggestion-item .text em { color: var(--accent); font-style: normal; font-weight: 500; }
+
+  /* ── Chat Panel ── */
+  .chat-panel {
+    margin-top: 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    display: none;
+  }
+  .chat-panel.visible { display: block; animation: slideDown 0.3s ease; }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .chat-messages {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .chat-msg {
+    display: flex;
+    gap: 12px;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .chat-msg.user { justify-content: flex-end; }
+  .chat-msg.user .msg-bubble {
+    background: rgba(88,166,255,0.12);
+    border: 1px solid rgba(88,166,255,0.2);
+    border-radius: 12px 12px 2px 12px;
+    max-width: 70%;
+  }
+  .chat-msg.system .msg-bubble {
+    background: rgba(139,148,158,0.08);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    max-width: 100%;
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .msg-avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .msg-avatar.ai {
+    background: linear-gradient(135deg, var(--accent), #a371f7);
+    color: #fff;
+  }
+
+  .msg-bubble {
+    background: rgba(88,166,255,0.05);
+    border-radius: 12px 12px 12px 2px;
+    padding: 12px 16px;
+    font-size: 14px;
+    max-width: 80%;
+  }
+  .msg-bubble p { margin-bottom: 10px; }
+  .msg-bubble p:last-child { margin-bottom: 0; }
+
+  /* ── Filter Pills ── */
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(88,166,255,0.12);
+    border: 1px solid rgba(88,166,255,0.25);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    cursor: default;
+    transition: all 0.2s;
+  }
+  .pill .remove {
+    cursor: pointer;
+    opacity: 0.5;
+    font-size: 16px;
+    line-height: 1;
+    transition: opacity 0.15s;
+  }
+  .pill .remove:hover { opacity: 1; }
+  .pill.removed {
+    text-decoration: line-through;
+    opacity: 0.4;
+    border-color: var(--border);
+    background: transparent;
+    color: var(--muted);
+  }
+  .pill.new {
+    animation: pillPop 0.3s ease;
+    border-color: rgba(126,231,135,0.3);
+    background: rgba(126,231,135,0.1);
+    color: var(--green);
+  }
+  @keyframes pillPop {
+    0% { transform: scale(0.8); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* ── Chat Input ── */
+  .chat-input-area {
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .chat-input-area input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .chat-input-area input:focus { border-color: var(--accent); }
+  .chat-input-area input::placeholder { color: var(--muted); }
+  .chat-input-area button {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .chat-input-area button:hover { opacity: 0.85; }
+
+  /* ── Listing Grid ── */
+  .listing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+    margin-top: 24px;
+  }
+  .listing-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: opacity 0.3s, transform 0.3s, border-color 0.2s;
+  }
+  .listing-card:hover { border-color: var(--accent); }
+  .listing-card.hidden {
+    opacity: 0;
+    transform: scale(0.95);
+    pointer-events: none;
+    position: absolute;
+    visibility: hidden;
+  }
+  .listing-card.new-result {
+    animation: cardSlideIn 0.4s ease;
+  }
+  @keyframes cardSlideIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .listing-img {
+    height: 140px;
+    background: linear-gradient(135deg, #1a1f2e, #252b3a);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 13px;
+    position: relative;
+  }
+  .listing-img .source-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(0,0,0,0.7);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .listing-img .source-badge.realtor { color: #f85149; }
+  .listing-img .source-badge.craigslist { color: #d29922; }
+  .listing-img .source-badge.renthop { color: #a371f7; }
+  .listing-img .source-badge.apartments { color: #7ee787; }
+  .listing-img .photo-icon { font-size: 28px; opacity: 0.3; }
+  .listing-img.has-photo { background: linear-gradient(135deg, #1e2a38, #2a3545); }
+  .listing-img.has-photo .photo-icon { opacity: 0.7; font-size: 32px; }
+  .listing-body {
+    padding: 14px;
+  }
+  .listing-price {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--green);
+    margin-bottom: 2px;
+  }
+  .listing-address {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .listing-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .listing-tag {
+    font-size: 11px;
+    background: rgba(139,148,158,0.1);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px 8px;
+    color: var(--muted);
+  }
+
+  /* ── Confirmation Modal ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.visible { display: flex; animation: fadeIn 0.2s ease; }
+  .modal-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    max-width: 440px;
+    width: 90%;
+    box-shadow: 0 16px 64px rgba(0,0,0,0.5);
+    animation: modalPop 0.25s ease;
+  }
+  @keyframes modalPop {
+    from { transform: scale(0.95) translateY(8px); opacity: 0; }
+    to { transform: scale(1) translateY(0); opacity: 1; }
+  }
+  .modal-card h3 {
+    font-size: 18px;
+    margin-bottom: 16px;
+  }
+  .source-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .source-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--bg);
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  .source-item .check { color: var(--green); font-weight: bold; }
+  .source-item .name { flex: 1; }
+  .modal-meta {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .modal-meta .dot { color: var(--border); }
+  .modal-quota {
+    font-size: 13px;
+    color: var(--yellow);
+    margin-bottom: 20px;
+    padding: 8px 12px;
+    background: rgba(210,153,34,0.08);
+    border: 1px solid rgba(210,153,34,0.2);
+    border-radius: 8px;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+  }
+  .modal-actions .btn-cancel {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .modal-actions .btn-cancel:hover { border-color: var(--text); color: var(--text); }
+  .modal-actions .btn-run {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .modal-actions .btn-run:hover { opacity: 0.85; }
+
+  /* ── Progress ── */
+  .progress-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+  .progress-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 16px;
+  }
+  .progress-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    font-size: 14px;
+  }
+  .progress-row .status-icon {
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .progress-row .status-icon.done { color: var(--green); }
+  .progress-row .status-icon.loading { color: var(--accent); animation: spin 1s linear infinite; }
+  .progress-row .status-icon.waiting { color: var(--muted); opacity: 0.4; }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  .progress-row .source-name { flex: 1; }
+  .progress-row .count { color: var(--muted); font-size: 13px; }
+
+  .progress-bar-track {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 16px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.6s ease;
+  }
+
+  /* ── Results Header ── */
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .results-count {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .results-count span { color: var(--accent); }
+
+  /* ── Save Search ── */
+  .save-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-top: 16px;
+  }
+  .save-bar .save-icon { font-size: 20px; color: var(--accent); }
+  .save-bar .save-text { flex: 1; }
+  .save-bar .save-text .name { font-weight: 600; font-size: 14px; }
+  .save-bar .save-text .desc { font-size: 12px; color: var(--muted); }
+  .save-bar button {
+    background: rgba(88,166,255,0.12);
+    color: var(--accent);
+    border: 1px solid rgba(88,166,255,0.25);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .save-bar button:hover { background: rgba(88,166,255,0.2); }
+  .save-bar.saved button {
+    background: rgba(126,231,135,0.12);
+    color: var(--green);
+    border-color: rgba(126,231,135,0.25);
+  }
+
+  /* ── Nav header ── */
+  .top-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .top-nav .brand {
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .top-nav .brand svg { color: var(--accent); }
+  .top-nav .nav-links {
+    display: flex;
+    gap: 20px;
+    font-size: 14px;
+  }
+  .top-nav .nav-links a {
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .top-nav .nav-links a:hover { color: var(--text); }
+
+  /* ── Utilities ── */
+  .mt-16 { margin-top: 16px; }
+  .mt-24 { margin-top: 24px; }
+  .text-muted { color: var(--muted); }
+  .text-sm { font-size: 13px; }
+
+  /* ── Static phase previews ── */
+  .static-preview {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ━━ NAV ━━ -->
+<nav class="top-nav">
+  <div class="brand">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    Deco
+  </div>
+  <div class="nav-links">
+    <a href="#">Listings</a>
+    <a href="#">Saved</a>
+    <a href="#">Profile</a>
+  </div>
+</nav>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     PHASE 1 — INTERACTIVE SEARCH BAR
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="phase-section">
+  <div class="phase-header">
+    <div class="phase-label">Phase 1 — Search Bar</div>
+    <div class="phase-title">Natural language search on the main page</div>
+    <div class="phase-desc">Click the search bar below to see suggestions. Type your query, then press Enter or click "Parse". This does NOT run an expensive search — it just sends your text to AI for parsing.</div>
+  </div>
+
+  <div id="demo-area">
+    <div class="search-container">
+      <div class="search-bar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="search-input" type="text" placeholder="Describe what you're looking for..." autocomplete="off" />
+        <button id="search-submit">Parse</button>
+      </div>
+
+      <div class="suggestions" id="suggestions-dropdown">
+        <div class="suggestions-title">Try searching for</div>
+        <div class="suggestion-item" data-query="5 bedrooms near the L train under 2500 per bed">
+          <span class="icon">🏠</span>
+          <span class="text"><em>5 bedrooms</em> near the L train under <em>$2,500/bed</em></span>
+        </div>
+        <div class="suggestion-item" data-query="2BR in Williamsburg with laundry under 3500">
+          <span class="icon">🧺</span>
+          <span class="text"><em>2BR</em> in Williamsburg with <em>laundry</em> under $3,500</span>
+        </div>
+        <div class="suggestion-item" data-query="studio in Manhattan near a park under 2000">
+          <span class="icon">🌳</span>
+          <span class="text"><em>Studio</em> in Manhattan near a <em>park</em> under $2,000</span>
+        </div>
+        <div class="suggestion-item" data-query="3+ beds pet friendly in Brooklyn with photos">
+          <span class="icon">🐕</span>
+          <span class="text"><em>3+ beds</em> pet friendly in Brooklyn with <em>photos</em></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat Panel (hidden initially) -->
+    <div class="chat-panel" id="chat-panel">
+      <div class="chat-messages" id="chat-messages"></div>
+      <div class="chat-input-area">
+        <input id="chat-input" type="text" placeholder="Refine your search..." />
+        <button id="chat-send">Send</button>
+      </div>
+    </div>
+
+    <!-- Listing Grid (always visible, filters based on pills) -->
+    <div class="listing-grid" id="listing-grid"></div>
+  </div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     PHASE 2 — STATIC: AI PARSING + CHAT REFINEMENT
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="phase-section">
+  <div class="phase-header">
+    <div class="phase-label">Phase 2 — AI Parses + Filter Refinement Chat</div>
+    <div class="phase-title">Conversational back-and-forth to dial in criteria</div>
+    <div class="phase-desc">Claude parses natural language into structured filters shown as pills. Users refine via chat — each message is cheap (just AI parsing, no external queries). Existing listings auto-filter.</div>
+  </div>
+
+  <div class="phase-body">
+    <div class="static-preview">
+      <div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:16px">
+        <div class="msg-avatar ai">AI</div>
+        <div>
+          <p style="font-size:14px;margin-bottom:10px">I'll search for apartments with these criteria:</p>
+          <div class="pills">
+            <div class="pill">5+ Beds</div>
+            <div class="pill">Near L Train</div>
+            <div class="pill">Under $2,500/bed</div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start;justify-content:flex-end;margin-bottom:16px">
+        <div style="background:rgba(88,166,255,0.12);border:1px solid rgba(88,166,255,0.2);border-radius:12px 12px 2px 12px;padding:12px 16px;font-size:14px">actually 3+ beds and include Manhattan too</div>
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <div class="msg-avatar ai">AI</div>
+        <div>
+          <p style="font-size:14px;margin-bottom:10px">Updated criteria:</p>
+          <div class="pills">
+            <div class="pill removed">5+ Beds <span class="remove">&times;</span></div>
+            <div class="pill new">3+ Beds</div>
+            <div class="pill">Near L Train</div>
+            <div class="pill new">+ Manhattan</div>
+            <div class="pill">Under $2,500/bed</div>
+          </div>
+          <p style="font-size:13px;color:var(--muted);margin-top:10px">Existing listings updated — 3 match locally. Say <strong style="color:var(--accent)">"search now"</strong> when ready to query external sources.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     PHASE 3 — CONFIRMATION MODAL
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="phase-section">
+  <div class="phase-header">
+    <div class="phase-label">Phase 3 — Confirmation Before Search</div>
+    <div class="phase-title">User approves before expensive external queries</div>
+    <div class="phase-desc">A confirmation card shows which sources will be queried, estimated time, and search quota usage. Nothing runs until the user clicks "Run Search".</div>
+  </div>
+
+  <div class="phase-body">
+    <div class="static-preview" style="max-width:440px;margin:0 auto">
+      <h3 style="font-size:18px;margin-bottom:16px">Ready to search across 4 sources?</h3>
+      <div class="source-list">
+        <div class="source-item"><span class="check">&#10003;</span><span class="name">Realtor.com</span></div>
+        <div class="source-item"><span class="check">&#10003;</span><span class="name">Craigslist</span></div>
+        <div class="source-item"><span class="check">&#10003;</span><span class="name">RentHop</span></div>
+        <div class="source-item"><span class="check">&#10003;</span><span class="name">Apartments.com</span></div>
+      </div>
+      <div class="modal-meta">
+        <span>Estimated time: ~15-30 seconds</span>
+      </div>
+      <div class="modal-quota">This will use 1 of your 5 free searches this month</div>
+      <div class="modal-actions">
+        <button class="btn-cancel">Cancel</button>
+        <button class="btn-run" id="static-run-search">Run Search</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     PHASE 4 — SEARCH RUNNING (PROGRESS)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="phase-section">
+  <div class="phase-header">
+    <div class="phase-label">Phase 4 — Search Running</div>
+    <div class="phase-title">Real-time progress as sources are queried</div>
+    <div class="phase-desc">Each source reports back independently. Results populate incrementally as each completes — no waiting for all sources to finish.</div>
+  </div>
+
+  <div class="phase-body">
+    <div class="progress-panel" id="static-progress">
+      <div class="progress-title">Searching 4 sources...</div>
+      <div class="progress-row"><span class="status-icon done">&#10003;</span><span class="source-name">Realtor.com</span><span class="count">12 found</span></div>
+      <div class="progress-row"><span class="status-icon done">&#10003;</span><span class="source-name">Craigslist</span><span class="count">8 found</span></div>
+      <div class="progress-row"><span class="status-icon loading">&#9696;</span><span class="source-name">RentHop</span><span class="count" style="color:var(--accent)">searching...</span></div>
+      <div class="progress-row"><span class="status-icon done">&#10003;</span><span class="source-name">Apartments.com</span><span class="count">5 found</span></div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" style="width:75%"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     PHASE 5 — RESULTS + REFINEMENT
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="phase-section">
+  <div class="phase-header">
+    <div class="phase-label">Phase 5 — Results + Continued Refinement</div>
+    <div class="phase-title">Browse results, then refine further via chat</div>
+    <div class="phase-desc">All results are loaded. Users continue chatting to narrow down — "show me only the ones with photos" — which is just local filtering (free). Removed filters show system messages.</div>
+  </div>
+
+  <div class="phase-body">
+    <div class="results-header">
+      <div class="results-count">Found <span>25 listings</span> across 4 sources</div>
+      <div class="pills" id="phase5-pills">
+        <div class="pill">3+ Beds <span class="remove" onclick="this.parentElement.classList.add('removed')">&times;</span></div>
+        <div class="pill">Near L Train + Manhattan <span class="remove" onclick="this.parentElement.classList.add('removed')">&times;</span></div>
+        <div class="pill">Under $2,500/bed <span class="remove" onclick="this.parentElement.classList.add('removed')">&times;</span></div>
+        <div class="pill new">Has Photos <span class="remove" onclick="this.parentElement.classList.add('removed')">&times;</span></div>
+      </div>
+    </div>
+
+    <div class="listing-grid" id="phase5-grid"></div>
+
+    <div style="margin-top:16px;display:flex;gap:12px;align-items:flex-start">
+      <div class="msg-avatar ai" style="margin-top:2px">AI</div>
+      <div>
+        <p style="font-size:14px;color:var(--muted)">Filtered to <strong style="color:var(--text)">18 listings</strong> with photos. 7 listings hidden (no photos).</p>
+        <p style="font-size:13px;color:var(--muted);margin-top:4px">This is local filtering — no search credits used.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     PHASE 6 — SAVE SEARCH
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<section class="phase-section">
+  <div class="phase-header">
+    <div class="phase-label">Phase 6 — Save Search</div>
+    <div class="phase-title">Name and save for future reference</div>
+    <div class="phase-desc">The conversation and filters are saved. Users can re-open it later to see updated results or continue refining.</div>
+  </div>
+
+  <div class="phase-body">
+    <div class="save-bar" id="save-bar">
+      <span class="save-icon">&#9733;</span>
+      <div class="save-text">
+        <div class="name" id="save-name">3BR near L Train + Manhattan</div>
+        <div class="desc">4 sources &middot; 25 results &middot; Last searched just now</div>
+      </div>
+      <button id="save-btn" onclick="saveSearch()">Save Search</button>
+    </div>
+  </div>
+</section>
+
+<!-- ━━ Confirmation Modal (used by interactive flow) ━━ -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal-card">
+    <h3>Ready to search across 4 sources?</h3>
+    <div class="source-list">
+      <div class="source-item"><span class="check">&#10003;</span><span class="name">Realtor.com</span></div>
+      <div class="source-item"><span class="check">&#10003;</span><span class="name">Craigslist</span></div>
+      <div class="source-item"><span class="check">&#10003;</span><span class="name">RentHop</span></div>
+      <div class="source-item"><span class="check">&#10003;</span><span class="name">Apartments.com</span></div>
+    </div>
+    <div class="modal-meta">Estimated time: ~15-30 seconds</div>
+    <div class="modal-quota">This will use 1 of your 5 free searches this month</div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="modal-cancel">Cancel</button>
+      <button class="btn-run" id="modal-run">Run Search</button>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+     JAVASCRIPT
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<script>
+// ── State ──
+let currentPills = [];
+let chatState = 'idle'; // idle | parsing | refined | searching | done
+const allListings = generateListings();
+
+// ── Elements ──
+const searchInput = document.getElementById('search-input');
+const searchSubmit = document.getElementById('search-submit');
+const suggestionsDropdown = document.getElementById('suggestions-dropdown');
+const chatPanel = document.getElementById('chat-panel');
+const chatMessages = document.getElementById('chat-messages');
+const chatInput = document.getElementById('chat-input');
+const chatSend = document.getElementById('chat-send');
+const listingGrid = document.getElementById('listing-grid');
+const confirmModal = document.getElementById('confirm-modal');
+
+// ── Listings data ──
+function generateListings() {
+  const sources = ['realtor', 'craigslist', 'renthop', 'apartments'];
+  const sourceNames = { realtor: 'Realtor.com', craigslist: 'Craigslist', renthop: 'RentHop', apartments: 'Apartments.com' };
+  const addresses = [
+    '142 Bedford Ave, Williamsburg', '89 Graham Ave, East Williamsburg', '315 Bushwick Ave, Bushwick',
+    '201 Myrtle Ave, Clinton Hill', '78 DeKalb Ave, Fort Greene', '445 Grand St, Lower East Side',
+    '112 Montrose Ave, Williamsburg', '330 Knickerbocker Ave, Bushwick', '55 Wyckoff Ave, Ridgewood',
+    '188 Jefferson St, Bushwick', '99 Broadway, Williamsburg', '410 E 14th St, East Village',
+    '225 Troutman St, Bushwick', '67 Metropolitan Ave, Williamsburg', '301 Central Ave, Bushwick',
+    '156 Halsey St, Bed-Stuy', '42 Flushing Ave, Clinton Hill', '278 Wilson Ave, Bushwick',
+    '505 Lorimer St, Williamsburg', '89 Stanhope St, Bushwick', '134 E 3rd St, Manhattan',
+    '77 Rivington St, Manhattan', '215 W 125th St, Harlem', '340 E 116th St, East Harlem',
+    '102 Lexington Ave, Manhattan'
+  ];
+  const beds = [2, 3, 3, 4, 5, 3, 5, 4, 3, 6, 3, 2, 5, 4, 3, 5, 3, 4, 3, 5, 2, 3, 4, 5, 3];
+  const prices = [3200, 4500, 3800, 5200, 7500, 4100, 8200, 5800, 4200, 9500, 3900, 2800, 7200, 5500, 4000, 7800, 4300, 5600, 4100, 7400, 2600, 3800, 5200, 7000, 4200];
+  const hasPhotos = [true, true, false, true, true, false, true, true, false, true, true, true, false, true, false, true, true, false, true, true, true, true, false, true, true];
+  const nearL = [true, true, true, false, false, false, true, true, true, true, true, false, true, true, true, false, false, true, true, true, false, false, false, false, false];
+  const inManhattan = [false, false, false, false, false, true, false, false, false, false, false, true, false, false, false, false, false, false, false, false, true, true, true, true, true];
+
+  return addresses.map((addr, i) => ({
+    id: i,
+    address: addr,
+    beds: beds[i],
+    price: prices[i],
+    pricePerBed: Math.round(prices[i] / beds[i]),
+    source: sources[i % 4],
+    sourceName: sourceNames[sources[i % 4]],
+    hasPhoto: hasPhotos[i],
+    nearL: nearL[i],
+    inManhattan: inManhattan[i],
+    tags: [
+      `${beds[i]} bed`,
+      hasPhotos[i] ? 'photos' : 'no photos',
+      nearL[i] ? 'near L' : null,
+      inManhattan[i] ? 'Manhattan' : 'Brooklyn'
+    ].filter(Boolean)
+  }));
+}
+
+function renderListings(listings, targetId) {
+  const grid = document.getElementById(targetId);
+  grid.innerHTML = '';
+  listings.forEach((l, i) => {
+    const card = document.createElement('div');
+    card.className = 'listing-card new-result';
+    card.style.animationDelay = `${i * 50}ms`;
+    card.innerHTML = `
+      <div class="listing-img ${l.hasPhoto ? 'has-photo' : ''}">
+        <span class="source-badge ${l.source}">${l.sourceName}</span>
+        <span class="photo-icon">${l.hasPhoto ? '&#128247;' : '&#128444;'}</span>
+      </div>
+      <div class="listing-body">
+        <div class="listing-price">$${l.price.toLocaleString()}/mo</div>
+        <div class="listing-address">${l.address}</div>
+        <div class="listing-tags">
+          ${l.tags.map(t => `<span class="listing-tag">${t}</span>`).join('')}
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// Render initial grid with some listings and the phase 5 grid
+renderListings(allListings.slice(0, 6), 'listing-grid');
+renderListings(allListings.filter(l => l.hasPhoto).slice(0, 6), 'phase5-grid');
+
+// ── Search bar interactions ──
+searchInput.addEventListener('focus', () => {
+  if (chatState === 'idle') suggestionsDropdown.classList.add('visible');
+});
+
+searchInput.addEventListener('input', () => {
+  if (searchInput.value.length > 0) suggestionsDropdown.classList.remove('visible');
+  else if (chatState === 'idle') suggestionsDropdown.classList.add('visible');
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.search-container')) suggestionsDropdown.classList.remove('visible');
+});
+
+document.querySelectorAll('.suggestion-item').forEach(item => {
+  item.addEventListener('click', () => {
+    searchInput.value = item.dataset.query;
+    suggestionsDropdown.classList.remove('visible');
+    searchInput.focus();
+  });
+});
+
+function submitSearch() {
+  const query = searchInput.value.trim();
+  if (!query) return;
+  suggestionsDropdown.classList.remove('visible');
+  chatState = 'parsing';
+  searchInput.disabled = true;
+  searchSubmit.disabled = true;
+  searchSubmit.textContent = 'Parsing...';
+
+  chatPanel.classList.add('visible');
+  chatMessages.innerHTML = '';
+
+  // User message
+  addChatMessage('user', query);
+
+  // Parse after "delay"
+  setTimeout(() => {
+    const parsed = parseQuery(query);
+    currentPills = parsed;
+    addAIParseMessage(parsed);
+    chatState = 'refined';
+    searchSubmit.textContent = 'Parse';
+    searchSubmit.disabled = false;
+    searchInput.disabled = false;
+    filterGrid();
+    chatInput.focus();
+  }, 800);
+}
+
+searchSubmit.addEventListener('click', submitSearch);
+searchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') submitSearch();
+});
+
+// ── Parse natural language (simulated) ──
+function parseQuery(text) {
+  const pills = [];
+  const lower = text.toLowerCase();
+
+  // Beds
+  const bedMatch = lower.match(/(\d+)\+?\s*(?:bed|br|bedroom)/);
+  if (bedMatch) pills.push({ label: `${bedMatch[1]}+ Beds`, type: 'beds', value: parseInt(bedMatch[1]) });
+
+  // Price per bed
+  const ppbMatch = lower.match(/under\s*\$?([\d,]+)\s*(?:per bed|\/bed)/);
+  if (ppbMatch) pills.push({ label: `Under $${ppbMatch[1].replace(',','')}/bed`, type: 'pricePerBed', value: parseInt(ppbMatch[1].replace(',','')) });
+
+  // Total price
+  const priceMatch = lower.match(/under\s*\$?([\d,]+)(?!\s*(?:per|\/bed))/);
+  if (priceMatch && !ppbMatch) pills.push({ label: `Under $${priceMatch[1].replace(',','')}`, type: 'price', value: parseInt(priceMatch[1].replace(',','')) });
+
+  // L train
+  if (lower.includes('l train')) pills.push({ label: 'Near L Train', type: 'nearL', value: true });
+
+  // Manhattan
+  if (lower.includes('manhattan')) pills.push({ label: 'Manhattan', type: 'manhattan', value: true });
+
+  // Pet friendly
+  if (lower.includes('pet')) pills.push({ label: 'Pet Friendly', type: 'pets', value: true });
+
+  // Laundry
+  if (lower.includes('laundry')) pills.push({ label: 'In-unit Laundry', type: 'laundry', value: true });
+
+  // Photos
+  if (lower.includes('photo')) pills.push({ label: 'Has Photos', type: 'photos', value: true });
+
+  // Park
+  if (lower.includes('park')) pills.push({ label: 'Near a Park', type: 'park', value: true });
+
+  // Williamsburg
+  if (lower.includes('williamsburg')) pills.push({ label: 'Williamsburg', type: 'area', value: 'williamsburg' });
+
+  // Brooklyn
+  if (lower.includes('brooklyn')) pills.push({ label: 'Brooklyn', type: 'area', value: 'brooklyn' });
+
+  // Studio
+  if (lower.includes('studio')) pills.push({ label: 'Studio', type: 'beds', value: 0 });
+
+  if (pills.length === 0) pills.push({ label: text, type: 'freetext', value: text });
+  return pills;
+}
+
+// ── Chat messages ──
+function addChatMessage(role, text) {
+  const div = document.createElement('div');
+  div.className = `chat-msg ${role}`;
+  if (role === 'user') {
+    div.innerHTML = `<div class="msg-bubble">${text}</div>`;
+  } else if (role === 'system') {
+    div.innerHTML = `<div class="msg-bubble">${text}</div>`;
+  }
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function addAIParseMessage(pills, prefix) {
+  const div = document.createElement('div');
+  div.className = 'chat-msg ai';
+  const pillsHTML = pills.map(p =>
+    `<div class="pill${p.isNew ? ' new' : ''}${p.removed ? ' removed' : ''}">${p.label}${!p.removed ? `<span class="remove" data-type="${p.type}">&times;</span>` : ''}</div>`
+  ).join('');
+
+  div.innerHTML = `
+    <div class="msg-avatar ai">AI</div>
+    <div class="msg-bubble" style="max-width:100%">
+      <p>${prefix || "I'll search for apartments with these criteria:"}</p>
+      <div class="pills">${pillsHTML}</div>
+      <p style="font-size:13px;color:var(--muted);margin-top:10px">
+        ${getFilterCount()} listings match locally. Say <strong style="color:var(--accent)">"search now"</strong> to query external sources, or keep refining.
+      </p>
+    </div>
+  `;
+
+  // Pill removal
+  div.querySelectorAll('.remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const type = btn.dataset.type;
+      currentPills = currentPills.filter(p => p.type !== type);
+      btn.parentElement.classList.add('removed');
+      filterGrid();
+      addChatMessage('system', `Removed filter: ${btn.parentElement.textContent.replace('×','').trim()}`);
+    });
+  });
+
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function getFilterCount() {
+  return filterListings(allListings).length;
+}
+
+function filterListings(listings) {
+  return listings.filter(l => {
+    for (const pill of currentPills) {
+      if (pill.removed) continue;
+      if (pill.type === 'beds' && pill.value > 0 && l.beds < pill.value) return false;
+      if (pill.type === 'pricePerBed' && l.pricePerBed > pill.value) return false;
+      if (pill.type === 'price' && l.price > pill.value) return false;
+      if (pill.type === 'nearL' && !l.nearL) return false;
+      if (pill.type === 'manhattan' && !l.inManhattan) return false;
+      if (pill.type === 'photos' && !l.hasPhoto) return false;
+    }
+    return true;
+  });
+}
+
+function filterGrid() {
+  const filtered = filterListings(allListings);
+  renderListings(filtered.slice(0, 8), 'listing-grid');
+}
+
+// ── Chat send ──
+function handleChatSend() {
+  const text = chatInput.value.trim();
+  if (!text) return;
+  chatInput.value = '';
+
+  // Check for "search now"
+  if (text.toLowerCase().includes('search now') || text.toLowerCase().includes('run search') || text.toLowerCase().includes('go ahead')) {
+    addChatMessage('user', text);
+    setTimeout(() => {
+      confirmModal.classList.add('visible');
+    }, 300);
+    return;
+  }
+
+  addChatMessage('user', text);
+
+  // Parse refinement
+  setTimeout(() => {
+    const newPills = parseQuery(text);
+    // Merge — replace same types, add new ones
+    const merged = [...currentPills];
+    for (const np of newPills) {
+      const existingIdx = merged.findIndex(p => p.type === np.type);
+      if (existingIdx >= 0) {
+        merged[existingIdx] = { ...merged[existingIdx], removed: true };
+        merged.push({ ...np, isNew: true });
+      } else {
+        merged.push({ ...np, isNew: true });
+      }
+    }
+    currentPills = merged.filter(p => !p.removed);
+    const displayPills = merged; // Show removed + new
+    addAIParseMessage(displayPills, 'Updated criteria:');
+    filterGrid();
+  }, 600);
+}
+
+chatSend.addEventListener('click', handleChatSend);
+chatInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') handleChatSend();
+});
+
+// ── Confirmation modal ──
+document.getElementById('modal-cancel').addEventListener('click', () => {
+  confirmModal.classList.remove('visible');
+});
+document.getElementById('modal-run').addEventListener('click', () => {
+  confirmModal.classList.remove('visible');
+  runSearch();
+});
+confirmModal.addEventListener('click', (e) => {
+  if (e.target === confirmModal) confirmModal.classList.remove('visible');
+});
+
+// ── Run search (simulated) ──
+function runSearch() {
+  chatState = 'searching';
+
+  // Add progress to chat
+  const progressDiv = document.createElement('div');
+  progressDiv.className = 'chat-msg ai';
+  progressDiv.innerHTML = `
+    <div class="msg-avatar ai">AI</div>
+    <div class="msg-bubble" style="max-width:100%">
+      <div class="progress-panel" style="background:transparent;border:none;padding:0" id="live-progress">
+        <div class="progress-title">Searching 4 sources...</div>
+        <div class="progress-row" id="prog-realtor"><span class="status-icon waiting">&#9675;</span><span class="source-name">Realtor.com</span><span class="count text-muted">waiting</span></div>
+        <div class="progress-row" id="prog-craigslist"><span class="status-icon waiting">&#9675;</span><span class="source-name">Craigslist</span><span class="count text-muted">waiting</span></div>
+        <div class="progress-row" id="prog-renthop"><span class="status-icon waiting">&#9675;</span><span class="source-name">RentHop</span><span class="count text-muted">waiting</span></div>
+        <div class="progress-row" id="prog-apartments"><span class="status-icon waiting">&#9675;</span><span class="source-name">Apartments.com</span><span class="count text-muted">waiting</span></div>
+        <div class="progress-bar-track"><div class="progress-bar-fill" id="live-bar" style="width:0%"></div></div>
+      </div>
+    </div>
+  `;
+  chatMessages.appendChild(progressDiv);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  const steps = [
+    { id: 'prog-realtor', count: 12, delay: 800 },
+    { id: 'prog-craigslist', count: 8, delay: 1800 },
+    { id: 'prog-apartments', count: 5, delay: 2800 },
+    { id: 'prog-renthop', count: 3, delay: 3800 },
+  ];
+
+  steps.forEach((step, i) => {
+    // Start searching
+    setTimeout(() => {
+      const row = document.getElementById(step.id);
+      row.querySelector('.status-icon').className = 'status-icon loading';
+      row.querySelector('.status-icon').innerHTML = '&#9696;';
+      row.querySelector('.count').textContent = 'searching...';
+      row.querySelector('.count').style.color = 'var(--accent)';
+    }, step.delay - 600);
+
+    // Done
+    setTimeout(() => {
+      const row = document.getElementById(step.id);
+      row.querySelector('.status-icon').className = 'status-icon done';
+      row.querySelector('.status-icon').innerHTML = '&#10003;';
+      row.querySelector('.count').textContent = `${step.count} found`;
+      row.querySelector('.count').style.color = 'var(--muted)';
+      document.getElementById('live-bar').style.width = `${(i + 1) * 25}%`;
+
+      // Add some results to grid
+      const filtered = filterListings(allListings);
+      const shown = Math.min(filtered.length, (i + 1) * 3);
+      renderListings(filtered.slice(0, shown), 'listing-grid');
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      if (i === steps.length - 1) {
+        setTimeout(() => {
+          chatState = 'done';
+          const total = steps.reduce((s, x) => s + x.count, 0);
+          addChatMessage('system', `Search complete. Found ${total} listings across 4 sources.`);
+          renderListings(filterListings(allListings), 'listing-grid');
+        }, 400);
+      }
+    }, step.delay);
+  });
+}
+
+// ── Phase 3 static "Run Search" button ──
+document.getElementById('static-run-search').addEventListener('click', function() {
+  this.textContent = 'Searching...';
+  this.style.opacity = '0.6';
+  setTimeout(() => {
+    this.textContent = 'Run Search';
+    this.style.opacity = '1';
+  }, 2000);
+});
+
+// ── Save search ──
+function saveSearch() {
+  const bar = document.getElementById('save-bar');
+  const btn = document.getElementById('save-btn');
+  bar.classList.add('saved');
+  btn.textContent = 'Saved!';
+  btn.style.cursor = 'default';
+}
+</script>
+
+</body>
+</html>

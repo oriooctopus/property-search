@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dwelligence — Commute Filter Redesign Options</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --card: #1c2028;
+      --border: #2d333b;
+      --text: #e1e4e8;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --green: #7ee787;
+      --red: #f85149;
+      --yellow: #e3b341;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ── PAGE STRUCTURE ── */
+    .page-header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 32px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .page-header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .page-header p {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .options-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .option-col {
+      border-right: 1px solid var(--border);
+      padding-bottom: 32px;
+    }
+    .option-col:last-child { border-right: none; }
+
+    .option-header {
+      padding: 20px 24px 14px;
+      border-bottom: 1px solid var(--border);
+      background: #14181f;
+    }
+    .option-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .option-badge {
+      background: var(--accent);
+      color: #0a0a0a;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+    .option-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .option-desc {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+
+    .option-body {
+      padding: 24px;
+    }
+
+    /* ── SHARED CONTEXT: filter bar ── */
+    .filter-bar {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+    .filter-chip {
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .filter-chip.active {
+      background: rgba(88,166,255,0.12);
+      border-color: rgba(88,166,255,0.4);
+      color: var(--accent);
+    }
+    .context-label {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      font-weight: 600;
+    }
+
+    /* ── TRANSIT BADGES ── */
+    .transit-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      font-size: 10px;
+      font-weight: 800;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .transit-badge.l { background: #888; }
+    .transit-badge.a { background: #0039a6; }
+    .transit-badge.six { background: #00933c; }
+    .transit-badge.n { background: #fccc0a; color: #000; }
+    .transit-badge.bus { background: #c60118; }
+    .transit-badge.walk { background: #4a5568; font-size: 11px; }
+
+    .transit-badge-sm {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      font-size: 9px;
+      font-weight: 800;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .transit-badge-sm.l { background: #888; }
+    .transit-badge-sm.a { background: #0039a6; }
+    .transit-badge-sm.six { background: #00933c; }
+    .transit-badge-sm.n { background: #fccc0a; color: #000; }
+
+    /* ────────────────────────────────────────────────────────────────
+       OPTION A — Inline pill chips in the filter bar
+    ──────────────────────────────────────────────────────────────── */
+
+    .commute-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(88,166,255,0.1);
+      border: 1px solid rgba(88,166,255,0.35);
+      border-radius: 20px;
+      padding: 4px 8px 4px 6px;
+      font-size: 12px;
+      color: var(--text);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .commute-pill-x {
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      line-height: 1;
+      margin-left: 2px;
+    }
+    .commute-pill-add {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px dashed rgba(88,166,255,0.35);
+      border-radius: 20px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: var(--accent);
+      cursor: pointer;
+      background: transparent;
+    }
+
+    /* Expanded add-rule form inline */
+    .add-rule-form-inline {
+      margin-top: 14px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+    }
+    .add-rule-form-inline .form-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .form-field-inline {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 12px;
+      color: var(--text);
+      min-width: 0;
+    }
+    .form-field-inline.focused {
+      border-color: var(--accent);
+    }
+    .form-select-inline {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 12px;
+      color: var(--text);
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .form-add-btn {
+      background: var(--accent);
+      color: #0a0a0a;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .form-hint {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    /* ────────────────────────────────────────────────────────────────
+       OPTION B — Compact card list
+    ──────────────────────────────────────────────────────────────── */
+
+    .commute-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .commute-section-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+    }
+    .commute-add-text-btn {
+      font-size: 12px;
+      color: var(--accent);
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .commute-rule-card {
+      background: #181e26;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .commute-rule-icon {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      background: rgba(88,166,255,0.1);
+      border: 1px solid rgba(88,166,255,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    .commute-rule-main {
+      flex: 1;
+      min-width: 0;
+    }
+    .commute-rule-dest {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .commute-rule-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 3px;
+      flex-wrap: wrap;
+    }
+    .commute-rule-time {
+      font-size: 12px;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .commute-rule-mode {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .commute-rule-delete {
+      color: var(--muted);
+      font-size: 14px;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    /* Add form for B */
+    .add-rule-form-b {
+      background: #181e26;
+      border: 1px solid rgba(88,166,255,0.25);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 4px;
+    }
+    .form-b-row {
+      display: grid;
+      grid-template-columns: 1fr 72px;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .form-b-field {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 12px;
+      color: var(--text);
+    }
+    .form-b-field.focused { border-color: var(--accent); }
+    .form-b-transit-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .transit-option {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 11px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .transit-option.selected {
+      border-color: rgba(88,166,255,0.4);
+      background: rgba(88,166,255,0.08);
+      color: var(--text);
+    }
+    .form-b-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .btn-cancel {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .btn-add {
+      background: var(--accent);
+      color: #0a0a0a;
+      border-radius: 6px;
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* ────────────────────────────────────────────────────────────────
+       OPTION C — Tag builder style
+    ──────────────────────────────────────────────────────────────── */
+
+    .tag-field-wrap {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      min-height: 48px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      align-items: center;
+      cursor: text;
+    }
+    .tag-field-wrap.focused-wrap {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(88,166,255,0.1);
+    }
+
+    .commute-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #1c2028;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 6px 3px 5px;
+      font-size: 12px;
+      color: var(--text);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .commute-tag-inner {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .commute-tag-dest {
+      font-weight: 600;
+      color: var(--text);
+    }
+    .commute-tag-sep {
+      color: var(--border);
+      margin: 0 1px;
+    }
+    .commute-tag-time {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .commute-tag-x {
+      color: var(--muted);
+      font-size: 11px;
+      cursor: pointer;
+      margin-left: 2px;
+      line-height: 1;
+    }
+    .commute-tag-x:hover { color: var(--text); }
+
+    .tag-input-ghost {
+      border: none;
+      background: transparent;
+      color: var(--text);
+      font-size: 12px;
+      outline: none;
+      min-width: 80px;
+      placeholder-color: var(--muted);
+    }
+
+    /* Step-by-step builder */
+    .builder-steps {
+      margin-top: 12px;
+    }
+    .builder-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .step-num {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: rgba(88,166,255,0.15);
+      border: 1px solid rgba(88,166,255,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    .step-num.done {
+      background: rgba(126,231,135,0.15);
+      border-color: rgba(126,231,135,0.3);
+      color: var(--green);
+    }
+    .step-label {
+      font-size: 11px;
+      color: var(--muted);
+      width: 60px;
+      flex-shrink: 0;
+    }
+    .step-value {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .step-field {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid rgba(88,166,255,0.4);
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 12px;
+      color: var(--text);
+    }
+    .step-suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 4px;
+    }
+    .step-suggestion {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 3px 8px;
+      font-size: 11px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .step-suggestion.sel {
+      border-color: rgba(88,166,255,0.4);
+      background: rgba(88,166,255,0.1);
+      color: var(--accent);
+    }
+    .step-suggestion:hover {
+      color: var(--text);
+      border-color: var(--muted);
+    }
+
+    .builder-confirm {
+      margin-top: 10px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    .builder-preview {
+      font-size: 11px;
+      color: var(--muted);
+      flex: 1;
+    }
+    .builder-preview span {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    /* ── FILTER FOOTER (shared) ── */
+    .filter-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .footer-reset {
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .footer-done {
+      background: var(--accent);
+      color: #0a0a0a;
+      border-radius: 6px;
+      padding: 6px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .footer-count {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* ── DIVIDER ── */
+    .rule-divider {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 10px 0;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .rule-divider::before,
+    .rule-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── SECTION WRAPPERS ── */
+    .panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .panel-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .panel-title-icon {
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Commute Rules Filter — Redesign Options</h1>
+  <p>Dwelligence apartment search — showing commute rules with 1-2 example rules filled in. The subway rule logic stays the same; only the container/chrome changes.</p>
+</div>
+
+<div class="options-row">
+
+  <!-- ════════════════════════════════════════════════════════════
+       OPTION A — Inline pill chips in the filter bar
+  ════════════════════════════════════════════════════════════ -->
+  <div class="option-col">
+    <div class="option-header">
+      <div class="option-label">
+        <span class="option-badge">Option A</span>
+        <span class="option-title">Inline pill chips</span>
+      </div>
+      <div class="option-desc">Rules live directly in the filter chip row as pills. Tap "+ Add commute rule" to open a compact inline form. No separate modal or section header.</div>
+    </div>
+    <div class="option-body">
+
+      <div class="context-label">Filter bar — rules as chips</div>
+
+      <!-- Filter bar with commute pills mixed in -->
+      <div class="filter-bar">
+        <div class="filter-chip">Price: $1k–$3.5k</div>
+        <div class="filter-chip">2+ beds</div>
+        <div class="filter-chip">No fee</div>
+
+        <!-- Two commute rule pills -->
+        <div class="commute-pill">
+          <div class="transit-badge-sm l">L</div>
+          &le;30 min to 14th St
+          <span class="commute-pill-x">×</span>
+        </div>
+        <div class="commute-pill">
+          <div class="transit-badge-sm a">A</div>
+          &le;45 min to Columbus Cir
+          <span class="commute-pill-x">×</span>
+        </div>
+
+        <div class="commute-pill-add">
+          + commute rule
+        </div>
+      </div>
+
+      <!-- Inline add form (expanded state) -->
+      <div class="context-label" style="margin-top:20px;">Inline add form — expanded when "+" is tapped</div>
+
+      <div class="panel">
+        <div class="panel-title">
+          <span class="panel-title-icon">+</span>
+          Add commute rule
+        </div>
+
+        <div class="add-rule-form-inline">
+          <div class="form-row" style="margin-bottom:8px;">
+            <div class="form-field-inline focused" style="flex:2;">14th St Union Sq</div>
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+              <span style="font-size:11px;color:var(--muted);">&le;</span>
+              <div class="form-field-inline" style="width:48px;text-align:center;">30</div>
+              <span style="font-size:11px;color:var(--muted);">min</span>
+            </div>
+          </div>
+          <div class="form-row" style="gap:6px;margin-bottom:10px;">
+            <div class="form-select-inline">
+              <div class="transit-badge-sm l">L</div>
+              <span>L train</span>
+            </div>
+            <div class="form-select-inline" style="border-color:rgba(88,166,255,0.4);background:rgba(88,166,255,0.08);color:var(--accent);">
+              <div class="transit-badge-sm a">A</div>
+              <span>A/C/E</span>
+            </div>
+            <div class="form-select-inline">
+              <div class="transit-badge-sm six">6</div>
+              <span>4/5/6</span>
+            </div>
+            <div class="form-select-inline" style="color:var(--muted);">
+              <span>+more</span>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;">
+            <div class="btn-cancel">Cancel</div>
+            <div class="form-add-btn">Add rule</div>
+          </div>
+          <div class="form-hint">Rule will appear as a pill in the filter bar above.</div>
+        </div>
+      </div>
+
+      <!-- Result preview -->
+      <div class="context-label" style="margin-top:20px;">Result after adding</div>
+      <div class="filter-bar">
+        <div class="filter-chip">Price: $1k–$3.5k</div>
+        <div class="filter-chip">2+ beds</div>
+        <div class="commute-pill">
+          <div class="transit-badge-sm l">L</div>
+          &le;30 min to 14th St
+          <span class="commute-pill-x">×</span>
+        </div>
+        <div class="commute-pill">
+          <div class="transit-badge-sm a">A</div>
+          &le;45 min to Columbus Cir
+          <span class="commute-pill-x">×</span>
+        </div>
+        <div class="commute-pill" style="background:rgba(126,231,135,0.08);border-color:rgba(126,231,135,0.3);">
+          <div class="transit-badge-sm a">A</div>
+          <span style="color:var(--green);">&le;30 min to 14th St</span>
+          <span class="commute-pill-x">×</span>
+        </div>
+        <div class="commute-pill-add">+ commute rule</div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:6px;">Newly added pill highlighted in green momentarily, then normalises.</div>
+
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       OPTION B — Compact card list
+  ════════════════════════════════════════════════════════════ -->
+  <div class="option-col">
+    <div class="option-header">
+      <div class="option-label">
+        <span class="option-badge">Option B</span>
+        <span class="option-title">Compact card list</span>
+      </div>
+      <div class="option-desc">Each rule is a clean card (no dashed border). Small text "Add rule" button. Fits the compact filter panel aesthetic.</div>
+    </div>
+    <div class="option-body">
+
+      <div class="context-label">Commute filter panel — 2 rules</div>
+
+      <div class="panel">
+        <div class="commute-section-header">
+          <div class="commute-section-title">Commute rules</div>
+          <div class="commute-add-text-btn">+ Add rule</div>
+        </div>
+
+        <!-- Rule 1 -->
+        <div class="commute-rule-card">
+          <div class="commute-rule-icon">
+            <div class="transit-badge l" style="width:20px;height:20px;font-size:10px;">L</div>
+          </div>
+          <div class="commute-rule-main">
+            <div class="commute-rule-dest">14th St Union Square</div>
+            <div class="commute-rule-meta">
+              <span class="commute-rule-time">&le;30 min</span>
+              <div class="commute-rule-mode">
+                <div class="transit-badge-sm l">L</div>
+                <span>L train</span>
+              </div>
+            </div>
+          </div>
+          <div class="commute-rule-delete">×</div>
+        </div>
+
+        <!-- Rule 2 -->
+        <div class="commute-rule-card">
+          <div class="commute-rule-icon">
+            <div class="transit-badge a" style="width:20px;height:20px;font-size:10px;">A</div>
+          </div>
+          <div class="commute-rule-main">
+            <div class="commute-rule-dest">Columbus Circle</div>
+            <div class="commute-rule-meta">
+              <span class="commute-rule-time">&le;45 min</span>
+              <div class="commute-rule-mode">
+                <div class="transit-badge-sm a">A</div>
+                <span>A/C/E train</span>
+              </div>
+            </div>
+          </div>
+          <div class="commute-rule-delete">×</div>
+        </div>
+
+        <div class="filter-footer">
+          <span class="footer-reset">Reset</span>
+          <span class="footer-count">2 active rules</span>
+          <div class="footer-done">Done</div>
+        </div>
+      </div>
+
+      <!-- Add form expanded -->
+      <div class="context-label" style="margin-top:20px;">Add rule form — expanded inline</div>
+
+      <div class="panel">
+        <div class="commute-section-header">
+          <div class="commute-section-title">Commute rules</div>
+        </div>
+
+        <div class="commute-rule-card" style="opacity:0.5;">
+          <div class="commute-rule-icon"><div class="transit-badge l" style="width:20px;height:20px;font-size:10px;">L</div></div>
+          <div class="commute-rule-main">
+            <div class="commute-rule-dest">14th St Union Square</div>
+            <div class="commute-rule-meta">
+              <span class="commute-rule-time">&le;30 min</span>
+              <div class="commute-rule-mode"><div class="transit-badge-sm l">L</div><span>L train</span></div>
+            </div>
+          </div>
+          <div class="commute-rule-delete">×</div>
+        </div>
+
+        <div class="add-rule-form-b">
+          <div class="form-b-row">
+            <div class="form-b-field focused" style="border-color:var(--accent);">Destination or address</div>
+            <div class="form-b-field" style="text-align:center;">30 min</div>
+          </div>
+          <div class="form-b-transit-row">
+            <div class="transit-option selected">
+              <div class="transit-badge-sm l">L</div>
+              <span>Subway</span>
+            </div>
+            <div class="transit-option">
+              <span>Bus</span>
+            </div>
+            <div class="transit-option">
+              <span>Walk</span>
+            </div>
+            <div class="transit-option">
+              <span>Any</span>
+            </div>
+          </div>
+          <div class="form-b-actions">
+            <div class="btn-cancel">Cancel</div>
+            <div class="btn-add">Add</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════
+       OPTION C — Tag builder style
+  ════════════════════════════════════════════════════════════ -->
+  <div class="option-col">
+    <div class="option-header">
+      <div class="option-label">
+        <span class="option-badge">Option C</span>
+        <span class="option-title">Tag builder style</span>
+      </div>
+      <div class="option-desc">Rules appear as token-tags inside a text-field chrome (like Gmail recipients). Type to add destination, pick time, pick mode. Very compact.</div>
+    </div>
+    <div class="option-body">
+
+      <div class="context-label">Tag field — 2 rules as tokens</div>
+
+      <div class="panel">
+        <div class="panel-title" style="margin-bottom:10px;">
+          <span class="panel-title-icon" style="font-size:13px;">Commute rules</span>
+        </div>
+
+        <!-- The token field with filled rules -->
+        <div class="tag-field-wrap focused-wrap">
+          <div class="commute-tag">
+            <div class="commute-tag-inner">
+              <div class="transit-badge-sm l">L</div>
+              <span class="commute-tag-dest">14th St</span>
+              <span class="commute-tag-sep">·</span>
+              <span class="commute-tag-time">30 min</span>
+            </div>
+            <span class="commute-tag-x">×</span>
+          </div>
+          <div class="commute-tag">
+            <div class="commute-tag-inner">
+              <div class="transit-badge-sm a">A</div>
+              <span class="commute-tag-dest">Columbus Cir</span>
+              <span class="commute-tag-sep">·</span>
+              <span class="commute-tag-time">45 min</span>
+            </div>
+            <span class="commute-tag-x">×</span>
+          </div>
+          <span style="font-size:12px;color:var(--muted);font-style:italic;">Add destination...</span>
+        </div>
+
+        <div class="filter-footer" style="margin-top:14px;padding-top:12px;">
+          <span class="footer-reset">Reset</span>
+          <div class="footer-done">Done</div>
+        </div>
+      </div>
+
+      <!-- Step-by-step builder -->
+      <div class="context-label" style="margin-top:20px;">Building a new rule — step by step</div>
+
+      <div class="panel">
+        <!-- Tags so far -->
+        <div class="tag-field-wrap focused-wrap" style="margin-bottom:12px;">
+          <div class="commute-tag">
+            <div class="commute-tag-inner">
+              <div class="transit-badge-sm l">L</div>
+              <span class="commute-tag-dest">14th St</span>
+              <span class="commute-tag-sep">·</span>
+              <span class="commute-tag-time">30 min</span>
+            </div>
+            <span class="commute-tag-x">×</span>
+          </div>
+          <!-- In-progress partial tag -->
+          <div class="commute-tag" style="border-color:rgba(88,166,255,0.5);background:rgba(88,166,255,0.08);">
+            <div class="commute-tag-inner">
+              <span class="commute-tag-dest" style="color:var(--accent);">Union Sq</span>
+              <span class="commute-tag-sep" style="color:var(--border);">·</span>
+              <span style="font-size:11px;color:var(--muted);">pick time</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step progress -->
+        <div class="builder-steps">
+          <!-- Step 1 — done -->
+          <div class="builder-step">
+            <div class="step-num done">&#10003;</div>
+            <div class="step-label" style="color:var(--green);">Destination</div>
+            <div class="step-value">Union Sq / 14th St</div>
+          </div>
+
+          <!-- Step 2 — active -->
+          <div class="builder-step">
+            <div class="step-num" style="background:rgba(88,166,255,0.2);border-color:var(--accent);color:var(--accent);">2</div>
+            <div class="step-label" style="color:var(--accent);">Max time</div>
+            <div style="flex:1;">
+              <div class="step-suggestions">
+                <div class="step-suggestion">15 min</div>
+                <div class="step-suggestion">20 min</div>
+                <div class="step-suggestion sel">30 min</div>
+                <div class="step-suggestion">45 min</div>
+                <div class="step-suggestion">60 min</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3 — upcoming -->
+          <div class="builder-step" style="opacity:0.45;">
+            <div class="step-num">3</div>
+            <div class="step-label">Transit</div>
+            <div style="flex:1;font-size:11px;color:var(--muted);">Subway, bus, walk, or any</div>
+          </div>
+        </div>
+
+        <div class="builder-confirm">
+          <div class="builder-preview">
+            Preview: <span>Union Sq &le; 30 min via subway</span>
+          </div>
+          <div class="btn-cancel" style="padding:4px 10px;font-size:11px;">Cancel</div>
+          <div class="btn-add" style="padding:4px 10px;font-size:11px;opacity:0.5;">Add tag</div>
+        </div>
+      </div>
+
+      <!-- Completed state -->
+      <div class="context-label" style="margin-top:20px;">Completed — 3 rules as tokens</div>
+      <div class="panel">
+        <div class="tag-field-wrap" style="min-height:56px;">
+          <div class="commute-tag">
+            <div class="commute-tag-inner">
+              <div class="transit-badge-sm l">L</div>
+              <span class="commute-tag-dest">14th St</span>
+              <span class="commute-tag-sep">·</span>
+              <span class="commute-tag-time">30 min</span>
+            </div>
+            <span class="commute-tag-x">×</span>
+          </div>
+          <div class="commute-tag">
+            <div class="commute-tag-inner">
+              <div class="transit-badge-sm a">A</div>
+              <span class="commute-tag-dest">Columbus Cir</span>
+              <span class="commute-tag-sep">·</span>
+              <span class="commute-tag-time">45 min</span>
+            </div>
+            <span class="commute-tag-x">×</span>
+          </div>
+          <div class="commute-tag">
+            <div class="commute-tag-inner">
+              <div class="transit-badge-sm six">6</div>
+              <span class="commute-tag-dest">Grand Central</span>
+              <span class="commute-tag-sep">·</span>
+              <span class="commute-tag-time">25 min</span>
+            </div>
+            <span class="commute-tag-x">×</span>
+          </div>
+          <span style="font-size:12px;color:var(--muted);font-style:italic;">Add...</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">All 3 rules as compact tokens — very scannable even with many rules.</div>
+        <div class="filter-footer">
+          <span class="footer-reset">Reset</span>
+          <div class="footer-done">Done</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

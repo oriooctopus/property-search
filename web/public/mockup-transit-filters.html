@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transit Filter Options — Dwelligence</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0d1117; color: #e1e4e8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; }
+
+  /* Colors */
+  :root {
+    --bg: #1c2028;
+    --bg-deep: #0d1117;
+    --border: #2d333b;
+    --text: #e1e4e8;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-bg: rgba(88, 166, 255, 0.08);
+    --accent-hover: rgba(88, 166, 255, 0.18);
+    --accent-border: rgba(88, 166, 255, 0.4);
+  }
+
+  /* Page layout */
+  .page-header {
+    max-width: 1100px; margin: 0 auto; padding: 40px 24px 20px;
+  }
+  .page-header h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .page-header p { font-size: 14px; color: var(--muted); line-height: 1.5; }
+
+  .option-section {
+    max-width: 1100px; margin: 0 auto; padding: 0 24px 48px;
+  }
+  .option-header {
+    display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px;
+  }
+  .option-letter {
+    font-size: 13px; font-weight: 800; color: var(--accent); background: var(--accent-bg);
+    border: 1px solid var(--accent); border-radius: 6px; padding: 2px 10px; letter-spacing: 0.04em;
+  }
+  .option-title { font-size: 17px; font-weight: 700; }
+  .option-subtitle { font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+
+  .pros-cons { display: flex; gap: 24px; margin-top: 16px; flex-wrap: wrap; }
+  .pros, .cons { flex: 1; min-width: 200px; }
+  .pros-title, .cons-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .pros-title { color: #3fb950; }
+  .cons-title { color: #f85149; }
+  .pros li, .cons li { font-size: 12px; color: var(--muted); line-height: 1.6; list-style: none; padding-left: 14px; position: relative; }
+  .pros li::before { content: '+'; position: absolute; left: 0; color: #3fb950; font-weight: 700; }
+  .cons li::before { content: '\2013'; position: absolute; left: 0; color: #f85149; font-weight: 700; }
+
+  /* Filter bar mockup */
+  .filter-bar {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+    overflow: visible; position: relative;
+  }
+  .row1 {
+    display: flex; align-items: center; height: 32px; padding: 0 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .area-tabs { display: flex; align-items: center; flex: 1; min-width: 0; overflow-x: auto; }
+  .area-tabs::-webkit-scrollbar { display: none; }
+  .area-tab {
+    position: relative; display: flex; align-items: center; height: 32px; padding: 0 10px;
+    font-size: 11px; white-space: nowrap; cursor: pointer; transition: color 0.15s;
+    color: var(--muted); background: none; border: none; font-family: inherit;
+  }
+  .area-tab:hover { color: #c0d6f5; }
+  .area-tab.active { color: var(--text); }
+  .area-tab.active::after {
+    content: ''; position: absolute; bottom: 0; left: 10px; right: 10px; height: 2px;
+    border-radius: 1px; background: var(--accent);
+  }
+  .row1-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; padding-left: 8px; }
+  .listing-count { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .sort-btn {
+    display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted);
+    cursor: pointer; white-space: nowrap; padding: 0 4px; background: none; border: none; font-family: inherit;
+  }
+  .filter-toggle {
+    display: flex; align-items: center; gap: 4px; border-radius: 6px; padding: 0 10px;
+    font-size: 11px; font-weight: 600; white-space: nowrap; height: 26px; cursor: pointer;
+    background: var(--accent-bg); color: var(--accent); border: 1px solid var(--accent);
+    font-family: inherit;
+  }
+  .filter-toggle .badge {
+    background: var(--accent); color: #0f1117; font-size: 10px; font-weight: 700;
+    border-radius: 999px; min-width: 16px; height: 16px; display: flex; align-items: center;
+    justify-content: center; padding: 0 4px;
+  }
+
+  /* Row 2 — filter chips */
+  .row2 {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 8px 4px;
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px; border-radius: 6px;
+    padding: 0 10px; font-size: 11px; font-weight: 500; white-space: nowrap;
+    height: 28px; cursor: pointer; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); font-family: inherit;
+    transition: all 0.15s;
+  }
+  .chip:hover { background: rgba(88,166,255,0.2); color: #c0d6f5; border-color: var(--accent-border); }
+  .chip.active { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+  .chip.open { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+  .chip .chevron { transition: transform 0.15s; font-size: 10px; }
+  .chip.open .chevron { transform: rotate(180deg); }
+  .chip-new-badge {
+    font-size: 9px; font-weight: 700; background: #3fb950; color: #0d1117;
+    border-radius: 3px; padding: 1px 4px; margin-left: 2px;
+  }
+
+  /* Dropdown panel */
+  .dropdown {
+    position: absolute; z-index: 100; border-radius: 12px; border: 1px solid var(--border);
+    padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); background: var(--bg);
+    min-width: 320px; margin-top: 8px;
+  }
+  .dropdown.wide { min-width: 400px; }
+  .section-title {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--muted); margin-bottom: 12px;
+  }
+
+  /* Slider */
+  .slider-row { margin-bottom: 16px; }
+  .slider-label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .slider-label { font-size: 12px; font-weight: 500; color: var(--muted); }
+  .slider-value { font-size: 14px; font-weight: 700; color: var(--text); }
+  input[type="range"] {
+    -webkit-appearance: none; width: 100%; height: 6px; border-radius: 3px; outline: none;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg); cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 18px; height: 18px; border-radius: 50%; background: var(--accent);
+    border: 2px solid var(--bg); cursor: pointer;
+  }
+  .slider-ticks { display: flex; justify-content: space-between; margin-top: 4px; }
+  .slider-ticks span { font-size: 10px; color: var(--muted); }
+
+  /* Subway lines */
+  .subway-lines { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; margin-bottom: 4px; }
+  .subway-line {
+    width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-size: 12px; font-weight: 800; color: #fff;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  .subway-line.dimmed { opacity: 0.25; transform: scale(0.85); }
+  .subway-accessible { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  /* Dropdown footer */
+  .dropdown-footer {
+    display: flex; justify-content: space-between; align-items: center; margin-top: 20px;
+  }
+  .btn-reset {
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--muted); background: none; border: none; cursor: pointer; font-family: inherit;
+    padding: 0;
+  }
+  .btn-reset:hover { color: var(--text); }
+  .btn-done {
+    height: 36px; padding: 0 24px; font-size: 14px; font-weight: 700;
+    background: var(--accent); color: #0f1117; border: none; border-radius: 8px;
+    cursor: pointer; font-family: inherit; transition: background 0.15s;
+  }
+  .btn-done:hover { background: #79bbff; }
+
+  /* Tabs inside dropdown */
+  .tab-bar { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .tab-btn {
+    flex: 1; padding: 8px 0; font-size: 12px; font-weight: 600; text-align: center;
+    color: var(--muted); background: none; border: none; cursor: pointer; font-family: inherit;
+    position: relative; transition: color 0.15s;
+  }
+  .tab-btn.active { color: var(--text); }
+  .tab-btn.active::after {
+    content: ''; position: absolute; bottom: 0; left: 16px; right: 16px; height: 2px;
+    border-radius: 1px; background: var(--accent);
+  }
+
+  /* Mode toggle pills */
+  .mode-pills { display: flex; }
+  .mode-pill {
+    flex: 1; padding: 4px 0; font-size: 11px; font-weight: 600; text-align: center;
+    color: var(--muted); background: transparent; border: 1px solid var(--border);
+    cursor: pointer; font-family: inherit; transition: all 0.15s;
+  }
+  .mode-pill:first-child { border-radius: 6px 0 0 6px; }
+  .mode-pill:last-child { border-radius: 0 6px 6px 0; }
+  .mode-pill:not(:first-child) { border-left: none; }
+  .mode-pill.active { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+  .mode-pill:hover:not(.active) { background: rgba(88,166,255,0.1); color: #c0d6f5; }
+
+  /* Destination row */
+  .destination-row {
+    display: flex; align-items: center; gap: 8px; padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .destination-row:last-of-type { border-bottom: none; }
+  .dest-icon { font-size: 14px; flex-shrink: 0; }
+  .dest-info { flex: 1; min-width: 0; }
+  .dest-name { font-size: 12px; font-weight: 600; color: var(--text); }
+  .dest-detail { font-size: 11px; color: var(--muted); }
+  .dest-time {
+    font-size: 14px; font-weight: 700; color: var(--accent); white-space: nowrap;
+  }
+  .dest-remove {
+    font-size: 14px; color: var(--muted); cursor: pointer; background: none; border: none;
+    padding: 4px; line-height: 1; font-family: inherit;
+  }
+  .dest-remove:hover { color: #f85149; }
+
+  /* Add destination */
+  .add-dest-input {
+    width: 100%; height: 32px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg-deep); color: var(--text); font-size: 12px; padding: 0 10px;
+    font-family: inherit; outline: none; margin-top: 10px;
+  }
+  .add-dest-input::placeholder { color: #484f58; }
+  .add-dest-input:focus { border-color: var(--accent); }
+
+  /* Match count badge */
+  .match-count {
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    font-size: 12px; font-weight: 600; color: var(--accent); background: var(--accent-bg);
+    border-radius: 6px; padding: 6px 12px; margin-top: 12px; text-align: center;
+  }
+
+  /* Divider */
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+  /* Dynamic area tabs */
+  .area-tab.user-dest {
+    color: var(--muted); position: relative;
+  }
+  .area-tab.user-dest .dest-indicator {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 4px;
+  }
+  .area-tab.add-tab { color: var(--accent); font-weight: 600; }
+
+  /* Section spacer */
+  .section-spacer { height: 32px; }
+
+  /* Annotation callout */
+  .annotation {
+    font-size: 11px; color: var(--accent); background: var(--accent-bg); border: 1px dashed var(--accent-border);
+    border-radius: 6px; padding: 6px 10px; margin-top: 8px; line-height: 1.5;
+  }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .dropdown { min-width: calc(100vw - 48px); left: 0 !important; right: 0; }
+    .pros-cons { flex-direction: column; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Transit &amp; Distance Filter Options</h1>
+  <p>Four design approaches for adding subway proximity and commute-time filters to the Dwelligence filter bar. All options use pre-computed isochrone data so filtering is instant (no API calls on slider change). Pick A, B, C, or D below.</p>
+</div>
+
+<!-- ============================================================ -->
+<!-- OPTION A: Inline Chips -->
+<!-- ============================================================ -->
+<div class="option-section" id="option-a">
+  <div class="option-header">
+    <span class="option-letter">A</span>
+    <span class="option-title">Inline Chips</span>
+  </div>
+  <div class="option-subtitle">Two new filter chips — "Near Subway" and "Commute" — added to the existing row alongside Price, Beds/Baths, etc.</div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <div class="row1">
+      <div class="area-tabs">
+        <button class="area-tab active">All</button>
+        <button class="area-tab">Fulton St</button>
+        <button class="area-tab">L Train</button>
+        <button class="area-tab">Manhattan</button>
+        <button class="area-tab">Brooklyn 14th</button>
+        <button class="area-tab">Uptown West</button>
+      </div>
+      <div class="row1-right">
+        <span class="listing-count">847</span>
+        <button class="sort-btn">&#8645; Price/Bedroom <span class="chevron">&#9662;</span></button>
+        <button class="filter-toggle">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 2h10M3 6h6M5 10h2"/></svg>
+          Filters
+          <span class="badge">2</span>
+        </button>
+      </div>
+    </div>
+    <div class="row2">
+      <button class="chip">Price <span class="chevron">&#9662;</span></button>
+      <button class="chip">Beds / Baths <span class="chevron">&#9662;</span></button>
+      <button class="chip">$/Bedroom <span class="chevron">&#9662;</span></button>
+      <button class="chip">Listed within <span class="chevron">&#9662;</span></button>
+      <button class="chip">Source <span class="chevron">&#9662;</span></button>
+      <button class="chip">Photos first</button>
+      <button class="chip active open" id="chipSubwayA">Near Subway <span class="chip-new-badge">NEW</span> <span class="chevron">&#9662;</span></button>
+      <button class="chip" id="chipCommuteA">Commute <span class="chip-new-badge">NEW</span> <span class="chevron">&#9662;</span></button>
+    </div>
+
+    <!-- Near Subway dropdown (open) -->
+    <div class="dropdown" id="dropSubwayA" style="left: 330px; top: 76px;">
+      <div class="section-title">Max Walk to Subway</div>
+      <div class="slider-row">
+        <div class="slider-label-row">
+          <span class="slider-label">Walking time</span>
+          <span class="slider-value" id="subwayValA">10 min</span>
+        </div>
+        <input type="range" min="1" max="30" value="10" id="subwaySliderA"
+          style="background: linear-gradient(to right, var(--accent) 0%, var(--accent) 31%, #2d333b 31%, #2d333b 100%);">
+        <div class="slider-ticks"><span>1 min</span><span>15 min</span><span>30 min</span></div>
+      </div>
+
+      <div class="section-title" style="margin-top: 16px;">Accessible Lines</div>
+      <div class="subway-lines" id="subwayLinesA">
+        <span class="subway-line" style="background:#ee352e;">1</span>
+        <span class="subway-line" style="background:#ee352e;">2</span>
+        <span class="subway-line" style="background:#ee352e;">3</span>
+        <span class="subway-line" style="background:#00933c;">4</span>
+        <span class="subway-line" style="background:#00933c;">5</span>
+        <span class="subway-line" style="background:#00933c;">6</span>
+        <span class="subway-line" style="background:#b933ad;">7</span>
+        <span class="subway-line" style="background:#0039a6;">A</span>
+        <span class="subway-line" style="background:#0039a6;">C</span>
+        <span class="subway-line" style="background:#0039a6;">E</span>
+        <span class="subway-line" style="background:#ff6319;">B</span>
+        <span class="subway-line" style="background:#ff6319;">D</span>
+        <span class="subway-line" style="background:#ff6319;">F</span>
+        <span class="subway-line" style="background:#ff6319;">M</span>
+        <span class="subway-line" style="background:#fccc0a; color:#333;">N</span>
+        <span class="subway-line" style="background:#fccc0a; color:#333;">Q</span>
+        <span class="subway-line" style="background:#fccc0a; color:#333;">R</span>
+        <span class="subway-line" style="background:#fccc0a; color:#333;">W</span>
+        <span class="subway-line" style="background:#6cbe45;">G</span>
+        <span class="subway-line" style="background:#996633;">J</span>
+        <span class="subway-line" style="background:#996633;">Z</span>
+        <span class="subway-line" style="background:#a7a9ac; color:#333;">L</span>
+        <span class="subway-line" style="background:#808183; color:#fff;">S</span>
+      </div>
+      <div class="subway-accessible" id="subwayAccessibleA">23 lines accessible within 10 min walk</div>
+
+      <div class="dropdown-footer">
+        <button class="btn-reset" onclick="document.getElementById('subwaySliderA').value=10; updateSubwayA();">RESET</button>
+        <button class="btn-done">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="annotation" style="margin-top: 12px;">Click "Commute" chip to see its dropdown. Both chips work independently and stack their filters.</div>
+
+  <!-- Commute dropdown preview (separate block) -->
+  <div style="margin-top: 20px; position: relative;">
+    <div class="dropdown" style="position: relative; display: inline-block;">
+      <div class="section-title">Commute Destinations</div>
+
+      <div class="destination-row">
+        <span class="dest-icon">&#128188;</span>
+        <div class="dest-info">
+          <div class="dest-name">100 Broadway, Manhattan</div>
+          <div class="dest-detail">Transit &middot; max 35 min</div>
+        </div>
+        <div class="dest-time">&le; 35m</div>
+        <button class="dest-remove">&times;</button>
+      </div>
+
+      <div class="destination-row">
+        <span class="dest-icon">&#127968;</span>
+        <div class="dest-info">
+          <div class="dest-name">Prospect Park</div>
+          <div class="dest-detail">Bike &middot; max 20 min</div>
+        </div>
+        <div class="dest-time">&le; 20m</div>
+        <button class="dest-remove">&times;</button>
+      </div>
+
+      <div class="slider-row" style="margin-top: 12px;">
+        <div class="slider-label-row">
+          <span class="slider-label">Max commute to 100 Broadway</span>
+          <span class="slider-value">35 min</span>
+        </div>
+        <input type="range" min="5" max="60" value="35" style="background: linear-gradient(to right, var(--accent) 0%, var(--accent) 55%, #2d333b 55%, #2d333b 100%);">
+        <div class="slider-ticks"><span>5 min</span><span>30 min</span><span>60 min</span></div>
+      </div>
+
+      <div class="section-title">Mode</div>
+      <div class="mode-pills">
+        <button class="mode-pill">Walk</button>
+        <button class="mode-pill active">Transit</button>
+        <button class="mode-pill">Bike</button>
+      </div>
+
+      <input class="add-dest-input" placeholder="+ Add destination (address or saved place)">
+
+      <div class="match-count">&#9679; 312 listings match all destinations</div>
+
+      <div class="dropdown-footer">
+        <button class="btn-reset">RESET</button>
+        <button class="btn-done">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-title">Pros</div>
+      <ul>
+        <li>Consistent with existing UI — zero learning curve</li>
+        <li>Each filter is independently discoverable</li>
+        <li>Easy to implement: two new FilterChip components</li>
+        <li>Chip label updates to show active state (e.g., "10 min walk")</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-title">Cons</div>
+      <ul>
+        <li>Filter row gets crowded (8 chips) — may wrap on smaller screens</li>
+        <li>Commute dropdown is complex/tall for a small chip trigger</li>
+        <li>Subway and commute are conceptually related but visually separate</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- OPTION B: Combined Transit Chip -->
+<!-- ============================================================ -->
+<div class="option-section" id="option-b">
+  <div class="option-header">
+    <span class="option-letter">B</span>
+    <span class="option-title">Combined "Transit" Chip</span>
+  </div>
+  <div class="option-subtitle">A single chip opens a wider dropdown with two tabs: Subway Proximity and Commute.</div>
+
+  <div class="filter-bar">
+    <div class="row1">
+      <div class="area-tabs">
+        <button class="area-tab active">All</button>
+        <button class="area-tab">Fulton St</button>
+        <button class="area-tab">L Train</button>
+        <button class="area-tab">Manhattan</button>
+        <button class="area-tab">Brooklyn 14th</button>
+        <button class="area-tab">Uptown West</button>
+      </div>
+      <div class="row1-right">
+        <span class="listing-count">847</span>
+        <button class="sort-btn">&#8645; Price/Bedroom <span class="chevron">&#9662;</span></button>
+        <button class="filter-toggle">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 2h10M3 6h6M5 10h2"/></svg>
+          Filters
+          <span class="badge">2</span>
+        </button>
+      </div>
+    </div>
+    <div class="row2">
+      <button class="chip">Price <span class="chevron">&#9662;</span></button>
+      <button class="chip">Beds / Baths <span class="chevron">&#9662;</span></button>
+      <button class="chip">$/Bedroom <span class="chevron">&#9662;</span></button>
+      <button class="chip">Listed within <span class="chevron">&#9662;</span></button>
+      <button class="chip">Source <span class="chevron">&#9662;</span></button>
+      <button class="chip">Photos first</button>
+      <button class="chip active open" id="chipTransitB">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="14" rx="2"/><path d="M4 11h16"/><path d="M12 3v14"/><circle cx="8" cy="21" r="1"/><circle cx="16" cy="21" r="1"/><path d="M8 17v4M16 17v4"/></svg>
+        Transit <span class="chip-new-badge">NEW</span> <span class="chevron">&#9662;</span>
+      </button>
+    </div>
+
+    <!-- Combined Transit dropdown -->
+    <div class="dropdown wide" id="dropTransitB" style="left: 330px; top: 76px; min-width: 420px;">
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="showTabB('subway')">Subway Proximity</button>
+        <button class="tab-btn" onclick="showTabB('commute')">Commute</button>
+      </div>
+
+      <!-- Subway tab -->
+      <div id="tabSubwayB">
+        <div class="slider-row">
+          <div class="slider-label-row">
+            <span class="slider-label">Max walk to nearest subway</span>
+            <span class="slider-value" id="subwayValB">10 min</span>
+          </div>
+          <input type="range" min="1" max="30" value="10" id="subwaySliderB"
+            style="background: linear-gradient(to right, var(--accent) 0%, var(--accent) 31%, #2d333b 31%, #2d333b 100%);">
+          <div class="slider-ticks"><span>1 min</span><span>15 min</span><span>30 min</span></div>
+        </div>
+
+        <div class="section-title" style="margin-top: 16px;">Accessible Lines</div>
+        <div class="subway-lines" id="subwayLinesB">
+          <span class="subway-line" style="background:#ee352e;">1</span>
+          <span class="subway-line" style="background:#ee352e;">2</span>
+          <span class="subway-line" style="background:#ee352e;">3</span>
+          <span class="subway-line" style="background:#00933c;">4</span>
+          <span class="subway-line" style="background:#00933c;">5</span>
+          <span class="subway-line" style="background:#00933c;">6</span>
+          <span class="subway-line" style="background:#b933ad;">7</span>
+          <span class="subway-line" style="background:#0039a6;">A</span>
+          <span class="subway-line" style="background:#0039a6;">C</span>
+          <span class="subway-line" style="background:#0039a6;">E</span>
+          <span class="subway-line" style="background:#ff6319;">B</span>
+          <span class="subway-line" style="background:#ff6319;">D</span>
+          <span class="subway-line" style="background:#ff6319;">F</span>
+          <span class="subway-line" style="background:#ff6319;">M</span>
+          <span class="subway-line" style="background:#fccc0a; color:#333;">N</span>
+          <span class="subway-line" style="background:#fccc0a; color:#333;">Q</span>
+          <span class="subway-line" style="background:#fccc0a; color:#333;">R</span>
+          <span class="subway-line" style="background:#fccc0a; color:#333;">W</span>
+          <span class="subway-line" style="background:#6cbe45;">G</span>
+          <span class="subway-line" style="background:#996633;">J</span>
+          <span class="subway-line" style="background:#996633;">Z</span>
+          <span class="subway-line" style="background:#a7a9ac; color:#333;">L</span>
+          <span class="subway-line" style="background:#808183; color:#fff;">S</span>
+        </div>
+        <div class="subway-accessible" id="subwayAccessibleB">23 lines accessible within 10 min walk</div>
+      </div>
+
+      <!-- Commute tab (hidden by default) -->
+      <div id="tabCommuteB" style="display: none;">
+        <div class="destination-row">
+          <span class="dest-icon">&#128188;</span>
+          <div class="dest-info">
+            <div class="dest-name">100 Broadway, Manhattan</div>
+            <div class="dest-detail">Transit &middot; max 35 min</div>
+          </div>
+          <div class="dest-time">&le; 35m</div>
+          <button class="dest-remove">&times;</button>
+        </div>
+
+        <div class="slider-row" style="margin-top: 12px;">
+          <div class="slider-label-row">
+            <span class="slider-label">Max commute time</span>
+            <span class="slider-value">35 min</span>
+          </div>
+          <input type="range" min="5" max="60" value="35" style="background: linear-gradient(to right, var(--accent) 0%, var(--accent) 55%, #2d333b 55%, #2d333b 100%);">
+          <div class="slider-ticks"><span>5 min</span><span>30 min</span><span>60 min</span></div>
+        </div>
+
+        <div class="section-title">Mode</div>
+        <div class="mode-pills">
+          <button class="mode-pill">Walk</button>
+          <button class="mode-pill active">Transit</button>
+          <button class="mode-pill">Bike</button>
+        </div>
+
+        <input class="add-dest-input" placeholder="+ Add destination (address or saved place)">
+
+        <div class="match-count">&#9679; 312 listings match all destinations</div>
+      </div>
+
+      <div class="dropdown-footer">
+        <button class="btn-reset">RESET</button>
+        <button class="btn-done">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-title">Pros</div>
+      <ul>
+        <li>Single chip — keeps filter row compact (7 chips total)</li>
+        <li>Groups related transit features together logically</li>
+        <li>Tab pattern already feels natural (like a settings panel)</li>
+        <li>Chip label can summarize both: "10 min walk + 1 dest"</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-title">Cons</div>
+      <ul>
+        <li>Larger dropdown than other chips — visual weight mismatch</li>
+        <li>Users may not discover the second tab if they only need subway</li>
+        <li>More complex state management (two sub-filters in one chip)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- OPTION C: Area Tabs Replacement -->
+<!-- ============================================================ -->
+<div class="option-section" id="option-c">
+  <div class="option-header">
+    <span class="option-letter">C</span>
+    <span class="option-title">Area Tabs Replacement</span>
+  </div>
+  <div class="option-subtitle">Replace hardcoded area tabs with user-configured destinations. Each "tab" is a saved commute destination that filters by isochrone. The subway proximity slider moves into the filter row.</div>
+
+  <div class="filter-bar">
+    <div class="row1">
+      <div class="area-tabs">
+        <button class="area-tab active">All</button>
+        <button class="area-tab user-dest"><span class="dest-indicator"></span>100 Broadway</button>
+        <button class="area-tab user-dest"><span class="dest-indicator"></span>Prospect Park</button>
+        <button class="area-tab user-dest" style="color: var(--muted); opacity: 0.6;"><span class="dest-indicator" style="background: var(--muted);"></span>Mom's House</button>
+        <button class="area-tab add-tab">+ Add</button>
+      </div>
+      <div class="row1-right">
+        <span class="listing-count">312</span>
+        <button class="sort-btn">&#8645; Price/Bedroom <span class="chevron">&#9662;</span></button>
+        <button class="filter-toggle">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 2h10M3 6h6M5 10h2"/></svg>
+          Filters
+          <span class="badge">1</span>
+        </button>
+      </div>
+    </div>
+    <div class="row2">
+      <button class="chip">Price <span class="chevron">&#9662;</span></button>
+      <button class="chip">Beds / Baths <span class="chevron">&#9662;</span></button>
+      <button class="chip">$/Bedroom <span class="chevron">&#9662;</span></button>
+      <button class="chip">Listed within <span class="chevron">&#9662;</span></button>
+      <button class="chip">Source <span class="chevron">&#9662;</span></button>
+      <button class="chip">Photos first</button>
+      <button class="chip active open">Near Subway <span class="chevron">&#9662;</span></button>
+    </div>
+  </div>
+
+  <div class="annotation" style="margin-top: 12px;">Clicking a destination tab filters listings by that destination's isochrone. Clicking "100 Broadway" shows only listings reachable within its configured commute time. The tab dropdown lets you edit time/mode.</div>
+
+  <!-- Tab config dropdown preview -->
+  <div style="margin-top: 20px; position: relative;">
+    <div class="dropdown" style="position: relative; display: inline-block;">
+      <div class="section-title">Edit: 100 Broadway</div>
+
+      <div class="slider-row">
+        <div class="slider-label-row">
+          <span class="slider-label">Max commute time</span>
+          <span class="slider-value">35 min</span>
+        </div>
+        <input type="range" min="5" max="60" value="35" style="background: linear-gradient(to right, var(--accent) 0%, var(--accent) 55%, #2d333b 55%, #2d333b 100%);">
+        <div class="slider-ticks"><span>5 min</span><span>30 min</span><span>60 min</span></div>
+      </div>
+
+      <div class="section-title">Mode</div>
+      <div class="mode-pills">
+        <button class="mode-pill">Walk</button>
+        <button class="mode-pill active">Transit</button>
+        <button class="mode-pill">Bike</button>
+      </div>
+
+      <div class="match-count" style="margin-top: 16px;">&#9679; 312 listings within 35 min transit</div>
+
+      <div class="dropdown-footer">
+        <button class="btn-reset" style="color: #f85149;">Remove Destination</button>
+        <button class="btn-done">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- "+ Add" dropdown preview -->
+  <div style="margin-top: 20px; position: relative;">
+    <div class="dropdown" style="position: relative; display: inline-block;">
+      <div class="section-title">Add Destination</div>
+      <input class="add-dest-input" placeholder="Search address..." style="margin-top: 0; margin-bottom: 12px;">
+      <div class="section-title">Saved Places</div>
+      <div style="display: flex; flex-direction: column; gap: 2px;">
+        <button style="text-align: left; padding: 8px 10px; border-radius: 6px; font-size: 12px; color: var(--text); background: none; border: none; cursor: pointer; font-family: inherit;" onmouseover="this.style.background='rgba(88,166,255,0.1)'" onmouseout="this.style.background='none'">&#128188; Work — 100 Broadway</button>
+        <button style="text-align: left; padding: 8px 10px; border-radius: 6px; font-size: 12px; color: var(--text); background: none; border: none; cursor: pointer; font-family: inherit;" onmouseover="this.style.background='rgba(88,166,255,0.1)'" onmouseout="this.style.background='none'">&#127968; Home — Prospect Park</button>
+        <button style="text-align: left; padding: 8px 10px; border-radius: 6px; font-size: 12px; color: var(--text); background: none; border: none; cursor: pointer; font-family: inherit;" onmouseover="this.style.background='rgba(88,166,255,0.1)'" onmouseout="this.style.background='none'">&#10084; Mom's House — 42 Elm St</button>
+      </div>
+      <div class="divider"></div>
+      <div class="section-title">Preset Areas</div>
+      <div style="display: flex; flex-direction: column; gap: 2px;">
+        <button style="text-align: left; padding: 8px 10px; border-radius: 6px; font-size: 12px; color: var(--muted); background: none; border: none; cursor: pointer; font-family: inherit;" onmouseover="this.style.background='rgba(88,166,255,0.1)'" onmouseout="this.style.background='none'">&#128647; Fulton St (25 min transit)</button>
+        <button style="text-align: left; padding: 8px 10px; border-radius: 6px; font-size: 12px; color: var(--muted); background: none; border: none; cursor: pointer; font-family: inherit;" onmouseover="this.style.background='rgba(88,166,255,0.1)'" onmouseout="this.style.background='none'">&#128647; L Train corridor (10 min walk)</button>
+        <button style="text-align: left; padding: 8px 10px; border-radius: 6px; font-size: 12px; color: var(--muted); background: none; border: none; cursor: pointer; font-family: inherit;" onmouseover="this.style.background='rgba(88,166,255,0.1)'" onmouseout="this.style.background='none'">&#128647; Brooklyn 14th St (35 min transit)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-title">Pros</div>
+      <ul>
+        <li>Most powerful: users build their own filter tabs from real destinations</li>
+        <li>Removes hardcoded geography — scales to any city</li>
+        <li>Old preset areas available as quick-add options (migration path)</li>
+        <li>Each tab shows a clear, personalized label</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-title">Cons</div>
+      <ul>
+        <li>Breaking change: existing users lose familiar area tab names</li>
+        <li>Requires onboarding — new users see an empty tab bar</li>
+        <li>More infrastructure: saved destinations need persistence (user accounts)</li>
+        <li>Largest implementation effort of all options</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- OPTION D: Hybrid -->
+<!-- ============================================================ -->
+<div class="option-section" id="option-d">
+  <div class="option-header">
+    <span class="option-letter">D</span>
+    <span class="option-title">Hybrid</span>
+  </div>
+  <div class="option-subtitle">Keep the existing area tabs as built-in presets, but add a "Near Subway" chip in the filter row. Clicking an area tab auto-populates a commute filter behind the scenes. Users can also add custom destinations.</div>
+
+  <div class="filter-bar">
+    <div class="row1">
+      <div class="area-tabs">
+        <button class="area-tab active">All</button>
+        <button class="area-tab">Fulton St</button>
+        <button class="area-tab">L Train</button>
+        <button class="area-tab">Manhattan</button>
+        <button class="area-tab">Brooklyn 14th</button>
+        <button class="area-tab">Uptown West</button>
+        <button class="area-tab user-dest" style="border-left: 1px solid var(--border); margin-left: 4px; padding-left: 12px;"><span class="dest-indicator"></span>100 Broadway</button>
+        <button class="area-tab add-tab">+</button>
+      </div>
+      <div class="row1-right">
+        <span class="listing-count">847</span>
+        <button class="sort-btn">&#8645; Price/Bedroom <span class="chevron">&#9662;</span></button>
+        <button class="filter-toggle">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 2h10M3 6h6M5 10h2"/></svg>
+          Filters
+          <span class="badge">1</span>
+        </button>
+      </div>
+    </div>
+    <div class="row2">
+      <button class="chip">Price <span class="chevron">&#9662;</span></button>
+      <button class="chip">Beds / Baths <span class="chevron">&#9662;</span></button>
+      <button class="chip">$/Bedroom <span class="chevron">&#9662;</span></button>
+      <button class="chip">Listed within <span class="chevron">&#9662;</span></button>
+      <button class="chip">Source <span class="chevron">&#9662;</span></button>
+      <button class="chip">Photos first</button>
+      <button class="chip active open">Near Subway <span class="chip-new-badge">NEW</span> <span class="chevron">&#9662;</span></button>
+    </div>
+  </div>
+
+  <div class="annotation" style="margin-top: 12px;">Built-in area tabs (Fulton St, L Train, etc.) stay as-is. User-added destinations appear after a subtle divider. The Near Subway chip handles walk-to-station filtering. Clicking "Fulton St" tab still works like before but now also powered by isochrone data internally.</div>
+
+  <!-- How it connects -->
+  <div style="margin-top: 20px; position: relative;">
+    <div class="dropdown" style="position: relative; display: inline-block; min-width: 400px;">
+      <div class="section-title">Near Subway</div>
+      <div class="slider-row">
+        <div class="slider-label-row">
+          <span class="slider-label">Max walk to nearest subway</span>
+          <span class="slider-value" id="subwayValD">10 min</span>
+        </div>
+        <input type="range" min="1" max="30" value="10" id="subwaySliderD"
+          style="background: linear-gradient(to right, var(--accent) 0%, var(--accent) 31%, #2d333b 31%, #2d333b 100%);">
+        <div class="slider-ticks"><span>1 min</span><span>15 min</span><span>30 min</span></div>
+      </div>
+
+      <div class="section-title" style="margin-top: 16px;">Lines Within Range</div>
+      <div class="subway-lines" id="subwayLinesD">
+        <span class="subway-line" style="background:#ee352e;">1</span>
+        <span class="subway-line" style="background:#ee352e;">2</span>
+        <span class="subway-line" style="background:#ee352e;">3</span>
+        <span class="subway-line" style="background:#00933c;">4</span>
+        <span class="subway-line" style="background:#00933c;">5</span>
+        <span class="subway-line" style="background:#00933c;">6</span>
+        <span class="subway-line" style="background:#b933ad;">7</span>
+        <span class="subway-line" style="background:#0039a6;">A</span>
+        <span class="subway-line" style="background:#0039a6;">C</span>
+        <span class="subway-line" style="background:#0039a6;">E</span>
+        <span class="subway-line" style="background:#ff6319;">B</span>
+        <span class="subway-line" style="background:#ff6319;">D</span>
+        <span class="subway-line" style="background:#ff6319;">F</span>
+        <span class="subway-line" style="background:#ff6319;">M</span>
+        <span class="subway-line" style="background:#fccc0a; color:#333;">N</span>
+        <span class="subway-line" style="background:#fccc0a; color:#333;">Q</span>
+        <span class="subway-line" style="background:#fccc0a; color:#333;">R</span>
+        <span class="subway-line" style="background:#fccc0a; color:#333;">W</span>
+        <span class="subway-line" style="background:#6cbe45;">G</span>
+        <span class="subway-line" style="background:#996633;">J</span>
+        <span class="subway-line" style="background:#996633;">Z</span>
+        <span class="subway-line" style="background:#a7a9ac; color:#333;">L</span>
+        <span class="subway-line" style="background:#808183; color:#fff;">S</span>
+      </div>
+      <div class="subway-accessible" id="subwayAccessibleD">23 lines accessible within 10 min walk</div>
+
+      <div class="divider"></div>
+
+      <div class="section-title">Custom Destinations</div>
+      <div class="destination-row">
+        <span class="dest-icon">&#128188;</span>
+        <div class="dest-info">
+          <div class="dest-name">100 Broadway, Manhattan</div>
+          <div class="dest-detail">Transit &middot; max 35 min</div>
+        </div>
+        <div class="dest-time">&le; 35m</div>
+        <button class="dest-remove">&times;</button>
+      </div>
+      <input class="add-dest-input" placeholder="+ Add destination">
+
+      <div class="match-count">&#9679; 487 listings match subway + destination filters</div>
+
+      <div class="dropdown-footer">
+        <button class="btn-reset">RESET</button>
+        <button class="btn-done">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Show what happens when Fulton St is clicked -->
+  <div class="annotation" style="margin-top: 16px;">
+    When user clicks "Fulton St" area tab, the app internally applies the equivalent isochrone filter (25 min transit to Fulton St station). The user can then open Near Subway to fine-tune walk distance. If they click a custom destination tab like "100 Broadway", that filters by its commute isochrone instead. Area tabs and custom destinations are mutually exclusive selections (radio behavior).
+  </div>
+
+  <div class="pros-cons">
+    <div class="pros">
+      <div class="pros-title">Pros</div>
+      <ul>
+        <li>Zero breaking changes — existing area tabs work exactly as before</li>
+        <li>Gradual migration: users discover custom destinations over time</li>
+        <li>Subway filter is independently useful even without commute setup</li>
+        <li>Area tabs gain superpowers (backed by isochrone data) without UI change</li>
+        <li>Moderate implementation effort — builds on existing architecture</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <div class="cons-title">Cons</div>
+      <ul>
+        <li>Two concepts in one dropdown (subway + destinations) may feel crowded</li>
+        <li>Custom destination tabs + area tabs in one row could get long</li>
+        <li>Radio behavior between preset/custom tabs needs clear visual distinction</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div style="height: 80px;"></div>
+
+<!-- ============================================================ -->
+<!-- Navigation + JS -->
+<!-- ============================================================ -->
+<div style="position: fixed; top: 16px; right: 16px; display: flex; gap: 6px; z-index: 999;">
+  <a href="#option-a" style="text-decoration:none;"><span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;font-size:13px;font-weight:800;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent);">A</span></a>
+  <a href="#option-b" style="text-decoration:none;"><span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;font-size:13px;font-weight:800;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent);">B</span></a>
+  <a href="#option-c" style="text-decoration:none;"><span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;font-size:13px;font-weight:800;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent);">C</span></a>
+  <a href="#option-d" style="text-decoration:none;"><span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;font-size:13px;font-weight:800;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent);">D</span></a>
+</div>
+
+<script>
+// Subway slider interactivity — simulates which lines are "accessible"
+// At low walk times, fewer lines. This is a rough simulation for the mockup.
+const lineThresholds = [
+  { min: 1, lines: ['L'] },
+  { min: 3, lines: ['L','G'] },
+  { min: 5, lines: ['L','G','J','Z','M'] },
+  { min: 7, lines: ['L','G','J','Z','M','A','C','1','2','3'] },
+  { min: 10, lines: ['1','2','3','4','5','6','7','A','C','E','B','D','F','M','N','Q','R','W','G','J','Z','L','S'] },
+  { min: 15, lines: ['1','2','3','4','5','6','7','A','C','E','B','D','F','M','N','Q','R','W','G','J','Z','L','S'] },
+];
+
+function getAccessibleLines(minutes) {
+  let best = [];
+  for (const t of lineThresholds) {
+    if (minutes >= t.min) best = t.lines;
+  }
+  return best;
+}
+
+function updateSubwayDisplay(sliderId, valueId, linesId, accessibleId) {
+  const slider = document.getElementById(sliderId);
+  const valEl = document.getElementById(valueId);
+  const linesEl = document.getElementById(linesId);
+  const accEl = document.getElementById(accessibleId);
+  if (!slider || !valEl) return;
+
+  const v = parseInt(slider.value);
+  const pct = ((v - 1) / 29) * 100;
+  slider.style.background = `linear-gradient(to right, var(--accent) 0%, var(--accent) ${pct}%, #2d333b ${pct}%, #2d333b 100%)`;
+  valEl.textContent = v + ' min';
+
+  if (linesEl) {
+    const accessible = getAccessibleLines(v);
+    const circles = linesEl.querySelectorAll('.subway-line');
+    circles.forEach(c => {
+      const letter = c.textContent.trim();
+      if (accessible.includes(letter)) {
+        c.classList.remove('dimmed');
+      } else {
+        c.classList.add('dimmed');
+      }
+    });
+    if (accEl) {
+      accEl.textContent = accessible.length + ' line' + (accessible.length !== 1 ? 's' : '') + ' accessible within ' + v + ' min walk';
+    }
+  }
+}
+
+// Option A subway slider
+const sliderA = document.getElementById('subwaySliderA');
+if (sliderA) sliderA.addEventListener('input', () => updateSubwayDisplay('subwaySliderA', 'subwayValA', 'subwayLinesA', 'subwayAccessibleA'));
+
+// Option B subway slider
+const sliderB = document.getElementById('subwaySliderB');
+if (sliderB) sliderB.addEventListener('input', () => updateSubwayDisplay('subwaySliderB', 'subwayValB', 'subwayLinesB', 'subwayAccessibleB'));
+
+// Option D subway slider
+const sliderD = document.getElementById('subwaySliderD');
+if (sliderD) sliderD.addEventListener('input', () => updateSubwayDisplay('subwaySliderD', 'subwayValD', 'subwayLinesD', 'subwayAccessibleD'));
+
+// All range inputs: update their gradient on input
+document.querySelectorAll('input[type="range"]').forEach(slider => {
+  slider.addEventListener('input', function() {
+    const min = parseFloat(this.min);
+    const max = parseFloat(this.max);
+    const val = parseFloat(this.value);
+    const pct = ((val - min) / (max - min)) * 100;
+    this.style.background = `linear-gradient(to right, var(--accent) 0%, var(--accent) ${pct}%, #2d333b ${pct}%, #2d333b 100%)`;
+  });
+});
+
+// Option B tab switching
+function showTabB(tab) {
+  const subwayTab = document.getElementById('tabSubwayB');
+  const commuteTab = document.getElementById('tabCommuteB');
+  const tabBtns = document.querySelector('#option-b .tab-bar').querySelectorAll('.tab-btn');
+  if (tab === 'subway') {
+    subwayTab.style.display = '';
+    commuteTab.style.display = 'none';
+    tabBtns[0].classList.add('active');
+    tabBtns[1].classList.remove('active');
+  } else {
+    subwayTab.style.display = 'none';
+    commuteTab.style.display = '';
+    tabBtns[0].classList.remove('active');
+    tabBtns[1].classList.add('active');
+  }
+}
+
+// Mode pill toggle
+document.querySelectorAll('.mode-pills').forEach(group => {
+  group.querySelectorAll('.mode-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      group.querySelectorAll('.mode-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+    });
+  });
+});
+
+// Smooth scroll for nav
+document.querySelectorAll('a[href^="#option-"]').forEach(link => {
+  link.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelector(link.getAttribute('href')).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+</script>
+
+</body>
+</html>

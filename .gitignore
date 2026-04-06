@@ -12,3 +12,4 @@ src/evaluate-config.json
 src/saved-filters/
 .vercel
 otp/data/
+.mcp.json

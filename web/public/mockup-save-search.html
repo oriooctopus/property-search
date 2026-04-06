@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dwelligence — Save Search Mockup</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #070a0f;
+    color: #e1e4e8;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 24px 16px 60px;
+  }
+
+  /* ── Page chrome ── */
+  .page-title { font-size: 22px; font-weight: 700; color: #e1e4e8; margin-bottom: 6px; }
+  .page-sub { font-size: 13px; color: #8b949e; margin-bottom: 36px; line-height: 1.5; }
+
+  /* ── Section styling ── */
+  .section { margin-bottom: 56px; }
+  .section-label {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: #8b949e; background: #1c2028; border: 1px solid #2d333b;
+    border-radius: 4px; padding: 3px 8px; margin-bottom: 12px;
+  }
+  .section-label.flow-a { color: #58a6ff; border-color: #1d3557; background: #0d1b2a; }
+  .section-label.flow-b { color: #7ee787; border-color: #1b3325; background: #0d1c14; }
+  .section-label.saved { color: #d2a8ff; border-color: #2d1b4e; background: #160d2a; }
+  .section-title { font-size: 15px; font-weight: 600; color: #e1e4e8; margin-bottom: 4px; }
+  .section-desc { font-size: 12px; color: #8b949e; margin-bottom: 14px; line-height: 1.5; }
+
+  /* ── Pros/Cons ── */
+  .pros-cons { display: flex; gap: 24px; margin-top: 16px; flex-wrap: wrap; }
+  .pros-cons > div { flex: 1; min-width: 260px; }
+  .pros-cons h4 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+  .pros-cons h4.pro { color: #7ee787; }
+  .pros-cons h4.con { color: #f85149; }
+  .pros-cons ul { list-style: none; padding: 0; }
+  .pros-cons li {
+    font-size: 12px; color: #8b949e; padding: 4px 0; padding-left: 16px; position: relative; line-height: 1.5;
+  }
+  .pros-cons li::before { position: absolute; left: 0; }
+  .pros-cons .pro-list li::before { content: '+'; color: #7ee787; font-weight: 700; }
+  .pros-cons .con-list li::before { content: '-'; color: #f85149; font-weight: 700; }
+
+  /* ── App frame ── */
+  .app-frame {
+    background: #0a0a0a; border: 1px solid #2d333b;
+    border-radius: 10px; overflow: hidden; max-width: 900px;
+    position: relative;
+  }
+
+  /* ── App header ── */
+  .app-header {
+    background: #0f1117; border-bottom: 1px solid #2d333b;
+    padding: 10px 16px; display: flex; align-items: center;
+    justify-content: space-between; gap: 12px;
+  }
+  .app-logo { font-size: 14px; font-weight: 700; color: #58a6ff; letter-spacing: -0.3px; }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .header-btn {
+    font-size: 11px; font-weight: 600; color: #8b949e;
+    background: transparent; border: 1px solid #2d333b; border-radius: 6px;
+    padding: 5px 10px; cursor: pointer; transition: all 0.15s;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .header-btn:hover { color: #e1e4e8; border-color: #444c56; background: rgba(255,255,255,0.03); }
+  .header-btn.active { color: #58a6ff; border-color: #58a6ff; background: rgba(88,166,255,0.08); }
+
+  /* ── Area tabs ── */
+  .area-tabs {
+    display: flex; gap: 0; border-bottom: 1px solid #2d333b;
+    padding: 0 12px; background: #0f1117;
+  }
+  .area-tab {
+    font-size: 11px; font-weight: 600; color: #8b949e; padding: 8px 12px;
+    border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .area-tab:hover { color: #c0d6f5; }
+  .area-tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+
+  /* ── Filter bar ── */
+  .filter-bar {
+    display: flex; align-items: center; gap: 6px; padding: 8px 12px;
+    border-bottom: 1px solid #2d333b; background: #0f1117;
+    flex-wrap: wrap;
+  }
+  .filter-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 600; color: #8b949e;
+    background: transparent; border: 1px solid #2d333b; border-radius: 6px;
+    padding: 4px 10px; height: 28px; cursor: pointer; transition: all 0.15s;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .filter-chip:hover { color: #c0d6f5; border-color: rgba(88,166,255,0.4); background: rgba(88,166,255,0.08); }
+  .filter-chip.active { color: #58a6ff; border-color: #58a6ff; background: rgba(88,166,255,0.08); }
+  .filter-chip svg { width: 10px; height: 10px; }
+  .filter-chip .chevron { transition: transform 0.15s; }
+
+  /* ── Save chip (special) ── */
+  .save-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600; color: #7ee787;
+    background: rgba(126,231,135,0.06); border: 1px solid rgba(126,231,135,0.25);
+    border-radius: 6px; padding: 4px 10px; height: 28px; cursor: pointer;
+    transition: all 0.15s; white-space: nowrap; flex-shrink: 0;
+  }
+  .save-chip:hover { background: rgba(126,231,135,0.12); border-color: rgba(126,231,135,0.5); }
+
+  /* ── Filter pills row ── */
+  .filter-pills {
+    display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 12px;
+    border-bottom: 1px solid #2d333b;
+  }
+  .filter-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 500; color: #58a6ff;
+    background: rgba(88,166,255,0.08); border: 1px solid rgba(88,166,255,0.3);
+    border-radius: 999px; padding: 3px 10px;
+  }
+  .filter-pill .remove {
+    width: 12px; height: 12px; cursor: pointer; opacity: 0.6; transition: opacity 0.15s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .filter-pill .remove:hover { opacity: 1; }
+
+  /* ── Dropdown / Modal ── */
+  .save-dropdown {
+    position: absolute; top: 0; left: 0; z-index: 100;
+    background: #1c2028; border: 1px solid #2d333b; border-radius: 12px;
+    padding: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    width: 360px;
+  }
+  .save-dropdown h3 { font-size: 13px; font-weight: 700; color: #e1e4e8; margin-bottom: 12px; }
+  .save-dropdown label {
+    font-size: 11px; font-weight: 600; color: #8b949e;
+    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; display: block;
+  }
+  .save-input {
+    width: 100%; background: #0d1117; border: 1px solid #2d333b; border-radius: 8px;
+    padding: 8px 12px; font-size: 13px; color: #e1e4e8; outline: none;
+    transition: border-color 0.15s; font-family: inherit;
+  }
+  .save-input:focus { border-color: #58a6ff; }
+  .save-input::placeholder { color: #484f58; }
+
+  .filter-summary {
+    margin-top: 12px; padding: 10px; background: rgba(88,166,255,0.04);
+    border: 1px solid #2d333b; border-radius: 8px;
+  }
+  .filter-summary-title { font-size: 10px; font-weight: 700; color: #8b949e; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; }
+  .filter-summary-items { display: flex; flex-wrap: wrap; gap: 4px; }
+  .filter-summary-item {
+    font-size: 10px; font-weight: 500; color: #58a6ff;
+    background: rgba(88,166,255,0.08); border-radius: 4px; padding: 2px 6px;
+  }
+
+  .save-actions { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-end; }
+  .btn-cancel {
+    font-size: 12px; font-weight: 600; color: #8b949e; background: transparent;
+    border: 1px solid #2d333b; border-radius: 8px; padding: 6px 14px;
+    cursor: pointer; transition: all 0.15s; font-family: inherit;
+  }
+  .btn-cancel:hover { color: #e1e4e8; border-color: #444c56; }
+  .btn-save {
+    font-size: 12px; font-weight: 600; color: #fff; background: #238636;
+    border: 1px solid #2ea043; border-radius: 8px; padding: 6px 16px;
+    cursor: pointer; transition: all 0.15s; font-family: inherit;
+  }
+  .btn-save:hover { background: #2ea043; }
+
+  /* ── Toast ── */
+  .toast {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    background: #1c2028; border: 1px solid #2ea043; border-radius: 10px;
+    padding: 10px 18px; display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 200;
+    animation: slideUp 0.3s ease-out;
+  }
+  .toast-icon { color: #7ee787; font-size: 14px; }
+  .toast-text { font-size: 12px; font-weight: 500; color: #e1e4e8; }
+  .toast-text span { color: #8b949e; }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  /* ── Floating save button ── */
+  .floating-save {
+    position: absolute; bottom: 20px; right: 20px; z-index: 50;
+    display: flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 600; color: #fff;
+    background: linear-gradient(135deg, #238636, #1a7f37); border: 1px solid #2ea043;
+    border-radius: 999px; padding: 8px 18px; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(35,134,54,0.4);
+    transition: all 0.2s; animation: floatIn 0.3s ease-out;
+  }
+  .floating-save:hover { box-shadow: 0 6px 24px rgba(35,134,54,0.6); transform: translateY(-1px); }
+  @keyframes floatIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Saved searches panel ── */
+  .saved-panel {
+    position: absolute; top: 0; right: 0; z-index: 100;
+    background: #1c2028; border: 1px solid #2d333b; border-radius: 12px;
+    padding: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    width: 380px;
+  }
+  .saved-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .saved-panel-header h3 { font-size: 14px; font-weight: 700; color: #e1e4e8; }
+  .saved-panel-close {
+    width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+    color: #8b949e; cursor: pointer; border-radius: 6px; transition: all 0.15s;
+  }
+  .saved-panel-close:hover { color: #e1e4e8; background: rgba(255,255,255,0.06); }
+
+  .saved-card {
+    background: #0d1117; border: 1px solid #2d333b; border-radius: 10px;
+    padding: 12px; margin-bottom: 8px; cursor: pointer; transition: all 0.15s;
+    position: relative;
+  }
+  .saved-card:hover { border-color: #444c56; background: #121820; }
+  .saved-card:last-child { margin-bottom: 0; }
+  .saved-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .saved-card-name { font-size: 13px; font-weight: 600; color: #e1e4e8; }
+  .saved-card-actions { display: flex; align-items: center; gap: 4px; }
+  .saved-card-action {
+    width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+    border-radius: 6px; color: #8b949e; cursor: pointer; transition: all 0.15s;
+  }
+  .saved-card-action:hover { color: #e1e4e8; background: rgba(255,255,255,0.06); }
+  .saved-card-action.notify-on { color: #58a6ff; }
+  .saved-card-action.delete:hover { color: #f85149; background: rgba(248,81,73,0.08); }
+  .saved-card-filters { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+  .saved-card-filter {
+    font-size: 10px; font-weight: 500; color: #8b949e;
+    background: rgba(139,148,158,0.08); border-radius: 4px; padding: 2px 6px;
+  }
+  .saved-card-meta { display: flex; align-items: center; gap: 10px; }
+  .saved-card-meta span { font-size: 10px; color: #484f58; }
+  .saved-card-count { color: #7ee787 !important; font-weight: 600; }
+  .saved-card-new {
+    font-size: 9px; font-weight: 700; color: #fff; background: #f85149;
+    border-radius: 4px; padding: 1px 5px; margin-left: 4px;
+  }
+
+  /* ── Content area placeholder ── */
+  .content-area {
+    padding: 24px 16px; min-height: 300px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .content-placeholder {
+    font-size: 12px; color: #484f58; text-align: center;
+  }
+
+  /* ── Divider ── */
+  .divider { width: 100%; height: 1px; background: #1c2028; margin: 24px 0; }
+
+  /* ── Interactive states ── */
+  .interactive-note {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 10px; color: #484f58; margin-top: 10px;
+    font-style: italic;
+  }
+
+  /* ── Step indicators ── */
+  .step-row { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px; }
+  .step {
+    flex: 1; min-width: 260px; background: #0d1117; border: 1px solid #2d333b;
+    border-radius: 10px; overflow: hidden;
+  }
+  .step-label {
+    font-size: 10px; font-weight: 700; color: #8b949e;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    padding: 8px 12px; border-bottom: 1px solid #2d333b;
+    background: #1c2028;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title">Save Search</div>
+<div class="page-sub">
+  Two placement options for saving filter configurations, plus a saved searches management panel.<br>
+  Users can name searches, toggle new-listing notifications, and reload them instantly.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- FLOW A: Save button in filter bar                          -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-label flow-a">Flow A</div>
+  <div class="section-title">Save button in filter chip row</div>
+  <div class="section-desc">
+    A green "Save" chip sits at the end of the filter bar, next to "Photos first".<br>
+    Clicking it opens an inline dropdown with a name field, filter summary, and save/cancel buttons.
+  </div>
+
+  <!-- Step 1: Idle state -->
+  <div class="step-row">
+    <div class="step">
+      <div class="step-label">1 &mdash; Idle (filters active)</div>
+      <div class="app-frame">
+        <div class="app-header">
+          <div class="app-logo">Dwelligence</div>
+          <div class="header-right">
+            <div class="header-btn active" id="mySearchesBtnA" onclick="toggleSavedPanel('panelA')">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2v13l6-3 6 3V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1z"/></svg>
+              My Searches
+            </div>
+          </div>
+        </div>
+        <div class="area-tabs">
+          <div class="area-tab">All</div>
+          <div class="area-tab">Fulton St</div>
+          <div class="area-tab active">L Train</div>
+          <div class="area-tab">Manhattan</div>
+          <div class="area-tab">Brooklyn 14th</div>
+          <div class="area-tab">Uptown West</div>
+        </div>
+        <div class="filter-bar">
+          <div class="filter-chip active">Under $4K <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip active">3+ Beds <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">$/Bedroom <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">Listed Within <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">Source <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip active">Commute <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">Photos first</div>
+          <div style="width: 1px; height: 20px; background: #2d333b; flex-shrink: 0;"></div>
+          <div class="save-chip" onclick="toggleSaveDropdown('dropdownA1')">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2v13l6-3 6 3V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1z"/></svg>
+            Save
+          </div>
+        </div>
+        <div class="filter-pills">
+          <div class="filter-pill">Near L Train <span class="remove"><svg width="8" height="8" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M2 2L8 8M8 2L2 8"/></svg></span></div>
+          <div class="filter-pill">Under $4K <span class="remove"><svg width="8" height="8" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M2 2L8 8M8 2L2 8"/></svg></span></div>
+          <div class="filter-pill">3+ Beds <span class="remove"><svg width="8" height="8" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M2 2L8 8M8 2L2 8"/></svg></span></div>
+          <div class="filter-pill">Bedford Ave &middot; 10 min walk <span class="remove"><svg width="8" height="8" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M2 2L8 8M8 2L2 8"/></svg></span></div>
+        </div>
+        <div class="content-area">
+          <div class="content-placeholder">42 listings &mdash; Showing card/map view</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Dropdown open -->
+  <div class="step-row" style="margin-top: 16px;">
+    <div class="step">
+      <div class="step-label">2 &mdash; Save dropdown open</div>
+      <div class="app-frame" style="min-height: 440px;">
+        <div class="app-header">
+          <div class="app-logo">Dwelligence</div>
+          <div class="header-right">
+            <div class="header-btn active">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2v13l6-3 6 3V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1z"/></svg>
+              My Searches
+            </div>
+          </div>
+        </div>
+        <div class="area-tabs">
+          <div class="area-tab">All</div>
+          <div class="area-tab">Fulton St</div>
+          <div class="area-tab active">L Train</div>
+          <div class="area-tab">Manhattan</div>
+          <div class="area-tab">Brooklyn 14th</div>
+          <div class="area-tab">Uptown West</div>
+        </div>
+        <div class="filter-bar">
+          <div class="filter-chip active">Under $4K <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip active">3+ Beds <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">$/Bedroom <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">Listed Within <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">Source <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip active">Commute <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">Photos first</div>
+          <div style="width: 1px; height: 20px; background: #2d333b; flex-shrink: 0;"></div>
+          <div class="save-chip" style="background: rgba(126,231,135,0.15); border-color: rgba(126,231,135,0.5);">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2v13l6-3 6 3V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1z"/></svg>
+            Save
+          </div>
+        </div>
+
+        <!-- Save Dropdown -->
+        <div class="save-dropdown" style="top: 140px; right: 16px; left: auto;">
+          <h3>Save This Search</h3>
+          <label>Name</label>
+          <input class="save-input" type="text" value="L Train · Under $4K · 3+ Beds" />
+          <div class="filter-summary">
+            <div class="filter-summary-title">Active Filters</div>
+            <div class="filter-summary-items">
+              <span class="filter-summary-item">L Train</span>
+              <span class="filter-summary-item">Under $4K</span>
+              <span class="filter-summary-item">3+ Beds</span>
+              <span class="filter-summary-item">Bedford Ave · 10 min walk</span>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
+            <label style="margin: 0; display: flex; align-items: center; gap: 6px; cursor: pointer; text-transform: none; letter-spacing: 0; font-size: 12px;">
+              <input type="checkbox" checked style="accent-color: #58a6ff;" />
+              Notify me of new listings
+            </label>
+          </div>
+          <div class="save-actions">
+            <button class="btn-cancel">Cancel</button>
+            <button class="btn-save">Save Search</button>
+          </div>
+        </div>
+
+        <div class="content-area" style="min-height: 200px;">
+          <div class="content-placeholder" style="opacity: 0.3;">42 listings</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: Success toast -->
+  <div class="step-row" style="margin-top: 16px;">
+    <div class="step">
+      <div class="step-label">3 &mdash; Success toast</div>
+      <div class="app-frame" style="min-height: 180px;">
+        <div class="app-header">
+          <div class="app-logo">Dwelligence</div>
+          <div class="header-right">
+            <div class="header-btn active">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2v13l6-3 6 3V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1z"/></svg>
+              My Searches
+            </div>
+          </div>
+        </div>
+        <div class="filter-bar">
+          <div class="filter-chip active">Under $4K <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip active">3+ Beds <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">$/Bedroom</div>
+          <div class="filter-chip active">Commute</div>
+          <div class="filter-chip">Photos first</div>
+          <div style="width: 1px; height: 20px; background: #2d333b; flex-shrink: 0;"></div>
+          <div class="save-chip">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2v13l6-3 6 3V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1z"/></svg>
+            Save
+          </div>
+        </div>
+        <div class="content-area" style="min-height: 80px;"></div>
+        <div class="toast">
+          <span class="toast-icon">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm3.78 5.28a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L4.22 8.34a.75.75 0 1 1 1.06-1.06L7 8.94l3.72-3.72a.75.75 0 0 1 1.06.06z"/></svg>
+          </span>
+          <span class="toast-text">"L Train &middot; Under $4K &middot; 3+ Beds" saved <span>&middot; Notifications on</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pros-cons">
+    <div>
+      <h4 class="pro">Pros</h4>
+      <ul class="pro-list">
+        <li>Discoverable — always visible in the filter bar alongside other controls</li>
+        <li>Logical placement: "I set my filters, now I save them" left-to-right flow</li>
+        <li>Minimal UI footprint when not active (just one small chip)</li>
+        <li>Consistent with the existing filter chip pattern users already know</li>
+        <li>Separator visually groups it as a distinct action, not a filter</li>
+      </ul>
+    </div>
+    <div>
+      <h4 class="con">Cons</h4>
+      <ul class="con-list">
+        <li>Filter bar can get crowded on narrow viewports with many chips</li>
+        <li>Could be mistaken for a filter if the separator is subtle</li>
+        <li>Dropdown may get clipped on smaller screens if bar is near edge</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- FLOW B: Floating action button                             -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-label flow-b">Flow B</div>
+  <div class="section-title">Floating "Save Search" action button</div>
+  <div class="section-desc">
+    A pill-shaped FAB appears in the bottom-right when any filter is active.<br>
+    Slides up with a smooth animation. Disappears when all filters are cleared.
+  </div>
+
+  <!-- Step 1: FAB visible -->
+  <div class="step-row">
+    <div class="step">
+      <div class="step-label">1 &mdash; Floating button visible (filters active)</div>
+      <div class="app-frame" style="min-height: 380px;">
+        <div class="app-header">
+          <div class="app-logo">Dwelligence</div>
+          <div class="header-right">
+            <div class="header-btn active">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2v13l6-3 6 3V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1z"/></svg>
+              My Searches
+            </div>
+          </div>
+        </div>
+        <div class="area-tabs">
+          <div class="area-tab">All</div>
+          <div class="area-tab">Fulton St</div>
+          <div class="area-tab active">L Train</div>
+          <div class="area-tab">Manhattan</div>
+          <div class="area-tab">Brooklyn 14th</div>
+          <div class="area-tab">Uptown West</div>
+        </div>
+        <div class="filter-bar">
+          <div class="filter-chip active">Under $4K <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip active">3+ Beds <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">$/Bedroom <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">Listed Within <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">Source <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip active">Commute <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">Photos first</div>
+        </div>
+        <div class="filter-pills">
+          <div class="filter-pill">Near L Train <span class="remove"><svg width="8" height="8" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M2 2L8 8M8 2L2 8"/></svg></span></div>
+          <div class="filter-pill">Under $4K <span class="remove"><svg width="8" height="8" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M2 2L8 8M8 2L2 8"/></svg></span></div>
+          <div class="filter-pill">3+ Beds <span class="remove"><svg width="8" height="8" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M2 2L8 8M8 2L2 8"/></svg></span></div>
+          <div class="filter-pill">Bedford Ave &middot; 10 min walk <span class="remove"><svg width="8" height="8" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M2 2L8 8M8 2L2 8"/></svg></span></div>
+        </div>
+        <div class="content-area">
+          <div class="content-placeholder">42 listings &mdash; Showing card/map view</div>
+        </div>
+        <div class="floating-save" onclick="toggleSaveDropdown('dropdownB')">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2v13l6-3 6 3V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1z"/></svg>
+          Save Search
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Modal open from FAB -->
+  <div class="step-row" style="margin-top: 16px;">
+    <div class="step">
+      <div class="step-label">2 &mdash; Save modal (centered overlay)</div>
+      <div class="app-frame" style="min-height: 420px;">
+        <div class="app-header" style="opacity: 0.4;">
+          <div class="app-logo">Dwelligence</div>
+        </div>
+        <div class="filter-bar" style="opacity: 0.4;">
+          <div class="filter-chip active">Under $4K</div>
+          <div class="filter-chip active">3+ Beds</div>
+          <div class="filter-chip active">Commute</div>
+        </div>
+        <div class="content-area" style="min-height: 260px; opacity: 0.15;"></div>
+
+        <!-- Centered modal overlay -->
+        <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; border-radius: 10px;">
+          <div style="background: #1c2028; border: 1px solid #2d333b; border-radius: 14px; padding: 20px; width: 380px; box-shadow: 0 16px 48px rgba(0,0,0,0.6);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+              <h3 style="font-size: 15px; font-weight: 700; color: #e1e4e8;">Save This Search</h3>
+              <div class="saved-panel-close">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 4L12 12M12 4L4 12"/></svg>
+              </div>
+            </div>
+            <label style="font-size: 11px; font-weight: 600; color: #8b949e; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; display: block;">Name</label>
+            <input class="save-input" type="text" value="Bushwick L train under $4K" />
+            <div class="filter-summary">
+              <div class="filter-summary-title">Active Filters</div>
+              <div class="filter-summary-items">
+                <span class="filter-summary-item">L Train</span>
+                <span class="filter-summary-item">Under $4K</span>
+                <span class="filter-summary-item">3+ Beds</span>
+                <span class="filter-summary-item">Bedford Ave · 10 min walk</span>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 12px;">
+              <label style="margin: 0; display: flex; align-items: center; gap: 6px; cursor: pointer; text-transform: none; letter-spacing: 0; font-size: 12px; color: #8b949e; font-weight: 500;">
+                <input type="checkbox" checked style="accent-color: #58a6ff;" />
+                Notify me of new listings
+              </label>
+            </div>
+            <div class="save-actions" style="margin-top: 16px;">
+              <button class="btn-cancel">Cancel</button>
+              <button class="btn-save">Save Search</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pros-cons">
+    <div>
+      <h4 class="pro">Pros</h4>
+      <ul class="pro-list">
+        <li>Prominent and unmissable — floats above content with green CTA styling</li>
+        <li>Only appears when relevant (filters are active), reducing noise</li>
+        <li>Keeps the filter bar clean — no extra chip to compete for space</li>
+        <li>Centered modal feels more intentional and focused than an inline dropdown</li>
+        <li>Works well on mobile — FAB is a familiar mobile pattern</li>
+      </ul>
+    </div>
+    <div>
+      <h4 class="con">Cons</h4>
+      <ul class="con-list">
+        <li>FAB can overlap listing cards or map controls in the bottom-right</li>
+        <li>Modal is more disruptive — blocks the view entirely</li>
+        <li>Animation in/out adds complexity and potential jank</li>
+        <li>Less discoverable than Flow A (users must scroll down or have filters active to see it)</li>
+        <li>May conflict with other floating elements (chat button, scroll-to-top, etc.)</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SAVED SEARCHES PANEL                                       -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-label saved">Saved Searches</div>
+  <div class="section-title">My Searches panel</div>
+  <div class="section-desc">
+    Accessible from the "My Searches" button in the app header (both flows).<br>
+    Shows saved searches as cards with name, filters, listing count, date, notifications toggle, and delete.
+  </div>
+
+  <div class="step-row">
+    <div class="step">
+      <div class="step-label">Panel open from header</div>
+      <div class="app-frame" style="min-height: 520px;">
+        <div class="app-header">
+          <div class="app-logo">Dwelligence</div>
+          <div class="header-right">
+            <div class="header-btn active">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2v13l6-3 6 3V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1z"/></svg>
+              My Searches
+            </div>
+          </div>
+        </div>
+        <div class="area-tabs">
+          <div class="area-tab active">All</div>
+          <div class="area-tab">Fulton St</div>
+          <div class="area-tab">L Train</div>
+          <div class="area-tab">Manhattan</div>
+          <div class="area-tab">Brooklyn 14th</div>
+          <div class="area-tab">Uptown West</div>
+        </div>
+        <div class="filter-bar">
+          <div class="filter-chip">Price <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">Beds/Baths <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">$/Bedroom <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">Listed Within <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">Source <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">Commute <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">Photos first</div>
+        </div>
+
+        <!-- Saved Searches Panel -->
+        <div class="saved-panel" style="top: 44px; right: 12px;">
+          <div class="saved-panel-header">
+            <h3>My Searches</h3>
+            <div class="saved-panel-close">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 4L12 12M12 4L4 12"/></svg>
+            </div>
+          </div>
+
+          <!-- Card 1: With notifications + new listings -->
+          <div class="saved-card">
+            <div class="saved-card-header">
+              <span class="saved-card-name">L Train &middot; Under $4K &middot; 3+ Beds</span>
+              <div class="saved-card-actions">
+                <div class="saved-card-action notify-on" title="Notifications on">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zM8 1.5A4.5 4.5 0 0 0 3.5 6c0 1.86-.54 3.13-1.05 3.94A1.5 1.5 0 0 0 3.72 12h8.56a1.5 1.5 0 0 0 1.27-2.06C13.04 9.13 12.5 7.86 12.5 6A4.5 4.5 0 0 0 8 1.5z"/></svg>
+                </div>
+                <div class="saved-card-action delete" title="Delete search">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4h12M5.33 4V2.67a1.33 1.33 0 0 1 1.34-1.34h2.66a1.33 1.33 0 0 1 1.34 1.34V4M6.67 7.33v4M9.33 7.33v4"/><path d="M3.33 4l.67 9.33a1.33 1.33 0 0 0 1.33 1.34h5.34a1.33 1.33 0 0 0 1.33-1.34L12.67 4"/></svg>
+                </div>
+              </div>
+            </div>
+            <div class="saved-card-filters">
+              <span class="saved-card-filter">L Train</span>
+              <span class="saved-card-filter">Under $4K</span>
+              <span class="saved-card-filter">3+ Beds</span>
+              <span class="saved-card-filter">Bedford Ave &middot; 10 min walk</span>
+            </div>
+            <div class="saved-card-meta">
+              <span class="saved-card-count">42 listings</span>
+              <span class="saved-card-new">5 NEW</span>
+              <span>Saved 2 days ago</span>
+            </div>
+          </div>
+
+          <!-- Card 2: Notifications off -->
+          <div class="saved-card">
+            <div class="saved-card-header">
+              <span class="saved-card-name">Williamsburg 3BR</span>
+              <div class="saved-card-actions">
+                <div class="saved-card-action" title="Notifications off" style="opacity: 0.4;">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zM8 1.5A4.5 4.5 0 0 0 3.5 6c0 1.86-.54 3.13-1.05 3.94A1.5 1.5 0 0 0 3.72 12h8.56a1.5 1.5 0 0 0 1.27-2.06C13.04 9.13 12.5 7.86 12.5 6A4.5 4.5 0 0 0 8 1.5z"/></svg>
+                </div>
+                <div class="saved-card-action delete" title="Delete search">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4h12M5.33 4V2.67a1.33 1.33 0 0 1 1.34-1.34h2.66a1.33 1.33 0 0 1 1.34 1.34V4M6.67 7.33v4M9.33 7.33v4"/><path d="M3.33 4l.67 9.33a1.33 1.33 0 0 0 1.33 1.34h5.34a1.33 1.33 0 0 0 1.33-1.34L12.67 4"/></svg>
+                </div>
+              </div>
+            </div>
+            <div class="saved-card-filters">
+              <span class="saved-card-filter">Brooklyn 14th</span>
+              <span class="saved-card-filter">3 Beds</span>
+              <span class="saved-card-filter">Under $5K</span>
+            </div>
+            <div class="saved-card-meta">
+              <span class="saved-card-count">28 listings</span>
+              <span>Saved 1 week ago</span>
+            </div>
+          </div>
+
+          <!-- Card 3 -->
+          <div class="saved-card">
+            <div class="saved-card-header">
+              <span class="saved-card-name">Manhattan Studios</span>
+              <div class="saved-card-actions">
+                <div class="saved-card-action notify-on" title="Notifications on">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zM8 1.5A4.5 4.5 0 0 0 3.5 6c0 1.86-.54 3.13-1.05 3.94A1.5 1.5 0 0 0 3.72 12h8.56a1.5 1.5 0 0 0 1.27-2.06C13.04 9.13 12.5 7.86 12.5 6A4.5 4.5 0 0 0 8 1.5z"/></svg>
+                </div>
+                <div class="saved-card-action delete" title="Delete search">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4h12M5.33 4V2.67a1.33 1.33 0 0 1 1.34-1.34h2.66a1.33 1.33 0 0 1 1.34 1.34V4M6.67 7.33v4M9.33 7.33v4"/><path d="M3.33 4l.67 9.33a1.33 1.33 0 0 0 1.33 1.34h5.34a1.33 1.33 0 0 0 1.33-1.34L12.67 4"/></svg>
+                </div>
+              </div>
+            </div>
+            <div class="saved-card-filters">
+              <span class="saved-card-filter">Manhattan</span>
+              <span class="saved-card-filter">0 Beds (Studio)</span>
+              <span class="saved-card-filter">Under $2.5K</span>
+              <span class="saved-card-filter">Within 1 Week</span>
+            </div>
+            <div class="saved-card-meta">
+              <span class="saved-card-count">15 listings</span>
+              <span class="saved-card-new">2 NEW</span>
+              <span>Saved 3 weeks ago</span>
+            </div>
+          </div>
+
+          <!-- Card 4 -->
+          <div class="saved-card">
+            <div class="saved-card-header">
+              <span class="saved-card-name">Uptown West Budget</span>
+              <div class="saved-card-actions">
+                <div class="saved-card-action" title="Notifications off" style="opacity: 0.4;">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zM8 1.5A4.5 4.5 0 0 0 3.5 6c0 1.86-.54 3.13-1.05 3.94A1.5 1.5 0 0 0 3.72 12h8.56a1.5 1.5 0 0 0 1.27-2.06C13.04 9.13 12.5 7.86 12.5 6A4.5 4.5 0 0 0 8 1.5z"/></svg>
+                </div>
+                <div class="saved-card-action delete" title="Delete search">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 4h12M5.33 4V2.67a1.33 1.33 0 0 1 1.34-1.34h2.66a1.33 1.33 0 0 1 1.34 1.34V4M6.67 7.33v4M9.33 7.33v4"/><path d="M3.33 4l.67 9.33a1.33 1.33 0 0 0 1.33 1.34h5.34a1.33 1.33 0 0 0 1.33-1.34L12.67 4"/></svg>
+                </div>
+              </div>
+            </div>
+            <div class="saved-card-filters">
+              <span class="saved-card-filter">Uptown West</span>
+              <span class="saved-card-filter">Under $3K</span>
+              <span class="saved-card-filter">2+ Beds</span>
+              <span class="saved-card-filter">1+ Baths</span>
+            </div>
+            <div class="saved-card-meta">
+              <span class="saved-card-count">9 listings</span>
+              <span>Saved 1 month ago</span>
+            </div>
+          </div>
+
+          <div style="text-align: center; margin-top: 12px; font-size: 11px; color: #484f58;">
+            Click a search to load its filters
+          </div>
+        </div>
+
+        <div class="content-area" style="min-height: 380px;">
+          <div class="content-placeholder" style="opacity: 0.3;">Content area dimmed while panel is open</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading a saved search -->
+  <div class="step-row" style="margin-top: 16px;">
+    <div class="step">
+      <div class="step-label">After clicking "L Train &middot; Under $4K &middot; 3+ Beds"</div>
+      <div class="app-frame">
+        <div class="app-header">
+          <div class="app-logo">Dwelligence</div>
+          <div class="header-right">
+            <div class="header-btn active">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2v13l6-3 6 3V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1z"/></svg>
+              My Searches
+            </div>
+          </div>
+        </div>
+        <div class="area-tabs">
+          <div class="area-tab">All</div>
+          <div class="area-tab">Fulton St</div>
+          <div class="area-tab active">L Train</div>
+          <div class="area-tab">Manhattan</div>
+          <div class="area-tab">Brooklyn 14th</div>
+          <div class="area-tab">Uptown West</div>
+        </div>
+        <div class="filter-bar">
+          <div class="filter-chip active">Under $4K <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip active">3+ Beds <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">$/Bedroom <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">Listed Within <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">Source <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip active">Commute <svg class="chevron" viewBox="0 0 10 10" stroke="currentColor" fill="none" stroke-width="1.5"><path d="M2 3.5L5 6.5L8 3.5"/></svg></div>
+          <div class="filter-chip">Photos first</div>
+        </div>
+        <!-- Loaded search indicator -->
+        <div style="display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(88,166,255,0.04); border-bottom: 1px solid #2d333b;">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="#58a6ff"><path d="M2 2v13l6-3 6 3V2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1z"/></svg>
+          <span style="font-size: 11px; font-weight: 600; color: #58a6ff;">L Train &middot; Under $4K &middot; 3+ Beds</span>
+          <span style="font-size: 10px; color: #484f58; margin-left: auto;">Saved search loaded</span>
+          <span style="font-size: 10px; color: #8b949e; cursor: pointer; padding: 2px 8px; border: 1px solid #2d333b; border-radius: 4px; transition: all 0.15s;">Update</span>
+        </div>
+        <div class="filter-pills">
+          <div class="filter-pill">Near L Train <span class="remove"><svg width="8" height="8" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M2 2L8 8M8 2L2 8"/></svg></span></div>
+          <div class="filter-pill">Under $4K <span class="remove"><svg width="8" height="8" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M2 2L8 8M8 2L2 8"/></svg></span></div>
+          <div class="filter-pill">3+ Beds <span class="remove"><svg width="8" height="8" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M2 2L8 8M8 2L2 8"/></svg></span></div>
+          <div class="filter-pill">Bedford Ave &middot; 10 min walk <span class="remove"><svg width="8" height="8" viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M2 2L8 8M8 2L2 8"/></svg></span></div>
+        </div>
+        <div class="content-area" style="min-height: 100px;">
+          <div class="content-placeholder">42 listings &mdash; Filters loaded from saved search</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Minimal interactivity for demo
+function toggleSaveDropdown(id) {
+  // Just visual — the static mockup shows all states
+}
+function toggleSavedPanel(id) {
+  // Just visual — the static mockup shows all states
+}
+</script>
+
+</body>
+</html>

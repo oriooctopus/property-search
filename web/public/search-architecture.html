@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Search Architecture — Dwelligence</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0a; color: #e0e0e0; font-family: -apple-system, system-ui, sans-serif; padding: 32px; }
+  h1 { font-size: 24px; margin-bottom: 8px; color: #fff; }
+  p.subtitle { color: #888; margin-bottom: 32px; font-size: 14px; }
+  .diagram-section { margin-bottom: 48px; }
+  .diagram-section h2 { font-size: 18px; color: #ccc; margin-bottom: 16px; border-bottom: 1px solid #222; padding-bottom: 8px; }
+  .mermaid { background: #111; border-radius: 12px; padding: 24px; overflow-x: auto; }
+  .mermaid svg { max-width: 100%; }
+</style>
+</head>
+<body>
+
+<h1>Dwelligence Search Architecture</h1>
+<p class="subtitle">Centralized adapter pipeline with validation, quality tagging, and composite dedup</p>
+
+<div class="diagram-section">
+  <h2>End-to-End Search Flow</h2>
+  <pre class="mermaid">
+graph TD
+    User(["fa:fa-user User Search"]) --> Route["POST /api/search\nmaxDuration: 60s"]
+    Route --> Auth{"Auth + Rate Limit"}
+    Auth -->|OK| PS["Promise.allSettled()"]
+    Auth -->|Denied| Err401["401 / 429"]
+
+    PS --> R["Realtor.com\n15s timeout"]
+    PS --> A["Apartments.com\n15s timeout"]
+    PS --> SE["StreetEasy\n15s NYC-only"]
+    PS --> Z["Zillow\n15s timeout"]
+    PS --> CL["Craigslist\n15s scraper"]
+    PS --> RH["RentHop\n15s scraper"]
+    PS --> FB["Facebook\n45s Apify"]
+
+    R --> P1["Pipeline"]
+    A --> P2["Pipeline"]
+    SE --> P3["Pipeline"]
+    Z --> P4["Pipeline"]
+    CL --> P5["Pipeline"]
+    RH --> P6["Pipeline"]
+    FB --> P7["Pipeline"]
+
+    P1 & P2 & P3 & P4 & P5 & P6 & P7 --> Dedup["Dedup & Composite\nAddress or Geo+Price match"]
+
+    Dedup --> Result["ValidatedListing[]"]
+    Result --> Upsert[("Supabase\nupsert")]
+    Result --> Response["JSON Response\nlistings + qualitySummary"]
+    Response --> User
+
+    style User fill:#1a1a2e,stroke:#4a4a8a,color:#fff
+    style Route fill:#1a2e1a,stroke:#4a8a4a,color:#fff
+    style Auth fill:#2e2e1a,stroke:#8a8a4a,color:#fff
+    style Err401 fill:#2e1a1a,stroke:#8a4a4a,color:#fff
+    style PS fill:#1a1a2e,stroke:#4a4a8a,color:#fff
+    style R fill:#0d2137,stroke:#1a73e8,color:#fff
+    style A fill:#0d2137,stroke:#1a73e8,color:#fff
+    style SE fill:#0d2137,stroke:#1a73e8,color:#fff
+    style Z fill:#0d2137,stroke:#1a73e8,color:#fff
+    style CL fill:#1f0d37,stroke:#7a1ae8,color:#fff
+    style RH fill:#1f0d37,stroke:#7a1ae8,color:#fff
+    style FB fill:#1f0d37,stroke:#7a1ae8,color:#fff
+    style P1 fill:#2e1a2e,stroke:#8a4a8a,color:#fff
+    style P2 fill:#2e1a2e,stroke:#8a4a8a,color:#fff
+    style P3 fill:#2e1a2e,stroke:#8a4a8a,color:#fff
+    style P4 fill:#2e1a2e,stroke:#8a4a8a,color:#fff
+    style P5 fill:#2e1a2e,stroke:#8a4a8a,color:#fff
+    style P6 fill:#2e1a2e,stroke:#8a4a8a,color:#fff
+    style P7 fill:#2e1a2e,stroke:#8a4a8a,color:#fff
+    style Dedup fill:#1a2e2e,stroke:#4a8a8a,color:#fff
+    style Result fill:#1a2e1a,stroke:#4a8a4a,color:#fff
+    style Upsert fill:#2e2e1a,stroke:#8a8a4a,color:#fff
+    style Response fill:#1a2e1a,stroke:#4a8a4a,color:#fff
+  </pre>
+</div>
+
+<div class="diagram-section">
+  <h2>Pipeline Detail (per source)</h2>
+  <pre class="mermaid">
+graph LR
+    Input["AdapterOutput[]\nnullable fields"] --> Reject
+
+    subgraph Pipeline["pipeline.ts"]
+        direction LR
+        Reject["1. Reject\nno URL\n$0 price\nno identity"] --> Normalize["2. Normalize\ntrim address\nround price\ncap photos"]
+        Normalize --> Defaults["3. Fill Defaults\nnull beds → 0\nnull coords → 0"]
+        Defaults --> Quality["4. Tag Quality\napi / parsed / missing\nper field"]
+    end
+
+    Quality --> Output["ValidatedListing[]\n= RawListing + quality"]
+    Reject --> Rejected["rejected[]\nwith reasons"]
+
+    style Input fill:#1a1a2e,stroke:#4a4a8a,color:#fff
+    style Reject fill:#2e1a1a,stroke:#8a4a4a,color:#fff
+    style Normalize fill:#2e2e1a,stroke:#8a8a4a,color:#fff
+    style Defaults fill:#1a2e2e,stroke:#4a8a8a,color:#fff
+    style Quality fill:#1a2e1a,stroke:#4a8a4a,color:#fff
+    style Output fill:#1a2e1a,stroke:#4a8a4a,color:#fff
+    style Rejected fill:#2e1a1a,stroke:#8a4a4a,color:#fff
+    style Pipeline fill:#111,stroke:#333,color:#fff
+  </pre>
+</div>
+
+<div class="diagram-section">
+  <h2>Adapter Types</h2>
+  <pre class="mermaid">
+graph TB
+    subgraph API["API Sources (structured data)"]
+        direction LR
+        R2["Realtor.com\nRapidAPI"]
+        A2["Apartments.com\nRapidAPI"]
+        SE2["StreetEasy\nRapidAPI NYC"]
+        Z2["Zillow\nRapidAPI"]
+    end
+
+    subgraph Scraper["Scraper Sources (text extraction)"]
+        direction LR
+        CL2["Craigslist\nHTML + Cheerio"]
+        RH2["RentHop\nHTML + Cheerio"]
+        FB2["Facebook\nApify Actor"]
+    end
+
+    subgraph Shared["parse-utils.ts"]
+        direction LR
+        EB["extractBeds()"]
+        EBa["extractBaths()"]
+        PP["parsePrice()"]
+        EP["extractPhotoUrls()"]
+    end
+
+    Scraper -->|"uses heavily"| Shared
+    API -->|"uses parsePrice\nextractPhotoUrls"| Shared
+
+    API -->|"quality: api"| AO["AdapterOutput\nnull = unknown\n0 = real zero"]
+    Scraper -->|"quality: parsed"| AO
+
+    style API fill:#0d2137,stroke:#1a73e8,color:#fff
+    style Scraper fill:#1f0d37,stroke:#7a1ae8,color:#fff
+    style Shared fill:#2e2e1a,stroke:#8a8a4a,color:#fff
+    style AO fill:#1a2e1a,stroke:#4a8a4a,color:#fff
+    style R2 fill:#0d2137,stroke:#1a73e8,color:#fff
+    style A2 fill:#0d2137,stroke:#1a73e8,color:#fff
+    style SE2 fill:#0d2137,stroke:#1a73e8,color:#fff
+    style Z2 fill:#0d2137,stroke:#1a73e8,color:#fff
+    style CL2 fill:#1f0d37,stroke:#7a1ae8,color:#fff
+    style RH2 fill:#1f0d37,stroke:#7a1ae8,color:#fff
+    style FB2 fill:#1f0d37,stroke:#7a1ae8,color:#fff
+    style EB fill:#2e2e1a,stroke:#8a8a4a,color:#fff
+    style EBa fill:#2e2e1a,stroke:#8a8a4a,color:#fff
+    style PP fill:#2e2e1a,stroke:#8a8a4a,color:#fff
+    style EP fill:#2e2e1a,stroke:#8a8a4a,color:#fff
+  </pre>
+</div>
+
+<div class="diagram-section">
+  <h2>Composite Dedup Logic</h2>
+  <pre class="mermaid">
+graph TD
+    All["All ValidatedListings\nfrom all sources"] --> Check{"Same property?"}
+
+    Check -->|"Address match\nOR geo ≤50m + price ±10%"| Cluster["Cluster together"]
+    Check -->|"No match"| Standalone["Keep as standalone"]
+
+    Cluster --> Merge["Merge best fields\nby source priority"]
+
+    subgraph Priority["Source Priority (high → low)"]
+        direction LR
+        S1["StreetEasy"] --> S2["Zillow"] --> S3["Realtor"] --> S4["Apartments"] --> S5["RentHop"] --> S6["Craigslist"] --> S7["Facebook"]
+    end
+
+    Merge --> Fields
+
+    subgraph Fields["Field Selection Rules"]
+        direction TB
+        F1["address, area → highest priority non-empty"]
+        F2["price → mode across sources"]
+        F3["beds, baths → highest priority where quality ≠ missing"]
+        F4["lat, lon → geo priority order, skip 0,0"]
+        F5["photos → union all URLs, dedup, cap at 20"]
+        F6["dates → earliest list_date, latest update"]
+        F7["quality → best confidence per field"]
+    end
+
+    Standalone --> Output["Final ValidatedListing[]"]
+    Fields --> Output
+
+    style All fill:#1a1a2e,stroke:#4a4a8a,color:#fff
+    style Check fill:#2e2e1a,stroke:#8a8a4a,color:#fff
+    style Cluster fill:#1a2e2e,stroke:#4a8a8a,color:#fff
+    style Standalone fill:#1a2e1a,stroke:#4a8a4a,color:#fff
+    style Merge fill:#2e1a2e,stroke:#8a4a8a,color:#fff
+    style Priority fill:#111,stroke:#333,color:#fff
+    style Fields fill:#111,stroke:#333,color:#fff
+    style Output fill:#1a2e1a,stroke:#4a8a4a,color:#fff
+    style S1 fill:#1f0d37,stroke:#7a1ae8,color:#fff
+    style S2 fill:#1f0d37,stroke:#7a1ae8,color:#fff
+    style S3 fill:#0d2137,stroke:#1a73e8,color:#fff
+    style S4 fill:#0d2137,stroke:#1a73e8,color:#fff
+    style S5 fill:#1f0d37,stroke:#7a1ae8,color:#fff
+    style S6 fill:#1f0d37,stroke:#7a1ae8,color:#fff
+    style S7 fill:#1f0d37,stroke:#7a1ae8,color:#fff
+    style F1 fill:#1a1a2e,stroke:#4a4a8a,color:#fff
+    style F2 fill:#1a1a2e,stroke:#4a4a8a,color:#fff
+    style F3 fill:#1a1a2e,stroke:#4a4a8a,color:#fff
+    style F4 fill:#1a1a2e,stroke:#4a4a8a,color:#fff
+    style F5 fill:#1a1a2e,stroke:#4a4a8a,color:#fff
+    style F6 fill:#1a1a2e,stroke:#4a4a8a,color:#fff
+    style F7 fill:#1a1a2e,stroke:#4a4a8a,color:#fff
+  </pre>
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      darkMode: true,
+      background: '#0a0a0a',
+      primaryColor: '#1a1a2e',
+      primaryTextColor: '#e0e0e0',
+      lineColor: '#555',
+      fontSize: '14px',
+    },
+  });
+</script>
+</body>
+</html>

@@ -1110,7 +1110,7 @@ function HomeInner() {
   // Chat drawer slides over from right when opened
   // -----------------------------------------------------------------------
   return (
-    <div className="flex flex-col lg:flex-row" style={{ height: 'calc(100vh - 60px)' }}>
+    <div className="flex flex-col lg:flex-row" style={{ height: 'calc(100dvh - 60px - env(safe-area-inset-top))' }}>
       {/* Sidebar: AI search bar + filters + listing cards */}
       <div
         className={`w-full lg:w-[480px] shrink-0 flex flex-col ${mobileView === 'map' ? 'max-lg:shrink max-lg:flex-none' : ''}`}

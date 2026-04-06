@@ -1,0 +1,1542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dwelligence — Compact Filter Bar Mockups</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #070a0f;
+    color: #e1e4e8;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 24px 16px 60px;
+  }
+
+  /* ── Page chrome ── */
+  .page-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #e1e4e8;
+    margin-bottom: 6px;
+  }
+  .page-sub {
+    font-size: 13px;
+    color: #8b949e;
+    margin-bottom: 36px;
+  }
+
+  /* ── Section header ── */
+  .section {
+    margin-bottom: 48px;
+  }
+  .section-label {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #8b949e;
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 4px;
+    padding: 3px 8px;
+    margin-bottom: 12px;
+  }
+  .section-label.before { color: #f85149; border-color: #3d1c1c; background: #1c1414; }
+  .section-label.option-a { color: #58a6ff; border-color: #1d3557; background: #0d1b2a; }
+  .section-label.option-b { color: #7ee787; border-color: #1b3325; background: #0d1c14; }
+  .section-label.option-c { color: #d2a8ff; border-color: #2d1b4e; background: #160d2a; }
+  .section-label.option-d { color: #ffa657; border-color: #3d2612; background: #1c1108; }
+
+  .section-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #e1e4e8;
+    margin-bottom: 4px;
+  }
+  .section-desc {
+    font-size: 12px;
+    color: #8b949e;
+    margin-bottom: 14px;
+  }
+  .height-badge {
+    display: inline-block;
+    font-size: 10px;
+    color: #7ee787;
+    background: rgba(126,231,135,0.08);
+    border: 1px solid rgba(126,231,135,0.2);
+    border-radius: 4px;
+    padding: 2px 6px;
+    margin-left: 8px;
+    vertical-align: middle;
+    font-weight: 600;
+  }
+
+  /* ── App frame ── */
+  .app-frame {
+    background: #0a0a0a;
+    border: 1px solid #2d333b;
+    border-radius: 10px;
+    overflow: hidden;
+    max-width: 900px;
+  }
+
+  /* ── App header ── */
+  .app-header {
+    background: #0f1117;
+    border-bottom: 1px solid #2d333b;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .app-logo {
+    font-size: 14px;
+    font-weight: 700;
+    color: #58a6ff;
+    letter-spacing: -0.3px;
+  }
+  .app-search {
+    flex: 1;
+    max-width: 360px;
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #8b949e;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: text;
+  }
+  .search-icon { color: #8b949e; font-size: 11px; }
+  .app-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #58a6ff, #7ee787);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: #0a0a0a;
+  }
+
+  /* ── Filter bar container ── */
+  .filter-bar {
+    background: #0f1117;
+    border-bottom: 1px solid #2d333b;
+    padding: 0 16px;
+  }
+
+  /* ── BEFORE: current filter bar ── */
+  .filter-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 0;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .filter-row:first-child {
+    border-bottom: 1px solid #2d333b;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 13px;
+    color: #e1e4e8;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+  .chip.active {
+    background: #1d3557;
+    border-color: #58a6ff;
+    color: #58a6ff;
+  }
+  .chip.special {
+    background: rgba(88,166,255,0.08);
+    border-color: rgba(88,166,255,0.3);
+    color: #58a6ff;
+  }
+  .chip svg { width: 12px; height: 12px; }
+  .chip-caret { font-size: 10px; color: #8b949e; }
+  .area-tabs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 1;
+  }
+  .area-tab {
+    padding: 5px 10px;
+    font-size: 12px;
+    color: #8b949e;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .area-tab.active {
+    color: #e1e4e8;
+    background: #1c2028;
+  }
+  .listing-count {
+    font-size: 12px;
+    color: #8b949e;
+    white-space: nowrap;
+    padding: 0 4px;
+  }
+  .view-icons {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+  }
+  .view-icon {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #8b949e;
+    font-size: 13px;
+  }
+  .view-icon.active {
+    background: #1c2028;
+    color: #58a6ff;
+  }
+  .divider-v {
+    width: 1px;
+    height: 18px;
+    background: #2d333b;
+    flex-shrink: 0;
+  }
+
+  /* ── Listing cards ── */
+  .listing-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: #2d333b;
+  }
+  .listing-card {
+    background: #0f1117;
+    padding: 12px;
+    cursor: pointer;
+  }
+  .listing-img {
+    width: 100%;
+    aspect-ratio: 16/10;
+    border-radius: 6px;
+    background: #1c2028;
+    margin-bottom: 8px;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .listing-img-inner {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #1c2028, #2d333b);
+    display: flex;
+    align-items: flex-end;
+    padding: 6px;
+  }
+  .listing-img-label {
+    font-size: 9px;
+    color: #8b949e;
+    background: rgba(0,0,0,0.6);
+    padding: 2px 5px;
+    border-radius: 3px;
+  }
+  .listing-price {
+    font-size: 15px;
+    font-weight: 700;
+    color: #e1e4e8;
+    margin-bottom: 2px;
+  }
+  .listing-meta {
+    font-size: 11px;
+    color: #8b949e;
+    margin-bottom: 2px;
+  }
+  .listing-addr {
+    font-size: 11px;
+    color: #8b949e;
+  }
+  .listing-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 5px;
+    border-radius: 3px;
+    margin-top: 4px;
+    background: rgba(126,231,135,0.12);
+    color: #7ee787;
+    border: 1px solid rgba(126,231,135,0.2);
+  }
+
+  /* ── OPTION A: StreetEasy style ── */
+  .opt-a-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    height: 36px;
+    padding: 0 4px;
+  }
+  .opt-a-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 10px;
+    height: 36px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #e1e4e8;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    white-space: nowrap;
+    border-radius: 0;
+    background: none;
+    border: none;
+  }
+  .opt-a-btn:hover { color: #58a6ff; }
+  .opt-a-btn.active { color: #58a6ff; }
+  .opt-a-btn .caret {
+    font-size: 8px;
+    color: #8b949e;
+    transition: transform 0.15s;
+  }
+  .opt-a-btn.open .caret { transform: rotate(180deg); color: #58a6ff; }
+  .opt-a-sep {
+    width: 1px;
+    height: 14px;
+    background: #2d333b;
+    flex-shrink: 0;
+  }
+  .opt-a-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: #8b949e;
+    padding: 0 8px;
+    white-space: nowrap;
+  }
+  .opt-a-views {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    padding: 0 4px;
+  }
+  .opt-a-view-btn {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #8b949e;
+    font-size: 12px;
+    background: none;
+    border: none;
+  }
+  .opt-a-view-btn.active {
+    background: #1c2028;
+    color: #58a6ff;
+  }
+
+  /* Dropdown shared */
+  .dropdown-wrapper {
+    position: relative;
+    display: inline-flex;
+  }
+  .dropdown-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 8px;
+    min-width: 180px;
+    z-index: 100;
+    padding: 6px 0;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+  .dropdown-wrapper.open .dropdown-menu { display: block; }
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: #e1e4e8;
+    cursor: pointer;
+    user-select: none;
+  }
+  .dropdown-item:hover { background: #2d333b; }
+  .dropdown-item.active { color: #58a6ff; }
+  .dropdown-item .check { color: #58a6ff; font-size: 10px; }
+  .dropdown-sep { height: 1px; background: #2d333b; margin: 4px 0; }
+  .dropdown-header {
+    padding: 4px 14px 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8b949e;
+  }
+  .dropdown-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: #e1e4e8;
+    cursor: pointer;
+  }
+  .toggle-pill {
+    width: 30px;
+    height: 16px;
+    border-radius: 8px;
+    background: #2d333b;
+    position: relative;
+    transition: background 0.2s;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .toggle-pill.on { background: #58a6ff; }
+  .toggle-pill::after {
+    content: '';
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    transition: left 0.2s;
+  }
+  .toggle-pill.on::after { left: 16px; }
+
+  /* ── OPTION B: Compact pills ── */
+  .opt-b-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 32px;
+    padding: 0 2px;
+    overflow-x: auto;
+  }
+  .opt-b-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 12px;
+    padding: 3px 8px;
+    font-size: 10px;
+    color: #e1e4e8;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    height: 22px;
+    flex-shrink: 0;
+  }
+  .opt-b-pill:hover { border-color: #58a6ff; color: #58a6ff; }
+  .opt-b-pill.active {
+    border-color: #58a6ff;
+    color: #58a6ff;
+    background: rgba(88,166,255,0.08);
+  }
+  .opt-b-pill .caret { font-size: 7px; color: #8b949e; }
+  .opt-b-pill.active .caret { color: #58a6ff; }
+  .opt-b-sep {
+    width: 1px;
+    height: 14px;
+    background: #2d333b;
+    flex-shrink: 0;
+    margin: 0 2px;
+  }
+  .opt-b-count {
+    font-size: 10px;
+    color: #8b949e;
+    margin-left: auto;
+    white-space: nowrap;
+    padding: 0 4px;
+    flex-shrink: 0;
+  }
+  .opt-b-views {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    flex-shrink: 0;
+  }
+  .opt-b-view-btn {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #8b949e;
+    font-size: 11px;
+  }
+  .opt-b-view-btn.active {
+    background: #1c2028;
+    color: #58a6ff;
+  }
+
+  /* ── OPTION C: Collapsible ── */
+  .opt-c-bar-main {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    height: 32px;
+    padding: 0 0;
+  }
+  .opt-c-area-tabs {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex: 1;
+    overflow-x: auto;
+  }
+  .opt-c-tab {
+    padding: 0 10px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    font-size: 11px;
+    color: #8b949e;
+    cursor: pointer;
+    white-space: nowrap;
+    position: relative;
+    user-select: none;
+  }
+  .opt-c-tab.active { color: #e1e4e8; }
+  .opt-c-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 10px;
+    right: 10px;
+    height: 2px;
+    background: #58a6ff;
+    border-radius: 1px;
+  }
+  .opt-c-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    padding: 0 8px;
+  }
+  .opt-c-count {
+    font-size: 11px;
+    color: #8b949e;
+    white-space: nowrap;
+  }
+  .opt-c-sort-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    color: #8b949e;
+    cursor: pointer;
+    user-select: none;
+    padding: 0 4px;
+  }
+  .opt-c-sort-btn:hover { color: #e1e4e8; }
+  .opt-c-filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #e1e4e8;
+    cursor: pointer;
+    user-select: none;
+    height: 26px;
+  }
+  .opt-c-filter-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+  .opt-c-filter-btn.has-active {
+    border-color: #58a6ff;
+    color: #58a6ff;
+    background: rgba(88,166,255,0.08);
+  }
+  .opt-c-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #58a6ff;
+    color: #0a0a0a;
+    font-size: 9px;
+    font-weight: 700;
+  }
+  .opt-c-views {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+  }
+  .opt-c-view-btn {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    cursor: pointer;
+    color: #8b949e;
+    font-size: 12px;
+  }
+  .opt-c-view-btn.active {
+    background: #1c2028;
+    color: #58a6ff;
+  }
+
+  /* Option C expanded filter row */
+  .opt-c-expanded {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 0 6px;
+    border-top: 1px solid #2d333b;
+    overflow-x: auto;
+  }
+  .opt-c-expanded.open { display: flex; }
+  .opt-c-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: #e1e4e8;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    flex-shrink: 0;
+  }
+  .opt-c-chip.active {
+    border-color: #58a6ff;
+    color: #58a6ff;
+    background: rgba(88,166,255,0.08);
+  }
+  .opt-c-chip .caret { font-size: 8px; color: #8b949e; }
+  .opt-c-clear {
+    margin-left: auto;
+    font-size: 11px;
+    color: #8b949e;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0 4px;
+  }
+  .opt-c-clear:hover { color: #e1e4e8; }
+
+  /* ── OPTION D: Toolbar style ── */
+  .opt-d-bar {
+    display: flex;
+    align-items: stretch;
+    height: 34px;
+    border-bottom: none;
+  }
+  .opt-d-segment {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 11px;
+    font-size: 11px;
+    color: #8b949e;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    border-right: 1px solid #2d333b;
+    position: relative;
+    flex-shrink: 0;
+  }
+  .opt-d-segment:hover {
+    background: #1c2028;
+    color: #e1e4e8;
+  }
+  .opt-d-segment.active {
+    background: rgba(88,166,255,0.06);
+    color: #58a6ff;
+  }
+  .opt-d-segment .seg-icon {
+    font-size: 12px;
+    line-height: 1;
+  }
+  .opt-d-segment .seg-label {
+    font-weight: 500;
+  }
+  .opt-d-segment .caret {
+    font-size: 7px;
+    color: #8b949e;
+    margin-left: 1px;
+  }
+  .opt-d-spacer { flex: 1; }
+  .opt-d-views {
+    display: flex;
+    align-items: stretch;
+    border-left: 1px solid #2d333b;
+  }
+  .opt-d-view-btn {
+    width: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #8b949e;
+    cursor: pointer;
+    border-right: 1px solid #2d333b;
+  }
+  .opt-d-view-btn.active {
+    background: #1c2028;
+    color: #58a6ff;
+  }
+  .opt-d-view-btn:last-child { border-right: none; }
+  .opt-d-count {
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    font-size: 10px;
+    color: #8b949e;
+    white-space: nowrap;
+    border-right: 1px solid #2d333b;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 700px) {
+    .listing-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .listing-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── Height indicator ── */
+  .height-ruler {
+    position: relative;
+    margin: 0 0 2px 0;
+  }
+  .height-ruler-inner {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 6px;
+    font-size: 10px;
+    color: #7ee787;
+    background: rgba(126,231,135,0.05);
+    border-left: 2px solid rgba(126,231,135,0.3);
+    border-radius: 0 4px 4px 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title">Dwelligence — Compact Filter Bar</div>
+<div class="page-sub">4 design options + current "before" state. Click filter buttons to see dropdowns open.</div>
+
+<!-- ═══════════════════════════════════════════════════
+     BEFORE: Current state
+═══════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-label before">Before — Current State</div>
+  <div class="section-title">Two-row filter bar</div>
+  <div class="section-desc">Row 1 has filter chips + view toggle. Row 2 has area tabs + listing count + sort. Combined height ~72px.</div>
+
+  <div class="app-frame">
+    <div class="app-header">
+      <div class="app-logo">Dwelligence</div>
+      <div class="app-search"><span class="search-icon">&#9906;</span>Search apartments in NYC…</div>
+      <div class="app-header-right">
+        <div class="avatar">O</div>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <!-- Row 1 -->
+      <div class="filter-row">
+        <div class="chip">Price <span class="chip-caret">&#8964;</span></div>
+        <div class="chip">Beds / Baths <span class="chip-caret">&#8964;</span></div>
+        <div class="chip active">Price / Bedroom <span class="chip-caret">&#8964;</span></div>
+        <div class="chip active">Within 1 Month <span class="chip-caret">&#8964;</span></div>
+        <div class="chip special">Photos first</div>
+        <div class="view-icons">
+          <div class="view-icon active">&#9776;</div>
+          <div class="view-icon">&#9634;</div>
+          <div class="view-icon">&#9974;</div>
+        </div>
+      </div>
+      <!-- Row 2 -->
+      <div class="filter-row">
+        <div class="area-tabs">
+          <div class="area-tab active">All</div>
+          <div class="area-tab">Fulton St</div>
+          <div class="area-tab">L Train</div>
+          <div class="area-tab">Manhattan</div>
+          <div class="area-tab">Brooklyn 14th</div>
+        </div>
+        <div class="listing-count">65 listings</div>
+        <div class="divider-v"></div>
+        <div class="chip" style="border:none;background:none;font-size:12px;color:#8b949e;gap:3px;">Sort: Price/Bedroom <span class="chip-caret">&#8964;</span></div>
+      </div>
+    </div>
+
+    <div class="listing-grid">
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner"><span class="listing-img-label">Fulton St</span></div></div>
+        <div class="listing-price">$2,450/mo</div>
+        <div class="listing-meta">1 bed · 1 bath · $2,450/bed</div>
+        <div class="listing-addr">240 Fulton St, Brooklyn</div>
+        <div class="listing-badge">Listed 3 days ago</div>
+      </div>
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner" style="background:linear-gradient(135deg,#1c2028,#1a2535);"><span class="listing-img-label">L Train</span></div></div>
+        <div class="listing-price">$3,200/mo</div>
+        <div class="listing-meta">2 bed · 1 bath · $1,600/bed</div>
+        <div class="listing-addr">415 Graham Ave, Brooklyn</div>
+        <div class="listing-badge">Listed 1 week ago</div>
+      </div>
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner" style="background:linear-gradient(135deg,#1a1c28,#2d2d3b);"><span class="listing-img-label">Manhattan</span></div></div>
+        <div class="listing-price">$4,100/mo</div>
+        <div class="listing-meta">2 bed · 2 bath · $2,050/bed</div>
+        <div class="listing-addr">88 W 14th St, Manhattan</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     OPTION A: StreetEasy text-only
+═══════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-label option-a">Option A</div>
+  <div class="section-title">Single row, text-only dropdowns (StreetEasy style) <span class="height-badge">~36px total</span></div>
+  <div class="section-desc">All caps, small text, no borders — just labels with chevrons. Area and sort are dropdowns. "More" hides Photos First + Within 1 Month toggles.</div>
+
+  <div class="app-frame">
+    <div class="app-header">
+      <div class="app-logo">Dwelligence</div>
+      <div class="app-search"><span class="search-icon">&#9906;</span>Search apartments in NYC…</div>
+      <div class="app-header-right"><div class="avatar">O</div></div>
+    </div>
+
+    <div class="filter-bar" style="padding:0 8px;">
+      <div class="opt-a-bar">
+
+        <!-- PRICE -->
+        <div class="dropdown-wrapper" id="a-price">
+          <div class="opt-a-btn" onclick="toggleDropdown('a-price')">PRICE <span class="caret">&#8964;</span></div>
+          <div class="dropdown-menu" style="min-width:200px;">
+            <div class="dropdown-header">Max monthly rent</div>
+            <div class="dropdown-item">Any price</div>
+            <div class="dropdown-item active">Under $2,500 <span class="check">&#10003;</span></div>
+            <div class="dropdown-item">Under $3,000</div>
+            <div class="dropdown-item">Under $4,000</div>
+            <div class="dropdown-item">Under $5,000</div>
+          </div>
+        </div>
+
+        <div class="opt-a-sep"></div>
+
+        <!-- BEDS -->
+        <div class="dropdown-wrapper" id="a-beds">
+          <div class="opt-a-btn" onclick="toggleDropdown('a-beds')">BEDS <span class="caret">&#8964;</span></div>
+          <div class="dropdown-menu">
+            <div class="dropdown-header">Bedrooms</div>
+            <div class="dropdown-item active">Any <span class="check">&#10003;</span></div>
+            <div class="dropdown-item">Studio</div>
+            <div class="dropdown-item">1+</div>
+            <div class="dropdown-item">2+</div>
+            <div class="dropdown-item">3+</div>
+            <div class="dropdown-sep"></div>
+            <div class="dropdown-header">Bathrooms</div>
+            <div class="dropdown-item active">Any <span class="check">&#10003;</span></div>
+            <div class="dropdown-item">1+</div>
+            <div class="dropdown-item">2+</div>
+          </div>
+        </div>
+
+        <div class="opt-a-sep"></div>
+
+        <!-- $/BED -->
+        <div class="dropdown-wrapper" id="a-perbed">
+          <div class="opt-a-btn active" onclick="toggleDropdown('a-perbed')">$/BED <span class="caret">&#8964;</span></div>
+          <div class="dropdown-menu">
+            <div class="dropdown-header">Max price per bedroom</div>
+            <div class="dropdown-item">Any</div>
+            <div class="dropdown-item active">Under $1,800 <span class="check">&#10003;</span></div>
+            <div class="dropdown-item">Under $2,000</div>
+            <div class="dropdown-item">Under $2,500</div>
+          </div>
+        </div>
+
+        <div class="opt-a-sep"></div>
+
+        <!-- AREA -->
+        <div class="dropdown-wrapper" id="a-area">
+          <div class="opt-a-btn" onclick="toggleDropdown('a-area')">AREA <span class="caret">&#8964;</span></div>
+          <div class="dropdown-menu" style="min-width:200px;">
+            <div class="dropdown-header">Saved searches</div>
+            <div class="dropdown-item active">All areas <span class="check">&#10003;</span></div>
+            <div class="dropdown-item">Fulton St</div>
+            <div class="dropdown-item">L Train corridor</div>
+            <div class="dropdown-item">Manhattan (14th)</div>
+            <div class="dropdown-item">Brooklyn 14th St</div>
+          </div>
+        </div>
+
+        <div class="opt-a-sep"></div>
+
+        <!-- SORT -->
+        <div class="dropdown-wrapper" id="a-sort">
+          <div class="opt-a-btn" onclick="toggleDropdown('a-sort')">SORT <span class="caret">&#8964;</span></div>
+          <div class="dropdown-menu">
+            <div class="dropdown-item">Newest first</div>
+            <div class="dropdown-item active">Price/Bedroom &#8593; <span class="check">&#10003;</span></div>
+            <div class="dropdown-item">Total price &#8593;</div>
+            <div class="dropdown-item">Most photos</div>
+          </div>
+        </div>
+
+        <div class="opt-a-sep"></div>
+
+        <!-- MORE -->
+        <div class="dropdown-wrapper" id="a-more">
+          <div class="opt-a-btn active" onclick="toggleDropdown('a-more')">MORE <span class="caret">&#8964;</span></div>
+          <div class="dropdown-menu" style="min-width:210px;">
+            <div class="dropdown-toggle-row" onclick="togglePill(this)">
+              <span>Within 1 month only</span>
+              <div class="toggle-pill on"></div>
+            </div>
+            <div class="dropdown-toggle-row" onclick="togglePill(this)">
+              <span>Photos first</span>
+              <div class="toggle-pill on"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="opt-a-count">65 listings</div>
+
+        <div class="opt-a-sep"></div>
+
+        <!-- VIEW ICONS -->
+        <div class="opt-a-views">
+          <div class="opt-a-view-btn active" title="List">&#9776;</div>
+          <div class="opt-a-view-btn" title="Grid">&#9634;</div>
+          <div class="opt-a-view-btn" title="Map">&#9974;</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="listing-grid">
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner"><span class="listing-img-label">Fulton St</span></div></div>
+        <div class="listing-price">$2,450/mo</div>
+        <div class="listing-meta">1 bed · 1 bath · $2,450/bed</div>
+        <div class="listing-addr">240 Fulton St, Brooklyn</div>
+        <div class="listing-badge">Listed 3 days ago</div>
+      </div>
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner" style="background:linear-gradient(135deg,#1c2028,#1a2535);"><span class="listing-img-label">L Train</span></div></div>
+        <div class="listing-price">$3,200/mo</div>
+        <div class="listing-meta">2 bed · 1 bath · $1,600/bed</div>
+        <div class="listing-addr">415 Graham Ave, Brooklyn</div>
+        <div class="listing-badge">Listed 1 week ago</div>
+      </div>
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner" style="background:linear-gradient(135deg,#1a1c28,#2d2d3b);"><span class="listing-img-label">Manhattan</span></div></div>
+        <div class="listing-price">$4,100/mo</div>
+        <div class="listing-meta">2 bed · 2 bath · $2,050/bed</div>
+        <div class="listing-addr">88 W 14th St, Manhattan</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     OPTION B: Compact pills
+═══════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-label option-b">Option B</div>
+  <div class="section-title">Single row, compact pills <span class="height-badge">~32px total</span></div>
+  <div class="section-desc">Same chip concept but 60% smaller. 10px text, 4px 8px padding. Active state: blue border (no fill). Area as a dropdown pill. Sort at the end.</div>
+
+  <div class="app-frame">
+    <div class="app-header">
+      <div class="app-logo">Dwelligence</div>
+      <div class="app-search"><span class="search-icon">&#9906;</span>Search apartments in NYC…</div>
+      <div class="app-header-right"><div class="avatar">O</div></div>
+    </div>
+
+    <div class="filter-bar" style="padding:0 8px;">
+      <div class="opt-b-bar">
+
+        <!-- PRICE -->
+        <div class="dropdown-wrapper" id="b-price">
+          <div class="opt-b-pill" onclick="toggleDropdown('b-price')">Price <span class="caret">&#8964;</span></div>
+          <div class="dropdown-menu">
+            <div class="dropdown-header">Max rent</div>
+            <div class="dropdown-item">Any price</div>
+            <div class="dropdown-item active">Under $2,500 <span class="check">&#10003;</span></div>
+            <div class="dropdown-item">Under $3,000</div>
+            <div class="dropdown-item">Under $4,000</div>
+          </div>
+        </div>
+
+        <!-- BEDS/BATHS -->
+        <div class="dropdown-wrapper" id="b-beds">
+          <div class="opt-b-pill" onclick="toggleDropdown('b-beds')">Beds/Baths <span class="caret">&#8964;</span></div>
+          <div class="dropdown-menu">
+            <div class="dropdown-header">Bedrooms</div>
+            <div class="dropdown-item active">Any <span class="check">&#10003;</span></div>
+            <div class="dropdown-item">Studio</div>
+            <div class="dropdown-item">1+</div>
+            <div class="dropdown-item">2+</div>
+          </div>
+        </div>
+
+        <!-- $/BED active -->
+        <div class="dropdown-wrapper" id="b-perbed">
+          <div class="opt-b-pill active" onclick="toggleDropdown('b-perbed')">$/Bed <span class="caret">&#8964;</span></div>
+          <div class="dropdown-menu">
+            <div class="dropdown-header">Max per bedroom</div>
+            <div class="dropdown-item">Any</div>
+            <div class="dropdown-item active">Under $1,800 <span class="check">&#10003;</span></div>
+            <div class="dropdown-item">Under $2,000</div>
+          </div>
+        </div>
+
+        <!-- WITHIN 1 MONTH active -->
+        <div class="opt-b-pill active" onclick="this.classList.toggle('active')">&le; 1 Month</div>
+
+        <!-- PHOTOS active -->
+        <div class="opt-b-pill active" onclick="this.classList.toggle('active')">Photos</div>
+
+        <div class="opt-b-sep"></div>
+
+        <!-- AREA -->
+        <div class="dropdown-wrapper" id="b-area">
+          <div class="opt-b-pill" onclick="toggleDropdown('b-area')">All Areas <span class="caret">&#8964;</span></div>
+          <div class="dropdown-menu">
+            <div class="dropdown-item active">All areas <span class="check">&#10003;</span></div>
+            <div class="dropdown-item">Fulton St</div>
+            <div class="dropdown-item">L Train</div>
+            <div class="dropdown-item">Manhattan 14th</div>
+            <div class="dropdown-item">Brooklyn 14th</div>
+          </div>
+        </div>
+
+        <div class="opt-b-count">65 listings</div>
+
+        <!-- SORT -->
+        <div class="dropdown-wrapper" id="b-sort">
+          <div class="opt-b-pill" onclick="toggleDropdown('b-sort')" style="background:none;border-color:#2d333b;color:#8b949e;">&#8645; $/Bed <span class="caret">&#8964;</span></div>
+          <div class="dropdown-menu" style="right:0;left:auto;">
+            <div class="dropdown-item">Newest</div>
+            <div class="dropdown-item active">Price/Bed &#8593; <span class="check">&#10003;</span></div>
+            <div class="dropdown-item">Total price</div>
+          </div>
+        </div>
+
+        <div class="opt-b-sep"></div>
+
+        <div class="opt-b-views">
+          <div class="opt-b-view-btn active">&#9776;</div>
+          <div class="opt-b-view-btn">&#9634;</div>
+          <div class="opt-b-view-btn">&#9974;</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="listing-grid">
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner"><span class="listing-img-label">Fulton St</span></div></div>
+        <div class="listing-price">$2,450/mo</div>
+        <div class="listing-meta">1 bed · 1 bath · $2,450/bed</div>
+        <div class="listing-addr">240 Fulton St, Brooklyn</div>
+        <div class="listing-badge">Listed 3 days ago</div>
+      </div>
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner" style="background:linear-gradient(135deg,#1c2028,#1a2535);"><span class="listing-img-label">L Train</span></div></div>
+        <div class="listing-price">$3,200/mo</div>
+        <div class="listing-meta">2 bed · 1 bath · $1,600/bed</div>
+        <div class="listing-addr">415 Graham Ave, Brooklyn</div>
+        <div class="listing-badge">Listed 1 week ago</div>
+      </div>
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner" style="background:linear-gradient(135deg,#1a1c28,#2d2d3b);"><span class="listing-img-label">Manhattan</span></div></div>
+        <div class="listing-price">$4,100/mo</div>
+        <div class="listing-meta">2 bed · 2 bath · $2,050/bed</div>
+        <div class="listing-addr">88 W 14th St, Manhattan</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     OPTION C: Collapsible
+═══════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-label option-c">Option C</div>
+  <div class="section-title">Collapsible — area tabs default, filters behind toggle <span class="height-badge">~32px collapsed / ~64px expanded</span></div>
+  <div class="section-desc">Default view shows only area tabs + listing count + sort + view icons. "Filters (2)" button expands a second row. Click the Filters button to toggle it.</div>
+
+  <div class="app-frame">
+    <div class="app-header">
+      <div class="app-logo">Dwelligence</div>
+      <div class="app-search"><span class="search-icon">&#9906;</span>Search apartments in NYC…</div>
+      <div class="app-header-right"><div class="avatar">O</div></div>
+    </div>
+
+    <div class="filter-bar" style="padding:0 8px;">
+      <!-- Main row (always visible) -->
+      <div class="opt-c-bar-main">
+        <div class="opt-c-area-tabs">
+          <div class="opt-c-tab active">All</div>
+          <div class="opt-c-tab">Fulton St</div>
+          <div class="opt-c-tab">L Train</div>
+          <div class="opt-c-tab">Manhattan</div>
+          <div class="opt-c-tab">Brooklyn 14th</div>
+        </div>
+        <div class="opt-c-right">
+          <div class="opt-c-count">65</div>
+          <div class="opt-a-sep"></div>
+          <div class="dropdown-wrapper" id="c-sort">
+            <div class="opt-c-sort-btn" onclick="toggleDropdown('c-sort')">&#8645; $/Bed <span style="font-size:8px;color:#8b949e;">&#8964;</span></div>
+            <div class="dropdown-menu" style="right:0;left:auto;">
+              <div class="dropdown-item">Newest</div>
+              <div class="dropdown-item active">Price/Bed &#8593; <span class="check">&#10003;</span></div>
+              <div class="dropdown-item">Total price</div>
+            </div>
+          </div>
+          <div class="opt-a-sep"></div>
+          <div class="opt-c-filter-btn has-active" onclick="toggleCExpanded(this)">
+            Filters <div class="opt-c-badge">2</div>
+          </div>
+          <div class="opt-a-sep"></div>
+          <div class="opt-c-views">
+            <div class="opt-c-view-btn active">&#9776;</div>
+            <div class="opt-c-view-btn">&#9634;</div>
+            <div class="opt-c-view-btn">&#9974;</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Expanded filter row -->
+      <div class="opt-c-expanded open" id="c-expanded">
+        <div class="opt-c-chip">Price <span class="caret">&#8964;</span></div>
+        <div class="opt-c-chip">Beds/Baths <span class="caret">&#8964;</span></div>
+        <div class="opt-c-chip active">$/Bed: &lt;$1,800 <span class="caret">&#8964;</span></div>
+        <div class="opt-c-chip active">Within 1 Month</div>
+        <div class="opt-c-chip">Photos first</div>
+        <div class="opt-c-clear">Clear all</div>
+      </div>
+    </div>
+
+    <div class="listing-grid">
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner"><span class="listing-img-label">Fulton St</span></div></div>
+        <div class="listing-price">$2,450/mo</div>
+        <div class="listing-meta">1 bed · 1 bath · $2,450/bed</div>
+        <div class="listing-addr">240 Fulton St, Brooklyn</div>
+        <div class="listing-badge">Listed 3 days ago</div>
+      </div>
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner" style="background:linear-gradient(135deg,#1c2028,#1a2535);"><span class="listing-img-label">L Train</span></div></div>
+        <div class="listing-price">$3,200/mo</div>
+        <div class="listing-meta">2 bed · 1 bath · $1,600/bed</div>
+        <div class="listing-addr">415 Graham Ave, Brooklyn</div>
+        <div class="listing-badge">Listed 1 week ago</div>
+      </div>
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner" style="background:linear-gradient(135deg,#1a1c28,#2d2d3b);"><span class="listing-img-label">Manhattan</span></div></div>
+        <div class="listing-price">$4,100/mo</div>
+        <div class="listing-meta">2 bed · 2 bath · $2,050/bed</div>
+        <div class="listing-addr">88 W 14th St, Manhattan</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:10px;font-size:11px;color:#8b949e;">
+    Collapsed state (no active filters) — the "Filters" button has no badge and no active styling:
+  </div>
+
+  <!-- Second instance: collapsed, no active filters -->
+  <div class="app-frame" style="margin-top:8px;">
+    <div class="app-header">
+      <div class="app-logo">Dwelligence</div>
+      <div class="app-search"><span class="search-icon">&#9906;</span>Search apartments in NYC…</div>
+      <div class="app-header-right"><div class="avatar">O</div></div>
+    </div>
+
+    <div class="filter-bar" style="padding:0 8px;">
+      <div class="opt-c-bar-main">
+        <div class="opt-c-area-tabs">
+          <div class="opt-c-tab active">All</div>
+          <div class="opt-c-tab">Fulton St</div>
+          <div class="opt-c-tab">L Train</div>
+          <div class="opt-c-tab">Manhattan</div>
+          <div class="opt-c-tab">Brooklyn 14th</div>
+        </div>
+        <div class="opt-c-right">
+          <div class="opt-c-count">65</div>
+          <div class="opt-a-sep"></div>
+          <div class="opt-c-sort-btn">&#8645; $/Bed <span style="font-size:8px;color:#8b949e;">&#8964;</span></div>
+          <div class="opt-a-sep"></div>
+          <div class="opt-c-filter-btn">Filters</div>
+          <div class="opt-a-sep"></div>
+          <div class="opt-c-views">
+            <div class="opt-c-view-btn active">&#9776;</div>
+            <div class="opt-c-view-btn">&#9634;</div>
+            <div class="opt-c-view-btn">&#9974;</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="listing-grid">
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner"><span class="listing-img-label">Fulton St</span></div></div>
+        <div class="listing-price">$2,450/mo</div>
+        <div class="listing-meta">1 bed · 1 bath · $2,450/bed</div>
+        <div class="listing-addr">240 Fulton St, Brooklyn</div>
+        <div class="listing-badge">Listed 3 days ago</div>
+      </div>
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner" style="background:linear-gradient(135deg,#1c2028,#1a2535);"><span class="listing-img-label">L Train</span></div></div>
+        <div class="listing-price">$3,200/mo</div>
+        <div class="listing-meta">2 bed · 1 bath · $1,600/bed</div>
+        <div class="listing-addr">415 Graham Ave, Brooklyn</div>
+      </div>
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner" style="background:linear-gradient(135deg,#1a1c28,#2d2d3b);"><span class="listing-img-label">Manhattan</span></div></div>
+        <div class="listing-price">$4,100/mo</div>
+        <div class="listing-meta">2 bed · 2 bath · $2,050/bed</div>
+        <div class="listing-addr">88 W 14th St, Manhattan</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════
+     OPTION D: Toolbar style
+═══════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-label option-d">Option D</div>
+  <div class="section-title">Toolbar style — icons + text, flat dense bar <span class="height-badge">~34px total</span></div>
+  <div class="section-desc">Spreadsheet toolbar aesthetic. Each item is a flat clickable segment with an icon + label. Dividers between groups. No pills, no borders, no chips.</div>
+
+  <div class="app-frame">
+    <div class="app-header">
+      <div class="app-logo">Dwelligence</div>
+      <div class="app-search"><span class="search-icon">&#9906;</span>Search apartments in NYC…</div>
+      <div class="app-header-right"><div class="avatar">O</div></div>
+    </div>
+
+    <div class="filter-bar" style="padding:0;">
+      <div class="opt-d-bar">
+
+        <!-- PRICE -->
+        <div class="dropdown-wrapper" id="d-price">
+          <div class="opt-d-segment" onclick="toggleDropdown('d-price')">
+            <span class="seg-icon">$</span>
+            <span class="seg-label">Price</span>
+            <span class="caret">&#8964;</span>
+          </div>
+          <div class="dropdown-menu">
+            <div class="dropdown-header">Max rent</div>
+            <div class="dropdown-item">Any price</div>
+            <div class="dropdown-item active">Under $2,500 <span class="check">&#10003;</span></div>
+            <div class="dropdown-item">Under $3,000</div>
+            <div class="dropdown-item">Under $4,000</div>
+          </div>
+        </div>
+
+        <!-- BEDS -->
+        <div class="dropdown-wrapper" id="d-beds">
+          <div class="opt-d-segment" onclick="toggleDropdown('d-beds')">
+            <span class="seg-icon">&#128716;</span>
+            <span class="seg-label">Beds</span>
+            <span class="caret">&#8964;</span>
+          </div>
+          <div class="dropdown-menu">
+            <div class="dropdown-item active">Any beds <span class="check">&#10003;</span></div>
+            <div class="dropdown-item">Studio</div>
+            <div class="dropdown-item">1+</div>
+            <div class="dropdown-item">2+</div>
+            <div class="dropdown-item">3+</div>
+          </div>
+        </div>
+
+        <!-- $/BED — active -->
+        <div class="dropdown-wrapper" id="d-perbed">
+          <div class="opt-d-segment active" onclick="toggleDropdown('d-perbed')">
+            <span class="seg-icon" style="color:#58a6ff;">&#128181;</span>
+            <span class="seg-label">$/Bed</span>
+            <span class="caret">&#8964;</span>
+          </div>
+          <div class="dropdown-menu">
+            <div class="dropdown-item">Any</div>
+            <div class="dropdown-item active">Under $1,800 <span class="check">&#10003;</span></div>
+            <div class="dropdown-item">Under $2,000</div>
+          </div>
+        </div>
+
+        <!-- AREA -->
+        <div class="dropdown-wrapper" id="d-area">
+          <div class="opt-d-segment" onclick="toggleDropdown('d-area')">
+            <span class="seg-icon">&#128205;</span>
+            <span class="seg-label">Area</span>
+            <span class="caret">&#8964;</span>
+          </div>
+          <div class="dropdown-menu">
+            <div class="dropdown-item active">All areas <span class="check">&#10003;</span></div>
+            <div class="dropdown-item">Fulton St</div>
+            <div class="dropdown-item">L Train</div>
+            <div class="dropdown-item">Manhattan 14th</div>
+            <div class="dropdown-item">Brooklyn 14th</div>
+          </div>
+        </div>
+
+        <!-- LISTED — active -->
+        <div class="dropdown-wrapper" id="d-listed">
+          <div class="opt-d-segment active" onclick="toggleDropdown('d-listed')">
+            <span class="seg-icon" style="color:#58a6ff;">&#128197;</span>
+            <span class="seg-label">Listed</span>
+            <span class="caret">&#8964;</span>
+          </div>
+          <div class="dropdown-menu">
+            <div class="dropdown-item">Any time</div>
+            <div class="dropdown-item active">Within 1 month <span class="check">&#10003;</span></div>
+            <div class="dropdown-item">Within 2 weeks</div>
+            <div class="dropdown-item">This week</div>
+          </div>
+        </div>
+
+        <!-- PHOTOS toggle -->
+        <div class="opt-d-segment active" onclick="this.classList.toggle('active')" style="border-right:1px solid #2d333b;">
+          <span class="seg-icon" style="color:#58a6ff;">&#128247;</span>
+          <span class="seg-label">Photos</span>
+        </div>
+
+        <!-- SORT -->
+        <div class="dropdown-wrapper" id="d-sort">
+          <div class="opt-d-segment" onclick="toggleDropdown('d-sort')">
+            <span class="seg-icon">&#8645;</span>
+            <span class="seg-label">Sort</span>
+            <span class="caret">&#8964;</span>
+          </div>
+          <div class="dropdown-menu">
+            <div class="dropdown-item">Newest</div>
+            <div class="dropdown-item active">$/Bed &#8593; <span class="check">&#10003;</span></div>
+            <div class="dropdown-item">Total price</div>
+          </div>
+        </div>
+
+        <div class="opt-d-spacer"></div>
+
+        <div class="opt-d-count">65 listings</div>
+
+        <!-- VIEW ICONS -->
+        <div class="opt-d-views">
+          <div class="opt-d-view-btn active" title="List">&#9776;</div>
+          <div class="opt-d-view-btn" title="Grid">&#9634;</div>
+          <div class="opt-d-view-btn" title="Map">&#9974;</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="listing-grid">
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner"><span class="listing-img-label">Fulton St</span></div></div>
+        <div class="listing-price">$2,450/mo</div>
+        <div class="listing-meta">1 bed · 1 bath · $2,450/bed</div>
+        <div class="listing-addr">240 Fulton St, Brooklyn</div>
+        <div class="listing-badge">Listed 3 days ago</div>
+      </div>
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner" style="background:linear-gradient(135deg,#1c2028,#1a2535);"><span class="listing-img-label">L Train</span></div></div>
+        <div class="listing-price">$3,200/mo</div>
+        <div class="listing-meta">2 bed · 1 bath · $1,600/bed</div>
+        <div class="listing-addr">415 Graham Ave, Brooklyn</div>
+        <div class="listing-badge">Listed 1 week ago</div>
+      </div>
+      <div class="listing-card">
+        <div class="listing-img"><div class="listing-img-inner" style="background:linear-gradient(135deg,#1a1c28,#2d2d3b);"><span class="listing-img-label">Manhattan</span></div></div>
+        <div class="listing-price">$4,100/mo</div>
+        <div class="listing-meta">2 bed · 2 bath · $2,050/bed</div>
+        <div class="listing-addr">88 W 14th St, Manhattan</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── Summary comparison ── -->
+<div class="section" style="margin-bottom:24px;">
+  <div class="section-label">Summary</div>
+  <div style="background:#1c2028;border:1px solid #2d333b;border-radius:8px;overflow:hidden;max-width:900px;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead>
+        <tr style="background:#2d333b;">
+          <th style="padding:10px 14px;text-align:left;color:#8b949e;font-weight:600;">Option</th>
+          <th style="padding:10px 14px;text-align:left;color:#8b949e;font-weight:600;">Height</th>
+          <th style="padding:10px 14px;text-align:left;color:#8b949e;font-weight:600;">Area handling</th>
+          <th style="padding:10px 14px;text-align:left;color:#8b949e;font-weight:600;">Best for</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-top:1px solid #2d333b;">
+          <td style="padding:10px 14px;color:#f85149;">Before</td>
+          <td style="padding:10px 14px;color:#e1e4e8;">~72px</td>
+          <td style="padding:10px 14px;color:#8b949e;">Two separate rows</td>
+          <td style="padding:10px 14px;color:#8b949e;">Current state</td>
+        </tr>
+        <tr style="border-top:1px solid #2d333b;">
+          <td style="padding:10px 14px;color:#58a6ff;">A — Text-only</td>
+          <td style="padding:10px 14px;color:#7ee787;">36px</td>
+          <td style="padding:10px 14px;color:#8b949e;">Dropdown consolidation</td>
+          <td style="padding:10px 14px;color:#8b949e;">Clean, StreetEasy-like, scannable</td>
+        </tr>
+        <tr style="border-top:1px solid #2d333b;">
+          <td style="padding:10px 14px;color:#7ee787;">B — Compact pills</td>
+          <td style="padding:10px 14px;color:#7ee787;">32px</td>
+          <td style="padding:10px 14px;color:#8b949e;">Dropdown pill</td>
+          <td style="padding:10px 14px;color:#8b949e;">Familiar chip UX, just smaller</td>
+        </tr>
+        <tr style="border-top:1px solid #2d333b;">
+          <td style="padding:10px 14px;color:#d2a8ff;">C — Collapsible</td>
+          <td style="padding:10px 14px;color:#7ee787;">32px / 64px</td>
+          <td style="padding:10px 14px;color:#8b949e;">Prominent tab row</td>
+          <td style="padding:10px 14px;color:#8b949e;">Keeps area tabs front-and-center</td>
+        </tr>
+        <tr style="border-top:1px solid #2d333b;">
+          <td style="padding:10px 14px;color:#ffa657;">D — Toolbar</td>
+          <td style="padding:10px 14px;color:#7ee787;">34px</td>
+          <td style="padding:10px 14px;color:#8b949e;">Dropdown segment</td>
+          <td style="padding:10px 14px;color:#8b949e;">Power-user, data-dense feel</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+<script>
+  // Close all open dropdowns
+  function closeAll(exceptId) {
+    document.querySelectorAll('.dropdown-wrapper.open').forEach(function(el) {
+      if (!exceptId || el.id !== exceptId) {
+        el.classList.remove('open');
+        var btn = el.querySelector('[class*="opt-a-btn"], [class*="opt-b-pill"], [class*="opt-c-sort"]');
+        if (btn) btn.classList.remove('open');
+      }
+    });
+  }
+
+  function toggleDropdown(id) {
+    var wrapper = document.getElementById(id);
+    if (!wrapper) return;
+    var isOpen = wrapper.classList.contains('open');
+    closeAll(id);
+    if (!isOpen) {
+      wrapper.classList.add('open');
+      // Rotate caret on the trigger button
+      var btn = wrapper.querySelector('.opt-a-btn, .opt-b-pill, .opt-c-sort-btn, .opt-d-segment');
+      if (btn) btn.classList.add('open');
+    } else {
+      wrapper.classList.remove('open');
+      var btn = wrapper.querySelector('.opt-a-btn, .opt-b-pill, .opt-c-sort-btn, .opt-d-segment');
+      if (btn) btn.classList.remove('open');
+    }
+  }
+
+  function toggleCExpanded(btn) {
+    var expanded = document.getElementById('c-expanded');
+    if (!expanded) return;
+    var isOpen = expanded.classList.contains('open');
+    if (isOpen) {
+      expanded.classList.remove('open');
+    } else {
+      expanded.classList.add('open');
+    }
+  }
+
+  function togglePill(row) {
+    var pill = row.querySelector('.toggle-pill');
+    if (pill) pill.classList.toggle('on');
+  }
+
+  // Click-away to close dropdowns
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.dropdown-wrapper')) {
+      closeAll(null);
+    }
+  });
+
+  // Tab switching — all sets
+  document.querySelectorAll('.opt-c-tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      var siblings = this.parentElement.querySelectorAll('.opt-c-tab');
+      siblings.forEach(function(s) { s.classList.remove('active'); });
+      this.classList.add('active');
+    });
+  });
+
+  // View icon toggle
+  document.querySelectorAll('.opt-a-view-btn, .opt-b-view-btn, .opt-c-view-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var siblings = this.parentElement.querySelectorAll('[class*="view-btn"]');
+      siblings.forEach(function(s) { s.classList.remove('active'); });
+      this.classList.add('active');
+    });
+  });
+  document.querySelectorAll('.opt-d-view-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var siblings = this.parentElement.querySelectorAll('.opt-d-view-btn');
+      siblings.forEach(function(s) { s.classList.remove('active'); });
+      this.classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dwelligence — Image Analysis Trait Picker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #070a0f;
+    color: #e1e4e8;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 24px 16px 80px;
+    line-height: 1.5;
+  }
+  a { color: #58a6ff; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .page-title { font-size: 26px; font-weight: 700; margin-bottom: 4px; }
+  .page-sub { font-size: 14px; color: #8b949e; margin-bottom: 24px; max-width: 700px; }
+
+  /* ── Summary panel ── */
+  .summary-panel {
+    position: sticky; top: 0; z-index: 100;
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 18px 24px;
+    margin-bottom: 28px;
+    display: flex; flex-wrap: wrap; gap: 24px; align-items: center;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  }
+  .summary-stat {
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .summary-stat .label { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+  .summary-stat .value { font-size: 22px; font-weight: 700; color: #58a6ff; }
+  .summary-stat .value.cost { color: #3fb950; }
+  .summary-stat .value.warn { color: #d29922; }
+  .summary-actions {
+    margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .summary-actions button {
+    background: #21262d; border: 1px solid #30363d; color: #e1e4e8;
+    padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 13px;
+    transition: all 0.15s;
+  }
+  .summary-actions button:hover { background: #30363d; border-color: #484f58; }
+  .summary-actions button.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  .summary-actions button.primary:hover { background: #388bfd; }
+  .summary-actions button.danger { border-color: #f85149; color: #f85149; }
+  .summary-actions button.danger:hover { background: #f851491a; }
+
+  /* ── Detection breakdown ── */
+  .detection-breakdown {
+    display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px;
+  }
+  .detection-chip {
+    display: flex; align-items: center; gap: 6px;
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 8px 14px; font-size: 13px;
+  }
+  .detection-chip .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+  .dot.image { background: #bc8cff; }
+  .dot.text { background: #79c0ff; }
+  .dot.both { background: #56d364; }
+
+  /* ── Category section ── */
+  .category {
+    margin-bottom: 32px;
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .category-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px;
+    background: #161b22;
+    border-bottom: 1px solid #21262d;
+    cursor: pointer;
+    user-select: none;
+  }
+  .category-header:hover { background: #1c2128; }
+  .category-title {
+    font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px;
+  }
+  .category-title .icon { font-size: 20px; }
+  .category-count {
+    font-size: 12px; color: #8b949e; background: #21262d;
+    padding: 2px 8px; border-radius: 10px;
+  }
+  .category-actions {
+    display: flex; gap: 8px; align-items: center;
+  }
+  .category-actions button {
+    background: none; border: 1px solid #30363d; color: #8b949e;
+    padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
+    transition: all 0.15s;
+  }
+  .category-actions button:hover { color: #e1e4e8; border-color: #484f58; }
+  .collapse-arrow {
+    color: #8b949e; font-size: 12px; transition: transform 0.2s; margin-left: 8px;
+  }
+  .category.collapsed .collapse-arrow { transform: rotate(-90deg); }
+  .category.collapsed .trait-list { display: none; }
+
+  /* ── Trait row ── */
+  .trait-list { padding: 4px 0; }
+  .trait-row {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    align-items: start;
+    padding: 10px 20px;
+    border-bottom: 1px solid #161b22;
+    transition: background 0.1s;
+  }
+  .trait-row:last-child { border-bottom: none; }
+  .trait-row:hover { background: #161b2266; }
+  .trait-row input[type="checkbox"] {
+    width: 16px; height: 16px; margin-top: 3px;
+    accent-color: #58a6ff; cursor: pointer;
+  }
+  .trait-info { display: flex; flex-direction: column; gap: 2px; }
+  .trait-name { font-size: 14px; font-weight: 500; }
+  .trait-desc { font-size: 12px; color: #8b949e; }
+  .trait-meta {
+    display: flex; gap: 8px; align-items: center; flex-shrink: 0; margin-top: 2px;
+  }
+  .badge {
+    font-size: 10px; padding: 2px 8px; border-radius: 10px;
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px;
+    white-space: nowrap;
+  }
+  .badge.image { background: #bc8cff22; color: #bc8cff; border: 1px solid #bc8cff44; }
+  .badge.text { background: #79c0ff22; color: #79c0ff; border: 1px solid #79c0ff44; }
+  .badge.both { background: #56d36422; color: #56d364; border: 1px solid #56d36444; }
+  .badge.high { background: #3fb95022; color: #3fb950; border: 1px solid #3fb95044; }
+  .badge.medium { background: #d2992222; color: #d29922; border: 1px solid #d2992244; }
+  .badge.low { background: #f8514922; color: #f85149; border: 1px solid #f8514944; }
+  .accuracy-note {
+    font-size: 10px; color: #6e7681; max-width: 180px; text-align: right;
+  }
+
+  /* ── Info sections ── */
+  .info-section {
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+  .info-section h2 {
+    font-size: 18px; font-weight: 600; margin-bottom: 16px;
+    padding-bottom: 12px; border-bottom: 1px solid #21262d;
+  }
+  .info-section h3 {
+    font-size: 15px; font-weight: 600; margin: 16px 0 8px; color: #c9d1d9;
+  }
+  .info-section p, .info-section li {
+    font-size: 14px; color: #8b949e; margin-bottom: 8px;
+  }
+  .info-section ul { padding-left: 20px; }
+  .info-section li { margin-bottom: 6px; }
+  .cost-table {
+    width: 100%; border-collapse: collapse; margin: 12px 0;
+  }
+  .cost-table th, .cost-table td {
+    text-align: left; padding: 10px 16px;
+    border-bottom: 1px solid #21262d; font-size: 14px;
+  }
+  .cost-table th { color: #8b949e; font-weight: 500; font-size: 12px; text-transform: uppercase; }
+  .cost-table td { color: #e1e4e8; }
+  .cost-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .callout {
+    background: #161b22; border-left: 3px solid #58a6ff;
+    padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 12px 0;
+    font-size: 13px; color: #c9d1d9;
+  }
+  .callout.warn { border-left-color: #d29922; }
+  .callout.danger { border-left-color: #f85149; }
+
+  /* ── Filter bar ── */
+  .filter-bar {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;
+  }
+  .filter-bar button {
+    background: #161b22; border: 1px solid #30363d; color: #8b949e;
+    padding: 6px 14px; border-radius: 20px; cursor: pointer; font-size: 12px;
+    transition: all 0.15s;
+  }
+  .filter-bar button:hover { color: #e1e4e8; border-color: #484f58; }
+  .filter-bar button.active { background: #1f6feb33; border-color: #1f6feb; color: #58a6ff; }
+
+  /* ── Search ── */
+  .search-box {
+    width: 100%; max-width: 400px; margin-bottom: 20px;
+    padding: 10px 16px; background: #0d1117; border: 1px solid #30363d;
+    border-radius: 8px; color: #e1e4e8; font-size: 14px;
+    outline: none; transition: border-color 0.15s;
+  }
+  .search-box:focus { border-color: #58a6ff; }
+  .search-box::placeholder { color: #484f58; }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .summary-panel { flex-direction: column; gap: 12px; }
+    .summary-actions { margin-left: 0; width: 100%; }
+    .trait-row { grid-template-columns: 30px 1fr; }
+    .trait-meta { grid-column: 2; margin-top: 6px; flex-wrap: wrap; }
+    .accuracy-note { text-align: left; max-width: none; }
+  }
+
+  .export-area {
+    margin-top: 12px;
+  }
+  .export-area textarea {
+    width: 100%; height: 120px; background: #0d1117; border: 1px solid #30363d;
+    border-radius: 8px; color: #e1e4e8; font-family: monospace; font-size: 12px;
+    padding: 12px; resize: vertical;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title">Image Analysis Trait Picker</div>
+<div class="page-sub">
+  Select which traits Dwelligence should detect from apartment listing photos and text.
+  Each trait is analyzed once at ingestion time using Claude Haiku vision + text extraction.
+</div>
+
+<!-- Summary Panel -->
+<div class="summary-panel" id="summaryPanel">
+  <div class="summary-stat">
+    <span class="label">Traits Selected</span>
+    <span class="value" id="totalSelected">0</span>
+  </div>
+  <div class="summary-stat">
+    <span class="label">Image Traits</span>
+    <span class="value" id="imageCount">0</span>
+  </div>
+  <div class="summary-stat">
+    <span class="label">Text Traits</span>
+    <span class="value" id="textCount">0</span>
+  </div>
+  <div class="summary-stat">
+    <span class="label">Per Listing</span>
+    <span class="value cost" id="costPerListing">$0.000</span>
+  </div>
+  <div class="summary-stat">
+    <span class="label">Per 1,000 Listings</span>
+    <span class="value cost" id="costPer1k">$0.00</span>
+  </div>
+  <div class="summary-stat">
+    <span class="label">Per 20,000 Listings</span>
+    <span class="value cost" id="costPer20k">$0.00</span>
+  </div>
+  <div class="summary-actions">
+    <button class="primary" onclick="selectAll()">Select All</button>
+    <button class="danger" onclick="deselectAll()">Deselect All</button>
+    <button onclick="exportSelected()">Export JSON</button>
+  </div>
+</div>
+
+<!-- Legend -->
+<div class="detection-breakdown">
+  <div class="detection-chip"><span class="dot image"></span> Image analysis (vision model)</div>
+  <div class="detection-chip"><span class="dot text"></span> Text extraction (listing description)</div>
+  <div class="detection-chip"><span class="dot both"></span> Both image + text</div>
+</div>
+
+<!-- Search & Filter -->
+<input type="text" class="search-box" id="searchBox" placeholder="Search traits..." oninput="filterTraits()">
+<div class="filter-bar" id="filterBar">
+  <button class="active" data-filter="all" onclick="setFilter('all', this)">All</button>
+  <button data-filter="image" onclick="setFilter('image', this)">Image Only</button>
+  <button data-filter="text" onclick="setFilter('text', this)">Text Only</button>
+  <button data-filter="both" onclick="setFilter('both', this)">Both</button>
+  <button data-filter="high" onclick="setFilter('high', this)">High Accuracy</button>
+  <button data-filter="medium" onclick="setFilter('medium', this)">Medium Accuracy</button>
+  <button data-filter="low" onclick="setFilter('low', this)">Low Accuracy</button>
+</div>
+
+<!-- Traits Container -->
+<div id="traitsContainer"></div>
+
+<!-- Export area (hidden by default) -->
+<div class="export-area" id="exportArea" style="display:none;">
+  <textarea id="exportOutput" readonly></textarea>
+</div>
+
+<!-- Approach & Cost Section -->
+<div class="info-section" id="approachSection">
+  <h2>Approach & Architecture</h2>
+
+  <h3>How It Works</h3>
+  <p>Each listing is analyzed <strong>once at ingestion time</strong>, not per user query. This keeps search fast and costs predictable.</p>
+  <ol style="padding-left: 20px; margin-bottom: 16px;">
+    <li style="color:#8b949e; margin-bottom:6px;">Listing text (title, description, amenities) is parsed for keywords and structured data</li>
+    <li style="color:#8b949e; margin-bottom:6px;">Up to 10 photos per listing are sent to Claude Haiku in a single batch request</li>
+    <li style="color:#8b949e; margin-bottom:6px;">The model returns a structured JSON response with all requested trait detections</li>
+    <li style="color:#8b949e; margin-bottom:6px;">Results are stored in the database as a JSON column on the listing record</li>
+    <li style="color:#8b949e; margin-bottom:6px;">Users can then filter/search by any detected trait instantly</li>
+  </ol>
+
+  <div class="callout">
+    All selected traits are analyzed in a <strong>single API call per listing</strong> (photos batched together).
+    Adding more traits has minimal marginal cost since the images are already being processed.
+    The primary cost driver is the number of photos, not the number of traits.
+  </div>
+
+  <h3>Cost Breakdown</h3>
+  <table class="cost-table">
+    <thead>
+      <tr><th>Scale</th><th class="num">Listings</th><th class="num">Estimated Cost</th><th class="num">Per Listing</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Small batch</td><td class="num">100</td><td class="num">$0.20</td><td class="num">~$0.002</td></tr>
+      <tr><td>Medium batch</td><td class="num">1,000</td><td class="num">$2.00</td><td class="num">~$0.002</td></tr>
+      <tr><td>Large batch</td><td class="num">10,000</td><td class="num">$20.00</td><td class="num">~$0.002</td></tr>
+      <tr><td>Full pipeline</td><td class="num">20,000</td><td class="num">$40.00</td><td class="num">~$0.002</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    Cost is dominated by image token count, not trait count. A 10-photo listing costs roughly the same
+    whether you detect 20 traits or 120 traits, because the images are the expensive part and the
+    structured output prompt adds minimal tokens.
+  </div>
+
+  <h3>Model Recommendation</h3>
+  <p><strong>Claude 3.5 Haiku</strong> is the recommended model for this pipeline:</p>
+  <ul>
+    <li>Vision capability with good spatial understanding</li>
+    <li>Fast enough for batch processing (sub-second per listing)</li>
+    <li>Cost-effective at ~$0.002/listing (10 photos)</li>
+    <li>Structured JSON output support reduces parsing errors</li>
+    <li>Good at following detailed classification rubrics</li>
+  </ul>
+  <p>For listings where higher accuracy is needed (e.g., luxury properties, featured listings),
+  Claude 3.5 Sonnet can be used as a fallback at ~5x the cost (~$0.01/listing).</p>
+</div>
+
+<div class="info-section">
+  <h2>Challenges & Limitations</h2>
+
+  <h3>Photo Quality & Coverage</h3>
+  <ul>
+    <li><strong>Limited angles:</strong> Most listings show 5-15 photos, often missing rooms entirely. Bathrooms and closets are frequently not photographed.</li>
+    <li><strong>Staging vs. reality:</strong> Staged apartments may show furniture and decor that won't be present. Virtual staging is increasingly common and can be misleading.</li>
+    <li><strong>Wide-angle distortion:</strong> Real estate photographers use ultra-wide lenses that make rooms appear larger. The model cannot determine actual room dimensions from photos.</li>
+    <li><strong>Lighting tricks:</strong> HDR photography can mask dark rooms. A room that appears bright and airy in photos may face a brick wall in reality.</li>
+    <li><strong>Selective photography:</strong> Landlords don't photograph problems. Missing photos of a room often means that room is unappealing.</li>
+  </ul>
+
+  <h3>Model Limitations</h3>
+  <ul>
+    <li><strong>Hallucination risk:</strong> Vision models sometimes "see" things that aren't there, especially with ambiguous or low-quality images. Confidence calibration is imperfect.</li>
+    <li><strong>Cannot detect:</strong> Noise levels, smells, temperature, water pressure, cell signal, actual dimensions, neighborhood safety, landlord responsiveness.</li>
+    <li><strong>Material confusion:</strong> Laminate vs. real hardwood, granite vs. quartz, real vs. faux brick are difficult to distinguish in photos.</li>
+    <li><strong>Temporal blindness:</strong> Photos may be months or years old. Seasonal elements (light, foliage) may not reflect current conditions.</li>
+    <li><strong>Occlusion:</strong> Furniture blocks view of floors, walls, outlets, and fixtures. A couch may hide damaged flooring or missing baseboards.</li>
+  </ul>
+
+  <h3>Text Extraction Caveats</h3>
+  <ul>
+    <li><strong>Inconsistent terminology:</strong> "Ensuite" vs "en-suite" vs "attached bath". "W/D in unit" vs "washer dryer" vs "laundry in apt".</li>
+    <li><strong>Exaggeration:</strong> Listing descriptions are marketing copy. "Sun-drenched" may mean one window faces south. "Spacious" is subjective.</li>
+    <li><strong>Missing info ≠ absence:</strong> A listing not mentioning a dishwasher doesn't mean there isn't one. Text extraction has high false-negative rates for unlisted features.</li>
+    <li><strong>Abbreviations & typos:</strong> "BR" "bdrm" "bd" all mean bedroom. Text parsing must handle extensive abbreviation tables.</li>
+  </ul>
+
+  <h3>Mitigation Strategies</h3>
+  <ul>
+    <li>Use confidence scores — only surface traits with high confidence to users</li>
+    <li>Combine image + text signals when possible (cross-validation)</li>
+    <li>Mark traits as "detected" vs "not detected" rather than "present" vs "absent"</li>
+    <li>Allow users to correct/override detected traits after viewing</li>
+    <li>Run periodic audits on a sample of listings to measure actual accuracy</li>
+  </ul>
+</div>
+
+<script>
+// ── Trait data ──
+const CATEGORIES = [
+  {
+    id: "kitchen",
+    name: "Kitchen",
+    icon: "🍳",
+    traits: [
+      { name: "Kitchen Exists", desc: "At least one photo shows a kitchen area", method: "image", accuracy: "high", note: "Easy to detect from cabinetry and appliances" },
+      { name: "Kitchen Size (Small/Medium/Large)", desc: "Relative size classification of kitchen", method: "image", accuracy: "medium", note: "Wide-angle lenses distort size perception" },
+      { name: "Open Kitchen Layout", desc: "Kitchen open to living area vs enclosed", method: "image", accuracy: "high", note: "Clearly visible in photos" },
+      { name: "Galley Kitchen", desc: "Narrow corridor-style kitchen layout", method: "image", accuracy: "high", note: "Distinctive shape is easy to identify" },
+      { name: "Kitchen Island", desc: "Freestanding or built-in island/peninsula", method: "image", accuracy: "high", note: "Very visible in photos" },
+      { name: "Granite/Stone Countertops", desc: "Natural or engineered stone counters", method: "both", accuracy: "medium", note: "Hard to distinguish granite from quartz in photos" },
+      { name: "Laminate Countertops", desc: "Budget laminate or formica countertops", method: "image", accuracy: "medium", note: "Sometimes confused with solid surface" },
+      { name: "Butcher Block Countertops", desc: "Wood countertop surface", method: "image", accuracy: "medium", note: "Distinctive grain pattern usually visible" },
+      { name: "White Cabinets", desc: "White or off-white kitchen cabinetry", method: "image", accuracy: "high", note: "Color detection is reliable" },
+      { name: "Dark Cabinets", desc: "Dark wood or painted dark cabinetry", method: "image", accuracy: "high", note: "Color detection is reliable" },
+      { name: "Modern/Shaker Cabinets", desc: "Clean-line modern or shaker style doors", method: "image", accuracy: "medium", note: "Style classification can be ambiguous" },
+      { name: "Cabinet Hardware", desc: "Visible handles, pulls, or knobs", method: "image", accuracy: "medium", note: "Small details may not be visible" },
+      { name: "Backsplash (Tile)", desc: "Tile backsplash behind counters", method: "image", accuracy: "high", note: "Tile patterns are distinctive" },
+      { name: "Backsplash (Subway Tile)", desc: "Specifically subway tile pattern", method: "image", accuracy: "high", note: "Very recognizable pattern" },
+      { name: "Stainless Steel Appliances", desc: "Appliances with stainless steel finish", method: "both", accuracy: "high", note: "Reflective surface is distinctive" },
+      { name: "Gas Stove", desc: "Gas burner cooktop", method: "both", accuracy: "high", note: "Visible grates and burners" },
+      { name: "Electric Stove", desc: "Electric or induction cooktop", method: "image", accuracy: "high", note: "Flat or coil surface visible" },
+      { name: "Dishwasher Visible", desc: "Dishwasher present in kitchen", method: "both", accuracy: "high", note: "Usually visible next to sink" },
+      { name: "Microwave (Built-in)", desc: "Built-in or over-range microwave", method: "image", accuracy: "high", note: "Clearly visible above stove" },
+      { name: "Double Sink", desc: "Two-basin kitchen sink", method: "image", accuracy: "medium", note: "May be obscured by dishes or angle" },
+      { name: "Garbage Disposal", desc: "Garbage disposal unit in sink", method: "text", accuracy: "medium", note: "Rarely visible in photos, usually listed in text" },
+      { name: "Pantry/Food Storage", desc: "Dedicated pantry closet or cabinet area", method: "both", accuracy: "medium", note: "May be closed in photos" },
+      { name: "Kitchen Window", desc: "Window in the kitchen area", method: "image", accuracy: "high", note: "Natural light source is visible" },
+      { name: "Under-Cabinet Lighting", desc: "Lighting beneath upper cabinets", method: "image", accuracy: "medium", note: "May only be visible when turned on" },
+      { name: "Pot Rack", desc: "Hanging pot rack or pot storage", method: "image", accuracy: "high", note: "Distinctive overhead fixture" },
+      { name: "Breakfast Bar/Counter Seating", desc: "Counter overhang with bar stools", method: "image", accuracy: "high", note: "Stools and overhang clearly visible" },
+      { name: "Refrigerator Size", desc: "Full-size vs compact/mini fridge", method: "image", accuracy: "high", note: "Size comparison to cabinets is reliable" },
+      { name: "Kitchen Ventilation Hood", desc: "Range hood or ventilation above stove", method: "image", accuracy: "high", note: "Mounted above stove, clearly visible" },
+    ]
+  },
+  {
+    id: "bathroom",
+    name: "Bathroom",
+    icon: "🚿",
+    traits: [
+      { name: "Bathroom Exists", desc: "At least one photo shows a bathroom", method: "image", accuracy: "high", note: "Toilet/shower/tub are distinctive" },
+      { name: "Bathtub", desc: "Full bathtub present", method: "both", accuracy: "high", note: "Very visible in photos" },
+      { name: "Stand-Up Shower", desc: "Separate shower stall (no tub)", method: "image", accuracy: "high", note: "Glass door/curtain visible" },
+      { name: "Shower/Tub Combo", desc: "Bathtub with showerhead", method: "image", accuracy: "high", note: "Common and recognizable" },
+      { name: "Walk-In Shower", desc: "Large walk-in shower with no step-over", method: "image", accuracy: "high", note: "Open design is distinctive" },
+      { name: "Glass Shower Door", desc: "Glass enclosure vs curtain", method: "image", accuracy: "high", note: "Transparency/reflection visible" },
+      { name: "Double Vanity", desc: "Two sinks in the bathroom", method: "image", accuracy: "high", note: "Two basins clearly visible" },
+      { name: "Single Vanity", desc: "One sink vanity", method: "image", accuracy: "high", note: "Standard configuration" },
+      { name: "Pedestal Sink", desc: "Freestanding pedestal sink (no vanity)", method: "image", accuracy: "high", note: "Distinctive shape" },
+      { name: "Bathroom Storage/Medicine Cabinet", desc: "Built-in storage or medicine cabinet", method: "image", accuracy: "medium", note: "May be closed or not visible from angle" },
+      { name: "Tile Floor (Bathroom)", desc: "Tile flooring in bathroom", method: "image", accuracy: "high", note: "Pattern and grout lines visible" },
+      { name: "Updated/Modern Bathroom", desc: "Recently renovated fixtures and finishes", method: "image", accuracy: "medium", note: "Subjective assessment of modernity" },
+      { name: "Dated Bathroom", desc: "Older fixtures, colored tiles, brass hardware", method: "image", accuracy: "medium", note: "Period indicators like pink tile, brass" },
+      { name: "Bathroom Window", desc: "Window present in bathroom", method: "image", accuracy: "high", note: "Light source visible" },
+      { name: "Exhaust Fan", desc: "Ventilation fan in bathroom ceiling", method: "image", accuracy: "low", note: "Small ceiling detail, often missed in photos" },
+      { name: "Heated Floors", desc: "Radiant heated bathroom floors", method: "text", accuracy: "low", note: "Invisible in photos, sometimes mentioned in text" },
+      { name: "Bidet", desc: "Bidet or bidet attachment present", method: "image", accuracy: "high", note: "Visible fixture next to toilet" },
+      { name: "Linen Closet", desc: "Closet for linens in or near bathroom", method: "image", accuracy: "medium", note: "May appear as a closed door" },
+    ]
+  },
+  {
+    id: "living",
+    name: "Living Space",
+    icon: "🛋️",
+    traits: [
+      { name: "Living Room Exists", desc: "Dedicated living room or main living area", method: "image", accuracy: "high", note: "Furniture arrangement is distinctive" },
+      { name: "Living Room Size", desc: "Small/medium/large classification", method: "image", accuracy: "medium", note: "Wide-angle distortion affects judgment" },
+      { name: "Open Floor Plan", desc: "Connected living/dining/kitchen areas", method: "image", accuracy: "high", note: "Visible sightlines between areas" },
+      { name: "Separate Dining Room", desc: "Dedicated dining area distinct from kitchen/living", method: "image", accuracy: "medium", note: "May be hard to distinguish from living area" },
+      { name: "Dining Area", desc: "Any designated dining space", method: "image", accuracy: "high", note: "Table and chairs visible" },
+      { name: "High Ceilings", desc: "Noticeably tall ceilings (9ft+)", method: "image", accuracy: "medium", note: "Proportions can indicate height, but hard to measure" },
+      { name: "Crown Molding", desc: "Decorative ceiling/wall molding", method: "image", accuracy: "medium", note: "Detail may not be visible in all photos" },
+      { name: "Baseboards", desc: "Visible baseboard trim", method: "image", accuracy: "low", note: "Often hidden by furniture, small detail" },
+      { name: "Accent Wall", desc: "Wall with different color or treatment", method: "image", accuracy: "high", note: "Color contrast is visible" },
+      { name: "Exposed Brick", desc: "Visible brick wall surface", method: "image", accuracy: "high", note: "Very distinctive texture" },
+      { name: "Fireplace", desc: "Fireplace present (working or decorative)", method: "both", accuracy: "high", note: "Distinctive architectural feature" },
+      { name: "Built-In Shelving", desc: "Permanent built-in bookshelves or display", method: "image", accuracy: "high", note: "Integrated with wall, clearly visible" },
+      { name: "Recessed Lighting", desc: "Ceiling recessed/can lights", method: "image", accuracy: "high", note: "Visible dots in ceiling" },
+      { name: "Ceiling Fan", desc: "Ceiling-mounted fan", method: "image", accuracy: "high", note: "Distinctive fixture" },
+      { name: "Wainscoting/Paneling", desc: "Decorative wall paneling", method: "image", accuracy: "medium", note: "Visible but may be confused with chair rail" },
+      { name: "Archways", desc: "Arched doorways or passages", method: "image", accuracy: "high", note: "Distinctive curved shape" },
+      { name: "Den/Office Space", desc: "Dedicated home office or den area", method: "both", accuracy: "medium", note: "Context-dependent, desk may just be furniture" },
+      { name: "Alcove/Nook", desc: "Recessed area usable as sleeping or work nook", method: "image", accuracy: "medium", note: "Common in studios, visible indent" },
+    ]
+  },
+  {
+    id: "bedroom",
+    name: "Bedroom",
+    icon: "🛏️",
+    traits: [
+      { name: "Bedroom Count", desc: "Number of bedrooms visible/mentioned", method: "both", accuracy: "high", note: "Text is most reliable; photos can confirm" },
+      { name: "Master/Primary Bedroom", desc: "Larger primary bedroom identified", method: "image", accuracy: "medium", note: "Size comparison between bedrooms" },
+      { name: "Bedroom Size (Small/Medium/Large)", desc: "Relative bedroom size classification", method: "image", accuracy: "medium", note: "Wide-angle lenses distort perception" },
+      { name: "Bedroom Window(s)", desc: "Windows present in bedroom", method: "image", accuracy: "high", note: "Light source clearly visible" },
+      { name: "En-Suite Bathroom", desc: "Private bathroom attached to bedroom", method: "both", accuracy: "medium", note: "Text is more reliable; doorway visible in photos" },
+      { name: "Walk-In Closet (Bedroom)", desc: "Walk-in closet visible from bedroom", method: "both", accuracy: "high", note: "Open closet or doorway visible" },
+      { name: "Reach-In Closet", desc: "Standard sliding or bi-fold door closet", method: "image", accuracy: "high", note: "Doors and tracks visible" },
+      { name: "Bedroom Door", desc: "Bedroom has a door for privacy", method: "image", accuracy: "high", note: "Door or frame visible" },
+      { name: "Fits Queen/King Bed", desc: "Room appears large enough for a queen or king bed", method: "image", accuracy: "medium", note: "Bed shown in photo helps, but staging may mislead" },
+      { name: "Second Bedroom Usable", desc: "Second bedroom is a real room (not a closet-sized space)", method: "image", accuracy: "medium", note: "Size judgment affected by wide-angle" },
+      { name: "Loft Bedroom", desc: "Sleeping area on a loft/mezzanine", method: "image", accuracy: "high", note: "Elevated platform/stairs visible" },
+    ]
+  },
+  {
+    id: "building",
+    name: "Building & Exterior",
+    icon: "🏢",
+    traits: [
+      { name: "Building Type", desc: "High-rise, mid-rise, low-rise, brownstone, townhouse", method: "both", accuracy: "high", note: "Exterior photos and listing text" },
+      { name: "Building Age (Pre-War/Post-War/New)", desc: "Approximate era of construction", method: "both", accuracy: "medium", note: "Architectural cues but not exact" },
+      { name: "Building Material (Brick/Stone/Concrete/Wood)", desc: "Primary exterior construction material", method: "image", accuracy: "high", note: "Texture and color are distinctive" },
+      { name: "Doorman Building", desc: "Staffed lobby with doorman", method: "both", accuracy: "medium", note: "Text is more reliable; lobby photo may show desk" },
+      { name: "Lobby Visible", desc: "Building has a visible lobby/entrance area", method: "image", accuracy: "high", note: "Interior common area photo" },
+      { name: "Elevator Building", desc: "Building has an elevator", method: "both", accuracy: "high", note: "Often mentioned in text; elevator visible in photos" },
+      { name: "Walk-Up", desc: "No elevator, stairs only", method: "both", accuracy: "high", note: "Often stated in text; staircase in photos" },
+      { name: "Floor Level (Low/Mid/High)", desc: "Approximate floor of the unit", method: "both", accuracy: "medium", note: "View from windows can indicate floor level" },
+      { name: "Well-Maintained Exterior", desc: "Building exterior in good condition", method: "image", accuracy: "medium", note: "Subjective quality assessment" },
+      { name: "Fire Escape Visible", desc: "External fire escape on building", method: "image", accuracy: "high", note: "Distinctive metal structure" },
+      { name: "Building Entrance Quality", desc: "Clean, well-lit, maintained entrance", method: "image", accuracy: "medium", note: "Subjective quality judgment" },
+      { name: "Hallway/Corridor Condition", desc: "Common hallway cleanliness and condition", method: "image", accuracy: "medium", note: "If hallway photo exists" },
+      { name: "Mailroom/Package Area", desc: "Dedicated mail or package room visible", method: "image", accuracy: "medium", note: "Only if photographed" },
+    ]
+  },
+  {
+    id: "light",
+    name: "Light & Windows",
+    icon: "☀️",
+    traits: [
+      { name: "Natural Light Level", desc: "Amount of natural light (bright/moderate/dim)", method: "image", accuracy: "medium", note: "HDR photography can fake bright rooms" },
+      { name: "Window Count (Estimate)", desc: "Approximate number of windows visible", method: "image", accuracy: "medium", note: "Only visible windows counted" },
+      { name: "Large Windows", desc: "Floor-to-ceiling or oversized windows", method: "image", accuracy: "high", note: "Proportions clearly visible" },
+      { name: "Bay Windows", desc: "Protruding bay window feature", method: "image", accuracy: "high", note: "Distinctive three-panel shape" },
+      { name: "Skylight", desc: "Ceiling-mounted skylight", method: "image", accuracy: "high", note: "Light from above is distinctive" },
+      { name: "Window Treatments (Blinds)", desc: "Blinds installed on windows", method: "image", accuracy: "high", note: "Visible slats or roller" },
+      { name: "Window Treatments (Curtains)", desc: "Curtains or drapes on windows", method: "image", accuracy: "high", note: "Fabric hanging visible" },
+      { name: "No Window Coverings", desc: "Windows without any blinds or curtains", method: "image", accuracy: "high", note: "Bare windows visible" },
+      { name: "Facing Direction (N/S/E/W)", desc: "Approximate window orientation", method: "both", accuracy: "low", note: "Sun position unreliable; text sometimes mentions" },
+      { name: "City/Street View", desc: "Windows face street or urban view", method: "image", accuracy: "high", note: "Buildings/street visible through windows" },
+      { name: "Park/Green View", desc: "Windows face trees, park, or greenery", method: "image", accuracy: "high", note: "Foliage visible through windows" },
+      { name: "Courtyard/Airshaft View", desc: "Windows face internal courtyard or airshaft", method: "image", accuracy: "medium", note: "Limited view, close buildings" },
+      { name: "Obstructed View", desc: "View blocked by adjacent building or wall", method: "image", accuracy: "medium", note: "Brick or wall visible immediately outside" },
+      { name: "Water View", desc: "River, lake, or ocean visible from windows", method: "image", accuracy: "high", note: "Distinctive blue/reflective surface" },
+    ]
+  },
+  {
+    id: "flooring",
+    name: "Flooring",
+    icon: "🪵",
+    traits: [
+      { name: "Hardwood Floors", desc: "Real hardwood flooring", method: "both", accuracy: "medium", note: "Hard to distinguish from laminate in photos" },
+      { name: "Laminate/Vinyl Plank", desc: "Wood-look laminate or LVP flooring", method: "image", accuracy: "low", note: "Very similar appearance to real hardwood" },
+      { name: "Tile Floors", desc: "Ceramic or porcelain tile flooring", method: "image", accuracy: "high", note: "Grout lines and pattern visible" },
+      { name: "Carpet", desc: "Wall-to-wall carpeting", method: "image", accuracy: "high", note: "Soft texture is distinctive" },
+      { name: "Concrete/Polished Concrete", desc: "Exposed or polished concrete floors", method: "image", accuracy: "high", note: "Industrial look is distinctive" },
+      { name: "Marble Floors", desc: "Marble or marble-look flooring", method: "image", accuracy: "medium", note: "Veining pattern visible but could be porcelain" },
+      { name: "Mixed Flooring", desc: "Different flooring types in different rooms", method: "image", accuracy: "medium", note: "Transitions visible if photographed" },
+      { name: "Floor Condition", desc: "Floors appear new/good/worn/damaged", method: "image", accuracy: "medium", note: "Scratches and wear visible in close-ups" },
+      { name: "Area Rugs (Staged)", desc: "Area rugs present (may be staging)", method: "image", accuracy: "high", note: "Rugs clearly visible but may not stay" },
+      { name: "Heated Floors", desc: "Radiant floor heating", method: "text", accuracy: "low", note: "Invisible in photos, must be in listing text" },
+      { name: "Herringbone/Chevron Pattern", desc: "Distinctive diagonal wood pattern", method: "image", accuracy: "high", note: "Pattern is very recognizable" },
+      { name: "Wide Plank Flooring", desc: "Wide-format wood planks (5\"+)", method: "image", accuracy: "medium", note: "Width comparison to room size" },
+    ]
+  },
+  {
+    id: "storage",
+    name: "Storage & Closets",
+    icon: "🗄️",
+    traits: [
+      { name: "Walk-In Closet", desc: "Any walk-in closet in the unit", method: "both", accuracy: "high", note: "Interior closet photo or text mention" },
+      { name: "Reach-In Closets", desc: "Standard closets with doors", method: "image", accuracy: "high", note: "Doors and tracks visible" },
+      { name: "Closet Count", desc: "Number of closets visible or mentioned", method: "both", accuracy: "medium", note: "Closed doors may be closets or rooms" },
+      { name: "Coat Closet", desc: "Closet near entrance for coats", method: "image", accuracy: "medium", note: "Location near entry helps identify" },
+      { name: "Built-In Storage", desc: "Built-in cabinets or wardrobes", method: "image", accuracy: "medium", note: "Integrated with walls" },
+      { name: "Storage Unit Included", desc: "Separate storage unit in building", method: "text", accuracy: "high", note: "Almost never visible in photos, text-only" },
+      { name: "Bike Storage", desc: "Building bike room or in-unit bike storage", method: "text", accuracy: "high", note: "Rarely photographed, mentioned in amenities" },
+      { name: "Closet Organization System", desc: "Shelving/organizing system in closet", method: "image", accuracy: "high", note: "Visible when closet is open in photo" },
+    ]
+  },
+  {
+    id: "appliances",
+    name: "Appliances & Fixtures",
+    icon: "🔌",
+    traits: [
+      { name: "In-Unit Washer/Dryer", desc: "Washing machine and dryer inside the unit", method: "both", accuracy: "high", note: "Very visible in photos; commonly listed in text" },
+      { name: "Washer/Dryer Hookups", desc: "Hookups present but no machines", method: "both", accuracy: "medium", note: "Pipes/connections visible; text mentions hookups" },
+      { name: "Stacked Washer/Dryer", desc: "Vertically stacked W/D unit", method: "image", accuracy: "high", note: "Compact stacked unit is distinctive" },
+      { name: "Building Laundry Room", desc: "Shared laundry facility in building", method: "text", accuracy: "high", note: "Rarely photographed, text-only" },
+      { name: "Central Air Conditioning", desc: "Central AC system", method: "both", accuracy: "medium", note: "Vents visible in ceiling; text mentions" },
+      { name: "Window AC Units", desc: "Window-mounted air conditioner(s)", method: "image", accuracy: "high", note: "Visible box in window" },
+      { name: "Wall AC Unit (Split/Mini-Split)", desc: "Ductless mini-split AC on wall", method: "image", accuracy: "high", note: "White rectangular unit on wall" },
+      { name: "Radiator Heating", desc: "Visible radiator units", method: "image", accuracy: "high", note: "Cast iron or baseboard radiators visible" },
+      { name: "Baseboard Heating", desc: "Baseboard heaters along walls", method: "image", accuracy: "medium", note: "Low-profile, may be blocked by furniture" },
+      { name: "Thermostat/Smart Thermostat", desc: "Visible thermostat on wall", method: "image", accuracy: "medium", note: "Small wall-mounted device" },
+      { name: "Ceiling Light Fixtures", desc: "Installed ceiling light fixtures (not just bare bulbs)", method: "image", accuracy: "high", note: "Visible ceiling fixtures" },
+      { name: "Track Lighting", desc: "Track-mounted adjustable lights", method: "image", accuracy: "high", note: "Distinctive rail with light heads" },
+      { name: "Smart Home Features", desc: "Smart locks, smart plugs, smart lighting visible", method: "both", accuracy: "low", note: "Small devices, rarely photographed" },
+      { name: "Intercom/Buzzer System", desc: "Door buzzer or intercom panel", method: "both", accuracy: "medium", note: "Small wall panel, sometimes in photos" },
+      { name: "USB Outlets", desc: "Electrical outlets with USB ports", method: "image", accuracy: "low", note: "Very small detail, rarely visible in listing photos" },
+    ]
+  },
+  {
+    id: "safety",
+    name: "Safety & Security",
+    icon: "🔒",
+    traits: [
+      { name: "Deadbolt Lock", desc: "Deadbolt on entry door", method: "image", accuracy: "medium", note: "Visible on door but small detail" },
+      { name: "Security Camera (Building)", desc: "Security cameras in common areas", method: "image", accuracy: "medium", note: "Small devices, may be visible in hallway photos" },
+      { name: "Secured Entry/Keypad", desc: "Building entry requires key fob or code", method: "both", accuracy: "medium", note: "Keypad visible in lobby photos" },
+      { name: "Smoke Detector Visible", desc: "Smoke detector on ceiling", method: "image", accuracy: "medium", note: "Small ceiling device, often out of frame" },
+      { name: "Fire Sprinkler", desc: "Sprinkler heads visible in ceiling", method: "image", accuracy: "medium", note: "Small ceiling protrusion" },
+      { name: "Carbon Monoxide Detector", desc: "CO detector visible", method: "image", accuracy: "low", note: "Small device, easily missed in photos" },
+      { name: "Window Guards", desc: "Safety guards on windows", method: "image", accuracy: "high", note: "Metal bars visible on windows" },
+      { name: "Peephole", desc: "Door peephole visible", method: "image", accuracy: "low", note: "Very small, rarely captured in photos" },
+      { name: "Well-Lit Common Areas", desc: "Hallways and stairwells appear well-lit", method: "image", accuracy: "medium", note: "Lighting quality visible if area photographed" },
+      { name: "Gated Entry", desc: "Gated compound or parking area", method: "image", accuracy: "high", note: "Gate structure clearly visible" },
+    ]
+  },
+  {
+    id: "outdoor",
+    name: "Outdoor Space",
+    icon: "🌿",
+    traits: [
+      { name: "Private Balcony", desc: "Dedicated balcony for the unit", method: "both", accuracy: "high", note: "Railing and outdoor floor visible" },
+      { name: "Private Terrace/Patio", desc: "Ground-level or rooftop private terrace", method: "both", accuracy: "high", note: "Outdoor flooring and furniture visible" },
+      { name: "Juliet Balcony", desc: "Small decorative balcony (railing only, no standing room)", method: "image", accuracy: "high", note: "Railing on window without floor space" },
+      { name: "Backyard/Garden Access", desc: "Access to private or shared backyard", method: "both", accuracy: "high", note: "Grass/garden visible through door" },
+      { name: "Rooftop Access", desc: "Building has a shared rooftop space", method: "both", accuracy: "high", note: "Rooftop photos or text mention" },
+      { name: "Shared Courtyard", desc: "Building courtyard accessible to residents", method: "both", accuracy: "high", note: "Usually photographed if it exists" },
+      { name: "Fire Pit/Outdoor Heating", desc: "Fire pit or patio heater on outdoor space", method: "image", accuracy: "high", note: "Distinctive structure in outdoor photos" },
+      { name: "Outdoor Furniture", desc: "Patio/balcony furniture present", method: "image", accuracy: "high", note: "Visible but may be staging" },
+      { name: "Grill/BBQ Area", desc: "Grill or BBQ setup on outdoor space", method: "image", accuracy: "high", note: "Grill clearly visible" },
+      { name: "Planters/Greenery", desc: "Plants, flower boxes, or garden beds", method: "image", accuracy: "high", note: "Vegetation is easy to detect" },
+    ]
+  },
+  {
+    id: "amenities",
+    name: "Building Amenities",
+    icon: "🏊",
+    traits: [
+      { name: "Gym/Fitness Center", desc: "Building gym or fitness room", method: "both", accuracy: "high", note: "Equipment clearly visible; often listed" },
+      { name: "Pool (Indoor/Outdoor)", desc: "Swimming pool in building", method: "both", accuracy: "high", note: "Distinctive blue water surface" },
+      { name: "Concierge Service", desc: "Concierge or front desk service", method: "both", accuracy: "medium", note: "Desk visible in lobby; text mentions" },
+      { name: "Package Room/Lockers", desc: "Amazon locker or package holding area", method: "both", accuracy: "medium", note: "Parcel lockers visible in photo" },
+      { name: "Resident Lounge", desc: "Common lounge or social space", method: "both", accuracy: "high", note: "Furnished common area visible" },
+      { name: "Co-Working Space", desc: "Shared workspace or business center", method: "both", accuracy: "medium", note: "Desks and chairs in common area" },
+      { name: "Children's Playroom", desc: "Indoor play area for children", method: "both", accuracy: "high", note: "Colorful equipment/toys visible" },
+      { name: "Media/Theater Room", desc: "Shared screening or media room", method: "both", accuracy: "high", note: "Large screen and seating visible" },
+      { name: "Parking (Indoor/Garage)", desc: "Indoor or garage parking available", method: "both", accuracy: "high", note: "Garage structure visible; text mentions" },
+      { name: "Parking (Outdoor/Lot)", desc: "Outdoor parking lot", method: "both", accuracy: "high", note: "Parking area visible in exterior photos" },
+      { name: "EV Charging", desc: "Electric vehicle charging stations", method: "both", accuracy: "medium", note: "Charging unit visible; text mentions" },
+      { name: "Valet Parking", desc: "Valet parking service", method: "text", accuracy: "high", note: "Service-based, not visible" },
+      { name: "Dog Wash Station", desc: "Pet washing area in building", method: "both", accuracy: "high", note: "Specialized basin visible" },
+      { name: "Dog Run/Park", desc: "Dedicated dog run or pet area", method: "both", accuracy: "high", note: "Fenced area visible in exterior" },
+      { name: "Game Room", desc: "Pool table, ping pong, or game area", method: "image", accuracy: "high", note: "Game equipment clearly visible" },
+      { name: "Sauna/Steam Room", desc: "Sauna or steam room in building", method: "both", accuracy: "high", note: "Wood interior visible; text mentions" },
+      { name: "Yoga/Studio Room", desc: "Dedicated yoga or exercise studio", method: "both", accuracy: "medium", note: "Mirrors and open floor visible" },
+      { name: "Recycling/Trash Room", desc: "Dedicated waste disposal room on floor", method: "text", accuracy: "medium", note: "Rarely photographed" },
+      { name: "Resident Events/Community", desc: "Building hosts resident events or community activities", method: "text", accuracy: "medium", note: "Text-only, not visible in photos" },
+    ]
+  },
+  {
+    id: "condition",
+    name: "Condition & Quality",
+    icon: "✨",
+    traits: [
+      { name: "Newly Renovated", desc: "Unit appears recently renovated or gut-renovated", method: "both", accuracy: "medium", note: "New fixtures and finishes suggest renovation" },
+      { name: "Original/Unrenovated", desc: "Unit has original fixtures and finishes", method: "image", accuracy: "medium", note: "Older style fixtures and finishes" },
+      { name: "Paint Condition", desc: "Walls appear freshly painted vs scuffed/peeling", method: "image", accuracy: "medium", note: "Close-ups reveal condition; wide shots may hide issues" },
+      { name: "Wall Condition", desc: "Walls clean, no visible damage", method: "image", accuracy: "medium", note: "Damage may be hidden by furniture or angles" },
+      { name: "Ceiling Condition", desc: "No water stains, cracks, or peeling", method: "image", accuracy: "medium", note: "Ceilings often not focused on in photos" },
+      { name: "Fixture Quality (Budget/Mid/High)", desc: "Overall quality tier of faucets, hardware, lighting", method: "image", accuracy: "medium", note: "Style and finish quality visible" },
+      { name: "Grout Condition", desc: "Tile grout appears clean and intact", method: "image", accuracy: "low", note: "Very fine detail, rarely captured well" },
+      { name: "Caulking Condition", desc: "Bathroom/kitchen caulking appears fresh", method: "image", accuracy: "low", note: "Very fine detail" },
+      { name: "Move-In Ready", desc: "Unit appears clean and ready to occupy", method: "image", accuracy: "medium", note: "Cleanliness assessment from photos" },
+      { name: "Luxury Finishes", desc: "High-end materials: marble, custom cabinetry, designer fixtures", method: "both", accuracy: "medium", note: "Material quality visible but subjective" },
+      { name: "Water Damage Signs", desc: "Visible water stains or damage", method: "image", accuracy: "medium", note: "Stains visible in close-ups; often not photographed" },
+      { name: "Pest Indicators", desc: "Signs of pest issues visible", method: "image", accuracy: "low", note: "Almost never visible in listing photos" },
+    ]
+  },
+  {
+    id: "style",
+    name: "Style & Design",
+    icon: "🎨",
+    traits: [
+      { name: "Modern/Contemporary", desc: "Clean lines, minimal ornamentation, modern materials", method: "image", accuracy: "high", note: "Distinctive visual style" },
+      { name: "Traditional/Classic", desc: "Ornate details, wood tones, classic proportions", method: "image", accuracy: "high", note: "Decorative elements visible" },
+      { name: "Industrial", desc: "Exposed pipes, ducts, concrete, raw materials", method: "image", accuracy: "high", note: "Raw materials and exposed structure visible" },
+      { name: "Mid-Century Modern", desc: "1950s-60s inspired design elements", method: "image", accuracy: "medium", note: "Period furniture may be staging" },
+      { name: "Minimalist", desc: "Sparse, clean design with minimal furnishing", method: "image", accuracy: "medium", note: "Could just be unfurnished/empty" },
+      { name: "Bohemian/Eclectic", desc: "Mixed patterns, colors, global influences", method: "image", accuracy: "medium", note: "Staging furniture may not stay" },
+      { name: "Scandinavian", desc: "Light wood, white walls, functional simplicity", method: "image", accuracy: "medium", note: "Style assessment from furnishings and finishes" },
+      { name: "Art Deco Elements", desc: "Geometric patterns, metallic accents, 1920s-30s style", method: "image", accuracy: "medium", note: "Architectural details visible in pre-war buildings" },
+      { name: "Neutral Color Palette", desc: "Walls and finishes in whites, grays, beiges", method: "image", accuracy: "high", note: "Color detection is reliable" },
+      { name: "Bold/Colorful Walls", desc: "Non-neutral wall colors", method: "image", accuracy: "high", note: "Strong colors easily detected" },
+      { name: "White Walls", desc: "Walls painted white or off-white", method: "image", accuracy: "high", note: "Very common and easily identified" },
+      { name: "Exposed Beams", desc: "Visible ceiling beams (wood or steel)", method: "image", accuracy: "high", note: "Structural elements on ceiling" },
+      { name: "Columns/Pillars", desc: "Interior columns or support pillars", method: "image", accuracy: "high", note: "Vertical structural elements visible" },
+      { name: "Wainscoting", desc: "Lower wall paneling", method: "image", accuracy: "medium", note: "Visible but may be confused with other trim" },
+      { name: "Coffered Ceiling", desc: "Grid pattern of recessed panels in ceiling", method: "image", accuracy: "high", note: "Distinctive ceiling pattern" },
+      { name: "Shiplap Walls", desc: "Horizontal plank wall treatment", method: "image", accuracy: "high", note: "Distinctive horizontal line pattern" },
+    ]
+  },
+  {
+    id: "accessibility",
+    name: "Accessibility",
+    icon: "♿",
+    traits: [
+      { name: "Ground Floor Unit", desc: "Unit is on the ground/first floor", method: "both", accuracy: "high", note: "Text mentions floor; photos show entry level" },
+      { name: "Step-Free Entry", desc: "No steps to enter the unit from the building entrance", method: "image", accuracy: "medium", note: "Entry photos may show steps or ramps" },
+      { name: "Wide Doorways (32\"+)", desc: "Doorways appear wide enough for wheelchair access", method: "image", accuracy: "low", note: "Width hard to judge from photos" },
+      { name: "Roll-In Shower", desc: "Zero-threshold shower for wheelchair access", method: "image", accuracy: "high", note: "Flush floor visible" },
+      { name: "Grab Bars", desc: "Grab bars installed in bathroom", method: "image", accuracy: "high", note: "Visible metal bars on walls" },
+      { name: "Lever Door Handles", desc: "Lever-style handles vs round knobs", method: "image", accuracy: "medium", note: "Small detail but visible if photographed" },
+      { name: "Accessible Kitchen", desc: "Lower counters or open under-counter space", method: "image", accuracy: "medium", note: "Counter height relative to person or fixtures" },
+      { name: "Elevator Access", desc: "Unit accessible via elevator", method: "both", accuracy: "high", note: "Elevator mentioned in text or visible" },
+      { name: "ADA Compliant Bathroom", desc: "Bathroom meets ADA guidelines", method: "both", accuracy: "low", note: "Requires multiple measurements; hard from photos" },
+      { name: "Ramp Access", desc: "Building has ramp entry", method: "image", accuracy: "high", note: "Ramp clearly visible in exterior photos" },
+    ]
+  },
+  {
+    id: "pets",
+    name: "Pet-Friendliness",
+    icon: "🐾",
+    traits: [
+      { name: "Pet-Friendly (Policy)", desc: "Building allows pets", method: "text", accuracy: "high", note: "Usually stated explicitly in listing" },
+      { name: "Dog-Friendly", desc: "Dogs specifically allowed", method: "text", accuracy: "high", note: "Usually stated in listing" },
+      { name: "Cat-Friendly", desc: "Cats specifically allowed", method: "text", accuracy: "high", note: "Usually stated in listing" },
+      { name: "Pet Weight Limit", desc: "Weight restrictions for pets mentioned", method: "text", accuracy: "high", note: "Specific numbers in listing text" },
+      { name: "Pet Deposit/Fee", desc: "Additional deposit or monthly fee for pets", method: "text", accuracy: "high", note: "Fee amounts in listing text" },
+      { name: "Breed Restrictions", desc: "Specific breed restrictions mentioned", method: "text", accuracy: "high", note: "Restrictions listed in text" },
+      { name: "Nearby Dog Park", desc: "Dog park mentioned as nearby amenity", method: "text", accuracy: "medium", note: "Sometimes mentioned in listing text" },
+      { name: "Pet-Resistant Flooring", desc: "Scratch-resistant or waterproof flooring", method: "both", accuracy: "low", note: "Material type can suggest durability" },
+    ]
+  },
+  {
+    id: "noise",
+    name: "Noise & Environment",
+    icon: "🔇",
+    traits: [
+      { name: "Busy Street Facing", desc: "Unit faces a major road or avenue", method: "image", accuracy: "medium", note: "Street visible from window photos" },
+      { name: "Quiet Side/Courtyard Facing", desc: "Unit faces quiet courtyard or rear", method: "image", accuracy: "medium", note: "Courtyard or garden visible from windows" },
+      { name: "Near Train/Subway", desc: "Elevated train or subway entrance visible/mentioned", method: "both", accuracy: "medium", note: "Transit infrastructure visible or mentioned" },
+      { name: "Near Highway/Freeway", desc: "Highway visible or mentioned nearby", method: "both", accuracy: "medium", note: "Road infrastructure visible" },
+      { name: "Tree-Lined Street", desc: "Street trees visible from exterior or windows", method: "image", accuracy: "high", note: "Trees clearly visible in street photos" },
+      { name: "Quiet Neighborhood", desc: "Residential area appearance", method: "image", accuracy: "low", note: "Noise level cannot be determined from photos" },
+      { name: "Commercial/Retail Below", desc: "Store or business on ground floor of building", method: "image", accuracy: "high", note: "Storefronts visible in exterior photos" },
+      { name: "Construction Nearby", desc: "Construction activity visible near building", method: "image", accuracy: "medium", note: "Cranes/scaffolding visible but may be temporary" },
+      { name: "Double-Pane Windows", desc: "Windows appear to be double or triple-pane", method: "both", accuracy: "low", note: "Cannot reliably determine from photos" },
+      { name: "Soundproofing", desc: "Mentions of soundproofing or acoustic treatment", method: "text", accuracy: "medium", note: "Text-only, not visible in photos" },
+    ]
+  },
+  {
+    id: "utilities",
+    name: "Utilities & Systems",
+    icon: "⚡",
+    traits: [
+      { name: "Utilities Included", desc: "Some or all utilities included in rent", method: "text", accuracy: "high", note: "Commonly stated in listing details" },
+      { name: "Heat Included", desc: "Heating costs included in rent", method: "text", accuracy: "high", note: "Commonly stated in listing details" },
+      { name: "Hot Water Included", desc: "Hot water costs included in rent", method: "text", accuracy: "high", note: "Commonly stated in listing details" },
+      { name: "Electric Included", desc: "Electricity included in rent", method: "text", accuracy: "high", note: "Commonly stated in listing details" },
+      { name: "Gas Included", desc: "Gas utility included in rent", method: "text", accuracy: "high", note: "Commonly stated in listing details" },
+      { name: "Internet/WiFi Included", desc: "Internet service included in rent", method: "text", accuracy: "high", note: "Commonly stated in listing details" },
+      { name: "Central Heating Type", desc: "Forced air, steam, hot water, electric", method: "both", accuracy: "medium", note: "Radiator type visible; text may specify" },
+      { name: "Water Heater Type", desc: "Tank vs tankless water heater", method: "both", accuracy: "low", note: "Usually not photographed" },
+      { name: "Electrical Panel (Updated)", desc: "Modern electrical panel vs old fuse box", method: "image", accuracy: "low", note: "Rarely photographed in listings" },
+      { name: "Visible Pipes/Ductwork", desc: "Exposed plumbing or HVAC ducts", method: "image", accuracy: "high", note: "Industrial look with exposed systems" },
+      { name: "In-Unit Hot Water Heater", desc: "Water heater visible in unit", method: "image", accuracy: "high", note: "Tank visible if in closet or utility area" },
+      { name: "Ceiling Height Estimate", desc: "Standard (8ft) vs tall (9-10ft) vs loft (12ft+)", method: "image", accuracy: "medium", note: "Proportions suggest height but imprecise" },
+    ]
+  },
+  {
+    id: "layout",
+    name: "Layout & Floor Plan",
+    icon: "📐",
+    traits: [
+      { name: "Studio Layout", desc: "Single open room with no separate bedroom", method: "both", accuracy: "high", note: "Open space without walls visible; text confirms" },
+      { name: "Railroad Layout", desc: "Rooms connected in a line (no hallway)", method: "image", accuracy: "medium", note: "Sightline through multiple rooms visible" },
+      { name: "True 1BR/2BR/etc.", desc: "All bedrooms are real enclosed rooms with doors", method: "both", accuracy: "medium", note: "Flex/converted rooms may be listed as bedrooms" },
+      { name: "Flex Room/Convertible", desc: "Room that could be used as extra bedroom", method: "both", accuracy: "medium", note: "Open area that could be walled off" },
+      { name: "Duplex/Triplex", desc: "Unit spans multiple floors", method: "both", accuracy: "high", note: "Internal staircase visible" },
+      { name: "Split-Level", desc: "Unit has offset floor levels", method: "image", accuracy: "high", note: "Steps between areas visible" },
+      { name: "Foyer/Entryway", desc: "Dedicated entry area before main living space", method: "image", accuracy: "medium", note: "Transitional space near door" },
+      { name: "Long Hallway", desc: "Extended corridor connecting rooms", method: "image", accuracy: "high", note: "Hallway visible in photos" },
+      { name: "Separate Kitchen", desc: "Kitchen is an enclosed separate room", method: "image", accuracy: "high", note: "Walls and doorway visible" },
+      { name: "Eat-In Kitchen", desc: "Kitchen large enough for a dining table", method: "image", accuracy: "medium", note: "Table/chairs in kitchen area visible" },
+      { name: "Floor Plan Provided", desc: "Listing includes a floor plan image", method: "image", accuracy: "high", note: "Architectural drawing recognizable" },
+      { name: "Square Footage Mentioned", desc: "Listing includes square footage", method: "text", accuracy: "high", note: "Numbers in text" },
+    ]
+  },
+  {
+    id: "laundry",
+    name: "Laundry & Cleaning",
+    icon: "🧺",
+    traits: [
+      { name: "In-Unit Washer/Dryer", desc: "Full-size W/D inside the apartment", method: "both", accuracy: "high", note: "Appliances clearly visible or mentioned" },
+      { name: "Combo Washer/Dryer", desc: "All-in-one wash+dry machine", method: "both", accuracy: "medium", note: "Single unit visible but hard to distinguish from standalone" },
+      { name: "Laundry Closet", desc: "Dedicated closet for W/D with doors", method: "image", accuracy: "high", note: "Closet doors revealing machines" },
+      { name: "Laundry Room (Building)", desc: "Shared laundry room in building", method: "text", accuracy: "high", note: "Mentioned in amenities list" },
+      { name: "Laundry Room (Floor)", desc: "Laundry room on same floor as unit", method: "text", accuracy: "medium", note: "Sometimes specified in text" },
+      { name: "Utility Sink", desc: "Utility or laundry sink", method: "image", accuracy: "high", note: "Deep basin visible in utility area" },
+    ]
+  },
+  {
+    id: "tech",
+    name: "Technology & Connectivity",
+    icon: "📡",
+    traits: [
+      { name: "Smart Lock", desc: "Electronic or smart lock on entry door", method: "image", accuracy: "medium", note: "Keypad or electronic lock visible on door" },
+      { name: "Video Intercom", desc: "Video doorbell or intercom system", method: "both", accuracy: "medium", note: "Screen or camera visible; text mentions" },
+      { name: "Pre-Wired for Cable/Internet", desc: "Cable/internet ports visible", method: "both", accuracy: "low", note: "Small wall plates, rarely visible in photos" },
+      { name: "Fiber Internet Available", desc: "Fiber optic internet noted as available", method: "text", accuracy: "high", note: "Text-only, not visible" },
+      { name: "Smart Thermostat (Nest/Ecobee)", desc: "Branded smart thermostat visible", method: "image", accuracy: "medium", note: "Distinctive round/square device on wall" },
+      { name: "Package Delivery Locker", desc: "Automated package lockers in building", method: "both", accuracy: "medium", note: "Amazon Hub or similar visible in common area" },
+      { name: "Keyless Building Entry", desc: "Key fob or app-based building access", method: "both", accuracy: "medium", note: "Reader visible on entry; text mentions" },
+    ]
+  },
+  {
+    id: "move_in",
+    name: "Move-In & Lease Terms",
+    icon: "📋",
+    traits: [
+      { name: "Broker Fee", desc: "Broker fee required", method: "text", accuracy: "high", note: "Clearly stated in listing text" },
+      { name: "No Fee", desc: "No broker fee", method: "text", accuracy: "high", note: "Usually prominently displayed" },
+      { name: "Security Deposit Amount", desc: "Security deposit specified", method: "text", accuracy: "high", note: "Dollar amount in text" },
+      { name: "Lease Length", desc: "Required lease duration mentioned", method: "text", accuracy: "high", note: "Duration in months/years in text" },
+      { name: "Flexible Lease", desc: "Short-term or flexible lease options", method: "text", accuracy: "high", note: "Mentioned in listing text" },
+      { name: "Furnished Option", desc: "Furnished unit or furnished option available", method: "both", accuracy: "high", note: "Furniture visible; text confirms" },
+      { name: "Available Date", desc: "Move-in date specified", method: "text", accuracy: "high", note: "Date in listing text" },
+      { name: "Guarantor Accepted", desc: "Guarantor accepted in lieu of income requirements", method: "text", accuracy: "high", note: "Stated in listing text" },
+      { name: "Income Requirements", desc: "Income threshold mentioned (e.g., 40x rent)", method: "text", accuracy: "high", note: "Numbers in listing text" },
+      { name: "Credit Score Requirement", desc: "Minimum credit score mentioned", method: "text", accuracy: "high", note: "Number in listing text" },
+      { name: "Application Fee", desc: "Application fee amount specified", method: "text", accuracy: "high", note: "Dollar amount in text" },
+    ]
+  },
+  {
+    id: "location",
+    name: "Location & Neighborhood",
+    icon: "📍",
+    traits: [
+      { name: "Near Subway/Transit", desc: "Transit stop mentioned or visible nearby", method: "both", accuracy: "high", note: "Station entrance visible; text lists nearby stops" },
+      { name: "Near Park/Green Space", desc: "Park mentioned or visible nearby", method: "both", accuracy: "high", note: "Trees/park visible; text mentions proximity" },
+      { name: "Near Grocery/Shopping", desc: "Stores mentioned or visible nearby", method: "both", accuracy: "medium", note: "Storefronts visible in street photos" },
+      { name: "Near School", desc: "School mentioned as nearby", method: "text", accuracy: "high", note: "Text mentions school proximity" },
+      { name: "Near Hospital/Medical", desc: "Hospital or medical facility nearby", method: "text", accuracy: "medium", note: "Sometimes mentioned in listing" },
+      { name: "Near Restaurant/Nightlife", desc: "Dining and nightlife mentioned nearby", method: "text", accuracy: "medium", note: "Sometimes mentioned as neighborhood perk" },
+      { name: "Corner Unit", desc: "Unit is on a building corner (more windows/light)", method: "both", accuracy: "medium", note: "Multiple window exposures visible" },
+      { name: "Top Floor Unit", desc: "Unit is on the top floor", method: "both", accuracy: "medium", note: "Text mentions floor; roof visible from inside" },
+    ]
+  },
+];
+
+// ── State ──
+let activeFilter = 'all';
+
+// ── Render ──
+function renderTraits() {
+  const container = document.getElementById('traitsContainer');
+  container.innerHTML = '';
+
+  CATEGORIES.forEach(cat => {
+    const section = document.createElement('div');
+    section.className = 'category';
+    section.dataset.categoryId = cat.id;
+
+    const selectedInCat = cat.traits.filter((_, i) => isChecked(cat.id, i)).length;
+
+    section.innerHTML = `
+      <div class="category-header" onclick="toggleCategory('${cat.id}')">
+        <div class="category-title">
+          <span class="icon">${cat.icon}</span>
+          ${cat.name}
+          <span class="category-count"><span id="count-${cat.id}">${selectedInCat}</span> / ${cat.traits.length}</span>
+        </div>
+        <div class="category-actions">
+          <button onclick="event.stopPropagation(); selectCategory('${cat.id}')">Select All</button>
+          <button onclick="event.stopPropagation(); deselectCategory('${cat.id}')">Deselect All</button>
+          <span class="collapse-arrow">▼</span>
+        </div>
+      </div>
+      <div class="trait-list">
+        ${cat.traits.map((t, i) => renderTrait(cat.id, i, t)).join('')}
+      </div>
+    `;
+    container.appendChild(section);
+  });
+
+  updateSummary();
+}
+
+function renderTrait(catId, idx, trait) {
+  const id = `${catId}-${idx}`;
+  return `
+    <div class="trait-row" data-method="${trait.method}" data-accuracy="${trait.accuracy}" data-name="${trait.name.toLowerCase()}" data-desc="${trait.desc.toLowerCase()}">
+      <input type="checkbox" id="${id}" checked onchange="updateSummary()">
+      <div class="trait-info">
+        <label class="trait-name" for="${id}">${trait.name}</label>
+        <div class="trait-desc">${trait.desc}</div>
+      </div>
+      <div class="trait-meta">
+        <span class="badge ${trait.method}">${trait.method}</span>
+        <span class="badge ${trait.accuracy}">${trait.accuracy}</span>
+        <span class="accuracy-note">${trait.note}</span>
+      </div>
+    </div>
+  `;
+}
+
+function isChecked(catId, idx) {
+  const el = document.getElementById(`${catId}-${idx}`);
+  return el ? el.checked : true;
+}
+
+// ── Category actions ──
+function toggleCategory(catId) {
+  const section = document.querySelector(`[data-category-id="${catId}"]`);
+  section.classList.toggle('collapsed');
+}
+
+function selectCategory(catId) {
+  const cat = CATEGORIES.find(c => c.id === catId);
+  cat.traits.forEach((_, i) => {
+    const el = document.getElementById(`${catId}-${i}`);
+    const row = el.closest('.trait-row');
+    if (row.style.display !== 'none') el.checked = true;
+  });
+  updateSummary();
+}
+
+function deselectCategory(catId) {
+  const cat = CATEGORIES.find(c => c.id === catId);
+  cat.traits.forEach((_, i) => {
+    document.getElementById(`${catId}-${i}`).checked = false;
+  });
+  updateSummary();
+}
+
+function selectAll() {
+  document.querySelectorAll('.trait-row input[type="checkbox"]').forEach(cb => {
+    if (cb.closest('.trait-row').style.display !== 'none') cb.checked = true;
+  });
+  updateSummary();
+}
+
+function deselectAll() {
+  document.querySelectorAll('.trait-row input[type="checkbox"]').forEach(cb => cb.checked = false);
+  updateSummary();
+}
+
+// ── Filtering ──
+function setFilter(filter, btn) {
+  activeFilter = filter;
+  document.querySelectorAll('.filter-bar button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  filterTraits();
+}
+
+function filterTraits() {
+  const search = document.getElementById('searchBox').value.toLowerCase();
+
+  document.querySelectorAll('.trait-row').forEach(row => {
+    const method = row.dataset.method;
+    const accuracy = row.dataset.accuracy;
+    const name = row.dataset.name;
+    const desc = row.dataset.desc;
+
+    let visible = true;
+
+    // Method/accuracy filter
+    if (activeFilter === 'image') visible = method === 'image';
+    else if (activeFilter === 'text') visible = method === 'text';
+    else if (activeFilter === 'both') visible = method === 'both';
+    else if (activeFilter === 'high') visible = accuracy === 'high';
+    else if (activeFilter === 'medium') visible = accuracy === 'medium';
+    else if (activeFilter === 'low') visible = accuracy === 'low';
+
+    // Search filter
+    if (visible && search) {
+      visible = name.includes(search) || desc.includes(search);
+    }
+
+    row.style.display = visible ? '' : 'none';
+  });
+}
+
+// ── Summary ──
+function updateSummary() {
+  let total = 0, imageCount = 0, textCount = 0;
+
+  CATEGORIES.forEach(cat => {
+    let catSelected = 0;
+    cat.traits.forEach((trait, i) => {
+      if (isChecked(cat.id, i)) {
+        total++;
+        catSelected++;
+        if (trait.method === 'image') imageCount++;
+        else if (trait.method === 'text') textCount++;
+        else { imageCount++; textCount++; }
+      }
+    });
+    const countEl = document.getElementById(`count-${cat.id}`);
+    if (countEl) countEl.textContent = catSelected;
+  });
+
+  document.getElementById('totalSelected').textContent = total;
+  document.getElementById('imageCount').textContent = imageCount;
+  document.getElementById('textCount').textContent = textCount;
+
+  // Cost: base ~$0.002/listing for image analysis (10 photos)
+  // Text traits add negligible cost (already parsed)
+  // More traits = slightly more output tokens but minimal
+  const hasImageTraits = imageCount > 0;
+  const baseCost = hasImageTraits ? 0.002 : 0;
+  const textOnlyCost = !hasImageTraits && textCount > 0 ? 0.0002 : 0;
+  const perListing = baseCost + textOnlyCost;
+
+  document.getElementById('costPerListing').textContent = '$' + perListing.toFixed(4);
+  document.getElementById('costPer1k').textContent = '$' + (perListing * 1000).toFixed(2);
+  document.getElementById('costPer20k').textContent = '$' + (perListing * 20000).toFixed(2);
+
+  const costEl = document.getElementById('costPer20k');
+  const val = perListing * 20000;
+  costEl.className = 'value ' + (val > 100 ? 'warn' : 'cost');
+}
+
+// ── Export ──
+function exportSelected() {
+  const exportArea = document.getElementById('exportArea');
+  const output = document.getElementById('exportOutput');
+
+  const selected = {};
+  CATEGORIES.forEach(cat => {
+    const traits = [];
+    cat.traits.forEach((trait, i) => {
+      if (isChecked(cat.id, i)) {
+        traits.push({
+          name: trait.name,
+          method: trait.method,
+          accuracy: trait.accuracy
+        });
+      }
+    });
+    if (traits.length > 0) {
+      selected[cat.name] = traits;
+    }
+  });
+
+  output.value = JSON.stringify(selected, null, 2);
+  exportArea.style.display = exportArea.style.display === 'none' ? 'block' : 'none';
+}
+
+// ── Init ──
+renderTraits();
+
+// Count total traits
+const totalTraits = CATEGORIES.reduce((sum, cat) => sum + cat.traits.length, 0);
+document.querySelector('.page-sub').innerHTML += ` <strong>${totalTraits} traits available across ${CATEGORIES.length} categories.</strong>`;
+</script>
+
+</body>
+</html>

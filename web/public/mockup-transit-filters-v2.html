@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dwelligence — Commute Filter v2 (Stop Drill-Down)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #070a0f;
+    color: #e1e4e8;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 24px 16px 80px;
+  }
+
+  .page-title { font-size: 22px; font-weight: 700; color: #e1e4e8; margin-bottom: 6px; }
+  .page-sub { font-size: 13px; color: #8b949e; margin-bottom: 36px; line-height: 1.5; }
+
+  .section { margin-bottom: 56px; }
+  .section-label {
+    display: inline-block; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    border-radius: 4px; padding: 3px 8px; margin-bottom: 12px;
+  }
+  .section-label.chosen { color: #58a6ff; border: 1px solid #1d3557; background: #0d1b2a; }
+
+  .section-title { font-size: 15px; font-weight: 600; color: #e1e4e8; margin-bottom: 4px; }
+  .section-desc { font-size: 12px; color: #8b949e; margin-bottom: 14px; line-height: 1.5; }
+
+  /* App frame */
+  .app-frame {
+    background: #0a0a0a; border: 1px solid #2d333b;
+    border-radius: 10px; overflow: hidden; max-width: 520px;
+  }
+
+  /* Filter bar */
+  .filter-bar {
+    background: #0f1117; border-bottom: 1px solid #2d333b;
+    padding: 10px 14px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .chip {
+    height: 26px; font-size: 11px; font-weight: 500; color: #8b949e;
+    background: #1c2028; border: 1px solid #2d333b; border-radius: 6px;
+    padding: 0 10px; display: inline-flex; align-items: center; gap: 4px;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap; user-select: none;
+  }
+  .chip:hover { border-color: #444c56; color: #c9d1d9; }
+  .chip.active { border-color: #1d3557; color: #58a6ff; background: #0d1b2a; }
+  .chip .chevron { font-size: 8px; margin-left: 2px; opacity: 0.5; }
+  .chip .dot { width: 5px; height: 5px; border-radius: 50%; background: #58a6ff; }
+
+  /* Dropdown panel */
+  .dropdown {
+    background: #1c2028; border: 1px solid #2d333b; border-radius: 10px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5); width: 460px; margin-top: 8px;
+    position: relative;
+  }
+  .dropdown-header {
+    padding: 12px 14px 8px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .dropdown-title {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: #8b949e;
+  }
+  .matches-badge {
+    font-size: 10px; color: #7ee787; background: rgba(126,231,135,0.08);
+    border: 1px solid rgba(126,231,135,0.2); border-radius: 4px;
+    padding: 2px 8px; font-weight: 600;
+  }
+
+  /* Rule list */
+  .rule-list { padding: 0 10px 6px; }
+  .rule {
+    background: #161b22; border: 1px solid #2d333b; border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 8px; position: relative;
+  }
+  .rule-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .rule-label { font-size: 11px; color: #8b949e; white-space: nowrap; }
+
+  /* Type selector */
+  .type-select {
+    height: 26px; font-size: 11px; color: #e1e4e8; font-weight: 500;
+    background: #0d1117; border: 1px solid #2d333b; border-radius: 5px;
+    padding: 0 24px 0 8px; cursor: pointer; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238b949e'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 8px center;
+    font-family: inherit;
+  }
+  .type-select:focus { outline: none; border-color: #58a6ff; }
+
+  /* Subway line pills */
+  .line-pills { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+  .line-pill {
+    width: 22px; height: 22px; border-radius: 50%; font-size: 10px;
+    font-weight: 700; color: #fff; display: flex; align-items: center;
+    justify-content: center; cursor: pointer; opacity: 0.35;
+    transition: all 0.15s; border: 2px solid transparent; position: relative;
+  }
+  .line-pill.selected { opacity: 1; border-color: #58a6ff; transform: scale(1.1); }
+  .line-pill:hover { opacity: 0.8; }
+
+  /* Expand chevron on selected pills */
+  .line-pill.selected .expand-indicator {
+    display: block;
+  }
+  .expand-indicator {
+    display: none; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0; border-left: 4px solid transparent;
+    border-right: 4px solid transparent; border-top: 4px solid #58a6ff;
+  }
+
+  /* Selected line summary row */
+  .selected-lines-summary {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center;
+  }
+  .line-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #0d1b2a; border: 1px solid #1d3557; border-radius: 4px;
+    padding: 2px 8px; font-size: 10px; color: #58a6ff; font-weight: 500;
+    cursor: pointer; transition: all 0.15s; user-select: none;
+  }
+  .line-tag:hover { background: #122744; border-color: #2a5a9e; }
+  .line-tag .tag-dot {
+    width: 12px; height: 12px; border-radius: 50%; font-size: 7px;
+    font-weight: 700; color: #fff; display: inline-flex; align-items: center;
+    justify-content: center; flex-shrink: 0;
+  }
+  .line-tag .tag-chevron {
+    font-size: 7px; opacity: 0.6; margin-left: 2px;
+    transition: transform 0.2s;
+  }
+  .line-tag.expanded .tag-chevron { transform: rotate(180deg); }
+  .line-tag .stop-count {
+    font-size: 9px; color: #8b949e; font-weight: 400;
+  }
+
+  /* Stop drill-down panel */
+  .stop-panel {
+    margin-top: 8px; background: #0d1117; border: 1px solid #2d333b;
+    border-radius: 6px; overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.2s;
+  }
+  .stop-panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px; border-bottom: 1px solid #2d333b;
+  }
+  .stop-panel-title {
+    font-size: 10px; font-weight: 600; color: #c9d1d9;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .stop-panel-title .title-dot {
+    width: 14px; height: 14px; border-radius: 50%; font-size: 8px;
+    font-weight: 700; color: #fff; display: inline-flex; align-items: center;
+    justify-content: center;
+  }
+  .stop-toggle-all {
+    font-size: 10px; color: #58a6ff; background: none; border: none;
+    cursor: pointer; font-family: inherit; font-weight: 500;
+    padding: 2px 6px; border-radius: 3px; transition: background 0.15s;
+  }
+  .stop-toggle-all:hover { background: rgba(88,166,255,0.1); }
+
+  .stop-list {
+    max-height: 180px; overflow-y: auto; padding: 4px 0;
+    scrollbar-width: thin; scrollbar-color: #2d333b #0d1117;
+  }
+  .stop-list::-webkit-scrollbar { width: 6px; }
+  .stop-list::-webkit-scrollbar-track { background: #0d1117; }
+  .stop-list::-webkit-scrollbar-thumb { background: #2d333b; border-radius: 3px; }
+  .stop-list::-webkit-scrollbar-thumb:hover { background: #444c56; }
+
+  .stop-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 10px; cursor: pointer; transition: background 0.1s;
+    font-size: 11px; color: #8b949e;
+  }
+  .stop-item:hover { background: #161b22; }
+  .stop-item.checked { color: #e1e4e8; }
+  .stop-item .stop-checkbox {
+    width: 14px; height: 14px; border-radius: 3px;
+    border: 1px solid #2d333b; background: #0d1117;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.15s;
+  }
+  .stop-item.checked .stop-checkbox {
+    background: #58a6ff; border-color: #58a6ff;
+  }
+  .stop-item.checked .stop-checkbox::after {
+    content: '';
+    width: 6px; height: 3px;
+    border-left: 1.5px solid #fff; border-bottom: 1.5px solid #fff;
+    transform: rotate(-45deg) translateY(-0.5px);
+  }
+  .stop-item .stop-name { flex: 1; }
+  .stop-item .transfer-lines {
+    display: flex; gap: 2px;
+  }
+  .transfer-dot {
+    width: 10px; height: 10px; border-radius: 50%; font-size: 6px;
+    font-weight: 700; color: #fff; display: inline-flex; align-items: center;
+    justify-content: center; opacity: 0.5;
+  }
+
+  .stop-panel-footer {
+    padding: 6px 10px; border-top: 1px solid #2d333b;
+    font-size: 10px; color: #8b949e; display: flex;
+    align-items: center; justify-content: space-between;
+  }
+  .stop-panel-footer .checked-count { color: #58a6ff; font-weight: 600; }
+
+  /* Mode toggle */
+  .mode-toggle {
+    display: inline-flex; border: 1px solid #2d333b; border-radius: 5px;
+    overflow: hidden; height: 24px;
+  }
+  .mode-btn {
+    font-size: 10px; font-weight: 500; color: #8b949e; background: #0d1117;
+    border: none; padding: 0 8px; cursor: pointer; transition: all 0.15s;
+    font-family: inherit; display: flex; align-items: center; gap: 3px;
+  }
+  .mode-btn + .mode-btn { border-left: 1px solid #2d333b; }
+  .mode-btn.active { background: #1d3557; color: #58a6ff; }
+  .mode-btn:hover:not(.active) { color: #c9d1d9; }
+
+  /* Slider */
+  .slider-row {
+    display: flex; align-items: center; gap: 8px; margin-top: 8px;
+  }
+  .slider-track {
+    flex: 1; height: 4px; background: #21262d; border-radius: 2px;
+    position: relative; cursor: pointer;
+  }
+  .slider-fill {
+    position: absolute; left: 0; top: 0; height: 100%;
+    background: #58a6ff; border-radius: 2px;
+  }
+  .slider-thumb {
+    position: absolute; top: 50%; transform: translate(-50%, -50%);
+    width: 14px; height: 14px; background: #e1e4e8; border-radius: 50%;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4); cursor: grab;
+    transition: box-shadow 0.15s;
+  }
+  .slider-thumb:hover { box-shadow: 0 0 0 4px rgba(88,166,255,0.2); }
+  .slider-value {
+    font-size: 11px; font-weight: 600; color: #58a6ff;
+    min-width: 42px; text-align: right; white-space: nowrap;
+  }
+
+  /* Delete button */
+  .rule-delete {
+    position: absolute; top: 8px; right: 8px; width: 20px; height: 20px;
+    border-radius: 4px; border: none; background: transparent; color: #484f58;
+    cursor: pointer; font-size: 14px; display: flex; align-items: center;
+    justify-content: center; transition: all 0.15s;
+  }
+  .rule-delete:hover { background: rgba(248,81,73,0.1); color: #f85149; }
+
+  /* Add rule button */
+  .add-rule {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    width: calc(100% - 20px); margin: 0 10px 10px; padding: 8px;
+    background: transparent; border: 1px dashed #2d333b; border-radius: 8px;
+    color: #58a6ff; font-size: 11px; font-weight: 500; cursor: pointer;
+    transition: all 0.15s; font-family: inherit;
+  }
+  .add-rule:hover { border-color: #58a6ff; background: rgba(88,166,255,0.04); }
+
+  /* Footer */
+  .dropdown-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; border-top: 1px solid #2d333b;
+  }
+  .btn-reset {
+    font-size: 11px; color: #8b949e; background: none; border: none;
+    cursor: pointer; font-family: inherit; padding: 4px 0;
+  }
+  .btn-reset:hover { color: #e1e4e8; }
+  .btn-done {
+    font-size: 11px; font-weight: 600; color: #fff; background: #58a6ff;
+    border: none; border-radius: 5px; padding: 6px 20px; cursor: pointer;
+    font-family: inherit; transition: background 0.15s;
+  }
+  .btn-done:hover { background: #79b8ff; }
+
+  /* Destination tag in rule */
+  .dest-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #0d1b2a; border: 1px solid #1d3557; border-radius: 4px;
+    padding: 2px 8px; font-size: 11px; color: #58a6ff; font-weight: 500;
+  }
+
+  /* Park destination tag — green accent */
+  .dest-tag.park {
+    background: #0d1c14; border-color: #1b3325; color: #7ee787;
+  }
+  .park-icon {
+    font-size: 12px; line-height: 1; flex-shrink: 0;
+  }
+
+  /* Park rule left accent */
+  .rule.park-rule {
+    border-left: 3px solid #2ea043;
+  }
+
+  /* Park select grid */
+  .park-grid {
+    margin-top: 8px; background: #0d1117; border: 1px solid #2d333b;
+    border-radius: 6px; overflow: hidden;
+  }
+  .park-grid-header {
+    padding: 8px 10px; border-bottom: 1px solid #2d333b;
+    font-size: 10px; font-weight: 600; color: #7ee787;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .park-list {
+    max-height: 140px; overflow-y: auto; padding: 4px 0;
+    scrollbar-width: thin; scrollbar-color: #2d333b #0d1117;
+  }
+  .park-list::-webkit-scrollbar { width: 6px; }
+  .park-list::-webkit-scrollbar-track { background: #0d1117; }
+  .park-list::-webkit-scrollbar-thumb { background: #2d333b; border-radius: 3px; }
+  .park-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; cursor: pointer; transition: background 0.1s;
+    font-size: 11px; color: #8b949e;
+  }
+  .park-item:hover { background: #161b22; }
+  .park-item.selected { color: #7ee787; background: rgba(126,231,135,0.05); }
+  .park-item .park-radio {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 1px solid #2d333b; background: #0d1117;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.15s;
+  }
+  .park-item.selected .park-radio {
+    border-color: #2ea043; background: #2ea043;
+  }
+  .park-item.selected .park-radio::after {
+    content: '';
+    width: 6px; height: 6px; border-radius: 50%; background: #fff;
+  }
+  .park-item .park-name { flex: 1; }
+  .park-item .park-borough {
+    font-size: 9px; color: #484f58; font-weight: 500;
+  }
+
+  /* Annotation callout */
+  .callout {
+    margin-top: 12px; max-width: 520px; padding: 12px 14px;
+    background: rgba(88,166,255,0.05); border: 1px solid rgba(88,166,255,0.15);
+    border-radius: 8px; font-size: 11px; line-height: 1.6; color: #c9d1d9;
+  }
+  .callout strong { color: #58a6ff; }
+  .callout ul { margin: 6px 0 0 16px; }
+  .callout li { margin-bottom: 3px; }
+</style>
+</head>
+<body>
+
+<div class="page-title">Commute Filter — Stop Drill-Down</div>
+<div class="page-sub">
+  Option A selected. New enhancement: click a selected subway line to expand its stops.<br>
+  Users can pick specific stops (e.g., only Bedford Ave and 1st Ave on the L) instead of the whole line.
+</div>
+
+<!-- ─────────────── MAIN MOCKUP ─────────────── -->
+<div class="section">
+  <div class="section-label chosen">Final Design</div>
+  <div class="section-title">Commute Filter with Stop Drill-Down</div>
+  <div class="section-desc">Subway line pills with expandable stop lists. L train is expanded below showing 2 of 24 stops selected.</div>
+
+  <div class="app-frame">
+    <div class="filter-bar">
+      <div class="chip">Price <span class="chevron">&#9662;</span></div>
+      <div class="chip">Beds / Baths <span class="chevron">&#9662;</span></div>
+      <div class="chip active"><span class="dot"></span> L (Bedford, 1st) · 14th St · Central Park <span class="chevron">&#9662;</span></div>
+      <div class="chip">Source <span class="chevron">&#9662;</span></div>
+    </div>
+
+    <div style="padding: 12px;">
+      <div class="dropdown">
+        <div class="dropdown-header">
+          <span class="dropdown-title">Commute Rules</span>
+          <span class="matches-badge">34 matches</span>
+        </div>
+
+        <div class="rule-list">
+
+          <!-- ════ Rule 1: Subway line with stop drill-down ════ -->
+          <div class="rule">
+            <button class="rule-delete" title="Remove">&times;</button>
+            <div class="rule-row">
+              <select class="type-select">
+                <option selected>Subway Line</option>
+                <option>Station</option>
+                <option>Address</option>
+                <option>Any Subway</option>
+                <option>Park</option>
+              </select>
+            </div>
+
+            <!-- Line pills -->
+            <div class="line-pills" style="margin-top: 8px;">
+              <div class="line-pill" style="background:#ee352e;">1</div>
+              <div class="line-pill" style="background:#ee352e;">2</div>
+              <div class="line-pill" style="background:#ee352e;">3</div>
+              <div class="line-pill" style="background:#00933c;">4</div>
+              <div class="line-pill" style="background:#00933c;">5</div>
+              <div class="line-pill" style="background:#00933c;">6</div>
+              <div class="line-pill" style="background:#b933ad;">7</div>
+              <div class="line-pill" style="background:#0039a6;">A</div>
+              <div class="line-pill" style="background:#0039a6;">C</div>
+              <div class="line-pill" style="background:#0039a6;">E</div>
+              <div class="line-pill" style="background:#ff6319;">B</div>
+              <div class="line-pill" style="background:#ff6319;">D</div>
+              <div class="line-pill" style="background:#ff6319;">F</div>
+              <div class="line-pill" style="background:#ff6319;">M</div>
+              <div class="line-pill" style="background:#6cbe45;">G</div>
+              <div class="line-pill selected" data-line="L" style="background:#a7a9ac;">L<span class="expand-indicator"></span></div>
+              <div class="line-pill" style="background:#996633;">J</div>
+              <div class="line-pill" style="background:#996633;">Z</div>
+              <div class="line-pill" style="background:#fccc0a; color:#333;">N</div>
+              <div class="line-pill" style="background:#fccc0a; color:#333;">Q</div>
+              <div class="line-pill" style="background:#fccc0a; color:#333;">R</div>
+              <div class="line-pill" style="background:#fccc0a; color:#333;">W</div>
+              <div class="line-pill" style="background:#808183;">S</div>
+            </div>
+
+            <!-- Selected lines summary tags -->
+            <div class="selected-lines-summary">
+              <div class="line-tag expanded" data-target="l-stops">
+                <span class="tag-dot" style="background:#a7a9ac;">L</span>
+                <span>2 stops</span>
+                <span class="tag-chevron">&#9662;</span>
+              </div>
+            </div>
+
+            <!-- L train stop panel (expanded) -->
+            <div class="stop-panel" id="l-stops">
+              <div class="stop-panel-header">
+                <div class="stop-panel-title">
+                  <span class="title-dot" style="background:#a7a9ac;">L</span>
+                  L train stops
+                </div>
+                <button class="stop-toggle-all" data-panel="l-stops" data-state="partial">Select All</button>
+              </div>
+              <div class="stop-list" id="l-stop-list">
+                <div class="stop-item" data-stop="8th-ave">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">8th Ave</span>
+                  <div class="transfer-lines">
+                    <span class="transfer-dot" style="background:#0039a6;">A</span>
+                    <span class="transfer-dot" style="background:#0039a6;">C</span>
+                    <span class="transfer-dot" style="background:#0039a6;">E</span>
+                  </div>
+                </div>
+                <div class="stop-item" data-stop="6th-ave">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">6th Ave</span>
+                  <div class="transfer-lines">
+                    <span class="transfer-dot" style="background:#ff6319;">F</span>
+                    <span class="transfer-dot" style="background:#ff6319;">M</span>
+                  </div>
+                </div>
+                <div class="stop-item" data-stop="union-sq">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">Union Sq &ndash; 14th St</span>
+                  <div class="transfer-lines">
+                    <span class="transfer-dot" style="background:#00933c;">4</span>
+                    <span class="transfer-dot" style="background:#00933c;">5</span>
+                    <span class="transfer-dot" style="background:#00933c;">6</span>
+                    <span class="transfer-dot" style="background:#fccc0a; color:#333;">N</span>
+                    <span class="transfer-dot" style="background:#fccc0a; color:#333;">Q</span>
+                    <span class="transfer-dot" style="background:#fccc0a; color:#333;">R</span>
+                    <span class="transfer-dot" style="background:#fccc0a; color:#333;">W</span>
+                  </div>
+                </div>
+                <div class="stop-item" data-stop="3rd-ave">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">3rd Ave</span>
+                </div>
+                <div class="stop-item checked" data-stop="1st-ave">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">1st Ave</span>
+                </div>
+                <div class="stop-item checked" data-stop="bedford-ave">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">Bedford Ave</span>
+                </div>
+                <div class="stop-item" data-stop="lorimer-st">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">Lorimer St</span>
+                  <div class="transfer-lines">
+                    <span class="transfer-dot" style="background:#6cbe45;">G</span>
+                  </div>
+                </div>
+                <div class="stop-item" data-stop="graham-ave">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">Graham Ave</span>
+                </div>
+                <div class="stop-item" data-stop="grand-st">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">Grand St</span>
+                </div>
+                <div class="stop-item" data-stop="montrose-ave">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">Montrose Ave</span>
+                </div>
+                <div class="stop-item" data-stop="morgan-ave">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">Morgan Ave</span>
+                </div>
+                <div class="stop-item" data-stop="jefferson-st">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">Jefferson St</span>
+                </div>
+                <div class="stop-item" data-stop="dekalb-ave">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">DeKalb Ave</span>
+                </div>
+                <div class="stop-item" data-stop="myrtle-wyckoff">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">Myrtle-Wyckoff Aves</span>
+                  <div class="transfer-lines">
+                    <span class="transfer-dot" style="background:#ff6319;">M</span>
+                  </div>
+                </div>
+                <div class="stop-item" data-stop="halsey-st">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">Halsey St</span>
+                </div>
+                <div class="stop-item" data-stop="wilson-ave">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">Wilson Ave</span>
+                </div>
+                <div class="stop-item" data-stop="bushwick-aberdeen">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">Bushwick Ave &ndash; Aberdeen St</span>
+                </div>
+                <div class="stop-item" data-stop="broadway-jct">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">Broadway Junction</span>
+                  <div class="transfer-lines">
+                    <span class="transfer-dot" style="background:#0039a6;">A</span>
+                    <span class="transfer-dot" style="background:#0039a6;">C</span>
+                    <span class="transfer-dot" style="background:#996633;">J</span>
+                    <span class="transfer-dot" style="background:#996633;">Z</span>
+                  </div>
+                </div>
+                <div class="stop-item" data-stop="atlantic-ave">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">Atlantic Ave</span>
+                </div>
+                <div class="stop-item" data-stop="sutter-ave">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">Sutter Ave</span>
+                </div>
+                <div class="stop-item" data-stop="livonia-ave">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">Livonia Ave</span>
+                </div>
+                <div class="stop-item" data-stop="new-lots-ave">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">New Lots Ave</span>
+                </div>
+                <div class="stop-item" data-stop="east-105th">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">East 105th St</span>
+                </div>
+                <div class="stop-item" data-stop="canarsie-rockaway">
+                  <div class="stop-checkbox"></div>
+                  <span class="stop-name">Canarsie &ndash; Rockaway Pkwy</span>
+                </div>
+              </div>
+              <div class="stop-panel-footer">
+                <span><span class="checked-count">2</span> of 24 stops selected</span>
+                <span style="color:#484f58;">Scroll for more</span>
+              </div>
+            </div>
+
+            <!-- Slider -->
+            <div class="slider-row">
+              <span class="rule-label">Within</span>
+              <div class="slider-track" data-rule="a1" data-min="1" data-max="20" data-value="10">
+                <div class="slider-fill" style="width:50%"></div>
+                <div class="slider-thumb" style="left:50%"></div>
+              </div>
+              <span class="slider-value" data-rule="a1">10 min</span>
+              <div class="mode-toggle">
+                <button class="mode-btn active">Walk</button>
+                <button class="mode-btn">Bike</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ════ Rule 2: Destination (unchanged) ════ -->
+          <div class="rule">
+            <button class="rule-delete" title="Remove">&times;</button>
+            <div class="rule-row">
+              <select class="type-select">
+                <option>Subway Line</option>
+                <option selected>Address</option>
+                <option>Station</option>
+                <option>Any Subway</option>
+                <option>Park</option>
+              </select>
+              <div class="dest-tag">14th St & 8th Ave</div>
+            </div>
+            <div class="slider-row">
+              <span class="rule-label">Within</span>
+              <div class="slider-track" data-rule="a2" data-min="5" data-max="60" data-value="30">
+                <div class="slider-fill" style="width:45.5%"></div>
+                <div class="slider-thumb" style="left:45.5%"></div>
+              </div>
+              <span class="slider-value" data-rule="a2">30 min</span>
+              <div class="mode-toggle">
+                <button class="mode-btn">Walk</button>
+                <button class="mode-btn active">Transit</button>
+                <button class="mode-btn">Bike</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ════ Rule 3: Any Subway (unchanged) ════ -->
+          <div class="rule">
+            <button class="rule-delete" title="Remove">&times;</button>
+            <div class="rule-row">
+              <select class="type-select">
+                <option>Subway Line</option>
+                <option>Address</option>
+                <option>Station</option>
+                <option selected>Any Subway</option>
+                <option>Park</option>
+              </select>
+              <span class="rule-label" style="color:#7ee787; font-weight:500;">Any subway station</span>
+            </div>
+            <div class="slider-row">
+              <span class="rule-label">Within</span>
+              <div class="slider-track" data-rule="a3" data-min="1" data-max="20" data-value="5">
+                <div class="slider-fill" style="width:21%"></div>
+                <div class="slider-thumb" style="left:21%"></div>
+              </div>
+              <span class="slider-value" data-rule="a3">5 min</span>
+              <div class="mode-toggle">
+                <button class="mode-btn active">Walk</button>
+                <button class="mode-btn">Bike</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ════ Rule 4: Park (new) ════ -->
+          <div class="rule park-rule">
+            <button class="rule-delete" title="Remove">&times;</button>
+            <div class="rule-row">
+              <select class="type-select">
+                <option>Subway Line</option>
+                <option>Address</option>
+                <option>Station</option>
+                <option>Any Subway</option>
+                <option selected>Park</option>
+              </select>
+              <div class="dest-tag park">
+                <span class="park-icon">&#127795;</span>
+                Central Park
+              </div>
+            </div>
+            <!-- Park selection grid (shown for context) -->
+            <div class="park-grid">
+              <div class="park-grid-header">
+                <span class="park-icon">&#127795;</span>
+                Select a park
+              </div>
+              <div class="park-list">
+                <div class="park-item selected" data-park="central-park">
+                  <div class="park-radio"></div>
+                  <span class="park-name">Central Park</span>
+                  <span class="park-borough">Manhattan</span>
+                </div>
+                <div class="park-item" data-park="prospect-park">
+                  <div class="park-radio"></div>
+                  <span class="park-name">Prospect Park</span>
+                  <span class="park-borough">Brooklyn</span>
+                </div>
+                <div class="park-item" data-park="brooklyn-bridge-park">
+                  <div class="park-radio"></div>
+                  <span class="park-name">Brooklyn Bridge Park</span>
+                  <span class="park-borough">Brooklyn</span>
+                </div>
+                <div class="park-item" data-park="washington-sq-park">
+                  <div class="park-radio"></div>
+                  <span class="park-name">Washington Square Park</span>
+                  <span class="park-borough">Manhattan</span>
+                </div>
+                <div class="park-item" data-park="tompkins-sq-park">
+                  <div class="park-radio"></div>
+                  <span class="park-name">Tompkins Square Park</span>
+                  <span class="park-borough">Manhattan</span>
+                </div>
+                <div class="park-item" data-park="mccarren-park">
+                  <div class="park-radio"></div>
+                  <span class="park-name">McCarren Park</span>
+                  <span class="park-borough">Brooklyn</span>
+                </div>
+                <div class="park-item" data-park="fort-greene-park">
+                  <div class="park-radio"></div>
+                  <span class="park-name">Fort Greene Park</span>
+                  <span class="park-borough">Brooklyn</span>
+                </div>
+                <div class="park-item" data-park="riverside-park">
+                  <div class="park-radio"></div>
+                  <span class="park-name">Riverside Park</span>
+                  <span class="park-borough">Manhattan</span>
+                </div>
+                <div class="park-item" data-park="hudson-river-park">
+                  <div class="park-radio"></div>
+                  <span class="park-name">Hudson River Park</span>
+                  <span class="park-borough">Manhattan</span>
+                </div>
+                <div class="park-item" data-park="domino-park">
+                  <div class="park-radio"></div>
+                  <span class="park-name">Domino Park</span>
+                  <span class="park-borough">Brooklyn</span>
+                </div>
+              </div>
+            </div>
+            <div class="slider-row">
+              <span class="rule-label">Within</span>
+              <div class="slider-track" data-rule="a4" data-min="1" data-max="20" data-value="5">
+                <div class="slider-fill" style="width:21%"></div>
+                <div class="slider-thumb" style="left:21%"></div>
+              </div>
+              <span class="slider-value" data-rule="a4">5 min</span>
+              <div class="mode-toggle">
+                <button class="mode-btn active">Walk</button>
+                <button class="mode-btn">Bike</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button class="add-rule">+ Add commute rule</button>
+
+        <div class="dropdown-footer">
+          <button class="btn-reset">Reset</button>
+          <button class="btn-done">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Behavior notes -->
+  <div class="callout">
+    <strong>Drill-down behavior:</strong>
+    <ul>
+      <li>Click a line pill to select it. A small downward chevron appears below selected pills.</li>
+      <li>A summary tag appears (e.g., <strong>L &middot; 2 stops</strong>). Click the tag to expand/collapse the stop list.</li>
+      <li>Default state when first selecting a line: <strong>All stops checked</strong>. User unchecks stops they don't want.</li>
+      <li>If all stops are checked, chip reads <strong>"L train"</strong>. If some, it reads <strong>"L (Bedford, 1st)"</strong>.</li>
+      <li><strong>Select All / Clear</strong> toggle at top of stop list for quick batch operations.</li>
+      <li>Stop list is scrollable (max 180px) for lines with many stops.</li>
+      <li>Transfer indicators (colored dots) show connecting lines at each stop for context.</li>
+      <li>Multiple lines can each have their own expanded stop panel (e.g., L + G both open).</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ─────────────── COLLAPSED STATE EXAMPLE ─────────────── -->
+<div class="section">
+  <div class="section-label chosen">Collapsed State</div>
+  <div class="section-title">What it looks like when the stop panel is collapsed</div>
+  <div class="section-desc">The line tag shows the stop count as a compact summary. Click to expand.</div>
+
+  <div class="app-frame" style="max-width: 520px;">
+    <div style="padding: 12px;">
+      <div class="dropdown">
+        <div class="dropdown-header">
+          <span class="dropdown-title">Commute Rules</span>
+          <span class="matches-badge">34 matches</span>
+        </div>
+        <div class="rule-list">
+          <div class="rule">
+            <button class="rule-delete" title="Remove">&times;</button>
+            <div class="rule-row">
+              <select class="type-select">
+                <option selected>Subway Line</option>
+                <option>Station</option>
+                <option>Address</option>
+                <option>Any Subway</option>
+                <option>Park</option>
+              </select>
+            </div>
+            <div class="line-pills" style="margin-top: 8px;">
+              <div class="line-pill" style="background:#ee352e;">1</div>
+              <div class="line-pill" style="background:#ee352e;">2</div>
+              <div class="line-pill" style="background:#ee352e;">3</div>
+              <div class="line-pill" style="background:#00933c;">4</div>
+              <div class="line-pill" style="background:#00933c;">5</div>
+              <div class="line-pill" style="background:#00933c;">6</div>
+              <div class="line-pill" style="background:#b933ad;">7</div>
+              <div class="line-pill" style="background:#0039a6;">A</div>
+              <div class="line-pill" style="background:#0039a6;">C</div>
+              <div class="line-pill" style="background:#0039a6;">E</div>
+              <div class="line-pill" style="background:#ff6319;">B</div>
+              <div class="line-pill" style="background:#ff6319;">D</div>
+              <div class="line-pill" style="background:#ff6319;">F</div>
+              <div class="line-pill" style="background:#ff6319;">M</div>
+              <div class="line-pill selected" style="background:#6cbe45;">G<span class="expand-indicator"></span></div>
+              <div class="line-pill selected" style="background:#a7a9ac;">L<span class="expand-indicator"></span></div>
+              <div class="line-pill" style="background:#996633;">J</div>
+              <div class="line-pill" style="background:#996633;">Z</div>
+              <div class="line-pill" style="background:#fccc0a; color:#333;">N</div>
+              <div class="line-pill" style="background:#fccc0a; color:#333;">Q</div>
+              <div class="line-pill" style="background:#fccc0a; color:#333;">R</div>
+              <div class="line-pill" style="background:#fccc0a; color:#333;">W</div>
+              <div class="line-pill" style="background:#808183;">S</div>
+            </div>
+            <div class="selected-lines-summary">
+              <div class="line-tag" data-target="g-stops-collapsed">
+                <span class="tag-dot" style="background:#6cbe45;">G</span>
+                <span>All stops</span>
+                <span class="tag-chevron">&#9662;</span>
+              </div>
+              <div class="line-tag" data-target="l-stops-collapsed">
+                <span class="tag-dot" style="background:#a7a9ac;">L</span>
+                <span>2 stops</span>
+                <span class="tag-chevron">&#9662;</span>
+              </div>
+            </div>
+            <div class="slider-row">
+              <span class="rule-label">Within</span>
+              <div class="slider-track" data-rule="c1" data-min="1" data-max="20" data-value="8">
+                <div class="slider-fill" style="width:38%"></div>
+                <div class="slider-thumb" style="left:38%"></div>
+              </div>
+              <span class="slider-value" data-rule="c1">8 min</span>
+              <div class="mode-toggle">
+                <button class="mode-btn active">Walk</button>
+                <button class="mode-btn">Bike</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="dropdown-footer">
+          <button class="btn-reset">Reset</button>
+          <button class="btn-done">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Chip label logic:</strong>
+    <ul>
+      <li>All stops on 1 line: <strong>"L train"</strong></li>
+      <li>Some stops on 1 line: <strong>"L (Bedford, 1st)"</strong> (up to 2 names, then "+ N more")</li>
+      <li>Multiple lines, all stops: <strong>"L + G trains"</strong></li>
+      <li>Multiple lines, some stops: <strong>"L (2) + G"</strong> (parenthetical count for filtered lines)</li>
+      <li>Too many rules to fit: <strong>"3 commute rules"</strong></li>
+    </ul>
+  </div>
+</div>
+
+<!-- ─────────────── Interactive JS ─────────────── -->
+<script>
+  // Interactive sliders
+  document.querySelectorAll('.slider-track').forEach(track => {
+    const thumb = track.querySelector('.slider-thumb');
+    const fill = track.querySelector('.slider-fill');
+    if (!thumb || !fill) return;
+
+    const ruleId = track.dataset.rule;
+    const min = parseInt(track.dataset.min) || 1;
+    const max = parseInt(track.dataset.max) || 60;
+    const valueEl = document.querySelector(`.slider-value[data-rule="${ruleId}"]`);
+
+    let dragging = false;
+
+    function update(e) {
+      const rect = track.getBoundingClientRect();
+      let pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      let val = Math.round(min + pct * (max - min));
+      fill.style.width = (pct * 100) + '%';
+      thumb.style.left = (pct * 100) + '%';
+      if (valueEl) valueEl.textContent = val + ' min';
+    }
+
+    thumb.addEventListener('mousedown', e => { dragging = true; e.preventDefault(); });
+    track.addEventListener('mousedown', e => { dragging = true; update(e); });
+    window.addEventListener('mousemove', e => { if (dragging) update(e); });
+    window.addEventListener('mouseup', () => { dragging = false; });
+
+    thumb.addEventListener('touchstart', e => { dragging = true; e.preventDefault(); });
+    track.addEventListener('touchstart', e => { dragging = true; update(e.touches[0]); });
+    window.addEventListener('touchmove', e => { if (dragging) update(e.touches[0]); });
+    window.addEventListener('touchend', () => { dragging = false; });
+  });
+
+  // Mode toggle buttons
+  document.querySelectorAll('.mode-toggle').forEach(toggle => {
+    toggle.querySelectorAll('.mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        toggle.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+  });
+
+  // Subway line pill selection
+  document.querySelectorAll('.line-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      pill.classList.toggle('selected');
+      // Add expand indicator if it doesn't have one
+      if (pill.classList.contains('selected') && !pill.querySelector('.expand-indicator')) {
+        const ind = document.createElement('span');
+        ind.className = 'expand-indicator';
+        pill.appendChild(ind);
+      }
+    });
+  });
+
+  // Stop checkbox toggling
+  document.querySelectorAll('.stop-item').forEach(item => {
+    item.addEventListener('click', () => {
+      item.classList.toggle('checked');
+      updateStopCount(item.closest('.stop-panel'));
+    });
+  });
+
+  function updateStopCount(panel) {
+    if (!panel) return;
+    const total = panel.querySelectorAll('.stop-item').length;
+    const checked = panel.querySelectorAll('.stop-item.checked').length;
+    const countEl = panel.querySelector('.checked-count');
+    if (countEl) countEl.textContent = checked;
+
+    // Update the toggle-all button text
+    const toggleBtn = panel.querySelector('.stop-toggle-all');
+    if (toggleBtn) {
+      toggleBtn.textContent = checked === total ? 'Clear All' : (checked === 0 ? 'Select All' : 'Select All');
+      toggleBtn.dataset.state = checked === total ? 'all' : (checked === 0 ? 'none' : 'partial');
+    }
+
+    // Update parent line tag
+    const panelId = panel.id;
+    const tag = document.querySelector(`.line-tag[data-target="${panelId}"]`);
+    if (tag) {
+      const labelSpan = tag.querySelector('span:nth-child(2)');
+      if (labelSpan) {
+        if (checked === total) {
+          labelSpan.textContent = 'All stops';
+        } else if (checked === 0) {
+          labelSpan.textContent = 'No stops';
+        } else {
+          labelSpan.textContent = checked + ' stop' + (checked !== 1 ? 's' : '');
+        }
+      }
+    }
+  }
+
+  // Select All / Clear All toggle
+  document.querySelectorAll('.stop-toggle-all').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const panel = btn.closest('.stop-panel');
+      const items = panel.querySelectorAll('.stop-item');
+      const allChecked = panel.querySelectorAll('.stop-item.checked').length === items.length;
+
+      items.forEach(item => {
+        if (allChecked) {
+          item.classList.remove('checked');
+        } else {
+          item.classList.add('checked');
+        }
+      });
+      updateStopCount(panel);
+    });
+  });
+
+  // Line tag expand/collapse
+  document.querySelectorAll('.line-tag').forEach(tag => {
+    tag.addEventListener('click', () => {
+      const targetId = tag.dataset.target;
+      const panel = document.getElementById(targetId);
+      if (!panel) return;
+
+      tag.classList.toggle('expanded');
+      if (tag.classList.contains('expanded')) {
+        panel.style.display = 'block';
+      } else {
+        panel.style.display = 'none';
+      }
+    });
+  });
+
+  // Delete rule animation
+  document.querySelectorAll('.rule-delete').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const rule = btn.closest('.rule');
+      rule.style.transition = 'opacity 0.2s, transform 0.2s';
+      rule.style.opacity = '0';
+      rule.style.transform = 'translateX(-10px)';
+      setTimeout(() => rule.remove(), 200);
+    });
+  });
+</script>
+
+</body>
+</html>

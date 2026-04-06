@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dwelligence - Source Badge Mockups</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0a0a0a;
+    color: #e1e4e8;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    padding: 40px 24px;
+  }
+
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #e1e4e8;
+    margin-bottom: 6px;
+    letter-spacing: -0.3px;
+  }
+
+  .page-subtitle {
+    font-size: 13px;
+    color: #8b949e;
+    margin-bottom: 48px;
+  }
+
+  .option-section {
+    margin-bottom: 64px;
+  }
+
+  .option-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+
+  .option-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #58a6ff;
+  }
+
+  .option-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #e1e4e8;
+  }
+
+  .option-desc {
+    font-size: 13px;
+    color: #8b949e;
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+
+  .cards-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  /* Base card styles */
+  .card {
+    background: #1c2028;
+    border: 1px solid #2d333b;
+    border-radius: 12px;
+    overflow: hidden;
+    width: 240px;
+    flex-shrink: 0;
+  }
+
+  .card-photo {
+    position: relative;
+    width: 100%;
+    height: 148px;
+    background: linear-gradient(135deg, #1e2533 0%, #252d3d 50%, #1a2230 100%);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .photo-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    opacity: 0.2;
+  }
+
+  .photo-placeholder svg {
+    width: 32px;
+    height: 32px;
+    fill: #8b949e;
+  }
+
+  .photo-placeholder span {
+    font-size: 10px;
+    color: #8b949e;
+    letter-spacing: 0.5px;
+  }
+
+  /* Simulate a realistic apartment photo with CSS */
+  .photo-bg-1 { background: linear-gradient(160deg, #1e3a5f 0%, #0f2640 40%, #162535 100%); }
+  .photo-bg-2 { background: linear-gradient(160deg, #2d1f3a 0%, #1a1128 40%, #231527 100%); }
+  .photo-bg-3 { background: linear-gradient(160deg, #1a3520 0%, #0f2318 40%, #162b1c 100%); }
+
+  .photo-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.45) 100%);
+  }
+
+  .card-info {
+    padding: 12px 14px 14px;
+  }
+
+  .card-price {
+    font-size: 17px;
+    font-weight: 700;
+    color: #e1e4e8;
+    letter-spacing: -0.4px;
+    margin-bottom: 2px;
+  }
+
+  .card-address {
+    font-size: 12px;
+    color: #8b949e;
+    margin-bottom: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card-specs {
+    display: flex;
+    gap: 10px;
+    font-size: 11px;
+    color: #8b949e;
+    margin-bottom: 10px;
+  }
+
+  .card-spec {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .card-spec-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: #2d333b;
+  }
+
+  /* ===================== OPTION A ===================== */
+  /* Corner badge on photo */
+
+  .badge-corner {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+    padding: 3px 7px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: #fff;
+    backdrop-filter: blur(4px);
+  }
+
+  .badge-realtor  { background: rgba(59, 130, 246, 0.80); }
+  .badge-craigs   { background: rgba(168, 85, 247, 0.80); }
+  .badge-streeteasy { background: rgba(34, 197, 94, 0.80); }
+  .badge-zillow   { background: rgba(0, 106, 255, 0.80); }
+  .badge-facebook { background: rgba(24, 119, 242, 0.80); }
+
+  /* ===================== OPTION B ===================== */
+  /* Source icon + text in info area */
+
+  .source-row-b {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 4px;
+  }
+
+  .source-icon-b {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+  }
+
+  .source-icon-b svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .source-text-b {
+    font-size: 11px;
+    color: #8b949e;
+    font-weight: 400;
+  }
+
+  /* ===================== OPTION C ===================== */
+  /* Multi-source composite badges */
+
+  .source-row-c {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+  }
+
+  .source-pill-c {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px 2px 5px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+
+  .source-dot-c {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .pill-realtor   { background: rgba(59, 130, 246, 0.15); color: #7eb3f8; }
+  .pill-craigs    { background: rgba(168, 85, 247, 0.15);  color: #c084fc; }
+  .pill-streeteasy{ background: rgba(34, 197, 94, 0.15);  color: #6ee799; }
+  .pill-zillow    { background: rgba(0, 106, 255, 0.15);   color: #5c9fff; }
+
+  .dot-realtor   { background: #3b82f6; }
+  .dot-craigs    { background: #a855f7; }
+  .dot-streeteasy{ background: #22c55e; }
+  .dot-zillow    { background: #006aff; }
+
+  .source-plus-c {
+    font-size: 10px;
+    color: #8b949e;
+    padding: 0 1px;
+  }
+
+  /* ===================== OPTION D ===================== */
+  /* Favicon-style tiny icons */
+
+  .source-favicons {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 6px;
+  }
+
+  .favicon-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    cursor: default;
+  }
+
+  .favicon-wrap:hover .favicon-tooltip {
+    opacity: 1;
+    transform: translateY(-3px);
+    pointer-events: none;
+  }
+
+  .favicon-icon {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.5px;
+  }
+
+  .fav-realtor   { background: #3b82f6; }
+  .fav-craigs    { background: #a855f7; }
+  .fav-streeteasy{ background: #22c55e; }
+  .fav-zillow    { background: #006aff; }
+  .fav-facebook  { background: #1877f2; }
+
+  .favicon-tooltip {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%) translateY(0px);
+    background: #2d333b;
+    color: #e1e4e8;
+    font-size: 10px;
+    font-weight: 500;
+    white-space: nowrap;
+    padding: 3px 7px;
+    border-radius: 5px;
+    opacity: 0;
+    transition: opacity 0.15s, transform 0.15s;
+    pointer-events: none;
+    border: 1px solid #3d444d;
+  }
+
+  .favicon-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 4px solid transparent;
+    border-top-color: #2d333b;
+  }
+
+  /* Divider */
+  .divider {
+    border: none;
+    border-top: 1px solid #1f252d;
+    margin: 0 14px;
+  }
+
+  /* Card label for demo */
+  .card-demo-label {
+    font-size: 10px;
+    color: #3d444d;
+    text-align: center;
+    padding: 4px 0 2px;
+    letter-spacing: 0.3px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Dwelligence - Source Badge Options</h1>
+<p class="page-subtitle">4 design explorations for showing listing data sources on apartment cards</p>
+
+<!-- ===================== OPTION A ===================== -->
+<div class="option-section">
+  <div class="option-header">
+    <span class="option-label">Option A</span>
+    <span class="option-title">Corner Badge on Photo</span>
+  </div>
+  <p class="option-desc">Small colored pill in the top-left corner of the photo. Each source has a distinct brand color with translucent background. Uppercase, bold, minimal — sits on the image without blocking it.</p>
+
+  <div class="cards-row">
+
+    <!-- Card 1: Realtor.com -->
+    <div class="card">
+      <div class="card-photo photo-bg-1">
+        <div class="photo-overlay"></div>
+        <div class="badge-corner badge-realtor">Realtor.com</div>
+        <div class="photo-placeholder">
+          <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        </div>
+      </div>
+      <div class="card-demo-label">single source</div>
+      <hr class="divider">
+      <div class="card-info">
+        <div class="card-price">$3,200 / mo</div>
+        <div class="card-address">245 W 107th St, Upper West Side</div>
+        <div class="card-specs">
+          <span class="card-spec">2 bd</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">1 ba</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">875 sqft</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: Craigslist -->
+    <div class="card">
+      <div class="card-photo photo-bg-2">
+        <div class="photo-overlay"></div>
+        <div class="badge-corner badge-craigs">Craigslist</div>
+        <div class="photo-placeholder">
+          <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        </div>
+      </div>
+      <div class="card-demo-label">single source</div>
+      <hr class="divider">
+      <div class="card-info">
+        <div class="card-price">$2,450 / mo</div>
+        <div class="card-address">88 Morningside Ave, Harlem</div>
+        <div class="card-specs">
+          <span class="card-spec">1 bd</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">1 ba</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">620 sqft</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3: Realtor + Zillow (show first/primary source in corner) -->
+    <div class="card">
+      <div class="card-photo photo-bg-3">
+        <div class="photo-overlay"></div>
+        <div class="badge-corner badge-realtor">Realtor.com</div>
+        <div class="photo-placeholder">
+          <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        </div>
+      </div>
+      <div class="card-demo-label">multi-source (primary only shown)</div>
+      <hr class="divider">
+      <div class="card-info">
+        <div class="card-price">$4,100 / mo</div>
+        <div class="card-address">512 W 122nd St, Morningside Heights</div>
+        <div class="card-specs">
+          <span class="card-spec">3 bd</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">2 ba</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">1,120 sqft</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 4: StreetEasy -->
+    <div class="card">
+      <div class="card-photo photo-bg-1">
+        <div class="photo-overlay"></div>
+        <div class="badge-corner badge-streeteasy">StreetEasy</div>
+        <div class="photo-placeholder">
+          <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        </div>
+      </div>
+      <div class="card-demo-label">single source</div>
+      <hr class="divider">
+      <div class="card-info">
+        <div class="card-price">$3,750 / mo</div>
+        <div class="card-address">19 Fulton St, Financial District</div>
+        <div class="card-specs">
+          <span class="card-spec">2 bd</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">2 ba</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">940 sqft</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== OPTION B ===================== -->
+<div class="option-section">
+  <div class="option-header">
+    <span class="option-label">Option B</span>
+    <span class="option-title">Source Icon + Text in Info Area</span>
+  </div>
+  <p class="option-desc">Small icon paired with the source name, placed in the card's info area. Muted grey so it doesn't compete with price or address. Icons are simple and recognizable — a house for Realtor, a list for Craigslist, etc.</p>
+
+  <div class="cards-row">
+
+    <!-- Card 1: Realtor.com -->
+    <div class="card">
+      <div class="card-photo photo-bg-1">
+        <div class="photo-overlay"></div>
+        <div class="photo-placeholder">
+          <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        </div>
+      </div>
+      <div class="card-demo-label">single source</div>
+      <hr class="divider">
+      <div class="card-info">
+        <div class="card-price">$3,200 / mo</div>
+        <div class="card-address">245 W 107th St, Upper West Side</div>
+        <div class="card-specs">
+          <span class="card-spec">2 bd</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">1 ba</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">875 sqft</span>
+        </div>
+        <div class="source-row-b">
+          <span class="source-icon-b">
+            <!-- House icon for Realtor -->
+            <svg viewBox="0 0 24 24" fill="#8b949e"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+          </span>
+          <span class="source-text-b">Realtor.com</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: Craigslist -->
+    <div class="card">
+      <div class="card-photo photo-bg-2">
+        <div class="photo-overlay"></div>
+        <div class="photo-placeholder">
+          <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        </div>
+      </div>
+      <div class="card-demo-label">single source</div>
+      <hr class="divider">
+      <div class="card-info">
+        <div class="card-price">$2,450 / mo</div>
+        <div class="card-address">88 Morningside Ave, Harlem</div>
+        <div class="card-specs">
+          <span class="card-spec">1 bd</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">1 ba</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">620 sqft</span>
+        </div>
+        <div class="source-row-b">
+          <span class="source-icon-b">
+            <!-- List/grid icon for Craigslist -->
+            <svg viewBox="0 0 24 24" fill="#8b949e"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
+          </span>
+          <span class="source-text-b">Craigslist</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3: Realtor + Zillow (show primary, note multi) -->
+    <div class="card">
+      <div class="card-photo photo-bg-3">
+        <div class="photo-overlay"></div>
+        <div class="photo-placeholder">
+          <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        </div>
+      </div>
+      <div class="card-demo-label">multi-source</div>
+      <hr class="divider">
+      <div class="card-info">
+        <div class="card-price">$4,100 / mo</div>
+        <div class="card-address">512 W 122nd St, Morningside Heights</div>
+        <div class="card-specs">
+          <span class="card-spec">3 bd</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">2 ba</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">1,120 sqft</span>
+        </div>
+        <div class="source-row-b">
+          <span class="source-icon-b">
+            <svg viewBox="0 0 24 24" fill="#8b949e"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+          </span>
+          <span class="source-text-b">Realtor.com + 1 more</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 4: StreetEasy -->
+    <div class="card">
+      <div class="card-photo photo-bg-1">
+        <div class="photo-overlay"></div>
+        <div class="photo-placeholder">
+          <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        </div>
+      </div>
+      <div class="card-demo-label">single source</div>
+      <hr class="divider">
+      <div class="card-info">
+        <div class="card-price">$3,750 / mo</div>
+        <div class="card-address">19 Fulton St, Financial District</div>
+        <div class="card-specs">
+          <span class="card-spec">2 bd</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">2 ba</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">940 sqft</span>
+        </div>
+        <div class="source-row-b">
+          <span class="source-icon-b">
+            <!-- Building/city icon for StreetEasy -->
+            <svg viewBox="0 0 24 24" fill="#8b949e"><path d="M15 11V5l-3-3-3 3v2H3v14h18V11h-6zm-8 8H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm6 12h-2v-2h2v2zm0-4h-2v-2h2v2z"/></svg>
+          </span>
+          <span class="source-text-b">StreetEasy</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== OPTION C ===================== -->
+<div class="option-section">
+  <div class="option-header">
+    <span class="option-label">Option C</span>
+    <span class="option-title">Multi-Source Composite Pills</span>
+  </div>
+  <p class="option-desc">Each source appears as a small colored pill with a dot indicator. Multi-source listings show all sources side by side, making Dwelligence's aggregation visible and a feature — not hidden. Single-source listings show just one pill.</p>
+
+  <div class="cards-row">
+
+    <!-- Card 1: Realtor.com only -->
+    <div class="card">
+      <div class="card-photo photo-bg-1">
+        <div class="photo-overlay"></div>
+        <div class="photo-placeholder">
+          <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        </div>
+      </div>
+      <div class="card-demo-label">single source</div>
+      <hr class="divider">
+      <div class="card-info">
+        <div class="card-price">$3,200 / mo</div>
+        <div class="card-address">245 W 107th St, Upper West Side</div>
+        <div class="card-specs">
+          <span class="card-spec">2 bd</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">1 ba</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">875 sqft</span>
+        </div>
+        <div class="source-row-c">
+          <span class="source-pill-c pill-realtor">
+            <span class="source-dot-c dot-realtor"></span>
+            Realtor.com
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: Craigslist only -->
+    <div class="card">
+      <div class="card-photo photo-bg-2">
+        <div class="photo-overlay"></div>
+        <div class="photo-placeholder">
+          <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        </div>
+      </div>
+      <div class="card-demo-label">single source</div>
+      <hr class="divider">
+      <div class="card-info">
+        <div class="card-price">$2,450 / mo</div>
+        <div class="card-address">88 Morningside Ave, Harlem</div>
+        <div class="card-specs">
+          <span class="card-spec">1 bd</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">1 ba</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">620 sqft</span>
+        </div>
+        <div class="source-row-c">
+          <span class="source-pill-c pill-craigs">
+            <span class="source-dot-c dot-craigs"></span>
+            Craigslist
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3: Realtor + Zillow -->
+    <div class="card">
+      <div class="card-photo photo-bg-3">
+        <div class="photo-overlay"></div>
+        <div class="photo-placeholder">
+          <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        </div>
+      </div>
+      <div class="card-demo-label">multi-source</div>
+      <hr class="divider">
+      <div class="card-info">
+        <div class="card-price">$4,100 / mo</div>
+        <div class="card-address">512 W 122nd St, Morningside Heights</div>
+        <div class="card-specs">
+          <span class="card-spec">3 bd</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">2 ba</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">1,120 sqft</span>
+        </div>
+        <div class="source-row-c">
+          <span class="source-pill-c pill-realtor">
+            <span class="source-dot-c dot-realtor"></span>
+            Realtor.com
+          </span>
+          <span class="source-pill-c pill-zillow">
+            <span class="source-dot-c dot-zillow"></span>
+            Zillow
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 4: Realtor + Zillow + StreetEasy (3-source) -->
+    <div class="card">
+      <div class="card-photo photo-bg-1">
+        <div class="photo-overlay"></div>
+        <div class="photo-placeholder">
+          <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        </div>
+      </div>
+      <div class="card-demo-label">3-source listing</div>
+      <hr class="divider">
+      <div class="card-info">
+        <div class="card-price">$3,750 / mo</div>
+        <div class="card-address">19 Fulton St, Financial District</div>
+        <div class="card-specs">
+          <span class="card-spec">2 bd</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">2 ba</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">940 sqft</span>
+        </div>
+        <div class="source-row-c">
+          <span class="source-pill-c pill-realtor">
+            <span class="source-dot-c dot-realtor"></span>
+            Realtor.com
+          </span>
+          <span class="source-pill-c pill-zillow">
+            <span class="source-dot-c dot-zillow"></span>
+            Zillow
+          </span>
+          <span class="source-pill-c pill-streeteasy">
+            <span class="source-dot-c dot-streeteasy"></span>
+            StreetEasy
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===================== OPTION D ===================== -->
+<div class="option-section">
+  <div class="option-header">
+    <span class="option-label">Option D</span>
+    <span class="option-title">Favicon-Style Tiny Icons</span>
+  </div>
+  <p class="option-desc">Minimal 14x14 colored icons at the bottom of each card — almost invisible until you look for them. Hover reveals a tooltip with the source name. Multi-source listings show a row of icons. The most low-profile option — no text, no visual noise.</p>
+
+  <div class="cards-row">
+
+    <!-- Card 1: Realtor.com -->
+    <div class="card">
+      <div class="card-photo photo-bg-1">
+        <div class="photo-overlay"></div>
+        <div class="photo-placeholder">
+          <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        </div>
+      </div>
+      <div class="card-demo-label">single source</div>
+      <hr class="divider">
+      <div class="card-info">
+        <div class="card-price">$3,200 / mo</div>
+        <div class="card-address">245 W 107th St, Upper West Side</div>
+        <div class="card-specs">
+          <span class="card-spec">2 bd</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">1 ba</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">875 sqft</span>
+        </div>
+        <div class="source-favicons">
+          <div class="favicon-wrap">
+            <div class="favicon-icon fav-realtor">R</div>
+            <div class="favicon-tooltip">Realtor.com</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: Craigslist -->
+    <div class="card">
+      <div class="card-photo photo-bg-2">
+        <div class="photo-overlay"></div>
+        <div class="photo-placeholder">
+          <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        </div>
+      </div>
+      <div class="card-demo-label">single source</div>
+      <hr class="divider">
+      <div class="card-info">
+        <div class="card-price">$2,450 / mo</div>
+        <div class="card-address">88 Morningside Ave, Harlem</div>
+        <div class="card-specs">
+          <span class="card-spec">1 bd</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">1 ba</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">620 sqft</span>
+        </div>
+        <div class="source-favicons">
+          <div class="favicon-wrap">
+            <div class="favicon-icon fav-craigs">CL</div>
+            <div class="favicon-tooltip">Craigslist</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3: Realtor + Zillow -->
+    <div class="card">
+      <div class="card-photo photo-bg-3">
+        <div class="photo-overlay"></div>
+        <div class="photo-placeholder">
+          <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        </div>
+      </div>
+      <div class="card-demo-label">multi-source</div>
+      <hr class="divider">
+      <div class="card-info">
+        <div class="card-price">$4,100 / mo</div>
+        <div class="card-address">512 W 122nd St, Morningside Heights</div>
+        <div class="card-specs">
+          <span class="card-spec">3 bd</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">2 ba</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">1,120 sqft</span>
+        </div>
+        <div class="source-favicons">
+          <div class="favicon-wrap">
+            <div class="favicon-icon fav-realtor">R</div>
+            <div class="favicon-tooltip">Realtor.com</div>
+          </div>
+          <div class="favicon-wrap">
+            <div class="favicon-icon fav-zillow">Z</div>
+            <div class="favicon-tooltip">Zillow</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 4: Realtor + Zillow + StreetEasy -->
+    <div class="card">
+      <div class="card-photo photo-bg-1">
+        <div class="photo-overlay"></div>
+        <div class="photo-placeholder">
+          <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+        </div>
+      </div>
+      <div class="card-demo-label">3-source listing</div>
+      <hr class="divider">
+      <div class="card-info">
+        <div class="card-price">$3,750 / mo</div>
+        <div class="card-address">19 Fulton St, Financial District</div>
+        <div class="card-specs">
+          <span class="card-spec">2 bd</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">2 ba</span>
+          <span class="card-spec-dot"></span>
+          <span class="card-spec">940 sqft</span>
+        </div>
+        <div class="source-favicons">
+          <div class="favicon-wrap">
+            <div class="favicon-icon fav-realtor">R</div>
+            <div class="favicon-tooltip">Realtor.com</div>
+          </div>
+          <div class="favicon-wrap">
+            <div class="favicon-icon fav-zillow">Z</div>
+            <div class="favicon-tooltip">Zillow</div>
+          </div>
+          <div class="favicon-wrap">
+            <div class="favicon-icon fav-streeteasy">SE</div>
+            <div class="favicon-tooltip">StreetEasy</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

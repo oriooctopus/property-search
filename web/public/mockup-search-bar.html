@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Search Bar UX Mockup — All States</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1c2028;
+    --border: #2d333b;
+    --text: #e1e4e8;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #7ee787;
+    --red: #f85149;
+    --yellow: #d29922;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.5;
+    padding: 0 0 80px;
+  }
+
+  /* Sticky interactive demo */
+  .sticky-demo {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px 0;
+  }
+  .sticky-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+
+  /* Search bar */
+  .search-wrap {
+    position: relative;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  .search-bar {
+    display: flex;
+    align-items: center;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0 16px;
+    height: 48px;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .search-bar.focused {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(88,166,255,.15);
+  }
+  .search-bar .icon-search {
+    color: var(--muted);
+    flex-shrink: 0;
+    margin-right: 10px;
+  }
+  .search-bar input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 15px;
+    font-family: inherit;
+  }
+  .search-bar input::placeholder { color: var(--muted); }
+  .search-bar .btn-send {
+    flex-shrink: 0;
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: scale(.8);
+    transition: opacity .2s, transform .2s;
+    pointer-events: none;
+  }
+  .search-bar .btn-send.visible {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+  }
+  .search-bar .btn-send:hover { background: #79b8ff; }
+
+  /* Spinner replaces send */
+  .spinner {
+    width: 20px; height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    flex-shrink: 0;
+    display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Dropdown */
+  .dropdown {
+    position: absolute;
+    top: 56px;
+    left: 0; right: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 0;
+    display: none;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  .dropdown.open { display: block; }
+  .dropdown .dd-header {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    padding: 4px 16px 8px;
+    font-weight: 600;
+  }
+  .dropdown .dd-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: background .15s;
+    gap: 10px;
+  }
+  .dropdown .dd-item:hover { background: rgba(88,166,255,.08); }
+  .dropdown .dd-item .dd-icon {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    background: rgba(88,166,255,.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 14px;
+  }
+  .dropdown .dd-item .dd-text { font-size: 14px; }
+  .dropdown .dd-item .dd-text b { color: var(--text); font-weight: 600; }
+  .dropdown .dd-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 8px 0;
+  }
+  .chips-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 4px 16px 8px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: rgba(88,166,255,.06);
+    color: var(--text);
+    transition: background .15s, border-color .15s;
+    white-space: nowrap;
+  }
+  .chip:hover {
+    border-color: var(--accent);
+    background: rgba(88,166,255,.12);
+  }
+  .dd-help {
+    padding: 8px 16px 4px;
+    font-size: 13px;
+    color: var(--accent);
+    cursor: pointer;
+  }
+  .dd-help:hover { text-decoration: underline; }
+
+  /* Filter pills row */
+  .pills-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 10px 0 0;
+    min-height: 10px;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px 4px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    background: rgba(88,166,255,.12);
+    border: 1px solid rgba(88,166,255,.3);
+    color: var(--accent);
+    animation: pillIn .3s ease;
+  }
+  @keyframes pillIn {
+    from { opacity: 0; transform: scale(.8); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .pill .pill-x {
+    cursor: pointer;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    background: rgba(88,166,255,.15);
+    transition: background .15s;
+  }
+  .pill .pill-x:hover { background: rgba(88,166,255,.3); }
+
+  /* Skeleton pills */
+  .pill-skeleton {
+    width: 100px; height: 28px;
+    border-radius: 16px;
+    background: var(--border);
+    animation: pulse 1.2s ease infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: .4; }
+    50% { opacity: .8; }
+  }
+
+  /* Confirmation banner */
+  .confirm-banner {
+    max-width: 640px;
+    margin: 8px auto 0;
+    font-size: 13px;
+    color: var(--green);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity .3s;
+  }
+  .confirm-banner.visible { opacity: 1; }
+
+  /* Loading text */
+  .loading-text {
+    max-width: 640px;
+    margin: 8px auto 0;
+    font-size: 13px;
+    color: var(--muted);
+    animation: pulse 1.5s ease infinite;
+    display: none;
+  }
+
+  /* Sticky bottom pad */
+  .sticky-demo .bottom-pad { height: 12px; }
+
+  /* Sections */
+  .section {
+    max-width: 720px;
+    margin: 40px auto;
+    padding: 0 24px;
+  }
+  .section-num {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .section h2 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .section .desc {
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 16px;
+    max-width: 560px;
+  }
+
+  /* Static demo boxes */
+  .demo-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+  }
+  .demo-box + .demo-box { margin-top: 12px; }
+
+  /* Static search bar replica */
+  .static-bar {
+    display: flex;
+    align-items: center;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0 16px;
+    height: 48px;
+    font-size: 15px;
+    color: var(--text);
+  }
+  .static-bar.focused-look {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(88,166,255,.15);
+  }
+  .static-bar .placeholder { color: var(--muted); }
+  .static-bar .icon-s { color: var(--muted); margin-right: 10px; }
+
+  /* Static dropdown replica */
+  .static-dropdown {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-top: 8px;
+    padding: 12px 0;
+  }
+  .static-dropdown .dd-header,
+  .static-dropdown .dd-item,
+  .static-dropdown .dd-divider,
+  .static-dropdown .chips-row,
+  .static-dropdown .dd-help {
+    /* reuse same styles */
+  }
+
+  /* Error boxes */
+  .error-box {
+    background: rgba(248,81,73,.06);
+    border: 1px solid rgba(248,81,73,.2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 14px;
+  }
+  .error-box .err-icon {
+    color: var(--red);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .error-box a { color: var(--accent); text-decoration: none; }
+  .error-box a:hover { text-decoration: underline; }
+  .warn-box {
+    background: rgba(210,153,34,.06);
+    border: 1px solid rgba(210,153,34,.2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .success-box {
+    background: rgba(126,231,135,.06);
+    border: 1px solid rgba(126,231,135,.2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 14px;
+    color: var(--green);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-link {
+    color: var(--accent);
+    background: none;
+    border: none;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 0;
+  }
+  .btn-link:hover { text-decoration: underline; }
+
+  .btn-retry {
+    padding: 6px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  .btn-retry:hover { border-color: var(--accent); }
+
+  /* Inline pill for static demos */
+  .inline-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px 3px 10px;
+    border-radius: 14px;
+    font-size: 12px;
+    background: rgba(88,166,255,.12);
+    border: 1px solid rgba(88,166,255,.3);
+    color: var(--accent);
+    margin: 2px;
+    vertical-align: middle;
+  }
+  .inline-pill .ix {
+    font-size: 10px;
+    opacity: .6;
+  }
+
+  /* Scroll-to nav */
+  .nav-bar {
+    display: flex;
+    gap: 4px;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 8px 0;
+    overflow-x: auto;
+  }
+  .nav-bar a {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    color: var(--muted);
+    text-decoration: none;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    transition: all .15s;
+  }
+  .nav-bar a:hover, .nav-bar a.active {
+    color: var(--accent);
+    border-color: var(--border);
+    background: rgba(88,166,255,.06);
+  }
+
+  .truncated-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 400px;
+    display: inline-block;
+  }
+</style>
+</head>
+<body>
+
+<!-- Sticky interactive demo at top -->
+<div class="sticky-demo" id="stickyDemo">
+  <div class="sticky-label">Interactive Demo — Try it</div>
+  <div class="search-wrap" id="mainSearch">
+    <div class="search-bar" id="searchBar">
+      <svg class="icon-search" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" id="searchInput" placeholder="Search apartments with AI..." autocomplete="off">
+      <div class="spinner" id="searchSpinner"></div>
+      <button class="btn-send" id="btnSend" title="Search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+    <div class="dropdown" id="dropdown"></div>
+  </div>
+  <div class="pills-row" id="pillsRow"></div>
+  <div class="confirm-banner" id="confirmBanner">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+    <span id="confirmText"></span>
+  </div>
+  <div class="loading-text" id="loadingText">Searching for apartments...</div>
+  <div class="nav-bar">
+    <a href="#s1">1. Empty</a>
+    <a href="#s2">2. Typing</a>
+    <a href="#s3">3. Loading</a>
+    <a href="#s4">4. Results</a>
+    <a href="#s5">5. Refine</a>
+    <a href="#s6">6. Errors</a>
+    <a href="#s7">7. Edge Cases</a>
+  </div>
+  <div class="bottom-pad"></div>
+</div>
+
+<!-- Section 1 -->
+<div class="section" id="s1">
+  <div class="section-num">State 1</div>
+  <h2>Empty / Focused</h2>
+  <p class="desc">Click the search bar above to see this state live. A dropdown appears with example suggestions, recent searches, and a help link.</p>
+  <div class="demo-box">
+    <div class="static-bar focused-look">
+      <svg class="icon-s" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <span class="placeholder">Search apartments with AI...</span>
+    </div>
+    <div class="static-dropdown">
+      <div class="dd-header" style="padding:8px 16px 6px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600;">Try searching for...</div>
+      <div class="chips-row" style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 16px 8px;">
+        <span class="chip">5+ bedrooms near the L train</span>
+        <span class="chip">Brooklyn under $2k/bed</span>
+        <span class="chip">Manhattan with doorman</span>
+        <span class="chip">Pet-friendly near Central Park</span>
+        <span class="chip">Studios under $3k in East Village</span>
+      </div>
+      <div style="height:1px;background:var(--border);margin:8px 0;"></div>
+      <div class="dd-header" style="padding:8px 16px 6px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600;">Your recent searches</div>
+      <div class="dd-item" style="display:flex;align-items:center;padding:8px 16px;gap:10px;">
+        <div class="dd-icon" style="width:28px;height:28px;border-radius:6px;background:rgba(88,166,255,.1);display:flex;align-items:center;justify-content:center;font-size:14px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        </div>
+        <span style="font-size:14px;">3 bed in Williamsburg under $4k</span>
+      </div>
+      <div class="dd-item" style="display:flex;align-items:center;padding:8px 16px;gap:10px;">
+        <div class="dd-icon" style="width:28px;height:28px;border-radius:6px;background:rgba(88,166,255,.1);display:flex;align-items:center;justify-content:center;font-size:14px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        </div>
+        <span style="font-size:14px;">Pet-friendly near Prospect Park</span>
+      </div>
+      <div style="height:1px;background:var(--border);margin:8px 0;"></div>
+      <div style="padding:8px 16px 4px;font-size:13px;color:var(--accent);cursor:pointer;">What can I search?</div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 2 -->
+<div class="section" id="s2">
+  <div class="section-num">State 2</div>
+  <h2>Typing — Smart Autocomplete</h2>
+  <p class="desc">Type "5 bed" in the search bar above to see autocomplete suggestions with icons and bold matching text.</p>
+  <div class="demo-box">
+    <div class="static-bar focused-look">
+      <svg class="icon-s" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <span>5 bed<span style="opacity:0;">|</span></span>
+    </div>
+    <div class="static-dropdown">
+      <div class="dd-item" style="display:flex;align-items:center;padding:10px 16px;gap:10px;">
+        <div class="dd-icon" style="width:28px;height:28px;border-radius:6px;background:rgba(88,166,255,.1);display:flex;align-items:center;justify-content:center;font-size:14px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><rect x="2" y="12" width="6" height="8" rx="1"/><rect x="9" y="8" width="6" height="12" rx="1"/><rect x="16" y="4" width="6" height="16" rx="1"/></svg>
+        </div>
+        <span style="font-size:14px;"><b style="color:var(--text);font-weight:600;">5 bed</b>rooms in Brooklyn</span>
+      </div>
+      <div class="dd-item" style="display:flex;align-items:center;padding:10px 16px;gap:10px;">
+        <div class="dd-icon" style="width:28px;height:28px;border-radius:6px;background:rgba(126,231,135,.1);display:flex;align-items:center;justify-content:center;font-size:14px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </div>
+        <span style="font-size:14px;"><b style="color:var(--text);font-weight:600;">5 bed</b>rooms near the L train</span>
+      </div>
+      <div class="dd-item" style="display:flex;align-items:center;padding:10px 16px;gap:10px;">
+        <div class="dd-icon" style="width:28px;height:28px;border-radius:6px;background:rgba(210,153,34,.1);display:flex;align-items:center;justify-content:center;font-size:14px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+        </div>
+        <span style="font-size:14px;"><b style="color:var(--text);font-weight:600;">5 bed</b>rooms under $10k</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 3 -->
+<div class="section" id="s3">
+  <div class="section-num">State 3</div>
+  <h2>Loading</h2>
+  <p class="desc">Press Enter in the search bar above after typing something. The send button becomes a spinner, skeleton pills appear, and a pulsing status message shows.</p>
+  <div class="demo-box">
+    <div class="static-bar">
+      <svg class="icon-s" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <span>5 bedrooms near the L train</span>
+      <span style="margin-left:auto;"><span style="display:inline-block;width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;"></span></span>
+    </div>
+    <div style="margin-top:10px;font-size:13px;color:var(--muted);animation:pulse 1.5s ease infinite;">Searching for apartments...</div>
+    <div style="display:flex;gap:6px;margin-top:10px;">
+      <div class="pill-skeleton" style="width:90px;height:28px;border-radius:16px;background:var(--border);animation:pulse 1.2s ease infinite;"></div>
+      <div class="pill-skeleton" style="width:120px;height:28px;border-radius:16px;background:var(--border);animation:pulse 1.2s ease infinite .15s;"></div>
+      <div class="pill-skeleton" style="width:140px;height:28px;border-radius:16px;background:var(--border);animation:pulse 1.2s ease infinite .3s;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 4 -->
+<div class="section" id="s4">
+  <div class="section-num">State 4</div>
+  <h2>Results Applied</h2>
+  <p class="desc">After loading completes: filter pills appear, a confirmation fades in (then out after 3s), and the search bar clears for refinement.</p>
+  <div class="demo-box">
+    <div class="static-bar">
+      <svg class="icon-s" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <span class="placeholder">Refine your search...</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">
+      <span class="inline-pill">5+ Beds <span class="ix">&times;</span></span>
+      <span class="inline-pill">Near L Train <span class="ix">&times;</span></span>
+      <span class="inline-pill">Under $2,500/bed <span class="ix">&times;</span></span>
+    </div>
+    <div style="margin-top:10px;font-size:13px;color:var(--green);display:flex;align-items:center;gap:6px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+      Found 8 listings matching your search
+    </div>
+    <div style="margin-top:6px;font-size:12px;color:var(--muted);font-style:italic;">Confirmation fades after 3 seconds</div>
+  </div>
+</div>
+
+<!-- Section 5 -->
+<div class="section" id="s5">
+  <div class="section-num">State 5</div>
+  <h2>Refinement</h2>
+  <p class="desc">User searches again while pills are active. Previous pills stay, new ones get added or modified, and the result count updates.</p>
+  <div class="demo-box">
+    <div class="static-bar focused-look">
+      <svg class="icon-s" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <span>actually closer to Manhattan</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">
+      <span class="inline-pill">5+ Beds <span class="ix">&times;</span></span>
+      <span class="inline-pill">Near L Train <span class="ix">&times;</span></span>
+      <span class="inline-pill">Under $2,500/bed <span class="ix">&times;</span></span>
+    </div>
+    <div class="static-dropdown" style="margin-top:8px;">
+      <div class="dd-header" style="padding:8px 16px 6px;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600;">Refine results</div>
+      <div class="dd-item" style="display:flex;align-items:center;padding:10px 16px;gap:10px;">
+        <div class="dd-icon" style="width:28px;height:28px;border-radius:6px;background:rgba(126,231,135,.1);display:flex;align-items:center;justify-content:center;font-size:14px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </div>
+        <span style="font-size:14px;">Closer to <b style="color:var(--text);font-weight:600;">Manhattan</b> (update location)</span>
+      </div>
+      <div class="dd-item" style="display:flex;align-items:center;padding:10px 16px;gap:10px;">
+        <div class="dd-icon" style="width:28px;height:28px;border-radius:6px;background:rgba(88,166,255,.1);display:flex;align-items:center;justify-content:center;font-size:14px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </div>
+        <span style="font-size:14px;">In <b style="color:var(--text);font-weight:600;">Manhattan</b> (replace Brooklyn)</span>
+      </div>
+    </div>
+  </div>
+  <div class="demo-box" style="margin-top:12px;">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:8px;">After refinement applied:</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;">
+      <span class="inline-pill">5+ Beds <span class="ix">&times;</span></span>
+      <span class="inline-pill" style="background:rgba(126,231,135,.12);border-color:rgba(126,231,135,.3);color:var(--green);">Near Manhattan <span class="ix">&times;</span></span>
+      <span class="inline-pill">Under $2,500/bed <span class="ix">&times;</span></span>
+    </div>
+    <div style="margin-top:10px;font-size:13px;color:var(--green);display:flex;align-items:center;gap:6px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+      Narrowed to 3 listings
+    </div>
+  </div>
+</div>
+
+<!-- Section 6 -->
+<div class="section" id="s6">
+  <div class="section-num">State 6</div>
+  <h2>Error States</h2>
+  <p class="desc">Various failure modes and how they appear to the user.</p>
+  <div class="demo-box">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">Not logged in:</div>
+    <div class="error-box">
+      <svg class="err-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <div>
+        <div style="color:var(--red);font-weight:500;">Log in to use AI search</div>
+        <div style="color:var(--muted);font-size:13px;margin-top:2px;">AI-powered search requires an account. <a href="#">Log in</a> or <a href="#">sign up</a></div>
+      </div>
+    </div>
+  </div>
+  <div class="demo-box">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">API error:</div>
+    <div class="error-box">
+      <svg class="err-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <div>
+        <div style="color:var(--red);font-weight:500;">Something went wrong</div>
+        <div style="color:var(--muted);font-size:13px;margin-top:2px;">We couldn't process your search. Please try again.</div>
+        <button class="btn-retry" style="margin-top:8px;padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:13px;cursor:pointer;">Try again</button>
+      </div>
+    </div>
+  </div>
+  <div class="demo-box">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">No results:</div>
+    <div class="warn-box">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+      <div>
+        <div style="color:var(--yellow);font-weight:500;">No listings match those criteria</div>
+        <div style="color:var(--muted);font-size:13px;margin-top:2px;">Try broadening your search. Remove a filter:</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
+          <span class="inline-pill" style="cursor:pointer;opacity:.7;">5+ Beds <span class="ix">&times;</span></span>
+          <span class="inline-pill" style="cursor:pointer;opacity:.7;">Near L Train <span class="ix">&times;</span></span>
+          <span class="inline-pill" style="cursor:pointer;opacity:.7;">Under $2,500/bed <span class="ix">&times;</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Section 7 -->
+<div class="section" id="s7">
+  <div class="section-num">State 7</div>
+  <h2>Edge Cases</h2>
+  <p class="desc">How the search bar handles unusual inputs and state transitions.</p>
+  <div class="demo-box">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">Empty search (just spaces) — nothing happens:</div>
+    <div class="static-bar">
+      <svg class="icon-s" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px;font-style:italic;">Send button stays hidden. Pressing Enter does nothing.</div>
+  </div>
+  <div class="demo-box">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">Very long query — text truncates with ellipsis:</div>
+    <div class="static-bar">
+      <svg class="icon-s" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <span class="truncated-text">I'm looking for a really spacious 5 bedroom apartment near the L train in Williamsburg or Bushwick that allows large dogs and has a doorman and laundry in unit and is under $2500 per bedroom per month</span>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px;font-style:italic;">Full text is sent to the API even though it visually truncates.</div>
+  </div>
+  <div class="demo-box">
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">Removing all pills — returns to unfiltered state:</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;">
+      <span class="inline-pill" style="opacity:.4;text-decoration:line-through;">5+ Beds <span class="ix">&times;</span></span>
+      <span class="inline-pill" style="opacity:.4;text-decoration:line-through;">Near L Train <span class="ix">&times;</span></span>
+      <span class="inline-pill" style="opacity:.4;text-decoration:line-through;">Under $2,500/bed <span class="ix">&times;</span></span>
+    </div>
+    <div class="success-box" style="margin-top:10px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+      Filters cleared
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const input = document.getElementById('searchInput');
+  const bar = document.getElementById('searchBar');
+  const dropdown = document.getElementById('dropdown');
+  const btnSend = document.getElementById('btnSend');
+  const spinner = document.getElementById('searchSpinner');
+  const pillsRow = document.getElementById('pillsRow');
+  const confirmBanner = document.getElementById('confirmBanner');
+  const confirmText = document.getElementById('confirmText');
+  const loadingText = document.getElementById('loadingText');
+
+  let activePills = [];
+  let currentState = 'idle'; // idle, focused, typing, loading, results
+  let confirmTimer = null;
+
+  const exampleSuggestions = [
+    '5+ bedrooms near the L train',
+    'Brooklyn under $2k/bed',
+    'Manhattan with doorman',
+    'Pet-friendly near Central Park',
+    'Studios under $3k in East Village',
+  ];
+  const recentSearches = [
+    '3 bed in Williamsburg under $4k',
+    'Pet-friendly near Prospect Park',
+  ];
+
+  const autocompleteSets = {
+    '5 bed': [
+      { icon: 'beds', color: 'var(--accent)', text: '5 bedrooms in Brooklyn', bold: '5 bed' },
+      { icon: 'location', color: 'var(--green)', text: '5 bedrooms near the L train', bold: '5 bed' },
+      { icon: 'price', color: 'var(--yellow)', text: '5 bedrooms under $10k', bold: '5 bed' },
+    ],
+    'brook': [
+      { icon: 'location', color: 'var(--green)', text: 'Brooklyn apartments', bold: 'Brook' },
+      { icon: 'beds', color: 'var(--accent)', text: 'Brooklyn 3+ bedrooms', bold: 'Brook' },
+      { icon: 'price', color: 'var(--yellow)', text: 'Brooklyn under $3k', bold: 'Brook' },
+    ],
+    'pet': [
+      { icon: 'location', color: 'var(--green)', text: 'Pet-friendly apartments', bold: 'Pet' },
+      { icon: 'location', color: 'var(--green)', text: 'Pet-friendly near Central Park', bold: 'Pet' },
+      { icon: 'beds', color: 'var(--accent)', text: 'Pet-friendly 2+ bedrooms', bold: 'Pet' },
+    ],
+    'man': [
+      { icon: 'location', color: 'var(--green)', text: 'Manhattan apartments', bold: 'Man' },
+      { icon: 'beds', color: 'var(--accent)', text: 'Manhattan with doorman', bold: 'Man' },
+      { icon: 'price', color: 'var(--yellow)', text: 'Manhattan under $4k', bold: 'Man' },
+    ],
+    'studio': [
+      { icon: 'beds', color: 'var(--accent)', text: 'Studios in East Village', bold: 'Studio' },
+      { icon: 'price', color: 'var(--yellow)', text: 'Studios under $3k', bold: 'Studio' },
+      { icon: 'location', color: 'var(--green)', text: 'Studios near NYU', bold: 'Studio' },
+    ],
+  };
+
+  // Map search text → generated pills
+  const pillMappings = {
+    '5+ bedrooms near the l train': [
+      { label: '5+ Beds', type: 'beds' },
+      { label: 'Near L Train', type: 'location' },
+    ],
+    '5 bedrooms in brooklyn': [
+      { label: '5+ Beds', type: 'beds' },
+      { label: 'Brooklyn', type: 'location' },
+    ],
+    '5 bedrooms near the l train': [
+      { label: '5+ Beds', type: 'beds' },
+      { label: 'Near L Train', type: 'location' },
+    ],
+    '5 bedrooms under $10k': [
+      { label: '5+ Beds', type: 'beds' },
+      { label: 'Under $10k', type: 'price' },
+    ],
+    'brooklyn under $2k/bed': [
+      { label: 'Brooklyn', type: 'location' },
+      { label: 'Under $2k/bed', type: 'price' },
+    ],
+    'manhattan with doorman': [
+      { label: 'Manhattan', type: 'location' },
+      { label: 'Doorman', type: 'amenity' },
+    ],
+    'pet-friendly near central park': [
+      { label: 'Pet-Friendly', type: 'amenity' },
+      { label: 'Near Central Park', type: 'location' },
+    ],
+    'studios under $3k in east village': [
+      { label: 'Studio', type: 'beds' },
+      { label: 'Under $3k', type: 'price' },
+      { label: 'East Village', type: 'location' },
+    ],
+    '3 bed in williamsburg under $4k': [
+      { label: '3+ Beds', type: 'beds' },
+      { label: 'Williamsburg', type: 'location' },
+      { label: 'Under $4k', type: 'price' },
+    ],
+    'pet-friendly near prospect park': [
+      { label: 'Pet-Friendly', type: 'amenity' },
+      { label: 'Near Prospect Park', type: 'location' },
+    ],
+    'brooklyn apartments': [
+      { label: 'Brooklyn', type: 'location' },
+    ],
+    'brooklyn 3+ bedrooms': [
+      { label: '3+ Beds', type: 'beds' },
+      { label: 'Brooklyn', type: 'location' },
+    ],
+    'brooklyn under $3k': [
+      { label: 'Brooklyn', type: 'location' },
+      { label: 'Under $3k', type: 'price' },
+    ],
+    'pet-friendly apartments': [
+      { label: 'Pet-Friendly', type: 'amenity' },
+    ],
+    'pet-friendly 2+ bedrooms': [
+      { label: 'Pet-Friendly', type: 'amenity' },
+      { label: '2+ Beds', type: 'beds' },
+    ],
+    'manhattan apartments': [
+      { label: 'Manhattan', type: 'location' },
+    ],
+    'manhattan under $4k': [
+      { label: 'Manhattan', type: 'location' },
+      { label: 'Under $4k', type: 'price' },
+    ],
+    'studios in east village': [
+      { label: 'Studio', type: 'beds' },
+      { label: 'East Village', type: 'location' },
+    ],
+    'studios under $3k': [
+      { label: 'Studio', type: 'beds' },
+      { label: 'Under $3k', type: 'price' },
+    ],
+    'studios near nyu': [
+      { label: 'Studio', type: 'beds' },
+      { label: 'Near NYU', type: 'location' },
+    ],
+  };
+
+  function iconSVG(type, color) {
+    if (type === 'beds') return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><rect x="2" y="12" width="6" height="8" rx="1"/><rect x="9" y="8" width="6" height="12" rx="1"/><rect x="16" y="4" width="6" height="16" rx="1"/></svg>`;
+    if (type === 'location') return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 1118 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
+    if (type === 'price') return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>`;
+    if (type === 'clock') return `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>`;
+    return '';
+  }
+
+  function showEmptyDropdown() {
+    let html = '';
+    html += '<div class="dd-header">Try searching for...</div>';
+    html += '<div class="chips-row">';
+    exampleSuggestions.forEach(s => {
+      html += `<span class="chip" data-suggestion="${s}">${s}</span>`;
+    });
+    html += '</div>';
+    html += '<div class="dd-divider"></div>';
+    html += '<div class="dd-header">Your recent searches</div>';
+    recentSearches.forEach(s => {
+      html += `<div class="dd-item" data-suggestion="${s}">
+        <div class="dd-icon">${iconSVG('clock', 'var(--muted)')}</div>
+        <span class="dd-text">${s}</span>
+      </div>`;
+    });
+    html += '<div class="dd-divider"></div>';
+    html += '<div class="dd-help" id="helpLink">What can I search?</div>';
+    dropdown.innerHTML = html;
+    dropdown.classList.add('open');
+    bindDropdownClicks();
+  }
+
+  function showAutocomplete(query) {
+    const q = query.toLowerCase().trim();
+    let matches = null;
+    for (const key of Object.keys(autocompleteSets)) {
+      if (q.includes(key) || key.includes(q)) {
+        matches = autocompleteSets[key];
+        break;
+      }
+    }
+    if (!matches) {
+      // Generic fallback
+      matches = [
+        { icon: 'beds', color: 'var(--accent)', text: query + ' in Brooklyn', bold: query },
+        { icon: 'location', color: 'var(--green)', text: query + ' near subway', bold: query },
+        { icon: 'price', color: 'var(--yellow)', text: query + ' under $5k', bold: query },
+      ];
+    }
+
+    let hasExistingPills = activePills.length > 0;
+    let html = '';
+    if (hasExistingPills) {
+      html += '<div class="dd-header">Refine results</div>';
+    }
+    matches.forEach(m => {
+      const highlighted = m.text.replace(new RegExp('(' + escapeRegex(m.bold) + ')', 'i'), '<b>$1</b>');
+      html += `<div class="dd-item" data-suggestion="${m.text}">
+        <div class="dd-icon" style="background:${m.color}15;">${iconSVG(m.icon, m.color)}</div>
+        <span class="dd-text">${highlighted}</span>
+      </div>`;
+    });
+    dropdown.innerHTML = html;
+    dropdown.classList.add('open');
+    bindDropdownClicks();
+  }
+
+  function escapeRegex(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function bindDropdownClicks() {
+    dropdown.querySelectorAll('[data-suggestion]').forEach(el => {
+      el.addEventListener('click', () => {
+        const text = el.getAttribute('data-suggestion');
+        input.value = text;
+        input.focus();
+        updateSendButton();
+        hideDropdown();
+        triggerSearch(text);
+      });
+    });
+    const helpLink = document.getElementById('helpLink');
+    if (helpLink) {
+      helpLink.addEventListener('click', () => {
+        dropdown.innerHTML = `
+          <div class="dd-header">What can I search?</div>
+          <div style="padding:4px 16px 12px;font-size:13px;color:var(--muted);line-height:1.6;">
+            Use natural language to describe what you're looking for:<br>
+            <span style="color:var(--text);">Bedrooms:</span> "3 bed", "studio", "5+ bedrooms"<br>
+            <span style="color:var(--text);">Location:</span> "near the L train", "in Williamsburg", "close to Central Park"<br>
+            <span style="color:var(--text);">Price:</span> "under $3k", "less than $2000/bed"<br>
+            <span style="color:var(--text);">Amenities:</span> "pet-friendly", "doorman", "laundry in unit"<br>
+            <span style="color:var(--text);">Combine them:</span> "5 bed near L train under $2500/bed"
+          </div>`;
+      });
+    }
+  }
+
+  function hideDropdown() {
+    dropdown.classList.remove('open');
+  }
+
+  function updateSendButton() {
+    const hasText = input.value.trim().length > 0;
+    btnSend.classList.toggle('visible', hasText && currentState !== 'loading');
+  }
+
+  function renderPills() {
+    pillsRow.innerHTML = '';
+    activePills.forEach((p, i) => {
+      const el = document.createElement('span');
+      el.className = 'pill';
+      el.innerHTML = `${p.label} <span class="pill-x" data-idx="${i}">&times;</span>`;
+      pillsRow.appendChild(el);
+    });
+    pillsRow.querySelectorAll('.pill-x').forEach(x => {
+      x.addEventListener('click', () => {
+        const idx = parseInt(x.getAttribute('data-idx'));
+        activePills.splice(idx, 1);
+        renderPills();
+        if (activePills.length === 0) {
+          showConfirmation('Filters cleared');
+        }
+      });
+    });
+  }
+
+  function showSkeletonPills() {
+    pillsRow.innerHTML = '';
+    for (let i = 0; i < 3; i++) {
+      const el = document.createElement('div');
+      el.className = 'pill-skeleton';
+      el.style.width = (80 + Math.random() * 60) + 'px';
+      el.style.animationDelay = (i * 0.15) + 's';
+      pillsRow.appendChild(el);
+    }
+  }
+
+  function showConfirmation(text) {
+    clearTimeout(confirmTimer);
+    confirmText.textContent = text;
+    confirmBanner.classList.add('visible');
+    confirmTimer = setTimeout(() => {
+      confirmBanner.classList.remove('visible');
+    }, 3000);
+  }
+
+  function triggerSearch(text) {
+    if (!text.trim()) return;
+    currentState = 'loading';
+
+    // Show loading state
+    btnSend.classList.remove('visible');
+    spinner.style.display = 'block';
+    loadingText.style.display = 'block';
+    hideDropdown();
+    showSkeletonPills();
+
+    // Simulate API delay
+    setTimeout(() => {
+      spinner.style.display = 'none';
+      loadingText.style.display = 'none';
+      currentState = 'results';
+
+      // Determine pills from search text
+      const key = text.toLowerCase().trim();
+      let newPills = pillMappings[key];
+      if (!newPills) {
+        // Generate generic pills from the query
+        newPills = [{ label: text.length > 20 ? text.substring(0, 20) + '...' : text, type: 'beds' }];
+      }
+
+      // Merge with existing pills (avoid duplicates)
+      newPills.forEach(np => {
+        if (!activePills.find(p => p.label === np.label)) {
+          activePills.push(np);
+        }
+      });
+
+      renderPills();
+      input.value = '';
+      input.placeholder = 'Refine your search...';
+      updateSendButton();
+
+      const count = 2 + Math.floor(Math.random() * 15);
+      if (activePills.length <= newPills.length) {
+        showConfirmation(`Found ${count} listings matching your search`);
+      } else {
+        showConfirmation(`Narrowed to ${Math.max(1, count - 5)} listings`);
+      }
+    }, 1500);
+  }
+
+  // Events
+  input.addEventListener('focus', () => {
+    bar.classList.add('focused');
+    if (currentState === 'loading') return;
+    if (input.value.trim().length > 0) {
+      showAutocomplete(input.value);
+    } else {
+      showEmptyDropdown();
+    }
+  });
+
+  input.addEventListener('blur', () => {
+    // Delay to allow click on dropdown
+    setTimeout(() => {
+      bar.classList.remove('focused');
+      hideDropdown();
+    }, 200);
+  });
+
+  input.addEventListener('input', () => {
+    updateSendButton();
+    if (currentState === 'loading') return;
+    const val = input.value.trim();
+    if (val.length > 0) {
+      showAutocomplete(val);
+    } else {
+      showEmptyDropdown();
+    }
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (text && currentState !== 'loading') {
+        hideDropdown();
+        triggerSearch(text);
+      }
+    }
+  });
+
+  btnSend.addEventListener('click', () => {
+    const text = input.value.trim();
+    if (text && currentState !== 'loading') {
+      hideDropdown();
+      triggerSearch(text);
+    }
+  });
+
+  // Close dropdown on outside click
+  document.addEventListener('click', (e) => {
+    if (!document.getElementById('mainSearch').contains(e.target)) {
+      hideDropdown();
+      bar.classList.remove('focused');
+    }
+  });
+})();
+</script>
+</body>
+</html>
