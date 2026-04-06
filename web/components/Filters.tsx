@@ -1318,13 +1318,23 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
                   alert(buildInfo);
                 }}
                 onTouchStart={(e) => {
+                  const el = e.currentTarget as HTMLElement;
+                  el.dataset.lptFired = '0';
                   const t = setTimeout(() => {
-                    const buildInfo = document.querySelector('footer')?.textContent?.trim() || 'Build info unavailable';
-                    alert(buildInfo);
-                  }, 800);
-                  (e.currentTarget as HTMLElement).dataset.lpt = String(t);
+                    el.dataset.lptFired = '1';
+                    const raw = document.querySelector('footer')?.textContent?.replace('Built ', '').trim() || '';
+                    const d = new Date(raw);
+                    const msg = isNaN(d.getTime()) ? 'Build info unavailable' : `Built ${d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}`;
+                    alert(msg);
+                  }, 500);
+                  el.dataset.lpt = String(t);
                 }}
-                onTouchEnd={(e) => { const t = (e.currentTarget as HTMLElement).dataset.lpt; if (t) clearTimeout(Number(t)); }}
+                onTouchEnd={(e) => {
+                  const el = e.currentTarget as HTMLElement;
+                  const t = el.dataset.lpt;
+                  if (t) clearTimeout(Number(t));
+                  if (el.dataset.lptFired === '1') e.preventDefault();
+                }}
                 className={cn(
                   'relative flex items-center h-8 px-2.5 text-[11px] whitespace-nowrap cursor-pointer transition-colors duration-150',
                   activeSearchId === null ? 'text-[#e1e4e8]' : 'text-[#8b949e] hover:text-[#c0d6f5]',
