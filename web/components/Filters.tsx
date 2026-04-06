@@ -1306,10 +1306,23 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
         >
           <style dangerouslySetInnerHTML={{ __html: `.area-tabs-scroll::-webkit-scrollbar { display: none; }` }} />
           <div className="area-tabs-scroll flex items-center overflow-x-auto" style={{ scrollbarWidth: 'none' } as React.CSSProperties}>
-            {/* "All" tab — always first */}
+            {/* "All" tab — always first; long-press shows build info */}
             <div className="relative group shrink-0">
               <button
                 onClick={() => setActiveSearchId(null)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  const buildInfo = document.querySelector('footer')?.textContent?.trim() || 'Build info unavailable';
+                  alert(buildInfo);
+                }}
+                onTouchStart={(e) => {
+                  const t = setTimeout(() => {
+                    const buildInfo = document.querySelector('footer')?.textContent?.trim() || 'Build info unavailable';
+                    alert(buildInfo);
+                  }, 800);
+                  (e.currentTarget as HTMLElement).dataset.lpt = String(t);
+                }}
+                onTouchEnd={(e) => { const t = (e.currentTarget as HTMLElement).dataset.lpt; if (t) clearTimeout(Number(t)); }}
                 className={cn(
                   'relative flex items-center h-8 px-2.5 text-[11px] whitespace-nowrap cursor-pointer transition-colors duration-150',
                   activeSearchId === null ? 'text-[#e1e4e8]' : 'text-[#8b949e] hover:text-[#c0d6f5]',
