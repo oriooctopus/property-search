@@ -1312,7 +1312,9 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
                 onClick={() => setActiveSearchId(null)}
                 onContextMenu={(e) => {
                   e.preventDefault();
-                  const buildInfo = document.querySelector('footer')?.textContent?.trim() || 'Build info unavailable';
+                  const raw = document.querySelector('footer')?.textContent?.replace('Built ', '').trim() || '';
+                  const d = new Date(raw);
+                  const buildInfo = isNaN(d.getTime()) ? 'Build info unavailable' : `Built ${d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}`;
                   alert(buildInfo);
                 }}
                 onTouchStart={(e) => {
