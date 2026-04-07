@@ -365,7 +365,7 @@ function buildPopupContent(listing: Listing, isFavorited: boolean, isWouldLive: 
           font-size: 11px;
           color: #8b949e;
           margin-bottom: 2px;
-        ">${listing.beds > 0 ? `$${Math.round(listing.price / listing.beds).toLocaleString()}/bed · ` : ''}${listing.beds === 0 ? 'Studio' : `${listing.beds} bd`} / ${listing.baths} ba</div>
+        ">${listing.beds === 0 ? 'Studio' : `${listing.beds} bd`} / ${listing.baths} ba</div>
         ${'' /* Commute badge removed — inaccurate for OTP polygon filters */}
         ${actionsHtml}
         <div data-action="open-detail-btn" data-listing-id="${listing.id}" style="
