@@ -1,0 +1,60 @@
+name: Ingest (new pipeline, soak)
+
+on:
+  schedule:
+    # Same cadence as refresh-sources.yml — every 12 hours at :15.
+    - cron: "15 6,18 * * *"
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: "Comma-separated sources (e.g. streeteasy,craigslist). Empty = all."
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry-run (no DB writes)"
+        required: false
+        default: "false"
+
+concurrency:
+  group: ingest-daily
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Run ingest (new pipeline)
+        working-directory: web
+        env:
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          REFRESH_STALE_HOURS: "12"
+          INPUT_SOURCES: ${{ github.event.inputs.sources }}
+          INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          ARGS="--fetch-strategy=staleness-gated"
+          if [ -n "$INPUT_SOURCES" ]; then
+            ARGS="$ARGS --sources=$INPUT_SOURCES"
+          fi
+          if [ "$INPUT_DRY_RUN" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          echo "Running: npx tsx scripts/ingest.ts $ARGS"
+          npx tsx scripts/ingest.ts $ARGS

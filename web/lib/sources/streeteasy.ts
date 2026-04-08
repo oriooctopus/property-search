@@ -9,11 +9,10 @@
  */
 
 import type { AdapterOutput, SearchParams } from "./types";
-import { makeSearchTag } from "./parse-utils";
 
 const SE_API_URL = "https://api-v6.streeteasy.com/";
 const SE_PAGE_SIZE = 100;
-const SE_DELAY_MS = 500; // delay between pages to avoid rate limiting
+const SE_DELAY_MS = 3000; // delay between pages to avoid rate limiting
 
 // Area codes: Manhattan=100, Brooklyn=300
 const AREA_CODES: Record<string, number[]> = {
@@ -91,7 +90,6 @@ export interface SENode {
   noFee?: boolean;
   monthsFree?: number;
   netEffectivePrice?: number;
-  yearBuilt?: number;
 }
 
 interface SEEdge {
@@ -311,12 +309,10 @@ function nodesToListings(nodes: SENode[], city: string): AdapterOutput[] {
       lon: n.geoPoint?.longitude ?? null,
       photo_urls: photoUrls,
       url: fullUrl,
-      search_tag: makeSearchTag(city),
       list_date: null,
       last_update_date: null,
       availability_date: n.availableAt ?? null,
       source: "streeteasy" as const,
-      year_built: n.yearBuilt ?? null,
     });
   }
 
@@ -326,6 +322,9 @@ function nodesToListings(nodes: SENode[], city: string): AdapterOutput[] {
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
+
+const SE_BEDROOM_SLICES = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+const SE_SLICE_DELAY_MS = 5_000; // delay between bedroom slices
 
 export async function fetchStreetEasyListings(
   params: SearchParams,
@@ -337,83 +336,142 @@ export async function fetchStreetEasyListings(
   const areas = AREA_CODES[cityLower] ?? AREA_CODES["new york"];
   const known = existingUrls ?? new Set<string>();
 
-  const filters = buildFilters(areas);
-
-  // For incremental mode, use the raw paginator with early-stop logic
-  const searchToken = crypto.randomUUID();
   const allNodes: SENode[] = [];
-  let totalCount = 0;
+  const seenUrlPaths = new Set<string>();
+  let grandTotal = 0;
 
-  for (let page = 1; ; page++) {
-    console.log(`[StreetEasy] Fetching page ${page} (areas: ${areas})`);
+  for (const bedrooms of SE_BEDROOM_SLICES) {
+    const label = bedrooms === 0 ? "studio" : `${bedrooms}BR`;
+    const filters = buildFilters(areas, bedrooms);
 
-    const res = await fetch(SE_API_URL, {
-      method: "POST",
-      headers: SE_HEADERS,
-      body: JSON.stringify({
-        query: SE_QUERY,
-        variables: {
-          input: {
-            filters,
-            page,
-            perPage: SE_PAGE_SIZE,
-            sorting: { attribute: "LISTED_AT", direction: "DESCENDING" },
-            userSearchToken: searchToken,
-            adStrategy: "NONE",
-          },
-        },
-      }),
-      signal: AbortSignal.timeout(15_000),
-    });
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`SE API error ${res.status}: ${text.slice(0, 200)}`);
+    // Probe totalCount first to skip empty slices
+    let sliceTotal: number;
+    try {
+      sliceTotal = await probeTotalCount(areas, filters);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[StreetEasy] ${label} probe failed: ${msg}`);
+      if (msg.includes("403")) {
+        console.error(`[StreetEasy] Rate limited — returning what we have so far`);
+        break; // Stop all slices, return partial results
+      }
+      continue; // Skip this slice on other errors
+    }
+    if (sliceTotal === 0) {
+      console.log(`[StreetEasy] ${label}: 0 listings — skipping`);
+      continue;
     }
 
-    const data: SEResponse = await res.json();
+    grandTotal += sliceTotal;
+    console.log(`[StreetEasy] ${label}: ${sliceTotal} listings — fetching`);
 
-    if (data.errors?.length) {
-      throw new Error(`SE GraphQL error: ${data.errors[0].message}`);
+    if (sliceTotal > 1100) {
+      console.warn(
+        `[StreetEasy] WARNING: ${label} has ${sliceTotal} listings, exceeds ~1,100 cap. Some may be missed.`,
+      );
     }
 
-    const edges = data.data?.searchRentals?.edges ?? [];
-    if (page === 1) {
-      totalCount = data.data?.searchRentals?.totalCount ?? 0;
-      console.log(`[StreetEasy] Total: ${totalCount} active listings`);
+    // Paginate this bedroom slice with incremental early-stop logic
+    const searchToken = crypto.randomUUID();
+    let rateLimited = false;
+
+    for (let page = 1; ; page++) {
+      console.log(`[StreetEasy] ${label} page ${page}`);
+
+      let res: Response;
+      try {
+        res = await fetch(SE_API_URL, {
+          method: "POST",
+          headers: SE_HEADERS,
+          body: JSON.stringify({
+            query: SE_QUERY,
+            variables: {
+              input: {
+                filters,
+                page,
+                perPage: SE_PAGE_SIZE,
+                sorting: { attribute: "LISTED_AT", direction: "DESCENDING" },
+                userSearchToken: searchToken,
+                adStrategy: "NONE",
+              },
+            },
+          }),
+          signal: AbortSignal.timeout(15_000),
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[StreetEasy] ${label} page ${page} fetch error: ${msg}`);
+        break;
+      }
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        console.error(`[StreetEasy] ${label} page ${page} HTTP ${res.status}: ${text.slice(0, 200)}`);
+        if (res.status === 403) {
+          rateLimited = true;
+        }
+        break;
+      }
+
+      const data: SEResponse = await res.json();
+
+      if (data.errors?.length) {
+        console.error(`[StreetEasy] ${label} GraphQL error: ${data.errors[0].message}`);
+        break;
+      }
+
+      const edges = data.data?.searchRentals?.edges ?? [];
+
+      if (edges.length === 0) {
+        console.log(`[StreetEasy] ${label} empty page — done`);
+        break;
+      }
+
+      let newCount = 0;
+      for (const edge of edges) {
+        const n = edge.node;
+        if (!n?.urlPath) continue;
+        // Deduplicate across bedroom slices
+        if (seenUrlPaths.has(n.urlPath)) continue;
+        seenUrlPaths.add(n.urlPath);
+
+        const fullUrl = `https://streeteasy.com${n.urlPath}`;
+        if (!known.has(fullUrl)) newCount++;
+        allNodes.push(n);
+      }
+
+      console.log(
+        `[StreetEasy] ${label} page ${page}: ${edges.length} results, ${newCount} new`,
+      );
+
+      // Incremental early-stop: if >70% are already known, stop this slice
+      if (known.size > 0 && newCount < edges.length * 0.3) {
+        console.log(
+          `[StreetEasy] ${label} caught up with existing data — stopping slice`,
+        );
+        break;
+      }
+
+      if (page * SE_PAGE_SIZE >= sliceTotal) {
+        console.log(`[StreetEasy] ${label} all pages fetched`);
+        break;
+      }
+
+      await new Promise((r) => setTimeout(r, SE_DELAY_MS));
     }
 
-    if (edges.length === 0) {
-      console.log(`[StreetEasy] Empty page — done`);
-      break;
+    if (rateLimited) {
+      console.error(`[StreetEasy] Rate limited on ${label} — returning partial results`);
+      break; // Stop all slices
     }
 
-    let newCount = 0;
-    for (const edge of edges) {
-      const n = edge.node;
-      if (!n?.urlPath) continue;
-      const fullUrl = `https://streeteasy.com${n.urlPath}`;
-      if (!known.has(fullUrl)) newCount++;
-      allNodes.push(n);
-    }
-
-    console.log(`[StreetEasy] Page ${page}: ${edges.length} results, ${newCount} new`);
-
-    // Stop if >70% are already known (incremental mode caught up)
-    if (known.size > 0 && newCount < edges.length * 0.3) {
-      console.log(`[StreetEasy] Caught up with existing data — stopping`);
-      break;
-    }
-
-    if (page * SE_PAGE_SIZE >= totalCount) {
-      console.log(`[StreetEasy] All pages fetched`);
-      break;
-    }
-
-    await new Promise((r) => setTimeout(r, SE_DELAY_MS));
+    // Delay between bedroom slices to avoid rate limiting
+    await new Promise((r) => setTimeout(r, SE_SLICE_DELAY_MS));
   }
 
-  console.log(`[StreetEasy] ${allNodes.length} raw results`);
+  console.log(
+    `[StreetEasy] All slices done: ${allNodes.length} raw results (API reported ${grandTotal} total)`,
+  );
 
   const listings = nodesToListings(allNodes, city);
   console.log(

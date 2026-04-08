@@ -2,7 +2,6 @@
 
 import { useState, useRef, useCallback } from 'react';
 import type { Database } from '@/lib/types';
-import { TAG_COLORS, TAG_LABELS, TAG_DESCRIPTIONS } from '@/lib/tag-constants';
 import { formatListedDate, formatAvailabilityDate } from '@/lib/format-date';
 import { ActionButton, IconButton } from '@/components/ui';
 import PeopleAvatars from './PeopleAvatars';
@@ -72,7 +71,6 @@ export default function ListingCard({
   onHide,
 }: ListingCardProps) {
   const pricePerBed = listing.beds > 0 ? Math.round(listing.price / listing.beds) : null;
-  const tagColor = TAG_COLORS[listing.search_tag] ?? '#8b949e';
   const photos = listing.photo_urls ?? [];
   const hasMorePhotosSlide = photos.length === 1;
   const totalPhotos = photos.length + (hasMorePhotosSlide ? 1 : 0);
@@ -291,47 +289,6 @@ export default function ListingCard({
       {/* Tag pill + source badges + actions */}
       <div className="flex items-center justify-between mt-2">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Only show tag pill for known tags with labels (hide raw search_* tags) */}
-          {TAG_LABELS[listing.search_tag] && (
-          <div className="relative group/tag">
-            <span
-              className="inline-flex items-center rounded-full px-2.5 h-[22px] text-[10px] font-semibold cursor-default"
-              style={{
-                backgroundColor: `${tagColor}20`,
-                color: tagColor,
-                border: `1px solid ${tagColor}40`,
-              }}
-            >
-              {TAG_LABELS[listing.search_tag]}
-            </span>
-            {TAG_DESCRIPTIONS[listing.search_tag] && (
-              <div
-                className="pointer-events-none absolute left-0 bottom-full mb-2 opacity-0 group-hover/tag:opacity-100 transition-opacity duration-75 z-50"
-              >
-                {/* Body */}
-                <div
-                  className="rounded-md px-2.5 py-1.5 text-xs"
-                  style={{
-                    backgroundColor: '#1c2028',
-                    color: '#e1e4e8',
-                    border: '1px solid #2d333b',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-                    maxWidth: 'min(280px, calc(100vw - 32px))',
-                    width: 'max-content',
-                    wordWrap: 'break-word',
-                  }}
-                >
-                  {TAG_DESCRIPTIONS[listing.search_tag]}
-                </div>
-                {/* Arrow (caret pointing down) */}
-                <div
-                  className="absolute -bottom-1 w-2 h-2 rotate-45"
-                  style={{ left: 16, backgroundColor: '#1c2028', border: '1px solid #2d333b', borderLeft: 'none', borderTop: 'none' }}
-                />
-              </div>
-            )}
-          </div>
-          )}
           {/* Source badges */}
           {((listing as Record<string, unknown>).sources as string[] | undefined ?? (listing.source ? [listing.source] : [])).map((src) => (
             <span

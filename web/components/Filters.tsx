@@ -1593,7 +1593,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
             />
           </FilterChip>
 
-          {/* Listing age chip */}
+          {/* Listing age chip — temporarily hidden
           <FilterChip
             compact
             label={listingAgeLabel(filters.maxListingAge)}
@@ -1616,6 +1616,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
               }}
             />
           </FilterChip>
+          */}
 
           {/* Source chip */}
           <FilterChip

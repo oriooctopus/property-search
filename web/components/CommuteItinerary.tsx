@@ -295,6 +295,7 @@ interface CommuteItineraryProps {
   destinationLat: number;
   destinationLon: number;
   destinationName: string;
+  destinationLines?: string[]; // If destination is a subway station, the line(s) it serves
   mode?: string;              // OTP mode string — e.g. "WALK", "BICYCLE", "TRANSIT,WALK"
 }
 
@@ -304,6 +305,7 @@ export default function CommuteItinerary({
   destinationLat,
   destinationLon,
   destinationName,
+  destinationLines,
   mode,
 }: CommuteItineraryProps) {
   const [itinerary, setItinerary] = useState<TripItinerary | null>(null);
@@ -375,7 +377,24 @@ export default function CommuteItinerary({
           </div>
         )}
 
-        {!loading && !error && itinerary && (
+        {!loading && !error && itinerary && destinationLines && destinationLines.length > 0 && itinerary.legs.every(l => l.type === 'walk') && (
+          <div className="p-4 flex items-center gap-3">
+            <WalkIcon />
+            <span className="text-sm" style={{ color: '#e1e4e8' }}>
+              <span className="font-semibold">{itinerary.totalDuration}-minute walk</span>
+              {' '}from{' '}
+              <span className="font-semibold">{destinationName}</span>
+            </span>
+            <div className="flex items-center gap-1 ml-auto">
+              {destinationLines.map((line) => {
+                const color = SUBWAY_COLORS[line.toUpperCase()] ?? '#58a6ff';
+                return <SubwayBullet key={line} route={line} color={color} />;
+              })}
+            </div>
+          </div>
+        )}
+
+        {!loading && !error && itinerary && !(destinationLines && destinationLines.length > 0 && itinerary.legs.every(l => l.type === 'walk')) && (
           <>
             {/* Timeline */}
             <div className="p-4 flex flex-col gap-0">

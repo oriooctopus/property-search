@@ -12,7 +12,7 @@
 
 import * as cheerio from "cheerio";
 import type { AdapterOutput, SearchParams } from "./types";
-import { extractBaths, extractBeds, makeSearchTag, parsePrice } from "./parse-utils";
+import { extractBaths, extractBeds, parsePrice } from "./parse-utils";
 
 const BASE_URL = "https://www.renthop.com/search/nyc";
 const TIMEOUT_MS = 15_000;
@@ -127,7 +127,6 @@ export async function fetchRentHopListings(
         lon: null,
         photo_urls: photoUrls.slice(0, 10),
         url: listingUrl,
-        search_tag: makeSearchTag(city),
         list_date: dateText,
         last_update_date: null,
         availability_date: null,

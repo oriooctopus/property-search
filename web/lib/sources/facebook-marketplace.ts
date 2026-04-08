@@ -14,7 +14,7 @@
  */
 
 import type { AdapterOutput, SearchParams } from "./types";
-import { extractBaths, extractBeds, makeSearchTag, parsePrice } from "./parse-utils";
+import { extractBaths, extractBeds, parsePrice } from "./parse-utils";
 import { createClient } from "@supabase/supabase-js";
 
 // ---------------------------------------------------------------------------
@@ -292,7 +292,6 @@ export async function fetchFacebookMarketplaceListings(
       lon: null,
       photo_urls: photoUrls,
       url: listingUrl,
-      search_tag: makeSearchTag(city),
       list_date: null,
       last_update_date: null,
       availability_date: null,

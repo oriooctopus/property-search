@@ -6,7 +6,7 @@
  */
 
 import type { AdapterOutput, SearchParams } from "./types";
-import { extractPhotoUrls, makeSearchTag, parsePrice } from "./parse-utils";
+import { extractPhotoUrls, parsePrice } from "./parse-utils";
 
 const APIFY_START_URL = "https://api.apify.com/v2/acts/epctex~realtor-scraper/runs";
 
@@ -165,7 +165,6 @@ export async function fetchRealtorListings(
       lon: lon != null && !isNaN(lon) ? lon : null,
       photo_urls: photoUrls,
       url: item.url,
-      search_tag: makeSearchTag(city),
       list_date: item.listDate ?? null,
       last_update_date: item.lastUpdate ?? null,
       availability_date: item.availableDate ?? null,
