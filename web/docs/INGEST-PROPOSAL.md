@@ -1,5 +1,11 @@
 # Ingest Pipeline Audit & Unified Entry-Point Proposal
 
+## Status (2026-04-08)
+
+PR 1 (orchestrator + shared modules + bug fixes) and PR 2 (delete old scripts,
+extract SE bisection) have both landed. Old scripts are recoverable from git
+history if needed.
+
 _Date: 2026-04-07. Author: audit pass before any code changes._
 
 Companion HTML flowchart: `web/public/ingest-flowchart.html`

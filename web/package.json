@@ -13,7 +13,9 @@
     "test:visual:update": "playwright test tests/visual-regression.spec.ts --update-snapshots",
     "test:visual:review": "node tests/serve-visual-approval.js",
     "predeploy": "npm run test:visual",
-    "refresh": "tsx scripts/refresh-sources.ts"
+    "ingest:daily": "tsx scripts/ingest.ts --fetch-strategy=staleness-gated",
+    "ingest:full": "tsx scripts/ingest.ts --fetch-strategy=full-bisection",
+    "ingest:enrich-only": "tsx scripts/ingest.ts --only-phase=enrich-year-built,enrich-isochrones"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
