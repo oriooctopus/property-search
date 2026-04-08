@@ -58,7 +58,6 @@ create table public.listings (
   transit_summary text,
   photos int not null,
   url text not null,
-  search_tag text not null,
   list_date timestamptz,
   last_update_date timestamptz,
   availability_date timestamptz,

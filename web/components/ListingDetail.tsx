@@ -12,16 +12,6 @@ import { PARK_COORDS } from '@/lib/park-coords';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
-const TAG_COLORS: Record<string, string> = {
-  manhattan: '#38bdf8',
-  brooklyn: '#4ade80',
-};
-
-const TAG_LABELS: Record<string, string> = {
-  manhattan: 'Manhattan',
-  brooklyn: 'Brooklyn',
-};
-
 const SOURCE_LABELS: Record<string, string> = {
   realtor: 'Realtor.com',
   craigslist: 'Craigslist',
@@ -55,6 +45,7 @@ function getCommuteDestination(
   lon: number;
   name: string;
   mode: 'walk' | 'transit' | 'bike';
+  stationLines?: string[];
 } | null {
   for (const rule of rules) {
     // Address rules have explicit lat/lon
@@ -68,7 +59,7 @@ function getCommuteDestination(
       if (name) {
         const station = SUBWAY_STATIONS.find((s) => s.name === name);
         if (station) {
-          return { lat: station.lat, lon: station.lon, name: station.name, mode: rule.mode };
+          return { lat: station.lat, lon: station.lon, name: station.name, mode: rule.mode, stationLines: station.lines };
         }
       }
     }
@@ -78,7 +69,7 @@ function getCommuteDestination(
       if (rule.stops && rule.stops.length > 0) {
         const station = SUBWAY_STATIONS.find((s) => s.name === rule.stops![0]);
         if (station) {
-          return { lat: station.lat, lon: station.lon, name: station.name, mode: rule.mode };
+          return { lat: station.lat, lon: station.lon, name: station.name, mode: rule.mode, stationLines: station.lines };
         }
       }
       // Otherwise pick nearest station on the selected lines to the listing
@@ -93,13 +84,13 @@ function getCommuteDestination(
               const d = (s.lat - listingLat) ** 2 + (s.lon - listingLon) ** 2;
               if (d < minDist) { nearest = s; minDist = d; }
             }
-            return { lat: nearest.lat, lon: nearest.lon, name: nearest.name, mode: rule.mode };
+            return { lat: nearest.lat, lon: nearest.lon, name: nearest.name, mode: rule.mode, stationLines: nearest.lines };
           }
         }
         // Fallback if no listing coords: pick first station on first line
         const station = SUBWAY_STATIONS.find((s) => s.lines.includes(rule.lines![0]));
         if (station) {
-          return { lat: station.lat, lon: station.lon, name: station.name, mode: rule.mode };
+          return { lat: station.lat, lon: station.lon, name: station.name, mode: rule.mode, stationLines: station.lines };
         }
       }
     }
@@ -143,7 +134,6 @@ export default function ListingDetail({
   const [linkCopied, setLinkCopied] = useState(false);
   const photos = listing.photo_urls ?? [];
   const pricePerBed = listing.beds > 0 ? Math.round(listing.price / listing.beds) : null;
-  const tagColor = TAG_COLORS[listing.search_tag] ?? '#8b949e';
   const commuteDest = getCommuteDestination(commuteRules, listing.lat, listing.lon);
 
   const scrollToPhoto = (index: number) => {
@@ -391,20 +381,10 @@ export default function ListingDetail({
             </div>
           )}
 
-          {/* Photos + tag */}
+          {/* Photos */}
           <div className="flex items-center gap-2 mb-4">
             <span className="text-xs" style={{ color: '#8b949e' }}>
               {listing.photos} photos
-            </span>
-            <span
-              className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
-              style={{
-                backgroundColor: `${tagColor}20`,
-                color: tagColor,
-                border: `1px solid ${tagColor}40`,
-              }}
-            >
-              {TAG_LABELS[listing.search_tag] ?? listing.search_tag}
             </span>
           </div>
 
@@ -472,6 +452,7 @@ export default function ListingDetail({
               destinationLat={commuteDest.lat}
               destinationLon={commuteDest.lon}
               destinationName={commuteDest.name}
+              destinationLines={commuteDest.stationLines}
               mode={commuteOtpMode(commuteDest.mode)}
             />
           )}

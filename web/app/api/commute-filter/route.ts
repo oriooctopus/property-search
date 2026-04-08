@@ -109,22 +109,31 @@ async function resolveSubwayLineRule(
   const allListingIds = new Set<number>();
   const meta: Record<number, ListingCommuteMeta> = {};
 
-  // Query in batches of 200 isochrone IDs to avoid IN-clause limits
+  // Query in batches of 200 isochrone IDs to avoid IN-clause limits.
+  // PostgREST caps results at 1000 rows per request regardless of .limit(),
+  // so we must page each batch with .range() until we drain it.
   const BATCH_SIZE = 200;
+  const PAGE_SIZE = 1000;
   for (let i = 0; i < isochroneIds.length; i += BATCH_SIZE) {
     const batch = isochroneIds.slice(i, i + BATCH_SIZE);
-    const { data: listingRows, error: listingError } = await supabase
-      .from("listing_isochrones")
-      .select("listing_id, isochrone_id")
-      .in("isochrone_id", batch)
-      .limit(50000);
+    let listingRows: Array<{ listing_id: number; isochrone_id: number }> = [];
+    for (let page = 0; page < 200; page++) {
+      const { data: pageRows, error: listingError } = await supabase
+        .from("listing_isochrones")
+        .select("listing_id, isochrone_id")
+        .in("isochrone_id", batch)
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-    if (listingError) {
-      console.error("[commute-filter] listing_isochrones query failed:", listingError.message);
-      return null;
+      if (listingError) {
+        console.error("[commute-filter] listing_isochrones query failed:", listingError.message);
+        return null;
+      }
+      if (!pageRows || pageRows.length === 0) break;
+      listingRows = listingRows.concat(pageRows as Array<{ listing_id: number; isochrone_id: number }>);
+      if (pageRows.length < PAGE_SIZE) break;
     }
 
-    if (listingRows) {
+    {
       for (const r of listingRows) {
         const listingId = r.listing_id as number;
         const isoId = r.isochrone_id as number;
@@ -194,19 +203,26 @@ async function resolveStationRule(
   const meta: Record<number, ListingCommuteMeta> = {};
   const stationIsoIds = isoRows.map((r) => r.id);
   const BATCH = 200;
+  const PAGE_SIZE = 1000;
   for (let i = 0; i < stationIsoIds.length; i += BATCH) {
     const batch = stationIsoIds.slice(i, i + BATCH);
-    const { data: listingRows, error: listingError } = await supabase
-      .from("listing_isochrones")
-      .select("listing_id, isochrone_id")
-      .in("isochrone_id", batch)
-      .limit(50000);
+    let listingRows: Array<{ listing_id: number; isochrone_id: number }> = [];
+    for (let page = 0; page < 200; page++) {
+      const { data: pageRows, error: listingError } = await supabase
+        .from("listing_isochrones")
+        .select("listing_id, isochrone_id")
+        .in("isochrone_id", batch)
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-    if (listingError) {
-      console.error("[commute-filter] station listing_isochrones query failed:", listingError.message);
-      return null;
+      if (listingError) {
+        console.error("[commute-filter] station listing_isochrones query failed:", listingError.message);
+        return null;
+      }
+      if (!pageRows || pageRows.length === 0) break;
+      listingRows = listingRows.concat(pageRows as Array<{ listing_id: number; isochrone_id: number }>);
+      if (pageRows.length < PAGE_SIZE) break;
     }
-    if (listingRows) {
+    {
       for (const r of listingRows) {
         const listingId = r.listing_id as number;
         const isoId = r.isochrone_id as number;

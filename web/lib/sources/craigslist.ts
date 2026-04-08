@@ -6,7 +6,7 @@
  */
 
 import type { AdapterOutput, SearchParams } from "./types";
-import { extractBaths, extractBeds, makeSearchTag, parsePrice } from "./parse-utils";
+import { extractBaths, extractBeds, parsePrice } from "./parse-utils";
 
 const APIFY_START_URL =
   "https://api.apify.com/v2/acts/ivanvs~craigslist-scraper-pay-per-result/runs";
@@ -157,7 +157,6 @@ export async function fetchCraigslistListings(
       lon: lon && !isNaN(lon) ? lon : null,
       photo_urls: (item.pics ?? []).slice(0, 8),
       url: item.url,
-      search_tag: makeSearchTag(city),
       list_date: item.datetime ?? null,
       last_update_date: null,
       availability_date: item.availableFrom ?? null,

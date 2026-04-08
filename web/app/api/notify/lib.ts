@@ -10,7 +10,6 @@ type Filters = Record<string, unknown>;
  *  - selectedBeds: listing.beds must be in the array (7 means 7+)
  *  - maxPerBed:    price/beds  <= maxPerBed
  *  - maxRent:      listing.price <= maxRent
- *  - searchTags:   listing.search_tag must be in the array
  */
 export function listingMatchesFilters(
   listing: Listing,
@@ -18,11 +17,10 @@ export function listingMatchesFilters(
 ): boolean {
   if (typeof filters !== "object" || filters === null) return true;
 
-  const { selectedBeds, maxPerBed, maxRent, searchTags } = filters as {
+  const { selectedBeds, maxPerBed, maxRent } = filters as {
     selectedBeds?: number[];
     maxPerBed?: number;
     maxRent?: number;
-    searchTags?: string[];
   };
 
   if (selectedBeds !== undefined && Array.isArray(selectedBeds) && selectedBeds.length > 0) {
@@ -37,10 +35,6 @@ export function listingMatchesFilters(
   }
 
   if (maxRent !== undefined && listing.price > maxRent) return false;
-
-  if (searchTags !== undefined && Array.isArray(searchTags) && searchTags.length > 0) {
-    if (!searchTags.includes(listing.search_tag)) return false;
-  }
 
   return true;
 }

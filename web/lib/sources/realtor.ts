@@ -3,7 +3,7 @@
  */
 
 import type { AdapterOutput, SearchParams } from "./types";
-import { extractPhotoUrls, makeSearchTag, parsePrice } from "./parse-utils";
+import { extractPhotoUrls, parsePrice } from "./parse-utils";
 
 const RAPIDAPI_HOST = "realty-in-us.p.rapidapi.com";
 const TIMEOUT_MS = 15_000;
@@ -174,7 +174,6 @@ export async function fetchRealtorListings(
       lon: coord.lon ?? null,
       photo_urls: photoUrls,
       url: href,
-      search_tag: makeSearchTag(city),
       list_date: r.list_date ?? null,
       last_update_date: r.last_update_date ?? null,
       availability_date: desc.available_date ?? null,

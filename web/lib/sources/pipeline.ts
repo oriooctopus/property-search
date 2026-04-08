@@ -15,6 +15,31 @@ import type {
 import { SCRAPER_SOURCES } from "./types";
 
 // ---------------------------------------------------------------------------
+// NYC bounding box (gating only — NOT for borough classification)
+// ---------------------------------------------------------------------------
+//
+// Single envelope covering all 5 boroughs. Used to drop stray non-NYC listings
+// that scrapers occasionally return. Replaces the old per-borough TAG_GEO_BOUNDS
+// approach, which overlapped Manhattan/Brooklyn and mislabeled ~2,159 rows.
+//
+// DO NOT use these constants for borough classification. If you ever need to
+// determine which borough a lat/lon is in, use NYC borough polygons from NYC
+// Open Data — bounding boxes overlap and will give wrong answers.
+const NYC_LAT_MIN = 40.477;  // South tip of Staten Island
+const NYC_LAT_MAX = 40.918;  // North Bronx
+const NYC_LON_MIN = -74.270; // West Staten Island
+const NYC_LON_MAX = -73.700; // East Queens
+
+function isInNYC(lat: number, lon: number): boolean {
+  return (
+    lat >= NYC_LAT_MIN &&
+    lat <= NYC_LAT_MAX &&
+    lon >= NYC_LON_MIN &&
+    lon <= NYC_LON_MAX
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Rejection
 // ---------------------------------------------------------------------------
 
@@ -29,6 +54,15 @@ function rejectReason(raw: AdapterOutput): string | null {
   if (raw.price == null || raw.price <= 0) return "no valid price";
   if (!raw.address && !hasCoords(raw)) {
     return "no address and no coords";
+  }
+  // NYC gating: drop stray non-NYC listings. Only enforced when coords exist —
+  // if a row has no coords, address-only validation has already passed above
+  // and we let it through (geocoding may fix it later).
+  if (hasCoords(raw) && !isInNYC(raw.lat!, raw.lon!)) {
+    console.warn(
+      `[Pipeline] dropped non-NYC listing: source=${raw.source} addr=${raw.address ?? "?"} lat=${raw.lat} lon=${raw.lon}`,
+    );
+    return "outside NYC bbox";
   }
   return null;
 }
@@ -86,11 +120,11 @@ function toValidatedListing(raw: AdapterOutput): ValidatedListing {
     photos: raw.photo_urls.length,
     photo_urls: raw.photo_urls.filter((u) => u.length > 0).slice(0, 10),
     url: raw.url,
-    search_tag: raw.search_tag,
     list_date: raw.list_date,
     last_update_date: raw.last_update_date,
     availability_date: raw.availability_date,
     source: raw.source,
+    year_built: raw.year_built ?? null,
     quality,
   };
 }

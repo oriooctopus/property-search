@@ -107,9 +107,6 @@ export async function POST(request: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   );
 
-  // Build the search tag pattern: "city, ST" (e.g. "New York, NY")
-  const searchTag = `${city}, ${stateCode}`.toLowerCase();
-
   let query = adminClient
     .from("listings")
     .select("*")
@@ -117,9 +114,8 @@ export async function POST(request: NextRequest) {
     .order("created_at", { ascending: false })
     .limit(500);
 
-  // Filter by area or search_tag matching the city/state
-  // Use ilike for case-insensitive matching
-  query = query.or(`area.ilike.%${city}%,search_tag.ilike.%${searchTag}%`);
+  // Filter by area name matching the city (case-insensitive).
+  query = query.ilike("area", `%${city}%`);
 
   if (bedsMin != null) {
     query = query.gte("beds", bedsMin);
@@ -158,7 +154,6 @@ export async function POST(request: NextRequest) {
     photos: Number(row.photos) || 0,
     photo_urls: row.photo_urls ?? [],
     url: row.url ?? "",
-    search_tag: row.search_tag ?? "",
     list_date: row.list_date ?? null,
     last_update_date: row.last_update_date ?? null,
     availability_date: row.availability_date ?? null,

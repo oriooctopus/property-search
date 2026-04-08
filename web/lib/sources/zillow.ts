@@ -6,7 +6,7 @@
  */
 
 import type { AdapterOutput, SearchParams } from "./types";
-import { extractPhotoUrls, makeSearchTag, parsePrice } from "./parse-utils";
+import { extractPhotoUrls, parsePrice } from "./parse-utils";
 
 const RAPIDAPI_HOST = "real-time-zillow-data.p.rapidapi.com";
 const TIMEOUT_MS = 15_000;
@@ -94,7 +94,6 @@ export async function fetchZillowListings(
       lon,
       photo_urls: photoUrls.slice(0, 10),
       url: fullUrl,
-      search_tag: makeSearchTag(city),
       list_date: r.datePosted ?? r.listDate ?? r.timeOnZillow ?? null,
       last_update_date: r.dateSold ?? r.lastUpdated ?? null,
       availability_date: r.availableDate ?? null,

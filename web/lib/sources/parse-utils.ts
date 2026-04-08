@@ -135,11 +135,3 @@ export function extractPhotoUrls(
   return urls;
 }
 
-// ---------------------------------------------------------------------------
-// Search tag
-// ---------------------------------------------------------------------------
-
-/** Generate a consistent search tag from a city name. */
-export function makeSearchTag(city: string): string {
-  return `search_${city.trim().toLowerCase().replace(/\s+/g, "_")}`;
-}

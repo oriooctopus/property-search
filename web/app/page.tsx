@@ -31,22 +31,22 @@ interface PersonWithBio {
 // Seed data fallback (used when DB is empty)
 // ---------------------------------------------------------------------------
 const SEED_LISTINGS: Listing[] = [
-  { id: -1, address: '240 E 6th St Apt 1', area: 'East Village', price: 9995, beds: 5, baths: 2, sqft: null, lat: 40.7262, lon: -73.9858, transit_summary: '~10 min walk to 1st Ave L', photos: 18, photo_urls: [], url: 'https://www.realtor.com/rentals/details/240-E-6th-St-Apt-1_New-York_NY_10003_M95522-46041', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
-  { id: -2, address: '165 Attorney St Apt 5C', area: 'Lower East Side', price: 9450, beds: 6, baths: 2, sqft: null, lat: 40.7195, lon: -73.9845, transit_summary: '16 min J to Fulton', photos: 6, photo_urls: [], url: 'https://www.realtor.com/rentals/details/165-Attorney-St-Apt-5C_New-York_NY_10002_M94116-63343', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
-  { id: -3, address: '53 Park Pl Ph 2', area: 'Tribeca', price: 9000, beds: 5, baths: 2, sqft: null, lat: 40.7141, lon: -74.0079, transit_summary: 'Tribeca / Park Place', photos: 12, photo_urls: [], url: 'https://www.realtor.com/rentals/details/53-Park-Pl-2_New-York_NY_10007_M90339-21295', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
-  { id: -4, address: '372 Bainbridge St', area: 'Stuyvesant Heights', price: 6995, beds: 5, baths: 4, sqft: null, lat: 40.6808, lon: -73.927, transit_summary: '34 min C to 14th/8th Ave', photos: 16, photo_urls: [], url: 'https://www.realtor.com/rentals/details/372-Bainbridge-St-Unit-Triplex_Brooklyn_NY_11233_M96732-47148', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
-  { id: -5, address: '171 Attorney St Unit 6A', area: 'Lower East Side', price: 11000, beds: 7, baths: 2.5, sqft: null, lat: 40.7198, lon: -73.9843, transit_summary: '16 min J to Fulton', photos: 3, photo_urls: [], url: 'https://www.realtor.com/rentals/details/171-Attorney-St-6A_New-York_NY_10002_M99751-50289', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
-  { id: -6, address: '386 Stuyvesant Ave', area: 'Stuyvesant Heights', price: 12500, beds: 6, baths: 3.5, sqft: 3200, lat: 40.6838, lon: -73.9298, transit_summary: '18 min A to Fulton / 30 min to 14th', photos: 24, photo_urls: [], url: 'https://www.realtor.com/rentals/details/386-Stuyvesant-Ave_Brooklyn_NY_11233_M44801-18988', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
-  { id: -7, address: '50 Murray St Unit 2211', area: 'Tribeca', price: 10000, beds: 5, baths: 2, sqft: null, lat: 40.7143, lon: -74.0086, transit_summary: 'Tribeca / Murray St', photos: 9, photo_urls: [], url: 'https://www.realtor.com/rentals/details/50-Murray-St-2211_New-York_NY_10007_M93038-48259', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
-  { id: -8, address: '290 Jefferson Ave', area: 'Bedford-Stuyvesant', price: 10900, beds: 5, baths: 4, sqft: 3600, lat: 40.6862, lon: -73.943, transit_summary: '30 min A to 14th/8th Ave', photos: 19, photo_urls: [], url: 'https://www.realtor.com/rentals/details/290-Jefferson-Ave_Brooklyn_NY_11216_M49395-49974', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
-  { id: -9, address: '276 Halsey St #2', area: 'Bedford-Stuyvesant', price: 10750, beds: 5, baths: 3.5, sqft: null, lat: 40.6842, lon: -73.9418, transit_summary: '31 min A to 14th/8th Ave', photos: 16, photo_urls: [], url: 'https://www.realtor.com/rentals/details/276-Halsey-St-2_Brooklyn_NY_11216_M93027-20426', search_tag: 'brooklyn', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
-  { id: -10, address: '53 Park Pl Apt 3E', area: 'Tribeca', price: 13500, beds: 5, baths: 3, sqft: null, lat: 40.7141, lon: -74.0079, transit_summary: 'Tribeca / Park Place', photos: 20, photo_urls: [], url: 'https://www.realtor.com/rentals/details/53-Park-Pl-Apt-3E_New-York_NY_10007_M39270-97535', search_tag: 'manhattan', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -1, address: '240 E 6th St Apt 1', area: 'East Village', price: 9995, beds: 5, baths: 2, sqft: null, lat: 40.7262, lon: -73.9858, transit_summary: '~10 min walk to 1st Ave L', photos: 18, photo_urls: [], url: 'https://www.realtor.com/rentals/details/240-E-6th-St-Apt-1_New-York_NY_10003_M95522-46041', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -2, address: '165 Attorney St Apt 5C', area: 'Lower East Side', price: 9450, beds: 6, baths: 2, sqft: null, lat: 40.7195, lon: -73.9845, transit_summary: '16 min J to Fulton', photos: 6, photo_urls: [], url: 'https://www.realtor.com/rentals/details/165-Attorney-St-Apt-5C_New-York_NY_10002_M94116-63343', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -3, address: '53 Park Pl Ph 2', area: 'Tribeca', price: 9000, beds: 5, baths: 2, sqft: null, lat: 40.7141, lon: -74.0079, transit_summary: 'Tribeca / Park Place', photos: 12, photo_urls: [], url: 'https://www.realtor.com/rentals/details/53-Park-Pl-2_New-York_NY_10007_M90339-21295', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -4, address: '372 Bainbridge St', area: 'Stuyvesant Heights', price: 6995, beds: 5, baths: 4, sqft: null, lat: 40.6808, lon: -73.927, transit_summary: '34 min C to 14th/8th Ave', photos: 16, photo_urls: [], url: 'https://www.realtor.com/rentals/details/372-Bainbridge-St-Unit-Triplex_Brooklyn_NY_11233_M96732-47148', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -5, address: '171 Attorney St Unit 6A', area: 'Lower East Side', price: 11000, beds: 7, baths: 2.5, sqft: null, lat: 40.7198, lon: -73.9843, transit_summary: '16 min J to Fulton', photos: 3, photo_urls: [], url: 'https://www.realtor.com/rentals/details/171-Attorney-St-6A_New-York_NY_10002_M99751-50289', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -6, address: '386 Stuyvesant Ave', area: 'Stuyvesant Heights', price: 12500, beds: 6, baths: 3.5, sqft: 3200, lat: 40.6838, lon: -73.9298, transit_summary: '18 min A to Fulton / 30 min to 14th', photos: 24, photo_urls: [], url: 'https://www.realtor.com/rentals/details/386-Stuyvesant-Ave_Brooklyn_NY_11233_M44801-18988', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -7, address: '50 Murray St Unit 2211', area: 'Tribeca', price: 10000, beds: 5, baths: 2, sqft: null, lat: 40.7143, lon: -74.0086, transit_summary: 'Tribeca / Murray St', photos: 9, photo_urls: [], url: 'https://www.realtor.com/rentals/details/50-Murray-St-2211_New-York_NY_10007_M93038-48259', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -8, address: '290 Jefferson Ave', area: 'Bedford-Stuyvesant', price: 10900, beds: 5, baths: 4, sqft: 3600, lat: 40.6862, lon: -73.943, transit_summary: '30 min A to 14th/8th Ave', photos: 19, photo_urls: [], url: 'https://www.realtor.com/rentals/details/290-Jefferson-Ave_Brooklyn_NY_11216_M49395-49974', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -9, address: '276 Halsey St #2', area: 'Bedford-Stuyvesant', price: 10750, beds: 5, baths: 3.5, sqft: null, lat: 40.6842, lon: -73.9418, transit_summary: '31 min A to 14th/8th Ave', photos: 16, photo_urls: [], url: 'https://www.realtor.com/rentals/details/276-Halsey-St-2_Brooklyn_NY_11216_M93027-20426', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
+  { id: -10, address: '53 Park Pl Apt 3E', area: 'Tribeca', price: 13500, beds: 5, baths: 3, sqft: null, lat: 40.7141, lon: -74.0079, transit_summary: 'Tribeca / Park Place', photos: 20, photo_urls: [], url: 'https://www.realtor.com/rentals/details/53-Park-Pl-Apt-3E_New-York_NY_10007_M39270-97535', list_date: null, last_update_date: null, availability_date: null, source: 'realtor', year_built: null, created_at: '' },
 ];
 
 // ---------------------------------------------------------------------------
 // Helpers: read / write URL query params
 // ---------------------------------------------------------------------------
-const VALID_VIEWS = new Set(['list', 'map', 'swipe']);
+const VALID_VIEWS = new Set(['list', 'map']); // 'swipe' temporarily hidden
 const VALID_SORTS = new Set<string>(['price', 'beds', 'listDate']);
 const VALID_LISTING_AGES = new Set<string>(['1w', '2w', '1m', '3m', '6m', '1y']);
 
@@ -77,7 +77,7 @@ function readFiltersFromParams(params: URLSearchParams): FiltersState {
     minBaths: parseNumOrNull(params.get('minBaths')),
     minRent: parseNumOrNull(params.get('minRent')),
     maxRent: parseNumOrNull(params.get('maxRent')),
-    maxListingAge: (age === 'any' ? null : age && VALID_LISTING_AGES.has(age) ? age : '1m') as MaxListingAge,
+    maxListingAge: (age === 'any' ? null : age && VALID_LISTING_AGES.has(age) ? age : null) as MaxListingAge,
     photosFirst: params.get('photosFirst') === '1',
     selectedSources: params.get('sources') ? params.get('sources')!.split(',') : null,
     minYearBuilt: parseNumOrNull(params.get('minYearBuilt')),
@@ -289,6 +289,8 @@ function HomeInner() {
   const [detailListing, setDetailListing] = useState<Listing | null>(null);
   const [mobileView, setMobileView] = useState<'list' | 'map' | 'swipe'>(() => {
     const v = searchParams.get('view');
+    // Swipe mode temporarily hidden — fall back to list
+    if (v === 'swipe') return 'list';
     if (v && VALID_VIEWS.has(v)) return v as 'list' | 'map' | 'swipe';
     return 'list';
   });
@@ -408,7 +410,28 @@ function HomeInner() {
         listingsQuery = listingsQuery.order('price', { ascending: true });
       }
 
-      const { data: dbListings } = await listingsQuery;
+      // Paginate fetch — Supabase PostgREST caps responses at 1000 rows.
+      // Use .range() to page through all results when no viewport is set.
+      let dbListings: unknown[] = [];
+      if (hasUrlPosition) {
+        const { data } = await listingsQuery;
+        dbListings = data ?? [];
+      } else {
+        const PAGE_SIZE = 1000;
+        let from = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from('listings')
+            .select('*')
+            .order('price', { ascending: true })
+            .range(from, from + PAGE_SIZE - 1);
+          if (error || !data || data.length === 0) break;
+          dbListings.push(...data);
+          if (data.length < PAGE_SIZE) break;
+          from += PAGE_SIZE;
+          if (from > 50000) break; // safety cap
+        }
+      }
 
       // Supabase returns Postgres `numeric` columns as strings.
       // Coerce lat, lon, baths (and sqft just in case) to real numbers
@@ -872,7 +895,8 @@ function HomeInner() {
       onChange={(v) => setMobileView(v as 'list' | 'map' | 'swipe')}
       options={[
         { value: 'list', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> },
-        { value: 'swipe', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 12h8M12 8v8"/></svg> },
+        // Swipe mode temporarily hidden
+        // { value: 'swipe', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 12h8M12 8v8"/></svg> },
         { value: 'map', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> },
       ]}
     />

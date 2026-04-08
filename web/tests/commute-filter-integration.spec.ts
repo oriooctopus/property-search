@@ -371,6 +371,14 @@ test.describe("Subway Line", () => {
     expect(firstEntry).toHaveProperty("station");
     expect(firstEntry).toHaveProperty("mode");
     expect(firstEntry.mode).toBe("walk");
+
+    // Returned listings must be spread across the L line, not clustered at
+    // a single neighborhood. Regression guard against the PostgREST 1000-row
+    // pagination cap that previously truncated listing_isochrones results.
+    const distinctStations = new Set(
+      Object.values(body.commuteInfo ?? {}).map((c) => (c as { station: string }).station),
+    );
+    expect(distinctStations.size).toBeGreaterThanOrEqual(8);
   });
 
   test("Case 16: 1 train, 15 min walk — should return west-side Manhattan listings", async () => {
@@ -386,7 +394,12 @@ test.describe("Subway Line", () => {
     expect(status).toBe(200);
     expect(Array.isArray(body.listingIds)).toBe(true);
     expect(body.listingIds!.length).toBeGreaterThan(0);
-    // 1 train runs the full west side of Manhattan — lots of coverage
+    // 1 train runs the full west side of Manhattan — lots of coverage.
+    // Should hit many distinct stations, not just one cluster.
+    const stations1 = new Set(
+      Object.values(body.commuteInfo ?? {}).map((c) => (c as { station: string }).station),
+    );
+    expect(stations1.size).toBeGreaterThanOrEqual(8);
   });
 
   test("Case 17: A + C + E lines, 20 min walk — massive coverage, should return large set", async () => {
@@ -405,6 +418,10 @@ test.describe("Subway Line", () => {
 
     // A/C/E combined with 20 min walk should cover a massive area
     // Should be more results than a single line with smaller radius
+    const stationsACE = new Set(
+      Object.values(body.commuteInfo ?? {}).map((c) => (c as { station: string }).station),
+    );
+    expect(stationsACE.size).toBeGreaterThanOrEqual(15);
   });
 });
 

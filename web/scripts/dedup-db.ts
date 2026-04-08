@@ -81,12 +81,18 @@ async function main() {
     if (toDelete.length > 15) console.log(`  ... and ${toDelete.length - 15} more`);
 
     const ids = toDelete.map((r) => r.id);
-    const { error: delErr } = await supabase.from("listings").delete().in("id", ids);
-    if (delErr) {
-      console.error("Delete error:", delErr.message);
-    } else {
-      console.log(`Deleted ${ids.length} duplicates`);
+    const BATCH = 200;
+    let deleted = 0;
+    for (let i = 0; i < ids.length; i += BATCH) {
+      const batch = ids.slice(i, i + BATCH);
+      const { error: delErr } = await supabase.from("listings").delete().in("id", batch);
+      if (delErr) {
+        console.error(`Delete batch ${i} error:`, delErr.message);
+      } else {
+        deleted += batch.length;
+      }
     }
+    console.log(`Deleted ${deleted} duplicates`);
   }
 
   const { count } = await supabase.from("listings").select("*", { count: "exact", head: true });

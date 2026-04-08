@@ -13,10 +13,6 @@ function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
-const TAG_COLORS: Record<string, string> = {
-  manhattan: '#38bdf8',
-  brooklyn: '#4ade80',
-};
 
 /* ------------------------------------------------------------------ */
 /*  Dark-themed Leaflet popup overrides                                */
@@ -614,7 +610,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
         <FlyToSelected listing={selectedListing} suppressBoundsRef={suppressBoundsRef} />
         {onBoundsChange && <BoundsWatcher onBoundsChange={onBoundsChange} onMapMove={onMapMove} suppressBoundsRef={suppressBoundsRef} />}
         {validListings.map((listing) => {
-          const color = TAG_COLORS[listing.search_tag] ?? '#8b949e';
+          const color = '#8b949e';
           const isSelected = listing.id === selectedId;
           return (
             <CircleMarker

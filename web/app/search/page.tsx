@@ -16,7 +16,6 @@ interface SearchListing {
   photos: number;
   photo_urls: string[];
   url: string;
-  search_tag: string;
 }
 
 interface QueryUsage {

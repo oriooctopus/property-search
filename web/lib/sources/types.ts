@@ -17,11 +17,11 @@ export interface RawListing {
   photos: number;
   photo_urls: string[];
   url: string;
-  search_tag: string;
   list_date: string | null;
   last_update_date: string | null;
   availability_date: string | null;
   source: ListingSource;
+  year_built?: number | null;
   /** All sources this listing was found on (populated after composite dedup). */
   sources?: ListingSource[];
   /** URL per source (populated after composite dedup). */
@@ -56,7 +56,6 @@ export interface AdapterOutput {
   lon: number | null;
   photo_urls: string[];
   url: string;
-  search_tag: string;
   list_date: string | null;
   last_update_date: string | null;
   availability_date: string | null;

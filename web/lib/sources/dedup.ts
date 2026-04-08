@@ -45,6 +45,51 @@ export function normalizeAddress(addr: string): string {
   return words.map((w) => STREET_ABBREVS[w] ?? w).join(" ");
 }
 
+/**
+ * Extract a normalized unit identifier from an address string or URL.
+ *
+ * Tries the address first (matches `#1A`, `Apt 2`, `Unit 3B`, `Suite 5`, `Ste 5`),
+ * then for StreetEasy falls back to the final path segment of the URL
+ * (e.g. `/building/355-grove-street-brooklyn/1a` → `1a`).
+ *
+ * Returns a lowercase alnum-only token, or null if nothing resembling a unit
+ * could be extracted.
+ */
+export function normalizeUnit(
+  address: string | null,
+  url?: string | null,
+  source?: string | null,
+): string | null {
+  const fromAddr = address
+    ? address.match(/(?:#|\b(?:apt|unit|suite|ste)\b)[.\s#-]*([a-z0-9][a-z0-9\s-]*)/i)
+    : null;
+  if (fromAddr && fromAddr[1]) {
+    const cleaned = fromAddr[1].toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (cleaned) return cleaned;
+  }
+
+  // StreetEasy URL fallback
+  const isSE = source === "streeteasy" || (!!url && url.includes("streeteasy.com"));
+  if (isSE && url) {
+    try {
+      const path = new URL(url).pathname;
+      // Last non-empty path segment
+      const segs = path.split("/").filter((s) => s.length > 0);
+      const last = segs[segs.length - 1];
+      // Only accept if the segment looks like a unit id (short, alphanumeric)
+      // and is NOT a building slug (which contains hyphens + words).
+      if (last && !/[a-z]{3,}-[a-z]{3,}/.test(last)) {
+        const cleaned = last.toLowerCase().replace(/[^a-z0-9]/g, "");
+        if (cleaned && cleaned.length <= 8) return cleaned;
+      }
+    } catch {
+      // not a valid URL — ignore
+    }
+  }
+
+  return null;
+}
+
 // Emoji regex: covers most common emoji ranges
 const EMOJI_RE =
   /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu;
@@ -415,7 +460,6 @@ function compositeListings(cluster: ValidatedListing[]): ValidatedListing {
     photos: photoUrls.length,
     photo_urls: photoUrls,
     url: primaryListing.url,
-    search_tag: primaryListing.search_tag,
     list_date: listDate,
     last_update_date: lastUpdateDate,
     availability_date: availabilityDate,
@@ -446,8 +490,10 @@ function compositeListings(cluster: ValidatedListing[]): ValidatedListing {
 export function deduplicateAndComposite(
   listings: ValidatedListing[],
 ): ValidatedListing[] {
+  // Pass 1: greedy clustering using the existing isSameProperty matcher
+  // (tier 1 street exact / tier 2 geo+price / tier 3,4 same-source). This
+  // produces street-level clusters that may span multiple units.
   const clusters: ValidatedListing[][] = [];
-
   for (const listing of listings) {
     let merged = false;
     for (const cluster of clusters) {
@@ -457,11 +503,49 @@ export function deduplicateAndComposite(
         break;
       }
     }
-
-    if (!merged) {
-      clusters.push([listing]);
-    }
+    if (!merged) clusters.push([listing]);
   }
 
-  return clusters.map(compositeListings);
+  // Pass 2: split each cluster into unit-aware sub-clusters.
+  //
+  // Rules:
+  //  - Rows with the SAME known unit group together.
+  //  - Rows with DIFFERENT known units must NEVER merge (separate sub-clusters).
+  //  - Rows with null unit fold into ONE non-null sub-cluster (prefer the
+  //    largest); if no non-null sub-cluster exists, all nulls stay together.
+  const refined: ValidatedListing[][] = [];
+  for (const cluster of clusters) {
+    if (cluster.length === 1) {
+      refined.push(cluster);
+      continue;
+    }
+
+    const byUnit = new Map<string, ValidatedListing[]>();
+    const nulls: ValidatedListing[] = [];
+    for (const l of cluster) {
+      const unit = normalizeUnit(l.address, l.url, l.source);
+      if (unit == null) {
+        nulls.push(l);
+      } else {
+        if (!byUnit.has(unit)) byUnit.set(unit, []);
+        byUnit.get(unit)!.push(l);
+      }
+    }
+
+    if (byUnit.size === 0) {
+      // All nulls — keep together
+      refined.push(nulls);
+      continue;
+    }
+
+    const subclusters = Array.from(byUnit.values());
+    if (nulls.length > 0) {
+      // Fold nulls into the largest non-null sub-cluster
+      subclusters.sort((a, b) => b.length - a.length);
+      subclusters[0].push(...nulls);
+    }
+    for (const sub of subclusters) refined.push(sub);
+  }
+
+  return refined.map(compositeListings);
 }
