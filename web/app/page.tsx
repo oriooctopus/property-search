@@ -407,31 +407,22 @@ function HomeInner() {
           .limit(500);
         hasInitialViewportLoad.current = true;
       } else {
-        listingsQuery = listingsQuery.order('price', { ascending: true });
+        // Default NYC viewport — covers all 5 boroughs. Matches the gating
+        // envelope in pipeline.ts. Bounded query + 500-row cap keeps cold
+        // load fast (single round-trip instead of paginating 8k+ rows).
+        listingsQuery = listingsQuery
+          .gte('lat', 40.55)
+          .lte('lat', 40.92)
+          .gte('lon', -74.05)
+          .lte('lon', -73.70)
+          .order('last_update_date', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false })
+          .limit(500);
+        hasInitialViewportLoad.current = true;
       }
 
-      // Paginate fetch — Supabase PostgREST caps responses at 1000 rows.
-      // Use .range() to page through all results when no viewport is set.
-      let dbListings: unknown[] = [];
-      if (hasUrlPosition) {
-        const { data } = await listingsQuery;
-        dbListings = data ?? [];
-      } else {
-        const PAGE_SIZE = 1000;
-        let from = 0;
-        while (true) {
-          const { data, error } = await supabase
-            .from('listings')
-            .select('*')
-            .order('price', { ascending: true })
-            .range(from, from + PAGE_SIZE - 1);
-          if (error || !data || data.length === 0) break;
-          dbListings.push(...data);
-          if (data.length < PAGE_SIZE) break;
-          from += PAGE_SIZE;
-          if (from > 50000) break; // safety cap
-        }
-      }
+      const { data: listingsData } = await listingsQuery;
+      const dbListings: unknown[] = listingsData ?? [];
 
       // Supabase returns Postgres `numeric` columns as strings.
       // Coerce lat, lon, baths (and sqft just in case) to real numbers
