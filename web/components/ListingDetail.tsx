@@ -13,8 +13,11 @@ import { PARK_COORDS } from '@/lib/park-coords';
 type Listing = Database['public']['Tables']['listings']['Row'];
 
 const SOURCE_LABELS: Record<string, string> = {
-  realtor: 'Realtor.com',
   craigslist: 'Craigslist',
+  streeteasy: 'StreetEasy',
+  'facebook-marketplace': 'Facebook',
+  facebook: 'Facebook',
+  realtor: 'Realtor.com',
   renthop: 'RentHop',
   apartments: 'Apartments.com',
 };

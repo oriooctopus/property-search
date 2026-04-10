@@ -2,7 +2,7 @@
  * Shared types for all listing data sources.
  */
 
-export type ListingSource = "realtor" | "apartments" | "craigslist" | "renthop" | "streeteasy" | "zillow" | "facebook";
+export type ListingSource = "streeteasy" | "craigslist" | "facebook-marketplace";
 
 /** The shape every source adapter must produce. */
 export interface RawListing {
@@ -22,6 +22,8 @@ export interface RawListing {
   availability_date: string | null;
   source: ListingSource;
   year_built?: number | null;
+  /** Stable per-source identifier, e.g. StreetEasy numeric id, CL post id, FB ad id. */
+  external_id?: string | null;
   /** All sources this listing was found on (populated after composite dedup). */
   sources?: ListingSource[];
   /** URL per source (populated after composite dedup). */
@@ -61,6 +63,8 @@ export interface AdapterOutput {
   availability_date: string | null;
   source: ListingSource;
   year_built?: number | null;
+  /** Stable per-source identifier; null if the source has no stable ID. */
+  external_id?: string | null;
 }
 
 /** How confident we are in a field's value. */
@@ -80,9 +84,15 @@ export interface ValidatedListing extends RawListing {
   quality: DataQuality;
 }
 
+/** All known sources currently ingested by the pipeline. */
+export const ALL_SOURCES: readonly ListingSource[] = [
+  "streeteasy",
+  "craigslist",
+  "facebook-marketplace",
+] as const;
+
 /** Sources that extract data from text rather than structured API fields. */
 export const SCRAPER_SOURCES: ReadonlySet<ListingSource> = new Set([
   "craigslist",
-  "renthop",
-  "facebook",
+  "facebook-marketplace",
 ]);

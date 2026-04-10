@@ -51,15 +51,9 @@ try {
 // Allow-list of sources
 // ---------------------------------------------------------------------------
 
-const ALL_SOURCES = [
-  "realtor",
-  "apartments",
-  "craigslist",
-  "renthop",
-  "streeteasy",
-  "zillow",
-  "facebook",
-];
+import { ALL_SOURCES as ACTIVE_LISTING_SOURCES } from "../lib/sources/types";
+
+const ALL_SOURCES = [...ACTIVE_LISTING_SOURCES];
 
 // ---------------------------------------------------------------------------
 // Arg parsing (no deps)
@@ -72,6 +66,7 @@ interface ParsedArgs {
   onlyPhases: Set<string> | null;
   dryRun: boolean;
   since?: string;
+  budgetUsd?: number;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -81,6 +76,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   let onlyPhases: Set<string> | null = null;
   let dryRun = false;
   let since: string | undefined;
+  let budgetUsd: number | undefined;
 
   for (const arg of argv.slice(2)) {
     if (arg === "--dry-run") {
@@ -107,6 +103,11 @@ function parseArgs(argv: string[]): ParsedArgs {
       );
     } else if (arg.startsWith("--since=")) {
       since = arg.slice("--since=".length);
+    } else if (arg.startsWith("--budget=")) {
+      budgetUsd = parseFloat(arg.slice("--budget=".length));
+      if (isNaN(budgetUsd) || budgetUsd <= 0) {
+        throw new Error(`Invalid --budget value: ${arg.slice("--budget=".length)}`);
+      }
     }
   }
 
@@ -120,7 +121,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     }
   }
 
-  return { fetchStrategy, sources, skipPhases, onlyPhases, dryRun, since };
+  return { fetchStrategy, sources, skipPhases, onlyPhases, dryRun, since, budgetUsd };
 }
 
 function buildStrategy(name: string): FetchStrategy {
@@ -157,6 +158,10 @@ async function main() {
     `=== ingest.ts run (strategy=${strategy.name} sources=${args.sources.join(",")} dryRun=${args.dryRun}) ===`,
   );
 
+  // Default budget: $10 for full-bisection, $1 for daily
+  const budgetUsd =
+    args.budgetUsd ?? (args.fetchStrategy === "full-bisection" ? 10.0 : 1.0);
+
   const report = await runOrchestrator({
     supabase,
     fetchStrategy: strategy,
@@ -165,6 +170,7 @@ async function main() {
     skipPhases: args.skipPhases,
     onlyPhases: args.onlyPhases,
     since: args.since,
+    budgetUsd,
   });
 
   console.log(`\n=== done (runId=${report.runId}) ===`);

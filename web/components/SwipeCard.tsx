@@ -5,11 +5,13 @@ import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { useDrag } from '@use-gesture/react';
 
 const SOURCE_LABELS: Record<string, string> = {
-  realtor: 'Realtor.com',
   craigslist: 'Craigslist',
+  streeteasy: 'StreetEasy',
+  'facebook-marketplace': 'FB Marketplace',
+  facebook: 'FB Marketplace',
+  realtor: 'Realtor.com',
   renthop: 'RentHop',
   apartments: 'Apartments.com',
-  facebook: 'FB Marketplace',
 };
 
 interface SwipeCardProps {

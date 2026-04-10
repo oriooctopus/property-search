@@ -17,9 +17,7 @@
  * `project_streeteasy_pagination.md`) — bisection is how we get past that.
  */
 
-import https from "https";
-import { HttpsProxyAgent } from "https-proxy-agent";
-
+import { makeProxyFetch } from "./proxy";
 import {
   paginateSlice,
   probeTotalCount,
@@ -45,44 +43,6 @@ const FETCH_DELAY_MS = 10_000;
 
 function delay(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
-}
-
-// ---------------------------------------------------------------------------
-// Proxy fetch
-// ---------------------------------------------------------------------------
-
-function makeProxyFetch(apifyProxyUrl: string): typeof fetch {
-  const agent = new HttpsProxyAgent(apifyProxyUrl);
-  return ((input: RequestInfo | URL, init?: RequestInit) =>
-    new Promise((resolve, reject) => {
-      const url =
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-            ? input.href
-            : input.url;
-      const bodyStr = init?.body as string | undefined;
-      const headers = (init?.headers ?? {}) as Record<string, string>;
-      const req = https.request(
-        url,
-        { method: init?.method ?? "GET", headers, agent },
-        (res) => {
-          let data = "";
-          res.on("data", (c: Buffer) => (data += c));
-          res.on("end", () => {
-            resolve(
-              new Response(data, {
-                status: res.statusCode ?? 200,
-                headers: res.headers as HeadersInit,
-              }),
-            );
-          });
-        },
-      );
-      req.on("error", reject);
-      if (bodyStr) req.write(bodyStr);
-      req.end();
-    })) as typeof fetch;
 }
 
 // ---------------------------------------------------------------------------

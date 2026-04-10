@@ -8,8 +8,11 @@
 import type { AdapterOutput, SearchParams } from "./types";
 import { extractBaths, extractBeds, parsePrice } from "./parse-utils";
 
+// maxItems is a platform-level run option (not an actor input param), so it's
+// appended as a query parameter on the run URL to cap pay-per-result costs.
+const CL_MAX_ITEMS = 50;
 const APIFY_START_URL =
-  "https://api.apify.com/v2/acts/ivanvs~craigslist-scraper-pay-per-result/runs";
+  `https://api.apify.com/v2/acts/ivanvs~craigslist-scraper-pay-per-result/runs?maxItems=${CL_MAX_ITEMS}`;
 
 const POLL_INTERVAL_MS = 5_000;
 const MAX_WAIT_MS = 300_000; // 5 min max
@@ -61,7 +64,6 @@ export async function fetchCraigslistListings(
   const input = {
     urls: [{ url: clUrl }],
     proxyConfiguration: { useApifyProxy: true },
-    maxItems: 100,
     maxAge: 30,
     maxConcurrency: 4,
   };
@@ -161,6 +163,7 @@ export async function fetchCraigslistListings(
       last_update_date: null,
       availability_date: item.availableFrom ?? null,
       source: "craigslist" as const,
+      external_id: item.id ?? null,
     });
   }
 

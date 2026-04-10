@@ -118,6 +118,36 @@ describe("upsertListings", () => {
     expect(result.retries).toBeGreaterThanOrEqual(1);
   });
 
+  it("dedup: rows with same URL are deduplicated before upsert (last-write wins)", async () => {
+    // 10 rows, but 3 share URLs with earlier rows → only 7 unique
+    const rows = makeRows(10);
+    rows[7] = { ...makeRow(99), url: rows[0].url }; // dup of row 0
+    rows[8] = { ...makeRow(98), url: rows[1].url }; // dup of row 1
+    rows[9] = { ...makeRow(97), url: rows[2].url }; // dup of row 2
+
+    const uniqueUrls = new Set(rows.map((r) => r.url));
+    expect(uniqueUrls.size).toBe(7); // sanity check
+
+    const fake = makeFakeSupabase([
+      // The upsert should receive 7 rows, respond with all 7
+      { data: Array.from(uniqueUrls).map((url) => ({ url })), error: null },
+    ]);
+    const result = await upsertListings(fake.client, rows, { batchSize: 50 });
+    expect(result.attempted).toBe(7);
+    expect(result.succeeded).toBe(7);
+    expect(result.failed).toBe(0);
+    expect(result.dedupedInBatch).toBe(3);
+    expect(result.errors).toHaveLength(0);
+
+    // Verify only 7 rows were sent to Supabase
+    const upsertedRows = fake.upsertSpy.mock.calls[0][0] as ListingRow[];
+    expect(upsertedRows).toHaveLength(7);
+
+    // Verify last-write wins: the dup rows (indices 7,8,9) should replace 0,1,2
+    const row0 = upsertedRows.find((r) => r.url === rows[0].url)!;
+    expect(row0.address).toBe("99 Test St"); // from makeRow(99), not makeRow(0)
+  });
+
   it("dry-run: no calls to supabase.from()", async () => {
     const rows = makeRows(5);
     const fake = makeFakeSupabase([]);

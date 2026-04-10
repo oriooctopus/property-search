@@ -8,22 +8,27 @@ import PeopleAvatars from './PeopleAvatars';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
+// Active sources: streeteasy, craigslist, facebook-marketplace.
+// Legacy keys (realtor, zillow, apartments, renthop, facebook) are kept so
+// historical rows written before the April 2026 cleanup still render labels.
 const SOURCE_LABELS: Record<string, string> = {
-  realtor: 'Realtor.com',
   craigslist: 'Craigslist',
+  streeteasy: 'StreetEasy',
+  'facebook-marketplace': 'Facebook',
+  facebook: 'Facebook',
+  realtor: 'Realtor.com',
   renthop: 'RentHop',
   apartments: 'Apartments.com',
-  streeteasy: 'StreetEasy',
   zillow: 'Zillow',
-  facebook: 'Facebook',
 };
 
 const SOURCE_DOT_COLORS: Record<string, string> = {
-  realtor: '#3b82f6',
   craigslist: '#a855f7',
   streeteasy: '#22c55e',
-  zillow: '#006aff',
+  'facebook-marketplace': '#1877f2',
   facebook: '#1877f2',
+  realtor: '#3b82f6',
+  zillow: '#006aff',
   renthop: '#f59e0b',
   apartments: '#ef4444',
 };

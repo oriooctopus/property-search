@@ -28,6 +28,7 @@ export interface UpsertResult {
   errors: Array<{ batchIndex: number; message: string; rowUrls: string[] }>;
   splitOn413: number;
   retries: number;
+  dedupedInBatch: number;
 }
 
 const DEFAULTS: Required<Omit<UpsertOpts, "dryRun">> & { dryRun: boolean } = {
@@ -37,6 +38,13 @@ const DEFAULTS: Required<Omit<UpsertOpts, "dryRun">> & { dryRun: boolean } = {
   onConflict: "url",
   dryRun: false,
 };
+
+// NOTE: toListingRow (lib/sources/row.ts) intentionally OMITS `delisted_at`
+// and `created_at` from the row payload. supabase-js strips undefined keys
+// before hitting PostgREST, so the ON CONFLICT UPDATE never touches those
+// columns — meaning a row that verify-stale marked delisted cannot be
+// resurrected by a subsequent upsert, and `created_at` keeps its original
+// value. `last_seen_at` IS set (to now) so upserts bump it naturally.
 
 function isPayloadTooLarge(err: unknown): boolean {
   if (!err) return false;
@@ -147,25 +155,39 @@ export async function upsertListings(
     dryRun: opts.dryRun ?? false,
   };
 
+  // Deduplicate by conflict key to prevent "cannot affect row a second time"
+  const conflictKey = merged.onConflict as keyof ListingRow;
+  const seen = new Map<string, ListingRow>();
+  for (const row of rows) {
+    const key = row[conflictKey] as string;
+    if (key) seen.set(key, row); // last-write wins
+  }
+  const dedupedRows = Array.from(seen.values());
+  const dedupedInBatch = rows.length - dedupedRows.length;
+  if (dedupedInBatch > 0) {
+    console.log(`[upsert] deduplicated ${dedupedInBatch} rows by "${merged.onConflict}" (${rows.length} → ${dedupedRows.length})`);
+  }
+
   const result: UpsertResult = {
-    attempted: rows.length,
+    attempted: dedupedRows.length,
     succeeded: 0,
     failed: 0,
     errors: [],
     splitOn413: 0,
     retries: 0,
+    dedupedInBatch,
   };
 
   if (merged.dryRun) {
-    console.log(`[upsert] dry-run: would upsert ${rows.length} rows (no writes)`);
+    console.log(`[upsert] dry-run: would upsert ${dedupedRows.length} rows (no writes)`);
     return result;
   }
 
-  if (rows.length === 0) return result;
+  if (dedupedRows.length === 0) return result;
 
-  const totalBatches = Math.ceil(rows.length / merged.batchSize);
-  for (let i = 0, batchIndex = 0; i < rows.length; i += merged.batchSize, batchIndex++) {
-    const batch = rows.slice(i, i + merged.batchSize);
+  const totalBatches = Math.ceil(dedupedRows.length / merged.batchSize);
+  for (let i = 0, batchIndex = 0; i < dedupedRows.length; i += merged.batchSize, batchIndex++) {
+    const batch = dedupedRows.slice(i, i + merged.batchSize);
     console.log(`[upsert] batch ${batchIndex + 1}/${totalBatches}: ${batch.length} rows`);
 
     const outcome = await upsertOneBatch(supabase, batch, merged, 0);
@@ -193,6 +215,7 @@ export function formatUpsertResult(r: UpsertResult): string {
     `  failed:      ${r.failed}`,
     `  retries:     ${r.retries}`,
     `  split-on-413: ${r.splitOn413}`,
+    `  deduped:     ${r.dedupedInBatch}`,
   ];
   if (r.errors.length > 0) {
     lines.push(`  errors:`);

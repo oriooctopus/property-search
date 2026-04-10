@@ -1,15 +1,18 @@
 /**
- * Unified search: queries all data sources in parallel, runs them through
- * the validation pipeline, then deduplicates via the dedup module.
+ * Unified search: queries all active data sources in parallel, runs them
+ * through the validation pipeline, then deduplicates via the dedup module.
+ *
+ * Active sources: streeteasy, craigslist, facebook-marketplace.
  */
 
-import type { AdapterOutput, SearchParams, ValidatedListing } from "./types";
-import { fetchRealtorListings } from "./realtor";
-import { fetchApartmentsListings } from "./apartments";
+import type {
+  AdapterOutput,
+  ListingSource,
+  SearchParams,
+  ValidatedListing,
+} from "./types";
 import { fetchCraigslistListings } from "./craigslist";
-import { fetchRentHopListings } from "./renthop";
 import { fetchStreetEasyListings } from "./streeteasy";
-import { fetchZillowListings } from "./zillow";
 import { fetchFacebookMarketplaceListings } from "./facebook-marketplace";
 import {
   validateAndNormalize,
@@ -18,20 +21,9 @@ import {
 } from "./pipeline";
 import { deduplicateAndComposite } from "./dedup";
 
-// ---------------------------------------------------------------------------
-// Unified search
-// ---------------------------------------------------------------------------
-
 export interface UnifiedSearchResult {
   listings: ValidatedListing[];
-  totals: {
-    realtor: number;
-    apartments: number;
-    craigslist: number;
-    renthop: number;
-    streeteasy: number;
-    zillow: number;
-    facebook: number;
+  totals: Record<ListingSource, number> & {
     merged: number;
     deduplicated: number;
   };
@@ -44,44 +36,27 @@ export async function unifiedSearch(
   apiKey: string,
 ): Promise<UnifiedSearchResult> {
   const errors: string[] = [];
-  const totals = {
-    realtor: 0,
-    apartments: 0,
-    craigslist: 0,
-    renthop: 0,
+  const totals: UnifiedSearchResult["totals"] = {
     streeteasy: 0,
-    zillow: 0,
-    facebook: 0,
+    craigslist: 0,
+    "facebook-marketplace": 0,
     merged: 0,
     deduplicated: 0,
   };
 
-  // Fire all requests concurrently
-  const [
-    realtorResult,
-    apartmentsResult,
-    craigslistResult,
-    renthopResult,
-    streeteasyResult,
-    zillowResult,
-    facebookResult,
-  ] = await Promise.allSettled([
-    fetchRealtorListings(params, apiKey),
-    fetchApartmentsListings(params, apiKey),
-    fetchCraigslistListings(params),
-    fetchRentHopListings(params),
-    fetchStreetEasyListings(params, apiKey),
-    fetchZillowListings(params, apiKey),
-    fetchFacebookMarketplaceListings(params),
-  ]);
+  const [streeteasyResult, craigslistResult, facebookResult] =
+    await Promise.allSettled([
+      fetchStreetEasyListings(params, apiKey),
+      fetchCraigslistListings(params),
+      fetchFacebookMarketplaceListings(params),
+    ]);
 
-  // Process each result through the pipeline
   const qualitySummaries: QualitySummary[] = [];
   let allListings: ValidatedListing[] = [];
 
   const processResult = (
     name: string,
-    key: keyof typeof totals,
+    key: ListingSource,
     result: PromiseSettledResult<{ listings: AdapterOutput[]; total: number }>,
   ) => {
     if (result.status === "fulfilled") {
@@ -100,22 +75,17 @@ export async function unifiedSearch(
     }
   };
 
-  processResult("Realtor.com", "realtor", realtorResult);
-  processResult("Apartments.com", "apartments", apartmentsResult);
-  processResult("Craigslist", "craigslist", craigslistResult);
-  processResult("RentHop", "renthop", renthopResult);
   processResult("StreetEasy", "streeteasy", streeteasyResult);
-  processResult("Zillow", "zillow", zillowResult);
-  processResult("Facebook Marketplace", "facebook", facebookResult);
+  processResult("Craigslist", "craigslist", craigslistResult);
+  processResult("Facebook Marketplace", "facebook-marketplace", facebookResult);
 
   const qualitySummary = mergeQualitySummaries(qualitySummaries);
 
   const totalBefore = allListings.length;
   console.log(
-    `[UnifiedSearch] Total before dedup: ${totalBefore} from ${7 - errors.length}/7 sources`,
+    `[UnifiedSearch] Total before dedup: ${totalBefore} from ${3 - errors.length}/3 sources`,
   );
 
-  // Composite-deduplicate
   allListings = deduplicateAndComposite(allListings);
   totals.merged = allListings.length;
   totals.deduplicated = totalBefore - allListings.length;

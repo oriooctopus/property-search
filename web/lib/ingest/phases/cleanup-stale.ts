@@ -1,8 +1,13 @@
 /**
- * cleanup-stale phase: delete listings older than STALE_LISTING_DAYS.
+ * cleanup-stale phase: archive rows that have been delisted for longer than
+ * ARCHIVE_DAYS.
  *
- * Ported from refresh-sources.ts (deleteStaleListings). Same cutoff semantics:
- * rows with created_at < now - 45d.
+ * Earlier versions of this phase deleted rows based on `created_at < now -
+ * 45d`, which incorrectly wiped active, re-verified listings whose first
+ * scrape was old. The correct semantics — now that verify-stale handles true
+ * staleness — is: only delete rows that verify-stale has confirmed delisted
+ * AND that have been delisted long enough that keeping them around no longer
+ * serves users (historic favorites still see them until this sweep runs).
  */
 
 import { phaseLogger } from "../logger";
@@ -12,7 +17,7 @@ import type {
   PhaseResult,
 } from "../types";
 
-const STALE_LISTING_DAYS = 45;
+const ARCHIVE_DAYS = 90;
 
 export async function runCleanupStalePhase(
   deps: OrchestratorDeps,
@@ -22,20 +27,23 @@ export async function runCleanupStalePhase(
   const t0 = Date.now();
 
   const cutoff = new Date(
-    Date.now() - STALE_LISTING_DAYS * 24 * 60 * 60 * 1000,
+    Date.now() - ARCHIVE_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
 
   const { count, error: countErr } = await deps.supabase
     .from("listings")
     .select("*", { count: "exact", head: true })
-    .lt("created_at", cutoff);
+    .not("delisted_at", "is", null)
+    .lt("delisted_at", cutoff);
 
   if (countErr) throw new Error(`count failed: ${countErr.message}`);
   const staleCount = count ?? 0;
-  log.info(`found ${staleCount} listings older than ${STALE_LISTING_DAYS} days`);
+  log.info(
+    `found ${staleCount} listings delisted more than ${ARCHIVE_DAYS} days ago`,
+  );
 
   if (deps.dryRun) {
-    log.info(`dry-run: skipping delete`);
+    log.info(`dry-run: skipping archive delete`);
     return {
       phase: "cleanup-stale",
       startedAt,
@@ -54,10 +62,11 @@ export async function runCleanupStalePhase(
     const { error: delErr } = await deps.supabase
       .from("listings")
       .delete()
-      .lt("created_at", cutoff);
+      .not("delisted_at", "is", null)
+      .lt("delisted_at", cutoff);
     if (delErr) throw new Error(`delete failed: ${delErr.message}`);
     staleDeleted = staleCount;
-    log.info(`deleted ${staleDeleted} stale listings`);
+    log.info(`archived ${staleDeleted} long-delisted listings`);
   }
 
   return {

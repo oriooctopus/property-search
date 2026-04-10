@@ -313,6 +313,7 @@ function nodesToListings(nodes: SENode[], city: string): AdapterOutput[] {
       last_update_date: null,
       availability_date: n.availableAt ?? null,
       source: "streeteasy" as const,
+      external_id: n.id ?? null,
     });
   }
 

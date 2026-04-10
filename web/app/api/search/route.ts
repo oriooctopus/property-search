@@ -110,6 +110,7 @@ export async function POST(request: NextRequest) {
   let query = adminClient
     .from("listings")
     .select("*")
+    .is("delisted_at", null)
     .order("last_update_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
     .limit(500);

@@ -15,7 +15,9 @@ import { runUpsertPhase } from "./phases/upsert";
 import { runEnrichYearBuiltPhase } from "./phases/enrich-year-built";
 import { runEnrichIsochronesPhase } from "./phases/enrich-isochrones";
 import { runCleanupStalePhase } from "./phases/cleanup-stale";
+import { runVerifyStalePhase } from "./phases/verify-stale";
 import { runReportPhase } from "./phases/report";
+import { runVerifyCostsPhase } from "./phases/verify-costs";
 import type {
   FetchPhaseOutput,
   FetchStrategy,
@@ -35,6 +37,7 @@ export interface RunOrchestratorOpts {
   skipPhases: Set<string>;
   onlyPhases: Set<string> | null;
   since?: string;
+  budgetUsd?: number;
 }
 
 const ALL_PHASES = [
@@ -43,8 +46,10 @@ const ALL_PHASES = [
   "upsert",
   "enrich-year-built",
   "enrich-isochrones",
+  "verify-stale",
   "cleanup-stale",
   "report",
+  "verify-costs",
 ] as const;
 
 function shouldRun(
@@ -96,6 +101,7 @@ export async function runOrchestrator(
     fetchStrategy: opts.fetchStrategy,
     runId,
     startedAt,
+    budgetUsd: opts.budgetUsd ?? 1.0,
   };
 
   const phases: PhaseResult[] = [];
@@ -146,6 +152,13 @@ export async function runOrchestrator(
     const res = await safeRun("enrich-isochrones", () =>
       runEnrichIsochronesPhase(deps),
     );
+    phases.push(res);
+  }
+
+  // verify-stale (must run before cleanup-stale so delisted rows get a
+  // chance to be marked before the 90-day archive sweep)
+  if (shouldRun("verify-stale", opts.skipPhases, opts.onlyPhases)) {
+    const res = await safeRun("verify-stale", () => runVerifyStalePhase(deps));
     phases.push(res);
   }
 
@@ -214,6 +227,14 @@ export async function runOrchestrator(
         { report, perSourceResults, totalListingsInDb },
         deps,
       ),
+    );
+    phases.push(res);
+  }
+
+  // verify-costs — always runs (even if earlier phases failed)
+  if (shouldRun("verify-costs", opts.skipPhases, opts.onlyPhases)) {
+    const res = await safeRun("verify-costs", () =>
+      runVerifyCostsPhase({ report }, deps),
     );
     phases.push(res);
   }

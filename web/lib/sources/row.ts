@@ -23,6 +23,9 @@ import type { Database } from "../types";
 export type ListingRow = Database["public"]["Tables"]["listings"]["Insert"] & {
   sources?: string[];
   source_urls?: Record<string, string>;
+  external_id?: string | null;
+  last_seen_at?: string | null;
+  delisted_at?: string | null;
 };
 
 export function toListingRow(v: ValidatedListing): ListingRow {
@@ -48,5 +51,13 @@ export function toListingRow(v: ValidatedListing): ListingRow {
     year_built: v.year_built ?? null,
     sources: v.sources ?? [v.source],
     source_urls: v.source_urls ?? { [v.source]: v.url },
+    external_id: v.external_id ?? null,
+    // Every successful upsert bumps last_seen_at automatically. The upsert
+    // phase uses a column-explicit UPDATE SET list that preserves delisted_at
+    // (and created_at) so resurrecting a verified-delisted row via upsert is
+    // impossible.
+    last_seen_at: new Date().toISOString(),
+    // Intentionally NOT setting delisted_at here — upsertListings excludes
+    // it from the UPDATE SET list so existing delisted rows stay delisted.
   } satisfies ListingRow;
 }
