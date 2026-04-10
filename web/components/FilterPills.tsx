@@ -73,7 +73,7 @@ function getDefaultValue(key: keyof FiltersState): FiltersState[keyof FiltersSta
     case 'sort':
       return 'price';
     case 'maxListingAge':
-      return '1m' as MaxListingAge;
+      return null as MaxListingAge;
     case 'commuteRules':
       return [] as never;
     case 'excludeNoSqft':
