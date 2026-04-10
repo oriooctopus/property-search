@@ -272,8 +272,8 @@ export default function ListingCard({
       {/* Details row */}
       <div className="flex items-center gap-3 text-xs mt-2 mb-2" style={{ color: '#8b949e' }}>
         <span>{listing.beds === 0 ? 'Studio' : `${listing.beds} bd`}</span>
-        <span>{listing.baths != null && Number(listing.baths) > 0 ? `${listing.baths} ba` : 'N/A ba'}</span>
-        <span>{listing.sqft != null && Number(listing.sqft) > 0 ? `${listing.sqft.toLocaleString()} sqft` : 'N/A sqft'}</span>
+        {listing.baths != null && Number(listing.baths) > 0 && <span>{listing.baths} ba</span>}
+        {listing.sqft != null && Number(listing.sqft) > 0 && <span>{listing.sqft.toLocaleString()} sqft</span>}
         {(listing as Record<string, unknown>).year_built != null && (
           <span>Built {String((listing as Record<string, unknown>).year_built)}</span>
         )}
