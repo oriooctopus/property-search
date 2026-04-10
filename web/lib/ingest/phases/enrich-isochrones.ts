@@ -12,7 +12,7 @@ import type {
 } from "../types";
 
 const SELECT_LIMIT = 10_000;
-const RPC_BATCH = 200;
+const RPC_BATCH = 25;
 
 interface Row {
   id: number;
@@ -80,7 +80,7 @@ export async function runEnrichIsochronesPhase(
         async () => {
           const { error: rpcErr } = await deps.supabase.rpc(
             "batch_enrich_listing_isochrones",
-            { p_listings: JSON.stringify(batch) },
+            { p_listings: batch },
           );
           if (rpcErr) throw new Error(rpcErr.message);
         },

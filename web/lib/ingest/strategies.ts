@@ -13,16 +13,12 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { AdapterOutput, SearchParams } from "../sources/types";
+import type { AdapterOutput, ListingSource, SearchParams } from "../sources/types";
 import type { FetchDeps, FetchStrategy } from "./types";
 
-import { fetchApartmentsListings } from "../sources/apartments";
 import { fetchCraigslistListings } from "../sources/craigslist";
-import { fetchRentHopListings } from "../sources/renthop";
-import { fetchRealtorListings } from "../sources/realtor";
 import { fetchStreetEasyListings } from "../sources/streeteasy";
 import { fetchStreetEasyFullBisection } from "../sources/streeteasy-bisection";
-import { fetchZillowListings } from "../sources/zillow";
 import { fetchFacebookMarketplaceListings } from "../sources/facebook-marketplace";
 
 // ---------------------------------------------------------------------------
@@ -34,43 +30,13 @@ const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY ?? "";
 const NYC_PARAMS: SearchParams = { city: "New York", stateCode: "NY" };
 
 /** Runs a single adapter by name. Returns raw AdapterOutput[] with source tag. */
-async function runAdapter(source: string): Promise<AdapterOutput[]> {
+async function runAdapter(source: ListingSource): Promise<AdapterOutput[]> {
   switch (source) {
-    case "realtor": {
-      const out: AdapterOutput[] = [];
-      for (const city of ["New York", "Brooklyn"]) {
-        const res = await fetchRealtorListings(
-          { city, stateCode: "NY" },
-          RAPIDAPI_KEY,
-        );
-        out.push(...res.listings);
-      }
-      return out;
-    }
-    case "apartments": {
-      const out: AdapterOutput[] = [];
-      for (const city of ["New York", "Brooklyn"]) {
-        const res = await fetchApartmentsListings(
-          { city, stateCode: "NY" },
-          RAPIDAPI_KEY,
-        );
-        out.push(...res.listings);
-      }
-      return out;
-    }
     case "craigslist": {
       const res = await fetchCraigslistListings(NYC_PARAMS);
       return res.listings;
     }
-    case "renthop": {
-      const res = await fetchRentHopListings(NYC_PARAMS);
-      return res.listings;
-    }
-    case "zillow": {
-      const res = await fetchZillowListings(NYC_PARAMS, RAPIDAPI_KEY);
-      return res.listings;
-    }
-    case "facebook": {
+    case "facebook-marketplace": {
       const res = await fetchFacebookMarketplaceListings(NYC_PARAMS);
       return res.listings;
     }
@@ -85,8 +51,10 @@ async function runAdapter(source: string): Promise<AdapterOutput[]> {
       }
       return out;
     }
-    default:
-      throw new Error(`Unknown source: ${source}`);
+    default: {
+      const never: never = source;
+      throw new Error(`Unknown source: ${never as string}`);
+    }
   }
 }
 
@@ -140,7 +108,7 @@ export class StalenessGatedFetch implements FetchStrategy {
         return [];
       }
     }
-    return runAdapter(source);
+    return runAdapter(source as ListingSource);
   }
 }
 
@@ -165,6 +133,9 @@ export class FullBisectionFetch implements FetchStrategy {
       const apifyProxyUrl = process.env.APIFY_PROXY_URL ?? "";
       return fetchStreetEasyFullBisection({ apifyProxyUrl });
     }
-    return runAdapter(source);
+    // Craigslist and Facebook Marketplace don't have meaningful full-bisection
+    // equivalents — they're already single-shot Apify actor runs. Fall back to
+    // the normal adapter so full-bisection mode still works for them.
+    return runAdapter(source as ListingSource);
   }
 }

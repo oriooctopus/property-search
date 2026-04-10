@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
   const { data: rawListings, error: listingsError } = await supabase
     .from("listings")
     .select("*")
+    .is("delisted_at", null)
     .gte("created_at", since);
 
   if (listingsError) {

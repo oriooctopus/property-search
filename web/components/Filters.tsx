@@ -9,13 +9,13 @@ export type SortField = 'price' | 'beds' | 'listDate';
 
 export type MaxListingAge = '1w' | '2w' | '1m' | '3m' | '6m' | '1y' | null;
 
-export const ALL_SOURCES = ['craigslist', 'streeteasy', 'facebook'] as const;
+export const ALL_SOURCES = ['craigslist', 'streeteasy', 'facebook-marketplace'] as const;
 export type ListingSource = (typeof ALL_SOURCES)[number];
 
 export const SOURCE_LABELS: Record<ListingSource, string> = {
   craigslist: 'Craigslist',
   streeteasy: 'StreetEasy',
-  facebook: 'Facebook',
+  'facebook-marketplace': 'Facebook',
 };
 
 export interface CommuteRule {

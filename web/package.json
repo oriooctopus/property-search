@@ -15,7 +15,8 @@
     "predeploy": "npm run test:visual",
     "ingest:daily": "tsx scripts/ingest.ts --fetch-strategy=staleness-gated",
     "ingest:full": "tsx scripts/ingest.ts --fetch-strategy=full-bisection",
-    "ingest:enrich-only": "tsx scripts/ingest.ts --only-phase=enrich-year-built,enrich-isochrones"
+    "ingest:enrich-only": "tsx scripts/ingest.ts --only-phase=enrich-year-built,enrich-isochrones",
+    "ingest:verify-stale-only": "tsx scripts/ingest.ts --only-phase=verify-stale"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

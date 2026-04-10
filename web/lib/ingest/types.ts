@@ -44,6 +44,7 @@ export interface IntegrityReport {
   startedAt: string;
   finishedAt: string;
   exitCode: number;
+  costReport?: CostReport;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,6 +61,7 @@ export interface OrchestratorDeps {
   fetchStrategy: FetchStrategy;
   runId: string;
   startedAt: string;
+  budgetUsd: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +109,36 @@ export interface EnrichIsochronesOutput {
 
 export interface CleanupStaleOutput {
   staleDeleted: number;
+}
+
+export interface VerifyStaleOutput {
+  candidates: number;
+  activeConfirmed: number;
+  delistedConfirmed: number;
+  unknown: number;
+  errors: number;
+}
+
+// ---------------------------------------------------------------------------
+// Cost tracking
+// ---------------------------------------------------------------------------
+
+export interface CostBreakdown {
+  source: string;
+  apifyActorRuns: number;
+  apifyUsd: number;
+}
+
+export interface CostReport {
+  breakdown: CostBreakdown[];
+  totalUsd: number;
+  budgetUsd: number;
+  overBudget: boolean;
+  monthToDateUsd: number | null;
+}
+
+export interface VerifyCostsOutput {
+  costReport: CostReport;
 }
 
 // ---------------------------------------------------------------------------

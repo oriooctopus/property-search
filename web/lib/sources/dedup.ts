@@ -162,22 +162,14 @@ function hasValidCoords(lat: number, lon: number): boolean {
 
 const SOURCE_PRIORITY: ListingSource[] = [
   "streeteasy",
-  "zillow",
-  "realtor",
-  "apartments",
-  "renthop",
   "craigslist",
-  "facebook",
+  "facebook-marketplace",
 ];
 
 const GEO_PRIORITY: ListingSource[] = [
-  "zillow",
-  "realtor",
   "streeteasy",
-  "apartments",
-  "renthop",
   "craigslist",
-  "facebook",
+  "facebook-marketplace",
 ];
 
 function priorityIndex(source: ListingSource, order: ListingSource[]): number {
@@ -204,7 +196,7 @@ function priceWithinPercent(a: number, b: number, pct: number): boolean {
  */
 function isSameProperty(a: ValidatedListing, b: ValidatedListing): boolean {
   // Skip Facebook entirely — generic titles make matching unreliable
-  if (a.source === "facebook" || b.source === "facebook") return false;
+  if (a.source === "facebook-marketplace" || b.source === "facebook-marketplace") return false;
 
   // Tier 1: Exact normalized address (only when both are real street addresses)
   const normA = normalizeAddress(a.address);

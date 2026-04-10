@@ -57,6 +57,9 @@ export type Database = {
           source: string;
           year_built: number | null;
           created_at: string;
+          external_id: string | null;
+          last_seen_at: string | null;
+          delisted_at: string | null;
         };
         Insert: {
           id?: number;
@@ -78,6 +81,9 @@ export type Database = {
           source?: string;
           year_built?: number | null;
           created_at?: string;
+          external_id?: string | null;
+          last_seen_at?: string | null;
+          delisted_at?: string | null;
         };
         Update: {
           id?: number;
@@ -99,6 +105,9 @@ export type Database = {
           source?: string;
           year_built?: number | null;
           created_at?: string;
+          external_id?: string | null;
+          last_seen_at?: string | null;
+          delisted_at?: string | null;
         };
         Relationships: [];
       };
