@@ -17,7 +17,7 @@ Available filters you can set:
 - minRent: minimum monthly rent in dollars (integer)
 - maxRent: maximum monthly rent in dollars (integer)
 - sort: one of "price", "beds", "listDate"
-- maxListingAge: one of "1w", "2w", "1m", "3m", "6m", "1y", or null for no limit — how recently the listing was posted
+- maxListingAge: one of "1h", "3h", "6h", "12h", "1d", "2d", "3d", "1w", "2w", "1m", or null for no limit — how recently the listing was posted
 
 When the user describes what they want, respond conversationally AND extract any filter updates.
 

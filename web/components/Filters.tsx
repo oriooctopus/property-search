@@ -7,7 +7,7 @@ import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
 
 export type SortField = 'price' | 'beds' | 'listDate';
 
-export type MaxListingAge = '1w' | '2w' | '1m' | '3m' | '6m' | '1y' | null;
+export type MaxListingAge = '1h' | '3h' | '6h' | '12h' | '1d' | '2d' | '3d' | '1w' | '2w' | '1m' | null;
 
 export const ALL_SOURCES = ['craigslist', 'streeteasy', 'facebook-marketplace'] as const;
 export type ListingSource = (typeof ALL_SOURCES)[number];
@@ -1060,13 +1060,16 @@ const CommuteRuleEditor = memo(function CommuteRuleEditor({
 // ---------------------------------------------------------------------------
 
 const LISTING_AGE_STEPS: { value: MaxListingAge; label: string }[] = [
+  { value: '1h', label: '1 Hour' },
+  { value: '3h', label: '3 Hours' },
+  { value: '6h', label: '6 Hours' },
+  { value: '12h', label: '12 Hours' },
+  { value: '1d', label: '1 Day' },
+  { value: '2d', label: '2 Days' },
+  { value: '3d', label: '3 Days' },
   { value: '1w', label: '1 Week' },
   { value: '2w', label: '2 Weeks' },
   { value: '1m', label: '1 Month' },
-  { value: '3m', label: '3 Months' },
-  { value: '6m', label: '6 Months' },
-  { value: '1y', label: '1 Year' },
-  { value: null, label: 'Any' },
 ];
 
 function listingAgeLabel(maxAge: MaxListingAge): string {
@@ -1076,8 +1079,9 @@ function listingAgeLabel(maxAge: MaxListingAge): string {
 }
 
 function listingAgeSliderIndex(maxAge: MaxListingAge): number {
+  if (maxAge === null) return 0;
   const idx = LISTING_AGE_STEPS.findIndex((o) => o.value === maxAge);
-  return idx >= 0 ? idx : LISTING_AGE_STEPS.length - 1; // default to "Any" if not found
+  return idx >= 0 ? idx : 0;
 }
 
 function ListingAgeSlider({
@@ -1090,16 +1094,13 @@ function ListingAgeSlider({
   const index = listingAgeSliderIndex(value);
   const maxIndex = LISTING_AGE_STEPS.length - 1;
   const pct = (index / maxIndex) * 100;
-  const currentLabel = LISTING_AGE_STEPS[index].label;
+  const currentLabel = value !== null ? LISTING_AGE_STEPS[index].label : null;
 
   return (
     <div className="mb-4">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium" style={{ color: '#8b949e' }}>
-          Listed within
-        </span>
-        <span className="text-sm font-bold" style={{ color: '#e1e4e8' }}>
-          {currentLabel}
+      <div className="flex items-center justify-end mb-2">
+        <span className="text-sm font-bold" style={{ color: '#58a6ff' }}>
+          {currentLabel ?? 'No limit'}
         </span>
       </div>
       <input
@@ -1119,10 +1120,10 @@ function ListingAgeSlider({
       />
       <div className="flex justify-between mt-1">
         <span className="text-[10px]" style={{ color: '#8b949e' }}>
-          1 Week
+          1 Hour
         </span>
         <span className="text-[10px]" style={{ color: '#8b949e' }}>
-          Any
+          1 Month
         </span>
       </div>
     </div>
@@ -1141,7 +1142,7 @@ function countActiveFilters(filters: FiltersState): number {
   if (filters.minBaths !== null) count++;
   if (filters.minRent !== null) count++;
   if (filters.maxRent !== null) count++;
-  if (filters.maxListingAge !== null && filters.maxListingAge !== '1m') count++;
+  if (filters.maxListingAge !== null) count++;
   if (filters.photosFirst) count++;
   if (filters.selectedSources !== null) count++;
   if (filters.minYearBuilt !== null || filters.maxYearBuilt !== null) count++;
@@ -1593,7 +1594,6 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
             />
           </FilterChip>
 
-          {/* Listing age chip — temporarily hidden
           <FilterChip
             compact
             label={listingAgeLabel(filters.maxListingAge)}
@@ -1607,7 +1607,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
             />
             <DropdownFooter
               onReset={() => {
-                onChange({ ...filters, maxListingAge: '1m' });
+                onChange({ ...filters, maxListingAge: null });
                 setOpenChip(null);
               }}
               onDone={() => {
@@ -1616,7 +1616,6 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
               }}
             />
           </FilterChip>
-          */}
 
           {/* Source chip */}
           <FilterChip

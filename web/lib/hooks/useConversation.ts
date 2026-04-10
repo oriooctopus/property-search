@@ -17,7 +17,7 @@ const DEFAULT_FILTERS: FiltersState = {
   minBaths: null,
   minRent: null,
   maxRent: null,
-  maxListingAge: '1m' as MaxListingAge,
+  maxListingAge: null as MaxListingAge,
   photosFirst: false,
   selectedSources: null,
   minYearBuilt: null,

@@ -48,7 +48,7 @@ const SEED_LISTINGS: Listing[] = [
 // ---------------------------------------------------------------------------
 const VALID_VIEWS = new Set(['list', 'map']); // 'swipe' temporarily hidden
 const VALID_SORTS = new Set<string>(['price', 'beds', 'listDate']);
-const VALID_LISTING_AGES = new Set<string>(['1w', '2w', '1m', '3m', '6m', '1y']);
+const VALID_LISTING_AGES = new Set<string>(['1h', '3h', '6h', '12h', '1d', '2d', '3d', '1w', '2w', '1m']);
 
 function boundsFromCenter(lat: number, lng: number, zoom: number) {
   // Approximate degrees visible at given zoom level
@@ -77,7 +77,7 @@ function readFiltersFromParams(params: URLSearchParams): FiltersState {
     minBaths: parseNumOrNull(params.get('minBaths')),
     minRent: parseNumOrNull(params.get('minRent')),
     maxRent: parseNumOrNull(params.get('maxRent')),
-    maxListingAge: (age === 'any' ? null : age && VALID_LISTING_AGES.has(age) ? age : null) as MaxListingAge,
+    maxListingAge: (age && VALID_LISTING_AGES.has(age) ? age : null) as MaxListingAge,
     photosFirst: params.get('photosFirst') === '1',
     selectedSources: params.get('sources') ? params.get('sources')!.split(',') : null,
     minYearBuilt: parseNumOrNull(params.get('minYearBuilt')),
@@ -110,8 +110,7 @@ function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatM
   if (f.minBaths != null) p.set('minBaths', String(f.minBaths));
   if (f.minRent != null) p.set('minRent', String(f.minRent));
   if (f.maxRent != null) p.set('maxRent', String(f.maxRent));
-  if (f.maxListingAge === null) p.set('maxAge', 'any');
-  else if (f.maxListingAge !== '1m') p.set('maxAge', f.maxListingAge);
+  if (f.maxListingAge !== null) p.set('maxAge', f.maxListingAge);
   if (f.photosFirst) p.set('photosFirst', '1');
   if (f.selectedSources !== null) p.set('sources', f.selectedSources.join(','));
   if (f.minYearBuilt != null) p.set('minYearBuilt', String(f.minYearBuilt));
@@ -703,12 +702,16 @@ function HomeInner() {
     if (filters.maxListingAge !== null) {
       const now = Date.now();
       const msMap: Record<string, number> = {
-        '1w': 7 * 24 * 60 * 60 * 1000,
-        '2w': 14 * 24 * 60 * 60 * 1000,
-        '1m': 30 * 24 * 60 * 60 * 1000,
-        '3m': 90 * 24 * 60 * 60 * 1000,
-        '6m': 180 * 24 * 60 * 60 * 1000,
-        '1y': 365 * 24 * 60 * 60 * 1000,
+        '1h': 3_600_000,
+        '3h': 10_800_000,
+        '6h': 21_600_000,
+        '12h': 43_200_000,
+        '1d': 86_400_000,
+        '2d': 172_800_000,
+        '3d': 259_200_000,
+        '1w': 604_800_000,
+        '2w': 1_209_600_000,
+        '1m': 2_592_000_000,
       };
       const cutoff = now - (msMap[filters.maxListingAge] ?? 0);
       result = result.filter((l) => {
