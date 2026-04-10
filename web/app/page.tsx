@@ -77,6 +77,7 @@ function readFiltersFromParams(params: URLSearchParams): FiltersState {
     minBaths: parseNumOrNull(params.get('minBaths')),
     minRent: parseNumOrNull(params.get('minRent')),
     maxRent: parseNumOrNull(params.get('maxRent')),
+    priceMode: params.get('priceMode') === 'perRoom' ? 'perRoom' : 'total',
     maxListingAge: (age && VALID_LISTING_AGES.has(age) ? age : null) as MaxListingAge,
     photosFirst: params.get('photosFirst') === '1',
     selectedSources: params.get('sources') ? params.get('sources')!.split(',') : null,
@@ -110,6 +111,7 @@ function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatM
   if (f.minBaths != null) p.set('minBaths', String(f.minBaths));
   if (f.minRent != null) p.set('minRent', String(f.minRent));
   if (f.maxRent != null) p.set('maxRent', String(f.maxRent));
+  if (f.priceMode === 'perRoom') p.set('priceMode', 'perRoom');
   if (f.maxListingAge !== null) p.set('maxAge', f.maxListingAge);
   if (f.photosFirst) p.set('photosFirst', '1');
   if (f.selectedSources !== null) p.set('sources', f.selectedSources.join(','));
@@ -692,10 +694,20 @@ function HomeInner() {
       });
     }
     if (filters.minRent !== null) {
-      result = result.filter((l) => l.price >= filters.minRent!);
+      result = result.filter((l) => {
+        const effectivePrice = filters.priceMode === 'perRoom'
+          ? l.price / Math.max(l.beds ?? 1, 1)
+          : l.price;
+        return effectivePrice >= filters.minRent!;
+      });
     }
     if (filters.maxRent !== null) {
-      result = result.filter((l) => l.price <= filters.maxRent!);
+      result = result.filter((l) => {
+        const effectivePrice = filters.priceMode === 'perRoom'
+          ? l.price / Math.max(l.beds ?? 1, 1)
+          : l.price;
+        return effectivePrice <= filters.maxRent!;
+      });
     }
 
     // Listing age filter

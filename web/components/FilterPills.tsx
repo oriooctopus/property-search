@@ -72,6 +72,8 @@ function getDefaultValue(key: keyof FiltersState): FiltersState[keyof FiltersSta
   switch (key) {
     case 'sort':
       return 'price';
+    case 'priceMode':
+      return 'total';
     case 'maxListingAge':
       return null as MaxListingAge;
     case 'commuteRules':

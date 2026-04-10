@@ -74,6 +74,7 @@ export interface FiltersState {
   minBaths: number | null;
   minRent: number | null;
   maxRent: number | null;
+  priceMode: 'total' | 'perRoom';
   sort: SortField;
   maxListingAge: MaxListingAge;
   photosFirst: boolean;
@@ -116,6 +117,10 @@ const SORT_OPTIONS: { value: SortField; label: string }[] = [
 const PRICE_SLIDER_MIN = 0;
 const PRICE_SLIDER_MAX = 25000;
 const PRICE_SLIDER_STEP = 500;
+
+const PRICE_PER_ROOM_MIN = 0;
+const PRICE_PER_ROOM_MAX = 4000;
+const PRICE_PER_ROOM_STEP = 50;
 
 
 const BEDROOM_OPTIONS = [
@@ -208,7 +213,7 @@ function RangeSlider({
           {formatSliderPrice(min)}
         </span>
         <span className="text-[10px]" style={{ color: '#8b949e' }}>
-          {formatSliderPrice(max)}
+          {formatSliderPrice(max)}+
         </span>
       </div>
     </div>
@@ -219,8 +224,16 @@ function RangeSlider({
 // Chip label helpers
 // ---------------------------------------------------------------------------
 
-function priceLabel(minRent: number | null, maxRent: number | null): string {
-  if (minRent === null && maxRent === null) return 'Price';
+function priceLabel(minRent: number | null, maxRent: number | null, priceMode?: 'total' | 'perRoom'): string {
+  const suffix = priceMode === 'perRoom' ? '/rm' : '';
+  if (minRent === null && maxRent === null) return priceMode === 'perRoom' ? 'Price/Room' : 'Price';
+  if (priceMode === 'perRoom') {
+    if (minRent !== null && maxRent !== null) {
+      return `$${minRent.toLocaleString()}\u2013$${maxRent.toLocaleString()}${suffix}`;
+    }
+    if (maxRent !== null) return `Under $${maxRent.toLocaleString()}${suffix}`;
+    return `$${minRent!.toLocaleString()}+${suffix}`;
+  }
   if (minRent !== null && maxRent !== null) {
     return `$${(minRent / 1000).toFixed(minRent % 1000 === 0 ? 0 : 1)}K\u2013$${(maxRent / 1000).toFixed(maxRent % 1000 === 0 ? 0 : 1)}K`;
   }
@@ -1199,6 +1212,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
   // Draft state for dropdowns — only applied on "Done"
   const [draftMinRent, setDraftMinRent] = useState<number | null>(filters.minRent);
   const [draftMaxRent, setDraftMaxRent] = useState<number | null>(filters.maxRent);
+  const [draftPriceMode, setDraftPriceMode] = useState<'total' | 'perRoom'>(filters.priceMode);
   const [draftSelectedBeds, setDraftSelectedBeds] = useState<number[]>(filters.selectedBeds ?? []);
   const [draftMinBaths, setDraftMinBaths] = useState<number | null>(filters.minBaths);
   const [draftMaxListingAge, setDraftMaxListingAge] = useState<MaxListingAge>(
@@ -1231,6 +1245,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
     if (openChip !== null) return;
     setDraftMinRent(filters.minRent);
     setDraftMaxRent(filters.maxRent);
+    setDraftPriceMode(filters.priceMode);
     setDraftSelectedBeds(filters.selectedBeds ?? []);
     setDraftMinBaths(filters.minBaths);
     setDraftMaxListingAge(filters.maxListingAge);
@@ -1241,7 +1256,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
     setDraftMinSqft(filters.minSqft);
     setDraftMaxSqft(filters.maxSqft);
     setDraftExcludeNoSqft(filters.excludeNoSqft);
-  }, [openChip, filters.minRent, filters.maxRent, filters.selectedBeds, filters.minBaths, filters.maxListingAge, filters.selectedSources, filters.commuteRules, filters.minYearBuilt, filters.maxYearBuilt, filters.minSqft, filters.maxSqft, filters.excludeNoSqft]);
+  }, [openChip, filters.minRent, filters.maxRent, filters.priceMode, filters.selectedBeds, filters.minBaths, filters.maxListingAge, filters.selectedSources, filters.commuteRules, filters.minYearBuilt, filters.maxYearBuilt, filters.minSqft, filters.maxSqft, filters.excludeNoSqft]);
 
   // Click-outside handler — discard drafts
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1265,6 +1280,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
       if (chip === 'price') {
         setDraftMinRent(filters.minRent);
         setDraftMaxRent(filters.maxRent);
+        setDraftPriceMode(filters.priceMode);
       } else if (chip === 'bedsBaths') {
         setDraftSelectedBeds(filters.selectedBeds ?? []);
         setDraftMinBaths(filters.minBaths);
@@ -1508,38 +1524,65 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
           {/* Price chip */}
           <FilterChip
             compact
-            label={priceLabel(filters.minRent, filters.maxRent)}
+            label={priceLabel(filters.minRent, filters.maxRent, filters.priceMode)}
             active={filters.minRent !== null || filters.maxRent !== null}
             open={openChip === 'price'}
             onToggle={() => toggleChip('price')}
           >
             <SectionTitle>Price</SectionTitle>
+            <div className="flex rounded-lg p-0.5 mb-3" style={{ backgroundColor: '#0d1117' }}>
+              <button
+                className="flex-1 text-xs font-medium py-1.5 rounded-md transition-colors"
+                style={{
+                  backgroundColor: draftPriceMode === 'total' ? '#58a6ff' : 'transparent',
+                  color: draftPriceMode === 'total' ? '#ffffff' : '#8b949e',
+                }}
+                onClick={() => {
+                  setDraftPriceMode('total');
+                  setDraftMinRent(null);
+                  setDraftMaxRent(null);
+                }}
+              >
+                Total
+              </button>
+              <button
+                className="flex-1 text-xs font-medium py-1.5 rounded-md transition-colors"
+                style={{
+                  backgroundColor: draftPriceMode === 'perRoom' ? '#58a6ff' : 'transparent',
+                  color: draftPriceMode === 'perRoom' ? '#ffffff' : '#8b949e',
+                }}
+                onClick={() => {
+                  setDraftPriceMode('perRoom');
+                  setDraftMinRent(null);
+                  setDraftMaxRent(null);
+                }}
+              >
+                Per Room
+              </button>
+            </div>
             <RangeSlider
-              label="Min Price"
-              min={PRICE_SLIDER_MIN}
-              max={PRICE_SLIDER_MAX}
-              step={PRICE_SLIDER_STEP}
-              value={draftMinRent ?? PRICE_SLIDER_MIN}
-              onChange={(v) => setDraftMinRent(v === PRICE_SLIDER_MIN ? null : v)}
+              label={draftPriceMode === 'total' ? 'Min Price' : 'Min / Room'}
+              min={draftPriceMode === 'total' ? PRICE_SLIDER_MIN : PRICE_PER_ROOM_MIN}
+              max={draftPriceMode === 'total' ? PRICE_SLIDER_MAX : PRICE_PER_ROOM_MAX}
+              step={draftPriceMode === 'total' ? PRICE_SLIDER_STEP : PRICE_PER_ROOM_STEP}
+              value={draftMinRent ?? (draftPriceMode === 'total' ? PRICE_SLIDER_MIN : PRICE_PER_ROOM_MIN)}
+              onChange={(v) => setDraftMinRent(v === (draftPriceMode === 'total' ? PRICE_SLIDER_MIN : PRICE_PER_ROOM_MIN) ? null : v)}
             />
             <RangeSlider
-              label="Max Price"
-              min={PRICE_SLIDER_MIN}
-              max={PRICE_SLIDER_MAX}
-              step={PRICE_SLIDER_STEP}
-              value={draftMaxRent ?? PRICE_SLIDER_MAX}
-              onChange={(v) => setDraftMaxRent(v === PRICE_SLIDER_MAX ? null : v)}
+              label={draftPriceMode === 'total' ? 'Max Price' : 'Max / Room'}
+              min={draftPriceMode === 'total' ? PRICE_SLIDER_MIN : PRICE_PER_ROOM_MIN}
+              max={draftPriceMode === 'total' ? PRICE_SLIDER_MAX : PRICE_PER_ROOM_MAX}
+              step={draftPriceMode === 'total' ? PRICE_SLIDER_STEP : PRICE_PER_ROOM_STEP}
+              value={draftMaxRent ?? (draftPriceMode === 'total' ? PRICE_SLIDER_MAX : PRICE_PER_ROOM_MAX)}
+              onChange={(v) => setDraftMaxRent(v === (draftPriceMode === 'total' ? PRICE_SLIDER_MAX : PRICE_PER_ROOM_MAX) ? null : v)}
             />
-            <p className="text-xs mb-1" style={{ color: '#8b949e' }}>
-              Applies to monthly rent
-            </p>
             <DropdownFooter
               onReset={() => {
-                onChange({ ...filters, minRent: null, maxRent: null });
+                onChange({ ...filters, minRent: null, maxRent: null, priceMode: 'total' });
                 setOpenChip(null);
               }}
               onDone={() => {
-                onChange({ ...filters, minRent: draftMinRent, maxRent: draftMaxRent });
+                onChange({ ...filters, minRent: draftMinRent, maxRent: draftMaxRent, priceMode: draftPriceMode });
                 setOpenChip(null);
               }}
             />
