@@ -550,9 +550,9 @@ export default function SwipeView({
       >
         {currentListing ? (
           <>
-            {/* Card + action bar as one centered unit — pt accounts for filter bar */}
-            <div className="flex-1 min-h-0 flex items-center pr-3 pt-10">
-            <div className="relative w-full" style={{ maxHeight: '100%' }}>
+            {/* Card + action bar — fills available space, content scrolls if needed */}
+            <div className="flex-1 min-h-0 flex items-stretch pr-3 pt-2 pb-2">
+            <div className="relative w-full">
               {/* Invisible layout card to establish natural height (card + action bar) */}
               <div className="invisible">
                 <SwipeCard
