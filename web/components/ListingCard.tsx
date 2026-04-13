@@ -4,7 +4,6 @@ import { useState, useRef, useCallback } from 'react';
 import type { Database } from '@/lib/types';
 import { formatListedDate, formatAvailabilityDate } from '@/lib/format-date';
 import { ActionButton, IconButton } from '@/components/ui';
-import PeopleAvatars from './PeopleAvatars';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -50,13 +49,10 @@ interface ListingCardProps {
   listing: Listing;
   isSelected: boolean;
   isFavorited: boolean;
-  wouldLiveThere: boolean;
-  wouldLivePeople: Person[];
   isHiding?: boolean;
   commuteInfo?: CommuteInfo;
   onClick: () => void;
-  onToggleWouldLive: () => void;
-  onToggleFavorite: () => void;
+  onStarClick: (listingId: number, anchorRect: DOMRect) => void;
   onExpand: () => void;
   onHide: () => void;
 }
@@ -65,13 +61,10 @@ export default function ListingCard({
   listing,
   isSelected,
   isFavorited,
-  wouldLiveThere,
-  wouldLivePeople,
   isHiding,
   commuteInfo,
   onClick,
-  onToggleWouldLive,
-  onToggleFavorite,
+  onStarClick,
   onExpand,
   onHide,
 }: ListingCardProps) {
@@ -81,6 +74,7 @@ export default function ListingCard({
   const totalPhotos = photos.length + (hasMorePhotosSlide ? 1 : 0);
 
   const [photoIndex, setPhotoIndex] = useState(0);
+  const starButtonRef = useRef<HTMLButtonElement>(null);
 
   // Touch/swipe handling
   const touchStartX = useRef<number | null>(null);
@@ -320,9 +314,9 @@ export default function ListingCard({
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Dislike */}
+          {/* Hide */}
           <ActionButton
-            variant="dislike"
+            variant="hide"
             active={false}
             compact
             onClick={(e) => {
@@ -331,41 +325,24 @@ export default function ListingCard({
             }}
           />
 
-          {/* Would live there toggle */}
+          {/* Save / star toggle */}
           <ActionButton
-            variant="wouldLive"
-            active={wouldLiveThere}
-            compact
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleWouldLive();
-            }}
-          />
-
-          {/* Like toggle */}
-          <ActionButton
-            variant="like"
+            ref={starButtonRef}
+            variant="save"
             active={isFavorited}
             compact
             onClick={(e) => {
               e.stopPropagation();
-              onToggleFavorite();
+              if (starButtonRef.current) {
+                onStarClick(listing.id, starButtonRef.current.getBoundingClientRect());
+              }
             }}
           />
         </div>
       </div>
 
-      {/* Who would live here + View listing (combined row) */}
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          {wouldLivePeople.length > 0 ? (
-            <PeopleAvatars people={wouldLivePeople} max={4} size={20} />
-          ) : (
-            <span className="text-[11px]" style={{ color: '#8b949e' }}>
-              Be the first to say you&apos;d live here!
-            </span>
-          )}
-        </div>
+      {/* View listing link */}
+      <div className="mt-2 flex items-center justify-end">
         <a
           href={listing.url}
           target="_blank"

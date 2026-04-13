@@ -17,15 +17,11 @@ import SwipeView from '@/components/SwipeView';
 import { useConversation } from '@/lib/hooks/useConversation';
 import { useConversations } from '@/lib/hooks/useConversations';
 import { useSavedSearches } from '@/lib/hooks/useSavedSearches';
+import { useWishlists, useWishlistMutations, useWishlistedListingIds } from '@/lib/hooks/useWishlists';
+import WishlistPicker from '@/components/WishlistPicker';
+import { setLastUsedWishlistId } from '@/lib/wishlist-storage';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
-
-interface PersonWithBio {
-  id: string;
-  display_name: string | null;
-  avatar_url: string | null;
-  bio: string | null;
-}
 
 // ---------------------------------------------------------------------------
 // Seed data fallback (used when DB is empty)
@@ -145,9 +141,13 @@ function HomeInner() {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
-  const [wouldLiveSet, setWouldLiveSet] = useState<Set<number>>(new Set());
-  const [favoritesSet, setFavoritesSet] = useState<Set<number>>(new Set());
-  const [wouldLivePeopleMap, setWouldLivePeopleMap] = useState<Record<number, PersonWithBio[]>>({});
+
+  // Wishlist system
+  const { data: wishlists } = useWishlists(userId);
+  const wishlistedIds = useWishlistedListingIds(userId);
+  const { addToWishlist, removeFromWishlist, createWishlist } = useWishlistMutations(userId);
+  const [pickerListingId, setPickerListingId] = useState<number | null>(null);
+  const [pickerAnchorRect, setPickerAnchorRect] = useState<DOMRect | null>(null);
 
   // Viewport loading state (map pan/zoom queries)
   const [viewportLoading, setViewportLoading] = useState(false);
@@ -449,73 +449,6 @@ function HomeInner() {
       }));
       setListings(allListings);
 
-      // Fetch would_live_there with profiles.
-      // Try progressively simpler queries if the join or columns fail.
-      let wltRows: unknown[] | null = null;
-      {
-        const { data, error } = await supabase
-          .from('would_live_there')
-          .select('listing_id, user_id, profiles:user_id(id, display_name, avatar_url, bio)');
-        if (!error) {
-          wltRows = data;
-        } else {
-          const { data: fb2, error: err2 } = await supabase
-            .from('would_live_there')
-            .select('listing_id, user_id, profiles:user_id(id, display_name, avatar_url)');
-          if (!err2) {
-            wltRows = fb2;
-          } else {
-            // Join itself is broken — fetch without profiles
-            const { data: fb3 } = await supabase
-              .from('would_live_there')
-              .select('listing_id, user_id');
-            wltRows = fb3;
-          }
-        }
-      }
-
-      if (wltRows) {
-        const userSet = new Set<number>();
-        const peopleMap: Record<number, PersonWithBio[]> = {};
-
-        type WltRow = {
-          listing_id: number;
-          user_id: string;
-          profiles: PersonWithBio | null;
-        };
-
-        for (const raw of wltRows) {
-          const row = raw as unknown as WltRow;
-          const lid = row.listing_id;
-          if (!peopleMap[lid]) peopleMap[lid] = [];
-          if (row.profiles) {
-            peopleMap[lid].push(row.profiles);
-          }
-          if (uid && row.user_id === uid) {
-            userSet.add(lid);
-          }
-        }
-        setWouldLiveSet(userSet);
-        setWouldLivePeopleMap(peopleMap);
-      }
-
-      // Fetch user's favorites
-      if (uid) {
-        const { data: favRows } = await supabase
-          .from('favorites')
-          .select('listing_id')
-          .eq('user_id', uid);
-        if (favRows) {
-          setFavoritesSet(
-            new Set(
-              (favRows as unknown as { listing_id: number }[]).map(
-                (r) => r.listing_id,
-              ),
-            ),
-          );
-        }
-      }
-
       } catch (err) {
         console.error('Failed to load data:', err);
       } finally {
@@ -793,68 +726,22 @@ function HomeInner() {
   filteredListingsRef.current = filteredListings;
 
   // -----------------------------------------------------------------------
-  // Toggle handlers
+  // Wishlist handlers
   // -----------------------------------------------------------------------
-  const handleToggleWouldLive = useCallback(
-    async (listingId: number) => {
-      if (!userId) {
-        router.push('/auth/login');
-        return;
-      }
+  const handleStarClick = useCallback((listingId: number, anchorRect: DOMRect) => {
+    setPickerListingId(listingId);
+    setPickerAnchorRect(anchorRect);
+  }, []);
 
-      const already = wouldLiveSet.has(listingId);
-      // Optimistic update
-      setWouldLiveSet((prev) => {
-        const next = new Set(prev);
-        if (already) next.delete(listingId);
-        else next.add(listingId);
-        return next;
-      });
-
-      if (already) {
-        await supabase
-          .from('would_live_there')
-          .delete()
-          .eq('user_id', userId)
-          .eq('listing_id', listingId);
-      } else {
-        await supabase
-          .from('would_live_there')
-          .insert({ user_id: userId, listing_id: listingId });
-      }
-    },
-    [userId, wouldLiveSet, supabase, router],
-  );
-
-  const handleToggleFavorite = useCallback(
-    async (listingId: number) => {
-      if (!userId) {
-        router.push('/auth/login');
-        return;
-      }
-
-      const already = favoritesSet.has(listingId);
-      setFavoritesSet((prev) => {
-        const next = new Set(prev);
-        if (already) next.delete(listingId);
-        else next.add(listingId);
-        return next;
-      });
-
-      if (already) {
-        await supabase
-          .from('favorites')
-          .delete()
-          .eq('user_id', userId)
-          .eq('listing_id', listingId);
-      } else {
-        await supabase
-          .from('favorites')
-          .insert({ user_id: userId, listing_id: listingId });
-      }
-    },
-    [userId, favoritesSet, supabase, router],
-  );
+  const handleWishlistToggle = useCallback((wishlistId: string, checked: boolean) => {
+    if (!pickerListingId) return;
+    if (checked) {
+      addToWishlist.mutate({ wishlistId, listingId: pickerListingId });
+      setLastUsedWishlistId(wishlistId);
+    } else {
+      removeFromWishlist.mutate({ wishlistId, listingId: pickerListingId });
+    }
+  }, [pickerListingId, addToWishlist, removeFromWishlist]);
 
   // -----------------------------------------------------------------------
   // Render
@@ -873,14 +760,11 @@ function HomeInner() {
           key={listing.id}
           listing={listing}
           isSelected={listing.id === selectedId}
-          isFavorited={favoritesSet.has(listing.id)}
-          wouldLiveThere={wouldLiveSet.has(listing.id)}
-          wouldLivePeople={wouldLivePeopleMap[listing.id] ?? []}
+          isFavorited={wishlistedIds.has(listing.id)}
           isHiding={hidingId === listing.id}
           commuteInfo={commuteInfoMap?.get(listing.id)}
           onClick={() => setSelectedId(listing.id)}
-          onToggleWouldLive={() => handleToggleWouldLive(listing.id)}
-          onToggleFavorite={() => handleToggleFavorite(listing.id)}
+          onStarClick={handleStarClick}
           onExpand={() => setDetailListing(listing)}
           onHide={() => handleHideListing(listing.id)}
         />
@@ -919,11 +803,13 @@ function HomeInner() {
       <Map
         listings={filteredListings}
         selectedId={selectedId}
-        favoritedIds={favoritesSet}
-        wouldLiveIds={wouldLiveSet}
-        onToggleFavorite={handleToggleFavorite}
-        onToggleWouldLive={handleToggleWouldLive}
+        favoritedIds={wishlistedIds}
         onHideListing={handleHideListing}
+        onToggleFavorite={(id) => {
+          const btn = document.querySelector(`[data-action="save"][data-listing-id="${id}"]`);
+          const rect = btn?.getBoundingClientRect() ?? new DOMRect(window.innerWidth / 2, window.innerHeight / 2, 0, 0);
+          handleStarClick(id, rect);
+        }}
         onSelectDetail={(listing) => { console.log(`[page] onSelectDetail called for listing #${listing.id} "${listing.address}"`); setDetailListing(listing); }}
         commuteInfoMap={commuteInfoMap ?? undefined}
         onBoundsChange={(bounds) => {
@@ -1031,12 +917,9 @@ function HomeInner() {
   const detailModal = detailListing && (
     <ListingDetail
       listing={detailListing}
-      wouldLiveThere={wouldLiveSet.has(detailListing.id)}
-      isFavorited={favoritesSet.has(detailListing.id)}
-      wouldLivePeople={wouldLivePeopleMap[detailListing.id] ?? []}
+      isFavorited={wishlistedIds.has(detailListing.id)}
       commuteRules={filters.commuteRules}
-      onToggleWouldLive={() => handleToggleWouldLive(detailListing.id)}
-      onToggleFavorite={() => handleToggleFavorite(detailListing.id)}
+      onStarClick={handleStarClick}
       onHide={() => handleHideListing(detailListing.id)}
       onClose={() => {
         setDetailListing(null);
@@ -1179,10 +1062,10 @@ function HomeInner() {
             <SwipeView
               listings={filteredListings}
               userId={userId}
-              favoritesSet={favoritesSet}
-              wouldLiveSet={wouldLiveSet}
-              onToggleFavorite={handleToggleFavorite}
-              onToggleWouldLive={handleToggleWouldLive}
+              favoritesSet={wishlistedIds}
+              wouldLiveSet={new Set<number>()}
+              onToggleFavorite={() => {}}
+              onToggleWouldLive={() => {}}
               onHideListing={handleHideListing}
               onExpandDetail={(listing) => { setSelectedId(listing.id); setDetailListing(filteredListings.find(l => l.id === listing.id) ?? null); }}
               onSwitchView={() => setMobileView('list')}
@@ -1284,6 +1167,18 @@ function HomeInner() {
 
       {/* Detail modal */}
       {detailModal}
+
+      {/* Wishlist picker */}
+      {pickerListingId !== null && wishlists && (
+        <WishlistPicker
+          listingId={pickerListingId}
+          wishlists={wishlists}
+          onToggle={handleWishlistToggle}
+          onCreateNew={(name) => createWishlist.mutate(name)}
+          onClose={() => setPickerListingId(null)}
+          anchorRect={pickerAnchorRect}
+        />
+      )}
 
       {/* Save search modal */}
       {saveSearchOpen && (

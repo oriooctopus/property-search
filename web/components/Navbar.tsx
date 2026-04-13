@@ -172,12 +172,12 @@ export default function Navbar() {
                     Profile
                   </Link>
                   <Link
-                    href="/favorites"
+                    href="/wishlists"
                     onClick={() => setDropdownOpen(false)}
                     className="block w-full px-4 py-2 text-left text-sm transition-colors hover:opacity-80"
                     style={{ color: "#e1e4e8" }}
                   >
-                    Favorites
+                    Wishlists
                   </Link>
                   <Link
                     href="/hidden"

@@ -43,19 +43,19 @@ const POPUP_STYLES = `
   .dark-popup .leaflet-popup-close-button:hover {
     color: #e1e4e8 !important;
   }
-  .dark-popup [data-action="would-live"] {
+  .dark-popup [data-action="hide"] {
     transition: color 150ms, background-color 150ms;
     border-radius: 4px;
   }
-  .dark-popup [data-action="would-live"]:hover {
-    background-color: rgba(249, 115, 22, 0.15) !important;
-    color: #fb923c !important;
+  .dark-popup [data-action="hide"]:hover {
+    background-color: rgba(248, 81, 73, 0.15) !important;
+    color: #f97583 !important;
   }
-  .dark-popup [data-action="favorite"] {
+  .dark-popup [data-action="save"] {
     transition: color 150ms, background-color 150ms;
     border-radius: 4px;
   }
-  .dark-popup [data-action="favorite"]:hover {
+  .dark-popup [data-action="save"]:hover {
     background-color: rgba(251, 191, 36, 0.15) !important;
     color: #fcd34d !important;
   }
@@ -221,7 +221,7 @@ function BoundsWatcher({ onBoundsChange, onMapMove, suppressBoundsRef }: { onBou
 /* ------------------------------------------------------------------ */
 /*  Rich popup content builder                                         */
 /* ------------------------------------------------------------------ */
-function buildPopupContent(listing: Listing, isFavorited: boolean, isWouldLive: boolean, commuteInfo?: CommuteInfo): string {
+function buildPopupContent(listing: Listing, isFavorited: boolean, _isWouldLive: boolean, commuteInfo?: CommuteInfo): string {
   const photos = listing.photo_urls ?? [];
   const hasPhoto = photos.length > 0;
   const totalPhotos = photos.length;
@@ -290,31 +290,24 @@ function buildPopupContent(listing: Listing, isFavorited: boolean, isWouldLive: 
       </div>`
     : '';
 
-  const wouldLiveColor = isWouldLive ? '#f97316' : '#8b949e';
-  const likeColor = isFavorited ? '#58a6ff' : '#8b949e';
+  const likeColor = isFavorited ? '#fbbf24' : '#8b949e';
 
   const actionBtnStyle = `background:none;border:none;cursor:pointer;padding:4px;display:flex;align-items:center;border-radius:4px;`;
 
   const actionsHtml = `
     <div style="display: flex; gap: 8px; margin-top: 6px;">
       <button
-        data-action="dislike"
+        data-action="hide"
         data-listing-id="${listing.id}"
-        title="Dislike"
+        title="Hide"
         style="${actionBtnStyle} color: #8b949e;"
-      ><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2H20a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3m-7 2v4a3 3 0 0 0 3 3l4-9V2H6.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10"/></svg></button>
+      ><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button>
       <button
-        data-action="would-live"
+        data-action="save"
         data-listing-id="${listing.id}"
-        title="Would live here"
-        style="${actionBtnStyle} color: ${wouldLiveColor};"
-      ><svg width="16" height="16" viewBox="0 0 24 24" fill="${isWouldLive ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><rect x="9" y="12" width="6" height="10"/></svg></button>
-      <button
-        data-action="favorite"
-        data-listing-id="${listing.id}"
-        title="Like"
+        title="Save"
         style="${actionBtnStyle} color: ${likeColor};"
-      ><svg width="16" height="16" viewBox="0 0 24 24" fill="${isFavorited ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3m7-2V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14"/></svg></button>
+      ><svg width="16" height="16" viewBox="0 0 24 24" fill="${isFavorited ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></button>
     </div>`;
 
   return `
@@ -484,13 +477,10 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
           console.log(`[popup] delegated ${ev.type} — action="${action}" listing=#${id}`);
 
           switch (action) {
-            case 'would-live':
-              onToggleWouldLiveRef.current(id);
-              break;
-            case 'favorite':
+            case 'save':
               onToggleFavoriteRef.current(id);
               break;
-            case 'dislike':
+            case 'hide':
               onHideListingRef.current(id);
               break;
             case 'photo-prev':
@@ -631,7 +621,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
                 popupopen: handlePopupOpen(listing),
               }}
             >
-              <Popup className="dark-popup">
+              <Popup className="dark-popup" autoClose={false} closeOnClick={false}>
                 <div dangerouslySetInnerHTML={{ __html: buildPopupContent(listing, favoritedIds.has(listing.id), wouldLiveIds.has(listing.id), commuteInfoMap?.get(listing.id)) }} />
               </Popup>
             </CircleMarker>
