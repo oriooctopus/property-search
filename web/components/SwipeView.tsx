@@ -546,7 +546,7 @@ export default function SwipeView({
       {/* Floating detail panel on the right */}
       <div
         className="absolute right-0 bottom-0 z-10 flex flex-col"
-        style={{ width: 420, top: 0 }}
+        style={{ width: 440, top: 0 }}
       >
         {currentListing ? (
           <>
