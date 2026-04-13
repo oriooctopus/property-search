@@ -114,7 +114,7 @@ function InvalidateSize({ visible }: { visible: boolean }) {
   return null;
 }
 
-function FlyToSelected({ listing, suppressBoundsRef }: { listing: Listing | undefined; suppressBoundsRef: React.MutableRefObject<boolean> }) {
+function FlyToSelected({ listing, suppressBoundsRef, panOffset }: { listing: Listing | undefined; suppressBoundsRef: React.MutableRefObject<boolean>; panOffset?: { x: number; y: number } }) {
   const map = useMap();
   const prevId = useRef<number | null>(null);
 
@@ -123,18 +123,25 @@ function FlyToSelected({ listing, suppressBoundsRef }: { listing: Listing | unde
       prevId.current = listing.id;
       const lat = Number(listing.lat);
       const lon = Number(listing.lon);
-      // Guard against NaN coordinates and hidden/zero-size map containers
-      // (Leaflet's flyTo calls unproject which produces NaN when the
-      // container has no dimensions, e.g. display:none on mobile).
       const size = map.getSize();
       if (!isNaN(lat) && !isNaN(lon) && size.x > 0 && size.y > 0) {
-        // Suppress the bounds-change callback triggered by this programmatic
-        // flyTo so we don't accidentally replace the full listing set.
         suppressBoundsRef.current = true;
-        map.flyTo([lat, lon], 15, { duration: 0.8 });
+        if (panOffset) {
+          // Offset the center so the dot appears shifted by panOffset pixels
+          // e.g. panOffset.x = 200 moves the dot 200px left of center
+          const zoom = map.getZoom() || 15;
+          const targetPoint = map.project([lat, lon], zoom);
+          const offsetCenter = map.unproject(
+            [targetPoint.x + panOffset.x, targetPoint.y + panOffset.y],
+            zoom,
+          );
+          map.flyTo(offsetCenter, zoom, { duration: 0.8 });
+        } else {
+          map.flyTo([lat, lon], 15, { duration: 0.8 });
+        }
       }
     }
-  }, [listing, map, suppressBoundsRef]);
+  }, [listing, map, suppressBoundsRef, panOffset]);
 
   return null;
 }
@@ -165,6 +172,8 @@ export interface MapProps {
   visible?: boolean;
   /** Per-listing commute info keyed by listing id */
   commuteInfoMap?: Map<number, CommuteInfo>;
+  /** Pixel offset for flyTo — shifts the selected listing's dot away from center */
+  panOffset?: { x: number; y: number };
 }
 
 /* ------------------------------------------------------------------ */
@@ -372,7 +381,7 @@ function buildPopupContent(listing: Listing, isFavorited: boolean, _isWouldLive:
   `;
 }
 
-export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap }: MapProps) {
+export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, panOffset }: MapProps) {
   // Fall back to a local ref if the caller doesn't provide one
   const localSuppressBoundsRef = useRef(false);
   const suppressBoundsRef = suppressBoundsRefProp ?? localSuppressBoundsRef;
@@ -597,7 +606,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
         />
         <InvalidateSize visible={visible} />
         <InjectPopupStyles />
-        <FlyToSelected listing={selectedListing} suppressBoundsRef={suppressBoundsRef} />
+        <FlyToSelected listing={selectedListing} suppressBoundsRef={suppressBoundsRef} panOffset={panOffset} />
         {onBoundsChange && <BoundsWatcher onBoundsChange={onBoundsChange} onMapMove={onMapMove} suppressBoundsRef={suppressBoundsRef} />}
         {validListings.map((listing) => {
           const color = '#8b949e';

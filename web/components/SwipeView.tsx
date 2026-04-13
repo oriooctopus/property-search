@@ -519,6 +519,7 @@ export default function SwipeView({
           initialZoom={initialZoom}
           visible={true}
           commuteInfoMap={commuteInfoMap}
+          panOffset={{ x: 210, y: 0 }}
         />
       </div>
 
@@ -529,11 +530,11 @@ export default function SwipeView({
       >
         {currentListing ? (
           <>
-            {/* Card centering area — pt accounts for filter bar overlay */}
+            {/* Card + action bar as one centered unit — pt accounts for filter bar */}
             <div className="flex-1 min-h-0 flex items-center pr-3 pt-20">
             <div className="relative w-full" style={{ maxHeight: '100%' }}>
-              {/* Invisible layout card to establish natural height */}
-              <div className="invisible pr-3">
+              {/* Invisible layout card to establish natural height (card + action bar) */}
+              <div className="invisible">
                 <SwipeCard
                   listing={currentListing}
                   onSwipe={() => {}}
@@ -541,12 +542,13 @@ export default function SwipeView({
                   isTop={false}
                   layoutOnly
                 />
+                <div style={{ height: 64 }} />
               </div>
 
               {/* Stack visual: background card */}
               {currentIndex + 1 < deck.length && (
                 <div
-                  className="absolute inset-0 mr-3 rounded-xl border"
+                  className="absolute inset-0 rounded-xl border"
                   style={{
                     backgroundColor: 'rgba(28, 32, 40, 0.93)',
                     borderColor: '#2d333b',
@@ -556,29 +558,33 @@ export default function SwipeView({
                 />
               )}
 
-              {/* Top card — the SwipeCard detail panel */}
-              <div className="absolute inset-0 mr-3" style={{ zIndex: 2 }}>
-                <SwipeCard
-                  key={currentListing.id}
-                  listing={currentListing}
-                  onSwipe={handleSwipe}
-                  onExpandDetail={() => onExpandDetail?.(currentListing)}
-                  isTop={true}
-                />
-              </div>
-            </div>
-            </div>
-
-            {/* Bottom action bar */}
-            <div
-              className="flex-shrink-0 flex items-center justify-between px-5"
-              style={{
-                height: 80,
-                backgroundColor: 'rgba(13, 17, 23, 0.85)',
-                backdropFilter: 'blur(12px)',
-                borderTop: '1px solid rgba(255,255,255,0.06)',
-              }}
-            >
+              {/* Top card + attached action bar — unified container */}
+              <div
+                className="absolute inset-0 rounded-xl overflow-hidden"
+                style={{
+                  zIndex: 2,
+                  backgroundColor: 'rgba(28, 32, 40, 0.97)',
+                  border: '1px solid #2d333b',
+                }}
+              >
+                {/* Card portion */}
+                <div className="absolute top-0 left-0 right-0" style={{ bottom: 64 }}>
+                  <SwipeCard
+                    key={currentListing.id}
+                    listing={currentListing}
+                    onSwipe={handleSwipe}
+                    onExpandDetail={() => onExpandDetail?.(currentListing)}
+                    isTop={true}
+                  />
+                </div>
+                {/* Action bar attached to bottom of card */}
+                <div
+                  className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-5"
+                  style={{
+                    height: 64,
+                    borderTop: '1px solid #2d333b',
+                  }}
+                >
               {/* Undo */}
               <button
                 onClick={handleUndo}
@@ -692,7 +698,10 @@ export default function SwipeView({
               <span className="text-xs tabular-nums whitespace-nowrap" style={{ color: 'rgba(255,255,255,0.3)' }}>
                 {currentIndex + 1} of {deck.length}
               </span>
-            </div>
+                </div>{/* action bar */}
+              </div>{/* absolute card+bar */}
+            </div>{/* relative w-full */}
+            </div>{/* flex-1 centering */}
           </>
         ) : (
           /* Empty state */

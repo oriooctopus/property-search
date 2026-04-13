@@ -39,9 +39,10 @@ interface MapProps {
   initialZoom?: number;
   visible?: boolean;
   commuteInfoMap?: Map<number, CommuteInfo>;
+  panOffset?: { x: number; y: number };
 }
 
-export default function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, initialCenter, initialZoom, visible, commuteInfoMap }: MapProps) {
+export default function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, initialCenter, initialZoom, visible, commuteInfoMap, panOffset }: MapProps) {
   return (
     <MapInner
       listings={listings}
@@ -60,6 +61,7 @@ export default function Map({ listings, selectedId, onMarkerClick, onSelectDetai
       initialZoom={initialZoom}
       visible={visible}
       commuteInfoMap={commuteInfoMap}
+      panOffset={panOffset}
     />
   );
 }
