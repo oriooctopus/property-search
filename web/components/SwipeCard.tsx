@@ -99,11 +99,11 @@ export default function SwipeCard({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         setPhotoIndex((i) => (i - 1 + totalPhotos) % totalPhotos);
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         setPhotoIndex((i) => (i + 1) % totalPhotos);
       } else if (e.key === 'Escape') {
         e.preventDefault();
