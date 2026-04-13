@@ -42,7 +42,7 @@ const SEED_LISTINGS: Listing[] = [
 // ---------------------------------------------------------------------------
 // Helpers: read / write URL query params
 // ---------------------------------------------------------------------------
-const VALID_VIEWS = new Set(['list', 'map']); // 'swipe' temporarily hidden
+const VALID_VIEWS = new Set(['list', 'map', 'swipe']);
 const VALID_SORTS = new Set<string>(['price', 'beds', 'listDate']);
 const VALID_LISTING_AGES = new Set<string>(['1h', '3h', '6h', '12h', '1d', '2d', '3d', '1w', '2w', '1m']);
 
@@ -291,8 +291,6 @@ function HomeInner() {
   const [detailListing, setDetailListing] = useState<Listing | null>(null);
   const [mobileView, setMobileView] = useState<'list' | 'map' | 'swipe'>(() => {
     const v = searchParams.get('view');
-    // Swipe mode temporarily hidden — fall back to list
-    if (v === 'swipe') return 'list';
     if (v && VALID_VIEWS.has(v)) return v as 'list' | 'map' | 'swipe';
     return 'list';
   });
@@ -789,8 +787,7 @@ function HomeInner() {
       onChange={(v) => setMobileView(v as 'list' | 'map' | 'swipe')}
       options={[
         { value: 'list', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> },
-        // Swipe mode temporarily hidden
-        // { value: 'swipe', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 12h8M12 8v8"/></svg> },
+        { value: 'swipe', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="14" height="18" rx="2"/><rect x="8" y="2" width="14" height="18" rx="2"/></svg> },
         { value: 'map', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> },
       ]}
     />
@@ -798,8 +795,10 @@ function HomeInner() {
 
   const isMapView = mobileView === 'map';
 
+  const isSwipeView = mobileView === 'swipe';
+
   const mapPanel = (
-    <div className={`flex-1 relative ${mobileView === 'list' ? 'hidden lg:block' : mobileView === 'map' ? 'block' : 'hidden lg:block'}`} style={{ minHeight: 'calc(100vh - 60px - 42px)' }}>
+    <div className={`flex-1 relative ${mobileView === 'list' ? 'hidden lg:block' : mobileView === 'map' ? 'block' : 'hidden'}`} style={{ minHeight: 'calc(100vh - 60px - 42px)' }}>
       <Map
         listings={filteredListings}
         selectedId={selectedId}
@@ -1027,11 +1026,11 @@ function HomeInner() {
   // Chat drawer slides over from right when opened
   // -----------------------------------------------------------------------
   return (
-    <div className="flex flex-col lg:flex-row" style={{ height: 'calc(100dvh - 60px - env(safe-area-inset-top))' }}>
+    <div className="relative flex flex-col lg:flex-row" style={{ height: 'calc(100dvh - 60px - env(safe-area-inset-top))' }}>
       {/* Sidebar: AI search bar + filters + listing cards */}
       <div
-        className={`w-full lg:w-[480px] shrink-0 flex flex-col ${mobileView === 'map' ? 'max-lg:shrink max-lg:flex-none' : ''}`}
-        style={{ borderRight: '1px solid #2d333b' }}
+        className={`${isSwipeView ? 'absolute top-0 left-0 right-0 z-20' : `w-full lg:w-[480px] shrink-0 ${mobileView === 'map' ? 'max-lg:shrink max-lg:flex-none' : ''}`} flex flex-col`}
+        style={{ borderRight: isSwipeView ? 'none' : '1px solid #2d333b' }}
       >
         {/* AI-applied filter pills */}
         {hasAIFilters && (
@@ -1058,19 +1057,7 @@ function HomeInner() {
         </div>
 
         <div className="relative flex-1 min-h-0 flex flex-col">
-          {mobileView === 'swipe' ? (
-            <SwipeView
-              listings={filteredListings}
-              userId={userId}
-              favoritesSet={wishlistedIds}
-              wouldLiveSet={new Set<number>()}
-              onToggleFavorite={() => {}}
-              onToggleWouldLive={() => {}}
-              onHideListing={handleHideListing}
-              onExpandDetail={(listing) => { setSelectedId(listing.id); setDetailListing(filteredListings.find(l => l.id === listing.id) ?? null); }}
-              onSwitchView={() => setMobileView('list')}
-            />
-          ) : (
+          {!isSwipeView && (
             <div
               className={`flex-1 overflow-y-auto dark-scrollbar min-h-0 px-3 py-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 relative z-0 ${mobileView === 'map' ? 'hidden lg:grid' : ''}`}
               style={{ opacity: (filterChanging || commuteLoading) ? 0.35 : 1, transition: 'opacity 150ms' }}
@@ -1156,8 +1143,82 @@ function HomeInner() {
         </div>
       </div>
 
-      {/* Map */}
-      {mapPanel}
+      {/* Map (hidden in swipe mode — SwipeView has its own map) */}
+      {!isSwipeView && mapPanel}
+
+      {/* Full-screen swipe view (replaces sidebar + map) */}
+      {isSwipeView && (
+        <div className="relative flex-1">
+          <SwipeView
+            listings={filteredListings}
+            userId={userId}
+            onHideListing={handleHideListing}
+            onSaveListing={() => {}}
+            onExpandDetail={(listing) => { setSelectedId(listing.id); setDetailListing(filteredListings.find(l => l.id === listing.id) ?? null); }}
+            onSwitchView={() => setMobileView('list')}
+            onBoundsChange={(bounds) => {
+              if (!hasInitialViewportLoad.current) {
+                hasInitialViewportLoad.current = true;
+                loadForViewport(bounds);
+              } else {
+                setPendingBounds(bounds);
+              }
+            }}
+            onMapMove={handleMapMove}
+            suppressBoundsRef={suppressBoundsRef}
+            initialCenter={initialCenter}
+            initialZoom={initialZoom}
+            commuteInfoMap={commuteInfoMap ?? undefined}
+          />
+
+          {/* "Search this area" pill overlay for swipe mode */}
+          {(viewportLoading || commuteLoading || pendingBounds) && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500] pointer-events-none">
+              {(viewportLoading || commuteLoading) ? (
+                <div
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
+                  style={{
+                    backgroundColor: '#1c2028',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: '#8b949e',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" strokeLinecap="round"
+                    style={{ animation: 'spin 0.7s linear infinite', flexShrink: 0 }}>
+                    <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.12)" strokeWidth="2.5" />
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" stroke="#38bdf8" strokeWidth="2.5" />
+                  </svg>
+                  Searching...
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (pendingBounds) {
+                      loadForViewport(pendingBounds);
+                      setPendingBounds(null);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium"
+                  style={{
+                    backgroundColor: '#1c2028',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    color: '#e1e4e8',
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
+                    cursor: 'pointer',
+                    pointerEvents: 'auto',
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+                  </svg>
+                  Search this area
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Chat drawer (slide-out) */}
       {chatDrawer}
