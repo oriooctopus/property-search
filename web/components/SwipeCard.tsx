@@ -151,7 +151,7 @@ export default function SwipeCard({
   if (layoutOnly) {
     return (
       <div className="rounded-xl overflow-hidden flex flex-col" style={{ backgroundColor: 'rgba(28, 32, 40, 0.97)', border: '1px solid #2d333b' }}>
-        <div className="w-full flex-shrink-0" style={{ height: 280, backgroundColor: '#0d1117' }} />
+        <div className="w-full flex-shrink-0" style={{ height: 220, backgroundColor: '#0d1117' }} />
         <div className="px-5 py-4 flex flex-col gap-3">
           <div>
             <div className="text-base font-bold leading-snug" style={{ color: '#e1e4e8' }}>{listing.address}</div>
@@ -265,7 +265,7 @@ export default function SwipeCard({
           className="relative z-[2] flex-1 overflow-y-auto dark-scrollbar"
         >
           {/* Photo carousel */}
-          <div className="relative w-full overflow-hidden flex-shrink-0" style={{ height: 280 }}>
+          <div className="relative w-full overflow-hidden flex-shrink-0" style={{ height: 220 }}>
             {totalPhotos > 0 ? (
               <>
                 <div
