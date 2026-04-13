@@ -551,7 +551,7 @@ export default function SwipeView({
         {currentListing ? (
           <>
             {/* Card + action bar — fills available space, content scrolls if needed */}
-            <div className="flex-1 min-h-0 flex items-stretch pr-3 pt-2 pb-2">
+            <div className="flex-1 min-h-0 flex items-center pr-3">
             <div className="relative w-full">
               {/* Invisible layout card to establish natural height (card + action bar) */}
               <div className="invisible">
