@@ -28,9 +28,9 @@ interface MapProps {
   onMarkerClick: (id: number) => void;
   onSelectDetail: (listing: Listing) => void;
   favoritedIds: Set<number>;
-  wouldLiveIds: Set<number>;
-  onToggleFavorite: (id: number) => void;
-  onToggleWouldLive: (id: number) => void;
+  wouldLiveIds?: Set<number>;
+  onToggleFavorite?: (id: number) => void;
+  onToggleWouldLive?: (id: number) => void;
   onHideListing: (id: number) => void;
   onBoundsChange?: (bounds: ViewportBounds) => void;
   onMapMove?: (center: { lat: number; lng: number }, zoom: number) => void;
@@ -49,9 +49,9 @@ export default function Map({ listings, selectedId, onMarkerClick, onSelectDetai
       onMarkerClick={onMarkerClick}
       onSelectDetail={onSelectDetail}
       favoritedIds={favoritedIds}
-      wouldLiveIds={wouldLiveIds}
-      onToggleFavorite={onToggleFavorite}
-      onToggleWouldLive={onToggleWouldLive}
+      wouldLiveIds={wouldLiveIds ?? new Set()}
+      onToggleFavorite={onToggleFavorite ?? (() => {})}
+      onToggleWouldLive={onToggleWouldLive ?? (() => {})}
       onHideListing={onHideListing}
       onBoundsChange={onBoundsChange}
       onMapMove={onMapMove}

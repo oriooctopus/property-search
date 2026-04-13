@@ -111,35 +111,68 @@ export type Database = {
         };
         Relationships: [];
       };
-      would_live_there: {
+      wishlists: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wishlists_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      wishlist_items: {
         Row: {
           id: number;
-          user_id: string;
+          wishlist_id: string;
           listing_id: number;
+          added_by: string | null;
           created_at: string;
         };
         Insert: {
-          id?: number;
-          user_id: string;
+          wishlist_id: string;
           listing_id: number;
+          added_by?: string | null;
           created_at?: string;
         };
         Update: {
-          id?: number;
-          user_id?: string;
+          wishlist_id?: string;
           listing_id?: number;
+          added_by?: string | null;
           created_at?: string;
         };
         Relationships: [
           {
-            foreignKeyName: "would_live_there_user_id_fkey";
-            columns: ["user_id"];
+            foreignKeyName: "wishlist_items_wishlist_id_fkey";
+            columns: ["wishlist_id"];
             isOneToOne: false;
-            referencedRelation: "profiles";
+            referencedRelation: "wishlists";
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "would_live_there_listing_id_fkey";
+            foreignKeyName: "wishlist_items_listing_id_fkey";
             columns: ["listing_id"];
             isOneToOne: false;
             referencedRelation: "listings";
@@ -147,38 +180,35 @@ export type Database = {
           },
         ];
       };
-      favorites: {
+      wishlist_shares: {
         Row: {
           id: number;
-          user_id: string;
-          listing_id: number;
+          wishlist_id: string;
+          shared_with_email: string;
+          shared_with_user_id: string | null;
+          permission: string;
           created_at: string;
         };
         Insert: {
-          id?: number;
-          user_id: string;
-          listing_id: number;
+          wishlist_id: string;
+          shared_with_email: string;
+          shared_with_user_id?: string | null;
+          permission: string;
           created_at?: string;
         };
         Update: {
-          id?: number;
-          user_id?: string;
-          listing_id?: number;
+          wishlist_id?: string;
+          shared_with_email?: string;
+          shared_with_user_id?: string | null;
+          permission?: string;
           created_at?: string;
         };
         Relationships: [
           {
-            foreignKeyName: "favorites_user_id_fkey";
-            columns: ["user_id"];
+            foreignKeyName: "wishlist_shares_wishlist_id_fkey";
+            columns: ["wishlist_id"];
             isOneToOne: false;
-            referencedRelation: "profiles";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "favorites_listing_id_fkey";
-            columns: ["listing_id"];
-            isOneToOne: false;
-            referencedRelation: "listings";
+            referencedRelation: "wishlists";
             referencedColumns: ["id"];
           },
         ];

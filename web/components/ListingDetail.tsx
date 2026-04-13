@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import type { Database } from '@/lib/types';
 import { ActionButton, IconButton } from '@/components/ui';
 import { formatShortDate } from '@/lib/format-date';
@@ -21,13 +21,6 @@ const SOURCE_LABELS: Record<string, string> = {
   renthop: 'RentHop',
   apartments: 'Apartments.com',
 };
-
-interface Person {
-  id: string;
-  display_name: string | null;
-  avatar_url: string | null;
-  bio: string | null;
-}
 
 /** Map user-facing mode to OTP mode string. */
 function commuteOtpMode(mode: 'walk' | 'transit' | 'bike'): string {
@@ -110,34 +103,35 @@ function getCommuteDestination(
 
 interface ListingDetailProps {
   listing: Listing;
-  wouldLiveThere: boolean;
   isFavorited: boolean;
-  wouldLivePeople: Person[];
   commuteRules?: CommuteRule[];
-  onToggleWouldLive: () => void;
-  onToggleFavorite: () => void;
+  onStarClick: (listingId: number, anchorRect: DOMRect) => void;
   onHide: () => void;
   onClose: () => void;
 }
 
 export default function ListingDetail({
   listing,
-  wouldLiveThere,
   isFavorited,
-  wouldLivePeople,
   commuteRules = [],
-  onToggleWouldLive,
-  onToggleFavorite,
+  onStarClick,
   onHide,
   onClose,
 }: ListingDetailProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const starButtonRef = useRef<HTMLButtonElement>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [linkCopied, setLinkCopied] = useState(false);
   const photos = listing.photo_urls ?? [];
   const pricePerBed = listing.beds > 0 ? Math.round(listing.price / listing.beds) : null;
   const commuteDest = getCommuteDestination(commuteRules, listing.lat, listing.lon);
+
+  const handleStarClick = useCallback(() => {
+    if (starButtonRef.current) {
+      onStarClick(listing.id, starButtonRef.current.getBoundingClientRect());
+    }
+  }, [listing.id, onStarClick]);
 
   const scrollToPhoto = (index: number) => {
     const clamped = Math.max(0, Math.min(index, photos.length - 1));
@@ -394,28 +388,22 @@ export default function ListingDetail({
           {/* Action buttons */}
           <div className="flex items-center gap-1.5 sm:gap-2 mb-6">
             <ActionButton
-              variant="dislike"
+              variant="hide"
               active={false}
               onClick={() => {
                 onHide();
                 onClose();
               }}
               className="px-2 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm"
-              label="Dislike"
+              label="Hide"
             />
             <ActionButton
-              variant="wouldLive"
-              active={wouldLiveThere}
-              onClick={onToggleWouldLive}
-              className="px-2 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm whitespace-nowrap"
-              label={wouldLiveThere ? 'Would Live!' : 'Would Live'}
-            />
-            <ActionButton
-              variant="like"
+              ref={starButtonRef}
+              variant="save"
               active={isFavorited}
-              onClick={onToggleFavorite}
+              onClick={handleStarClick}
               className="px-2 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm"
-              label={isFavorited ? 'Liked' : 'Like'}
+              label={isFavorited ? 'Saved' : 'Save'}
             />
           </div>
 
@@ -460,61 +448,6 @@ export default function ListingDetail({
             />
           )}
 
-          {/* Would Live There People */}
-          <div className="mt-2">
-            <div className="text-xs font-semibold mb-3" style={{ color: '#8b949e' }}>
-              People who would live here
-            </div>
-            {wouldLivePeople.length > 0 ? (
-              <div className="grid grid-cols-2 gap-2">
-                {wouldLivePeople.map((person) => {
-                  const letter = (person.display_name ?? person.id).charAt(0).toUpperCase();
-                  return (
-                    <div
-                      key={person.id}
-                      className="flex items-center gap-3 rounded-lg p-3"
-                      style={{ backgroundColor: '#0f1117', border: '1px solid #2d333b' }}
-                    >
-                      <div
-                        className="flex items-center justify-center rounded-full shrink-0 text-sm font-bold"
-                        style={{
-                          width: 48,
-                          height: 48,
-                          backgroundColor: person.avatar_url ? 'transparent' : '#58a6ff',
-                          color: '#0f1117',
-                          backgroundImage: person.avatar_url ? `url(${person.avatar_url})` : undefined,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                        }}
-                      >
-                        {!person.avatar_url && letter}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium truncate" style={{ color: '#e1e4e8' }}>
-                          {person.display_name ?? 'User'}
-                        </div>
-                        {person.bio && (
-                          <div
-                            className="text-xs truncate"
-                            style={{ color: '#8b949e' }}
-                          >
-                            {person.bio}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div
-                className="flex items-center justify-center rounded-lg p-4 text-sm"
-                style={{ backgroundColor: '#0f1117', border: '1px solid #2d333b', color: '#8b949e' }}
-              >
-                No one yet — would you live here?
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>

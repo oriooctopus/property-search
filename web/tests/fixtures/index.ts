@@ -1,8 +1,8 @@
 import type { Database } from "@/lib/types";
 import { MOCK_LISTINGS } from "./mock-listings";
 import { MOCK_PROFILES } from "./mock-profiles";
-import { MOCK_FAVORITES } from "./mock-favorites";
-import { MOCK_WOULD_LIVE_THERE } from "./mock-would-live";
+import { MOCK_WISHLIST_ITEMS } from "./mock-favorites";
+import { MOCK_WISHLISTS } from "./mock-would-live";
 
 type Tables = Database["public"]["Tables"];
 
@@ -18,8 +18,9 @@ type MockRegistry = {
 export const MOCKS: MockRegistry = {
   listings: MOCK_LISTINGS,
   profiles: MOCK_PROFILES,
-  favorites: MOCK_FAVORITES,
-  would_live_there: MOCK_WOULD_LIVE_THERE,
+  wishlists: MOCK_WISHLISTS,
+  wishlist_items: MOCK_WISHLIST_ITEMS,
+  wishlist_shares: [],
   saved_searches: [],
   conversations: [],
   conversation_messages: [],
@@ -36,5 +37,5 @@ export {
   MOCK_PROFILE_LOGGED_IN,
   MOCK_PROFILES_LOGGED_OUT,
 } from "./mock-profiles";
-export { MOCK_FAVORITES } from "./mock-favorites";
-export { MOCK_WOULD_LIVE_THERE } from "./mock-would-live";
+export { MOCK_WISHLIST_ITEMS } from "./mock-favorites";
+export { MOCK_WISHLISTS } from "./mock-would-live";
