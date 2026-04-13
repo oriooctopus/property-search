@@ -396,7 +396,9 @@ export default function SwipeView({
         ]);
         setCurrentIndex((prev) => prev + 1);
       } else {
-        // Track as swiped
+        // Track as swiped — don't increment currentIndex because removing
+        // the item from swipedIds causes the deck to recompute, shifting the
+        // next item into the current index position automatically.
         setSwipedIds((prev) => {
           const next = new Set(prev);
           next.add(listing.id);
@@ -408,8 +410,6 @@ export default function SwipeView({
           ...prev.slice(-9),
           { index: currentIndex, listingId: listing.id, action: direction },
         ]);
-
-        setCurrentIndex((prev) => prev + 1);
       }
     },
     [currentIndex, deck, userId, onHideListing, onSaveListing, resolvedWishlistId, addToWishlist],
@@ -433,7 +433,11 @@ export default function SwipeView({
     }
 
     setUndoStack((prev) => prev.slice(0, -1));
-    setCurrentIndex((prev) => Math.max(0, prev - 1));
+    // Only decrement index for 'down' (pass) — for left/right the deck
+    // recomputes to re-insert the item at the same position.
+    if (last.action === 'down') {
+      setCurrentIndex((prev) => Math.max(0, prev - 1));
+    }
   }, [undoStack]);
 
   // ---------------------------------------------------------------------------
@@ -542,7 +546,7 @@ export default function SwipeView({
                   isTop={false}
                   layoutOnly
                 />
-                <div style={{ height: 64 }} />
+                <div style={{ height: 72 }} />
               </div>
 
               {/* Stack visual: background card */}
@@ -568,7 +572,7 @@ export default function SwipeView({
                 }}
               >
                 {/* Card portion */}
-                <div className="absolute top-0 left-0 right-0" style={{ bottom: 64 }}>
+                <div className="absolute top-0 left-0 right-0" style={{ bottom: 72 }}>
                   <SwipeCard
                     key={currentListing.id}
                     listing={currentListing}
@@ -579,9 +583,9 @@ export default function SwipeView({
                 </div>
                 {/* Action bar attached to bottom of card */}
                 <div
-                  className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-5"
+                  className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-5 py-2"
                   style={{
-                    height: 64,
+                    height: 72,
                     borderTop: '1px solid #2d333b',
                   }}
                 >
