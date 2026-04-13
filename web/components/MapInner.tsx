@@ -609,17 +609,18 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
         <FlyToSelected listing={selectedListing} suppressBoundsRef={suppressBoundsRef} panOffset={panOffset} />
         {onBoundsChange && <BoundsWatcher onBoundsChange={onBoundsChange} onMapMove={onMapMove} suppressBoundsRef={suppressBoundsRef} />}
         {validListings.map((listing) => {
-          const color = '#8b949e';
+          const isSaved = favoritedIds.has(listing.id);
+          const color = isSaved ? '#7ee787' : '#8b949e';
           const isSelected = listing.id === selectedId;
           return (
             <CircleMarker
               key={listing.id}
               center={[listing.lat, listing.lon]}
-              radius={isSelected ? 18 : 14}
+              radius={isSelected ? 18 : isSaved ? 10 : 14}
               pathOptions={{
                 color: isSelected ? '#ffffff' : color,
                 fillColor: color,
-                fillOpacity: 0.85,
+                fillOpacity: isSaved ? 1 : 0.85,
                 weight: isSelected ? 3 : 1.5,
               }}
               eventHandlers={{

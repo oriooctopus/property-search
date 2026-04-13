@@ -314,6 +314,7 @@ export default function SwipeView({
   commuteInfoMap,
 }: SwipeViewProps) {
   const [swipedIds, setSwipedIds] = useState<Set<number>>(() => loadSwipedIds());
+  const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
   const [currentIndex, setCurrentIndex] = useState(0);
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
   const [authToast, setAuthToast] = useState(false);
@@ -377,7 +378,9 @@ export default function SwipeView({
       }
 
       // Execute the action
-      if (direction === 'left') onHideListing(listing.id);
+      // Note: don't call onHideListing for left swipes — SwipeView tracks
+      // its own swipedIds. Calling the parent would cause filteredListings
+      // to recompute 300ms later, reshuffling the geo-sorted deck mid-flyTo.
       if (direction === 'right') {
         const wlId = resolvedWishlistId;
         if (wlId) {
@@ -385,6 +388,7 @@ export default function SwipeView({
           setLastUsedWishlistId(wlId);
         }
         onSaveListing(listing.id, wlId ?? 'default');
+        setSavedIds((prev) => { const next = new Set(prev); next.add(listing.id); return next; });
       }
       // 'down' = pass — move to back of queue, no persistent action
 
@@ -430,6 +434,9 @@ export default function SwipeView({
         localStorage.setItem(SWIPED_IDS_KEY, JSON.stringify([...next]));
         return next;
       });
+      if (last.action === 'right') {
+        setSavedIds((prev) => { const next = new Set(prev); next.delete(last.listingId); return next; });
+      }
     }
 
     setUndoStack((prev) => prev.slice(0, -1));
@@ -489,21 +496,30 @@ export default function SwipeView({
   // Render
   // ---------------------------------------------------------------------------
 
-  // Convert SwipeListing[] to Listing-compatible shape for Map
-  const mapListings = useMemo(() => listings.map((l) => ({
-    ...l,
-    lat: l.lat ?? 0,
-    lon: l.lon ?? 0,
-    transit_summary: l.transit_summary ?? null,
-    year_built: l.year_built ?? null,
-    photos: l.photo_urls.length,
-    last_update_date: null,
-    availability_date: null,
-    created_at: '',
-    external_id: null,
-    last_seen_at: null,
-    delisted_at: null,
-  })), [listings]);
+  // Convert SwipeListing[] to Listing-compatible shape for Map.
+  // Exclude hidden (left-swiped) listings but keep saved (right-swiped) ones.
+  const hiddenIds = useMemo(() => {
+    const hidden = new Set(swipedIds);
+    for (const id of savedIds) hidden.delete(id);
+    return hidden;
+  }, [swipedIds, savedIds]);
+
+  const mapListings = useMemo(() => listings
+    .filter((l) => !hiddenIds.has(l.id) || savedIds.has(l.id))
+    .map((l) => ({
+      ...l,
+      lat: l.lat ?? 0,
+      lon: l.lon ?? 0,
+      transit_summary: l.transit_summary ?? null,
+      year_built: l.year_built ?? null,
+      photos: l.photo_urls.length,
+      last_update_date: null,
+      availability_date: null,
+      created_at: '',
+      external_id: null,
+      last_seen_at: null,
+      delisted_at: null,
+    })), [listings, hiddenIds, savedIds]);
 
   return (
     <div className="relative flex-1 min-h-0 flex overflow-hidden" style={{ height: '100%' }}>
@@ -514,7 +530,7 @@ export default function SwipeView({
           selectedId={currentListing?.id ?? null}
           onMarkerClick={() => {}}
           onSelectDetail={() => {}}
-          favoritedIds={new Set()}
+          favoritedIds={savedIds}
           onHideListing={() => {}}
           onBoundsChange={onBoundsChange}
           onMapMove={onMapMove}
@@ -546,7 +562,7 @@ export default function SwipeView({
                   isTop={false}
                   layoutOnly
                 />
-                <div style={{ height: 72 }} />
+                <div style={{ height: 96 }} />
               </div>
 
               {/* Stack visual: background card */}
@@ -572,7 +588,7 @@ export default function SwipeView({
                 }}
               >
                 {/* Card portion */}
-                <div className="absolute top-0 left-0 right-0" style={{ bottom: 72 }}>
+                <div className="absolute top-0 left-0 right-0" style={{ bottom: 96 }}>
                   <SwipeCard
                     key={currentListing.id}
                     listing={currentListing}
@@ -583,9 +599,9 @@ export default function SwipeView({
                 </div>
                 {/* Action bar attached to bottom of card */}
                 <div
-                  className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-5 py-2"
+                  className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-5 py-5"
                   style={{
-                    height: 72,
+                    height: 96,
                     borderTop: '1px solid #2d333b',
                   }}
                 >
