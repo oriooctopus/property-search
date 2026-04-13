@@ -184,6 +184,7 @@ function HomeInner() {
   });
   const [hidingId, setHidingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ listingId: number; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
 
   const persistHidden = useCallback((ids: Set<number>) => {
     try {
@@ -611,8 +612,10 @@ function HomeInner() {
   const filteredListings = useMemo(() => {
     let result = [...listings];
 
-    // Filter out hidden listings
-    result = result.filter((l) => !hiddenIds.has(l.id));
+    // Filter out hidden listings (unless showHidden is active)
+    if (!showHidden) {
+      result = result.filter((l) => !hiddenIds.has(l.id));
+    }
 
     // Scam filter: remove per-room listings (price per bedroom below $800)
     result = result.filter((l) => l.beds === 0 || l.price / l.beds >= 800);
@@ -718,7 +721,7 @@ function HomeInner() {
     });
 
     return result;
-  }, [listings, filters, hiddenIds, commuteMatchIds]);
+  }, [listings, filters, hiddenIds, showHidden, commuteMatchIds]);
 
   // Keep the ref in sync so the chat hook's getListingCount stays current
   filteredListingsRef.current = filteredListings;
@@ -1053,6 +1056,8 @@ function HomeInner() {
             onLoadSearch={setFilters}
             onUpdateSearch={updateSavedSearch}
             onLoginRequired={() => router.push('/auth/login')}
+            showHidden={showHidden}
+            onToggleShowHidden={() => setShowHidden((v) => !v)}
           />
         </div>
 

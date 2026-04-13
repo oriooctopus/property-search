@@ -106,6 +106,8 @@ interface FiltersProps {
   onLoadSearch?: (filters: FiltersState) => void;
   onUpdateSearch?: (id: number, name: string) => void;
   onLoginRequired?: () => void;
+  showHidden?: boolean;
+  onToggleShowHidden?: () => void;
 }
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
@@ -1204,7 +1206,7 @@ function FilterToggleButton({
   );
 }
 
-const Filters = memo(function Filters({ filters, onChange, listingCount, viewToggle, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onLoginRequired }: FiltersProps) {
+const Filters = memo(function Filters({ filters, onChange, listingCount, viewToggle, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onLoginRequired, showHidden, onToggleShowHidden }: FiltersProps) {
   const [openChip, setOpenChip] = useState<ChipId | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
@@ -2043,6 +2045,41 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
               </div>
             </div>
           </div>
+
+          {/* Show hidden toggle chip */}
+          {onToggleShowHidden !== undefined && (
+            <div className="relative group shrink-0">
+              <FilterChip
+                compact
+                label="Show hidden"
+                active={showHidden ?? false}
+                open={false}
+                onToggle={onToggleShowHidden}
+              />
+              <div
+                className="pointer-events-none absolute left-0 top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-75 z-50"
+              >
+                <div
+                  className="absolute -top-1 w-2 h-2 rotate-45"
+                  style={{ left: 12, backgroundColor: '#1c2028', border: '1px solid #2d333b', borderRight: 'none', borderBottom: 'none' }}
+                />
+                <div
+                  className="rounded-md px-2.5 py-1.5 text-xs"
+                  style={{
+                    backgroundColor: '#1c2028',
+                    color: '#e1e4e8',
+                    border: '1px solid #2d333b',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                    maxWidth: 'min(260px, calc(100vw - 32px))',
+                    width: 'max-content',
+                    wordWrap: 'break-word',
+                  }}
+                >
+                  Include listings you&apos;ve hidden
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Divider + Save / My Searches */}
           <>

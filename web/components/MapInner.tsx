@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet';
+import { useEffect, useRef, useCallback, useMemo } from 'react';
+import { MapContainer, TileLayer, CircleMarker, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Database } from '@/lib/types';
@@ -13,6 +13,48 @@ function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
+
+/* ------------------------------------------------------------------ */
+/*  Coordinate-based manual clustering helpers                         */
+/* ------------------------------------------------------------------ */
+
+/** Round a coordinate to N decimal places for same-building grouping. */
+function roundCoord(v: number, decimals = 4): number {
+  const factor = Math.pow(10, decimals);
+  return Math.round(v * factor) / factor;
+}
+
+function coordKey(lat: number, lon: number): string {
+  return `${roundCoord(lat)},${roundCoord(lon)}`;
+}
+
+/** Returns the cluster DivIcon for a given group size and whether any are saved. */
+function makeClusterIcon(count: number, hasSaved: boolean): L.DivIcon {
+  const size = count <= 3 ? 30 : count <= 9 ? 36 : 44;
+  const borderColor = hasSaved ? '#7ee787' : '#8b949e';
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:${size}px;
+      height:${size}px;
+      border-radius:50%;
+      background:#1c2028;
+      border:2px solid ${borderColor};
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:#fff;
+      font-size:${size <= 30 ? 11 : 13}px;
+      font-weight:700;
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      box-shadow:0 2px 6px rgba(0,0,0,0.5);
+      cursor:pointer;
+    ">${count}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2],
+  });
+}
 
 /* ------------------------------------------------------------------ */
 /*  Dark-themed Leaflet popup overrides                                */
@@ -592,6 +634,50 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
     };
   }, []);
 
+  /* ------------------------------------------------------------------ */
+  /*  Manual coordinate-based clustering                                 */
+  /* ------------------------------------------------------------------ */
+
+  // Group validListings by rounded coordinate key.
+  const coordGroups = useMemo(() => {
+    const groups = new Map<string, typeof validListings>();
+    for (const listing of validListings) {
+      const key = coordKey(listing.lat, listing.lon);
+      const existing = groups.get(key);
+      if (existing) {
+        existing.push(listing);
+      } else {
+        groups.set(key, [listing]);
+      }
+    }
+    return groups;
+  }, [validListings]);
+
+  // Build the set of groups to render. If the selected listing is in a cluster,
+  // split that cluster so the selected dot always shows individually.
+  const renderGroups = useMemo(() => {
+    const result: Array<{ key: string; listings: typeof validListings; isCluster: boolean }> = [];
+
+    for (const [key, group] of coordGroups.entries()) {
+      if (group.length === 1) {
+        result.push({ key, listings: group, isCluster: false });
+        continue;
+      }
+
+      const hasSelected = group.some((l) => l.id === selectedId);
+      if (hasSelected) {
+        // Render each listing individually so the selected dot is visible
+        for (const listing of group) {
+          result.push({ key: `${key}__${listing.id}`, listings: [listing], isCluster: false });
+        }
+      } else {
+        result.push({ key, listings: group, isCluster: true });
+      }
+    }
+
+    return result;
+  }, [coordGroups, selectedId]);
+
   return (
     <div style={{ position: 'relative', height: '100%', width: '100%' }}>
       <MapContainer
@@ -608,13 +694,93 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
         <InjectPopupStyles />
         <FlyToSelected listing={selectedListing} suppressBoundsRef={suppressBoundsRef} panOffset={panOffset} />
         {onBoundsChange && <BoundsWatcher onBoundsChange={onBoundsChange} onMapMove={onMapMove} suppressBoundsRef={suppressBoundsRef} />}
-        {validListings.map((listing) => {
+
+        {renderGroups.map(({ key, listings: groupListings, isCluster }) => {
+          if (isCluster) {
+            // Multi-listing cluster at same coordinates
+            const rep = groupListings[0];
+            const hasSaved = groupListings.some((l) => favoritedIds.has(l.id));
+            const icon = makeClusterIcon(groupListings.length, hasSaved);
+
+            // Build a simple popup listing the addresses
+            const clusterPopupHtml = `
+              <div style="
+                padding:10px 14px;
+                min-width:180px;
+                color:#e1e4e8;
+                font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+              ">
+                <div style="font-size:11px;font-weight:600;color:#8b949e;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">
+                  ${groupListings.length} listings at this address
+                </div>
+                ${groupListings.map((l) => {
+                  const isSaved = favoritedIds.has(l.id);
+                  return `<div
+                    data-action="open-detail"
+                    data-listing-id="${l.id}"
+                    style="
+                      display:flex;
+                      align-items:center;
+                      gap:8px;
+                      padding:5px 4px;
+                      border-radius:6px;
+                      cursor:pointer;
+                      font-size:12px;
+                    "
+                  >
+                    ${isSaved ? `<span style="color:#7ee787;flex-shrink:0;">&#9733;</span>` : `<span style="color:#8b949e;flex-shrink:0;font-size:10px;">&#9675;</span>`}
+                    <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(l.address)}</span>
+                    <span style="color:#3fb950;font-weight:700;flex-shrink:0;">$${l.price.toLocaleString()}</span>
+                  </div>`;
+                }).join('')}
+              </div>
+            `;
+
+            return (
+              <Marker
+                key={key}
+                position={[rep.lat, rep.lon]}
+                icon={icon}
+                eventHandlers={{
+                  click: (e) => {
+                    // Stop propagation so the map doesn't also receive the click
+                    L.DomEvent.stopPropagation(e);
+                    // The popup will open; wire delegation after popupopen
+                  },
+                  popupopen: (e) => {
+                    const popup = (e as unknown as { popup: L.Popup }).popup;
+                    const container = popup?.getElement?.();
+                    if (!container || container.getAttribute('data-cluster-delegated')) return;
+                    container.setAttribute('data-cluster-delegated', '1');
+                    L.DomEvent.disableClickPropagation(container);
+                    container.addEventListener('click', (ev) => {
+                      const target = ev.target as HTMLElement;
+                      const actionEl = target.closest('[data-action="open-detail"]') as HTMLElement | null;
+                      if (!actionEl) return;
+                      ev.stopPropagation();
+                      const id = Number(actionEl.getAttribute('data-listing-id') || '0');
+                      onMarkerClick(id);
+                      const found = listingsMapRef.current.get(id);
+                      if (found) onSelectDetailRef.current(found);
+                    });
+                  },
+                }}
+              >
+                <Popup className="dark-popup" autoClose={false} closeOnClick={false}>
+                  <div dangerouslySetInnerHTML={{ __html: clusterPopupHtml }} />
+                </Popup>
+              </Marker>
+            );
+          }
+
+          // Single listing — render as before
+          const listing = groupListings[0];
           const isSaved = favoritedIds.has(listing.id);
           const color = isSaved ? '#7ee787' : '#8b949e';
           const isSelected = listing.id === selectedId;
           return (
             <CircleMarker
-              key={listing.id}
+              key={key}
               center={[listing.lat, listing.lon]}
               radius={isSelected ? 18 : isSaved ? 10 : 14}
               pathOptions={{
