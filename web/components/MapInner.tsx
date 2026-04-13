@@ -127,8 +127,6 @@ function FlyToSelected({ listing, suppressBoundsRef, panOffset }: { listing: Lis
       if (!isNaN(lat) && !isNaN(lon) && size.x > 0 && size.y > 0) {
         suppressBoundsRef.current = true;
         if (panOffset) {
-          // Offset the center so the dot appears shifted by panOffset pixels
-          // e.g. panOffset.x = 200 moves the dot 200px left of center
           const zoom = map.getZoom() || 15;
           const targetPoint = map.project([lat, lon], zoom);
           const offsetCenter = map.unproject(
@@ -139,6 +137,8 @@ function FlyToSelected({ listing, suppressBoundsRef, panOffset }: { listing: Lis
         } else {
           map.flyTo([lat, lon], 15, { duration: 0.8 });
         }
+        // Reset suppress after flyTo animation completes (~1.2s covers 0.8s + buffer)
+        setTimeout(() => { suppressBoundsRef.current = false; }, 1200);
       }
     }
   }, [listing, map, suppressBoundsRef, panOffset]);
@@ -189,9 +189,9 @@ function BoundsWatcher({ onBoundsChange, onMapMove, suppressBoundsRef }: { onBou
 
   useEffect(() => {
     const fireBounds = () => {
-      // Skip viewport reload triggered by a programmatic flyTo
+      // Skip viewport reload triggered by a programmatic flyTo.
+      // Don't reset the flag here — FlyToSelected controls the lifecycle.
       if (suppressBoundsRef.current) {
-        suppressBoundsRef.current = false;
         return;
       }
       if (timerRef.current) clearTimeout(timerRef.current);
