@@ -40,6 +40,8 @@ interface SwipeCardProps {
   layoutOnly?: boolean;
   /** Called when photo-browsing mode enters or exits */
   onPhotoFocusChange?: (focused: boolean) => void;
+  /** Ref callback so parent can imperatively enter photo focus */
+  enterPhotoFocusRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 const SWIPE_X_THRESHOLD = 100;
@@ -53,6 +55,7 @@ export default function SwipeCard({
   isTop,
   layoutOnly = false,
   onPhotoFocusChange,
+  enterPhotoFocusRef,
 }: SwipeCardProps) {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [photoFocused, setPhotoFocused] = useState(false);
@@ -87,6 +90,12 @@ export default function SwipeCard({
     setPhotoFocused(true);
     onPhotoFocusChange?.(true);
   }, [isTop, totalPhotos, onPhotoFocusChange]);
+
+  // Expose enterPhotoFocus to parent via ref
+  useEffect(() => {
+    if (enterPhotoFocusRef) enterPhotoFocusRef.current = enterPhotoFocus;
+    return () => { if (enterPhotoFocusRef) enterPhotoFocusRef.current = null; };
+  }, [enterPhotoFocus, enterPhotoFocusRef]);
 
   const exitPhotoFocus = useCallback(() => {
     setPhotoFocused(false);
