@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { useDrag } from '@use-gesture/react';
 
@@ -38,6 +38,8 @@ interface SwipeCardProps {
   isTop: boolean;
   /** Render in normal flow (not absolute) to establish parent height */
   layoutOnly?: boolean;
+  /** Called when photo-browsing mode enters or exits */
+  onPhotoFocusChange?: (focused: boolean) => void;
 }
 
 const SWIPE_X_THRESHOLD = 100;
@@ -50,8 +52,11 @@ export default function SwipeCard({
   onExpandDetail,
   isTop,
   layoutOnly = false,
+  onPhotoFocusChange,
 }: SwipeCardProps) {
   const [photoIndex, setPhotoIndex] = useState(0);
+  const [photoFocused, setPhotoFocused] = useState(false);
+  const photoAreaRef = useRef<HTMLDivElement>(null);
 
   const photos = listing.photo_urls ?? [];
   const totalPhotos = photos.length;
@@ -75,6 +80,52 @@ export default function SwipeCard({
 
   const isDragging = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // Photo-focus mode: arrow keys cycle photos instead of triggering swipe actions
+  const enterPhotoFocus = useCallback(() => {
+    if (!isTop || totalPhotos <= 1) return;
+    setPhotoFocused(true);
+    onPhotoFocusChange?.(true);
+  }, [isTop, totalPhotos, onPhotoFocusChange]);
+
+  const exitPhotoFocus = useCallback(() => {
+    setPhotoFocused(false);
+    onPhotoFocusChange?.(false);
+  }, [onPhotoFocusChange]);
+
+  // Keyboard handler for photo-focus mode
+  useEffect(() => {
+    if (!photoFocused) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        e.stopPropagation();
+        setPhotoIndex((i) => (i - 1 + totalPhotos) % totalPhotos);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        e.stopPropagation();
+        setPhotoIndex((i) => (i + 1) % totalPhotos);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        exitPhotoFocus();
+      }
+    };
+    // Use capture so this fires before SwipeView's handler
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [photoFocused, totalPhotos, exitPhotoFocus]);
+
+  // Click-outside to exit photo focus
+  useEffect(() => {
+    if (!photoFocused) return;
+    const handleMouseDown = (e: MouseEvent) => {
+      if (photoAreaRef.current && !photoAreaRef.current.contains(e.target as Node)) {
+        exitPhotoFocus();
+      }
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, [photoFocused, exitPhotoFocus]);
 
   const commitSwipe = useCallback((direction: 'left' | 'right' | 'down') => {
     const targets = {
@@ -276,7 +327,18 @@ export default function SwipeCard({
           className="relative z-[2] flex-1 overflow-y-auto dark-scrollbar"
         >
           {/* Photo carousel */}
-          <div className="relative w-full overflow-hidden flex-shrink-0" style={{ height: 220 }}>
+          <div
+            ref={photoAreaRef}
+            className="relative w-full overflow-hidden flex-shrink-0"
+            style={{
+              height: 220,
+              outline: photoFocused ? '2px solid rgba(88,166,255,0.7)' : 'none',
+              outlineOffset: '-2px',
+              cursor: totalPhotos > 1 && !photoFocused ? 'zoom-in' : 'default',
+            }}
+            onClick={!photoFocused ? enterPhotoFocus : undefined}
+            title={totalPhotos > 1 && !photoFocused ? 'Click to browse photos with arrow keys' : undefined}
+          >
             {totalPhotos > 0 ? (
               <>
                 <div
@@ -335,6 +397,16 @@ export default function SwipeCard({
                 >
                   {photoIndex + 1} / {totalPhotos}
                 </div>
+
+                {/* Photo-focus mode indicator */}
+                {photoFocused && (
+                  <div
+                    className="absolute bottom-2.5 left-3 text-xs font-medium px-2 py-0.5 rounded-full"
+                    style={{ backgroundColor: 'rgba(88,166,255,0.85)', color: '#fff' }}
+                  >
+                    ← → to browse · Esc to exit
+                  </div>
+                )}
 
                 {/* Share link button */}
                 <a

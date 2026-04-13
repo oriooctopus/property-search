@@ -320,6 +320,8 @@ export default function SwipeView({
   const [authToast, setAuthToast] = useState(false);
   const [wishlistDropdownOpen, setWishlistDropdownOpen] = useState(false);
   const saveAnchorRef = useRef<HTMLDivElement>(null);
+  // Track whether the card's photo carousel has keyboard focus
+  const photoFocusedRef = useRef(false);
 
   // Wishlist hooks
   const { data: wishlists = [] } = useWishlists(userId);
@@ -468,10 +470,14 @@ export default function SwipeView({
 
       switch (e.key) {
         case 'ArrowLeft':
+          // Suppress when photo carousel has focus — SwipeCard handles it
+          if (photoFocusedRef.current) return;
           e.preventDefault();
           handleSwipe('left');
           break;
         case 'ArrowRight':
+          // Suppress when photo carousel has focus — SwipeCard handles it
+          if (photoFocusedRef.current) return;
           e.preventDefault();
           handleSwipe('right');
           break;
@@ -595,6 +601,7 @@ export default function SwipeView({
                     onSwipe={handleSwipe}
                     onExpandDetail={() => onExpandDetail?.(currentListing)}
                     isTop={true}
+                    onPhotoFocusChange={(focused) => { photoFocusedRef.current = focused; }}
                   />
                 </div>
                 {/* Action bar attached to bottom of card */}
