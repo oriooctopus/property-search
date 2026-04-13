@@ -169,6 +169,17 @@ export default function SwipeCard({
               </div>
             ))}
           </div>
+          {listing.year_built != null && (
+            <div className="text-sm" style={{ color: '#8b949e' }}>Built {listing.year_built}</div>
+          )}
+          {listing.transit_summary && (
+            <div className="flex items-start gap-2 text-sm rounded-lg px-3 py-2.5" style={{ backgroundColor: '#161b22', border: '1px solid #2d333b', color: '#8b949e' }}>
+              <span>{listing.transit_summary}</span>
+            </div>
+          )}
+          {totalPhotos > 0 && (
+            <div className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{totalPhotos} photo{totalPhotos !== 1 ? 's' : ''}</div>
+          )}
           <div className="flex items-center justify-between pt-1 pb-2">
             <span className="inline-block rounded-full px-2.5 py-0.5 text-xs" style={{ backgroundColor: '#21262d', color: '#8b949e', border: '1px solid #30363d' }}>via {listing.source}</span>
             <span className="text-sm font-medium" style={{ color: '#58a6ff' }}>View details &rarr;</span>
