@@ -641,80 +641,96 @@ export default function SwipeView({
                     borderTop: '1px solid #2d333b',
                   }}
                 >
-              {/* Undo */}
-              <button
-                onClick={handleUndo}
-                disabled={undoStack.length === 0}
-                className="w-10 h-10 rounded-full flex items-center justify-center border transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed"
-                style={{ borderColor: '#3d444d', color: '#8b949e' }}
-                onMouseEnter={(e) => {
-                  if (!e.currentTarget.disabled) {
-                    e.currentTarget.style.backgroundColor = 'rgba(139,148,158,0.1)';
-                    e.currentTarget.style.borderColor = '#8b949e';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.borderColor = '#3d444d';
-                }}
-                title="Undo (Z)"
-              >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 7v6h6" />
-                  <path d="M3 13a9 9 0 0 1 15.36-6.36L21 9" />
-                </svg>
-              </button>
+              {/* Undo · Z */}
+              <div className="flex flex-col items-center gap-0.5">
+                <button
+                  onClick={handleUndo}
+                  disabled={undoStack.length === 0}
+                  className="flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed"
+                  style={{ color: '#8b949e', background: 'none', border: 'none', padding: 0 }}
+                  title="Undo (Z)"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 7v6h6" />
+                    <path d="M3 13a9 9 0 0 1 15.36-6.36L21 9" />
+                  </svg>
+                </button>
+                <span className="text-[9px]" style={{ color: '#6e7681' }}>Undo · <span style={{ color: '#8b949e' }}>Z</span></span>
+              </div>
 
-              {/* Center 3 buttons — fixed-width wrappers for even spacing */}
+              {/* Center: ← Hide, [↑/↓ pill], → Save */}
               <div className="flex items-center gap-5">
-                {/* Hide */}
-                <div className="flex flex-col items-center gap-1" style={{ width: 56 }}>
+                {/* Hide ← */}
+                <div className="flex flex-col items-center gap-1">
                   <button
                     onClick={() => handleSwipe('left')}
-                    className="w-12 h-12 rounded-full flex items-center justify-center border transition-all active:scale-95 cursor-pointer"
+                    className="w-11 h-11 rounded-full flex items-center justify-center border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
                     style={{ borderColor: '#3d444d', color: '#8b949e' }}
                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(139,148,158,0.12)'; e.currentTarget.style.borderColor = '#8b949e'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; }}
                     title="Hide (←)"
                   >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="19" y1="12" x2="5" y2="12" />
+                      <polyline points="12 19 5 12 12 5" />
                     </svg>
                   </button>
                   <span className="text-[10px]" style={{ color: '#8b949e' }}>Hide</span>
                 </div>
 
-                {/* Later (clock/snooze icon) */}
-                <div className="flex flex-col items-center gap-1" style={{ width: 56 }}>
-                  <button
-                    onClick={() => handleSwipe('down')}
-                    className="w-12 h-12 rounded-full flex items-center justify-center border transition-all active:scale-95 cursor-pointer"
-                    style={{ borderColor: '#3d444d', color: '#8b949e' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(139,148,158,0.12)'; e.currentTarget.style.borderColor = '#8b949e'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; }}
-                    title="Pass (↓)"
+                {/* ↑/↓ vertical pill */}
+                <div className="flex flex-col items-center gap-1">
+                  <div
+                    className="flex flex-col items-center overflow-hidden border transition-all"
+                    style={{ borderColor: '#3d444d', borderRadius: 20, width: 36 }}
                   >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10" />
-                      <polyline points="12 6 12 12 16 14" />
-                    </svg>
-                  </button>
-                  <span className="text-[10px]" style={{ color: '#8b949e' }}>Later</span>
+                    {/* Photos ↑ */}
+                    <button
+                      onClick={() => enterPhotoFocusRef.current?.()}
+                      className="w-full flex items-center justify-center transition-all active:scale-95 active:bg-white/15 cursor-pointer"
+                      style={{ height: 28, color: '#8b949e', background: 'transparent' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(139,148,158,0.12)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      title="Photos (↑)"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="19" x2="12" y2="5" />
+                        <polyline points="5 12 12 5 19 12" />
+                      </svg>
+                    </button>
+                    {/* Divider */}
+                    <div style={{ width: '100%', height: 1, backgroundColor: '#3d444d' }} />
+                    {/* Later ↓ */}
+                    <button
+                      onClick={() => handleSwipe('down')}
+                      className="w-full flex items-center justify-center transition-all active:scale-95 active:bg-white/15 cursor-pointer"
+                      style={{ height: 28, color: '#8b949e', background: 'transparent' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(139,148,158,0.12)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      title="Later (↓)"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <polyline points="19 12 12 19 5 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <span className="text-[9px]" style={{ color: '#8b949e' }}>Photos / Later</span>
                 </div>
 
-                {/* Save — blue accent */}
-                <div ref={saveAnchorRef} className="flex flex-col items-center gap-1" style={{ width: 56 }}>
+                {/* Save → blue */}
+                <div ref={saveAnchorRef} className="flex flex-col items-center gap-1">
                   <button
                     onClick={() => handleSwipe('right')}
-                    className="w-12 h-12 rounded-full flex items-center justify-center border transition-all active:scale-95 cursor-pointer"
+                    className="w-11 h-11 rounded-full flex items-center justify-center border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
                     style={{ borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,0.1)', color: '#58a6ff' }}
                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.2)'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.1)'; }}
                     title="Save (→)"
                   >
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                      <polyline points="12 5 19 12 12 19" />
                     </svg>
                   </button>
                   <button
