@@ -685,6 +685,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
         zoom={zoom}
         style={{ height: '100%', width: '100%', background: '#0f1117' }}
         zoomControl={false}
+        keyboard={false}
       >
         <TileLayer
           attribution='&copy; <a href="https://carto.com/">CARTO</a>'
