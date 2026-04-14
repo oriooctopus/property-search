@@ -378,6 +378,77 @@ export default function ListingDetail({
             </div>
           )}
 
+          {/* Nearest subway stations */}
+          {listing.lat != null && listing.lon != null && (() => {
+            const MI_PER_DEG_LAT = 69;
+            const MI_PER_DEG_LON = 52;
+            const LINE_COLORS: Record<string, string> = {
+              '1': '#EE352E', '2': '#EE352E', '3': '#EE352E',
+              '4': '#00933C', '5': '#00933C', '6': '#00933C',
+              '7': '#B933AD',
+              'A': '#0039A6', 'C': '#0039A6', 'E': '#0039A6',
+              'B': '#FF6319', 'D': '#FF6319', 'F': '#FF6319', 'M': '#FF6319',
+              'G': '#6CBE45',
+              'J': '#996633', 'Z': '#996633',
+              'L': '#A7A9AC',
+              'N': '#FCCC0A', 'Q': '#FCCC0A', 'R': '#FCCC0A', 'W': '#FCCC0A',
+              'S': '#808183',
+            };
+            const lat = listing.lat as number;
+            const lon = listing.lon as number;
+            const stations = SUBWAY_STATIONS
+              .map((s) => {
+                const dLat = (s.lat - lat) * MI_PER_DEG_LAT;
+                const dLon = (s.lon - lon) * MI_PER_DEG_LON;
+                return { station: s, distMi: Math.sqrt(dLat * dLat + dLon * dLon) };
+              })
+              .sort((a, b) => a.distMi - b.distMi)
+              .slice(0, 2);
+            if (stations.length === 0) return null;
+            return (
+              <div className="mb-4">
+                <div className="text-xs font-medium mb-2" style={{ color: '#8b949e' }}>Nearest Subway</div>
+                <div className="flex flex-col gap-2">
+                  {stations.map(({ station, distMi }) => {
+                    const displayDist = distMi < 0.1 ? '<0.1' : distMi.toFixed(1);
+                    return (
+                      <div key={station.stopId} className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ backgroundColor: '#0f1117', border: '1px solid #2d333b' }}>
+                        <div className="flex gap-0.5 flex-wrap">
+                          {station.lines.map((l) => {
+                            const bg = LINE_COLORS[l] ?? '#555';
+                            const color = (l === 'N' || l === 'Q' || l === 'R' || l === 'W') ? '#000' : '#fff';
+                            return (
+                              <span
+                                key={l}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: '50%',
+                                  backgroundColor: bg,
+                                  color,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {l}
+                              </span>
+                            );
+                          })}
+                        </div>
+                        <span className="text-sm" style={{ color: '#e1e4e8' }}>{station.name}</span>
+                        <span className="text-sm ml-auto flex-shrink-0" style={{ color: '#8b949e' }}>{displayDist} mi</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Photos */}
           <div className="flex items-center gap-2 mb-4">
             <span className="text-xs" style={{ color: '#8b949e' }}>

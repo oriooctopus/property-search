@@ -1,8 +1,63 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { useDrag } from '@use-gesture/react';
+import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
+
+// NYC lat/lon degree-to-miles conversion factors
+const MI_PER_DEG_LAT = 69;
+const MI_PER_DEG_LON = 52;
+
+function getClosestStations(lat: number, lon: number, count: number) {
+  return SUBWAY_STATIONS
+    .map((s) => {
+      const dLat = (s.lat - lat) * MI_PER_DEG_LAT;
+      const dLon = (s.lon - lon) * MI_PER_DEG_LON;
+      const distMi = Math.sqrt(dLat * dLat + dLon * dLon);
+      return { station: s, distMi };
+    })
+    .sort((a, b) => a.distMi - b.distMi)
+    .slice(0, count);
+}
+
+const LINE_COLORS: Record<string, string> = {
+  '1': '#EE352E', '2': '#EE352E', '3': '#EE352E',
+  '4': '#00933C', '5': '#00933C', '6': '#00933C',
+  '7': '#B933AD',
+  'A': '#0039A6', 'C': '#0039A6', 'E': '#0039A6',
+  'B': '#FF6319', 'D': '#FF6319', 'F': '#FF6319', 'M': '#FF6319',
+  'G': '#6CBE45',
+  'J': '#996633', 'Z': '#996633',
+  'L': '#A7A9AC',
+  'N': '#FCCC0A', 'Q': '#FCCC0A', 'R': '#FCCC0A', 'W': '#FCCC0A',
+  'S': '#808183',
+};
+
+function LineBadge({ line }: { line: string }) {
+  const bg = LINE_COLORS[line] ?? '#555';
+  // Yellow lines need dark text
+  const color = (line === 'N' || line === 'Q' || line === 'R' || line === 'W') ? '#000' : '#fff';
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 18,
+        height: 18,
+        borderRadius: '50%',
+        backgroundColor: bg,
+        color,
+        fontSize: 10,
+        fontWeight: 700,
+        flexShrink: 0,
+      }}
+    >
+      {line}
+    </span>
+  );
+}
 
 const SOURCE_LABELS: Record<string, string> = {
   craigslist: 'Craigslist',
@@ -25,6 +80,8 @@ interface SwipeCardListing {
   photo_urls: string[];
   source: string;
   url: string;
+  lat?: number | null;
+  lon?: number | null;
   list_date?: string | null;
   year_built?: number | null;
   transit_summary?: string | null;
@@ -203,6 +260,11 @@ export default function SwipeCard({
   const gestureBindings = isTop ? bind() : {};
   const perBedPrice = listing.beds > 0 ? Math.round(listing.price / listing.beds) : null;
 
+  const nearbyStations = useMemo(() => {
+    if (listing.lat == null || listing.lon == null) return [];
+    return getClosestStations(listing.lat as number, listing.lon as number, 2);
+  }, [listing.lat, listing.lon]);
+
   const listDateFormatted = listing.list_date
     ? new Date(listing.list_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : null;
@@ -222,7 +284,7 @@ export default function SwipeCard({
           </div>
           {listDateFormatted && <div className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Listed {listDateFormatted}</div>}
           <div className="grid grid-cols-3 gap-px rounded-lg overflow-hidden" style={{ border: '1px solid #2d333b' }}>
-            {[{ label: 'Beds', value: listing.beds === 0 ? 'Studio' : `${listing.beds}` }, { label: 'Baths', value: listing.baths != null ? `${listing.baths}` : 'N/A' }, { label: 'Sqft', value: listing.sqft != null ? listing.sqft.toLocaleString() : 'N/A' }].map(({ label, value }) => (
+            {[{ label: 'Beds', value: listing.beds === 0 ? 'Studio' : `${listing.beds}` }, { label: 'Baths', value: listing.baths != null ? `${listing.baths}` : 'N/A' }, { label: 'Sqft', value: listing.sqft ? listing.sqft.toLocaleString() : 'N/A' }].map(({ label, value }) => (
               <div key={label} className="flex flex-col items-center py-3 gap-0.5" style={{ backgroundColor: '#161b22' }}>
                 <span className="text-sm font-semibold" style={{ color: '#e1e4e8' }}>{value}</span>
                 <span className="text-[10px] uppercase tracking-wider" style={{ color: '#8b949e' }}>{label}</span>
@@ -237,6 +299,24 @@ export default function SwipeCard({
               <span>{listing.transit_summary}</span>
             </div>
           )}
+          {listing.lat != null && listing.lon != null && (() => {
+            const stations = getClosestStations(listing.lat as number, listing.lon as number, 2);
+            if (stations.length === 0) return null;
+            return (
+              <div className="rounded-lg px-3 py-2.5 flex flex-col gap-2" style={{ backgroundColor: '#161b22', border: '1px solid #2d333b' }}>
+                <div className="text-[10px] uppercase tracking-wider font-medium" style={{ color: '#8b949e' }}>Nearest Subway</div>
+                {stations.map(({ station, distMi }) => (
+                  <div key={station.stopId} className="flex items-center gap-2">
+                    <div className="flex gap-0.5 flex-wrap">
+                      {station.lines.map((l) => <LineBadge key={l} line={l} />)}
+                    </div>
+                    <span className="text-xs truncate" style={{ color: '#e1e4e8' }}>{station.name}</span>
+                    <span className="text-xs ml-auto flex-shrink-0" style={{ color: '#8b949e' }}>{distMi < 0.1 ? '<0.1' : distMi.toFixed(1)} mi</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           {totalPhotos > 0 && (
             <div className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{totalPhotos} photo{totalPhotos !== 1 ? 's' : ''}</div>
           )}
@@ -495,7 +575,7 @@ export default function SwipeCard({
                 },
                 {
                   label: 'Sqft',
-                  value: listing.sqft != null ? listing.sqft.toLocaleString() : 'N/A',
+                  value: listing.sqft ? listing.sqft.toLocaleString() : 'N/A',
                 },
               ].map(({ label, value }) => (
                 <div
@@ -531,6 +611,29 @@ export default function SwipeCard({
                   <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
                 </svg>
                 <span>{listing.transit_summary}</span>
+              </div>
+            )}
+
+            {/* Nearest subway stations */}
+            {nearbyStations.length > 0 && (
+              <div
+                className="rounded-lg px-3 py-2.5 flex flex-col gap-2"
+                style={{ backgroundColor: '#161b22', border: '1px solid #2d333b' }}
+              >
+                <div className="text-[10px] uppercase tracking-wider font-medium" style={{ color: '#8b949e' }}>
+                  Nearest Subway
+                </div>
+                {nearbyStations.map(({ station, distMi }) => (
+                  <div key={station.stopId} className="flex items-center gap-2">
+                    <div className="flex gap-0.5 flex-wrap">
+                      {station.lines.map((l) => <LineBadge key={l} line={l} />)}
+                    </div>
+                    <span className="text-xs truncate" style={{ color: '#e1e4e8' }}>{station.name}</span>
+                    <span className="text-xs ml-auto flex-shrink-0" style={{ color: '#8b949e' }}>
+                      {distMi < 0.1 ? '<0.1' : distMi.toFixed(1)} mi
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
 
