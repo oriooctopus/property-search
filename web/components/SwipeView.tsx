@@ -597,13 +597,13 @@ export default function SwipeView({
       {/* Floating detail panel on the right */}
       <div
         className="absolute right-0 bottom-0 z-10 flex flex-col"
-        style={{ width: 440, top: 0 }}
+        style={{ width: 440, top: 76 }}
       >
         {currentListing ? (
           <>
             {/* Card + action bar — fills available space, content scrolls if needed */}
             <div className="flex-1 min-h-0 overflow-hidden pr-3 flex flex-col">
-            <div className="relative w-full my-auto">
+            <div className="relative w-full my-auto" style={{ maxHeight: 'calc(100% - 40px)' }}>
               {/* Invisible layout card to establish natural height (card + action bar) */}
               <div className="invisible">
                 <SwipeCard
@@ -677,118 +677,131 @@ export default function SwipeView({
                 <span className="text-[11px]" style={{ color: '#6e7681' }}>Undo · <span style={{ color: '#8b949e' }}>Z</span></span>
               </div>
 
-              {/* Center: ← Hide, [↑/↓ pill], → Save — circles aligned */}
-              <div className="flex items-start gap-7">
-                {/* Hide ← */}
-                <div className="flex flex-col items-center gap-1.5">
-                  <button
-                    ref={hideBtnRef}
-                    onClick={() => { flashButton(hideBtnRef); handleSwipe('left'); }}
-                    className="w-12 h-12 rounded-full flex items-center justify-center border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
-                    style={{ borderColor: '#3d444d', color: '#8b949e' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
-                    title="Hide (←)"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="19" y1="12" x2="5" y2="12" />
-                      <polyline points="12 19 5 12 12 5" />
-                    </svg>
-                  </button>
-                  <span className="text-[11px]" style={{ color: '#8b949e' }}>Hide</span>
-                </div>
+              {/* Center: 4-circle arrow cluster with tooltips */}
+              <div ref={saveAnchorRef} className="flex flex-col items-center gap-1.5">
+                <div className="flex items-center gap-1.5">
+                  {/* Hide ← */}
+                  <div className="relative group">
+                    <button
+                      ref={hideBtnRef}
+                      onClick={() => { flashButton(hideBtnRef); handleSwipe('left'); }}
+                      className="flex items-center justify-center rounded-full border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
+                      style={{ width: 38, height: 38, borderColor: '#3d444d', color: '#8b949e', background: 'transparent' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12" />
+                        <polyline points="12 19 5 12 12 5" />
+                      </svg>
+                    </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ zIndex: 100 }}>
+                      <div style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b', color: '#e1e4e8', fontSize: 11, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
+                        Hide
+                      </div>
+                    </div>
+                  </div>
 
-                {/* ↑/↓ vertical pill */}
-                <div className="flex flex-col items-center gap-1.5">
-                  <div
-                    className="flex flex-col items-center overflow-hidden border transition-all"
-                    style={{ borderColor: '#3d444d', borderRadius: 24, width: 42 }}
-                  >
-                    {/* Photos ↑ */}
+                  {/* Photos ↑ */}
+                  <div className="relative group">
                     <button
                       ref={photoBtnRef}
                       onClick={() => { flashButton(photoBtnRef); enterPhotoFocusRef.current?.(); }}
-                      className="w-full flex items-center justify-center transition-all active:scale-95 active:bg-white/15 cursor-pointer"
-                      style={{ height: 34, color: '#8b949e', background: 'transparent' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.color = '#58a6ff'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#8b949e'; }}
-                      title="Photos (↑)"
+                      className="flex items-center justify-center rounded-full border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
+                      style={{ width: 38, height: 38, borderColor: '#3d444d', color: '#8b949e', background: 'transparent' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="12" y1="19" x2="12" y2="5" />
                         <polyline points="5 12 12 5 19 12" />
                       </svg>
                     </button>
-                    {/* Divider */}
-                    <div style={{ width: '100%', height: 1, backgroundColor: '#3d444d' }} />
-                    {/* Later ↓ */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ zIndex: 100 }}>
+                      <div style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b', color: '#e1e4e8', fontSize: 11, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
+                        Photos
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Later ↓ */}
+                  <div className="relative group">
                     <button
                       ref={laterBtnRef}
                       onClick={() => { flashButton(laterBtnRef); handleSwipe('down'); }}
-                      className="w-full flex items-center justify-center transition-all active:scale-95 active:bg-white/15 cursor-pointer"
-                      style={{ height: 34, color: '#8b949e', background: 'transparent' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.color = '#58a6ff'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#8b949e'; }}
-                      title="Later (↓)"
+                      className="flex items-center justify-center rounded-full border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
+                      style={{ width: 38, height: 38, borderColor: '#3d444d', color: '#8b949e', background: 'transparent' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="12" y1="5" x2="12" y2="19" />
                         <polyline points="19 12 12 19 5 12" />
                       </svg>
                     </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ zIndex: 100 }}>
+                      <div style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b', color: '#e1e4e8', fontSize: 11, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
+                        Later
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-[11px]" style={{ color: '#8b949e' }}>Photos / Later</span>
+
+                  {/* Save → */}
+                  <div className="relative group">
+                    <button
+                      ref={saveBtnRef}
+                      onClick={() => { flashButton(saveBtnRef); handleSwipe('right'); }}
+                      className="flex items-center justify-center rounded-full border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
+                      style={{ width: 38, height: 38, borderColor: '#3d444d', color: '#8b949e', background: 'transparent' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                        <polyline points="12 5 19 12 12 19" />
+                      </svg>
+                    </button>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ zIndex: 100 }}>
+                      <div style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b', color: '#e1e4e8', fontSize: 11, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
+                        Save
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Save → */}
-                <div ref={saveAnchorRef} className="flex flex-col items-center gap-1.5">
-                  <button
-                    ref={saveBtnRef}
-                    onClick={() => { flashButton(saveBtnRef); handleSwipe('right'); }}
-                    className="w-12 h-12 rounded-full flex items-center justify-center border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
-                    style={{ borderColor: '#3d444d', color: '#8b949e' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
-                    title="Save (→)"
-                  >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                      <polyline points="12 5 19 12 12 19" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => setWishlistDropdownOpen((prev) => !prev)}
-                    className="text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
-                    style={{
-                      color: '#8b949e',
-                      background: 'none',
-                      border: 'none',
-                      padding: '2px 4px',
-                      borderRadius: 4,
-                      lineHeight: 1,
-                      maxWidth: 120,
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = '#58a6ff'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = '#8b949e'; }}
-                    title="Choose wishlist"
-                  >
-                    <span style={{ whiteSpace: 'nowrap' }}>Save to:</span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 70 }}>
-                      {selectedWishlist ? selectedWishlist.name : 'Wishlist'}
-                    </span>
-                    <span style={{ flexShrink: 0 }}>▾</span>
-                  </button>
-                  {wishlistDropdownOpen && userId && (
-                    <WishlistDropdown
-                      wishlists={wishlists}
-                      selectedId={resolvedWishlistId}
-                      onSelect={handleSelectWishlist}
-                      onCreate={handleCreateWishlist}
-                      onClose={() => setWishlistDropdownOpen(false)}
-                      anchorRef={saveAnchorRef}
-                    />
-                  )}
-                </div>
+                {/* Save to: wishlist selector — centered below the 4 circles */}
+                <button
+                  onClick={() => setWishlistDropdownOpen((prev) => !prev)}
+                  className="text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+                  style={{
+                    color: '#8b949e',
+                    background: 'none',
+                    border: 'none',
+                    padding: '2px 4px',
+                    borderRadius: 4,
+                    lineHeight: 1,
+                    maxWidth: 160,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#58a6ff'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#8b949e'; }}
+                  title="Choose wishlist"
+                >
+                  <span style={{ whiteSpace: 'nowrap' }}>Save to:</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 80 }}>
+                    {selectedWishlist ? selectedWishlist.name : 'Wishlist'}
+                  </span>
+                  <span style={{ flexShrink: 0 }}>▾</span>
+                </button>
+                {wishlistDropdownOpen && userId && (
+                  <WishlistDropdown
+                    wishlists={wishlists}
+                    selectedId={resolvedWishlistId}
+                    onSelect={handleSelectWishlist}
+                    onCreate={handleCreateWishlist}
+                    onClose={() => setWishlistDropdownOpen(false)}
+                    anchorRef={saveAnchorRef}
+                  />
+                )}
               </div>
 
               {/* Counter */}
