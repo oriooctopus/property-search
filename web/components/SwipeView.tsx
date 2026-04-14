@@ -813,8 +813,25 @@ export default function SwipeView({
             </div>{/* relative w-full */}
             </div>{/* flex-1 centering */}
           </>
+        ) : listings.length === 0 ? (
+          /* Loading state — listings haven't loaded yet */
+          <div
+            className="flex-1 flex flex-col items-center justify-center gap-3 text-center m-3 rounded-xl"
+            style={{
+              backgroundColor: 'rgba(28, 32, 40, 0.97)',
+              border: '1px solid #2d333b',
+            }}
+          >
+            <div
+              className="w-8 h-8 rounded-full border-2 animate-spin"
+              style={{ borderColor: '#3d444d', borderTopColor: '#58a6ff' }}
+            />
+            <div className="text-sm" style={{ color: '#8b949e' }}>
+              Loading listings...
+            </div>
+          </div>
         ) : (
-          /* Empty state */
+          /* Empty state — user has swiped through everything */
           <div
             className="flex-1 flex flex-col items-center justify-center gap-4 text-center m-3 rounded-xl"
             style={{
