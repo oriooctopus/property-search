@@ -46,17 +46,6 @@ const VALID_VIEWS = new Set(['list', 'map', 'swipe']);
 const VALID_SORTS = new Set<string>(['price', 'beds', 'listDate']);
 const VALID_LISTING_AGES = new Set<string>(['1h', '3h', '6h', '12h', '1d', '2d', '3d', '1w', '2w', '1m']);
 
-function boundsFromCenter(lat: number, lng: number, zoom: number) {
-  // Approximate degrees visible at given zoom level
-  const latSpan = 180 / Math.pow(2, zoom);
-  const lngSpan = 360 / Math.pow(2, zoom);
-  return {
-    latMin: lat - latSpan / 2,
-    latMax: lat + latSpan / 2,
-    lonMin: lng - lngSpan / 2,
-    lonMax: lng + lngSpan / 2,
-  };
-}
 
 function parseNumOrNull(v: string | null): number | null {
   if (v == null) return null;
@@ -383,70 +372,11 @@ function HomeInner() {
       const uid = user?.id ?? null;
       setUserId(uid);
 
-      // Fetch listings — if URL has a saved map position, scope the initial
-      // query to those bounds so we don't load listings from the wrong area.
-      const initLat = searchParams.get('lat');
-      const initLng = searchParams.get('lng');
-      const initZoom = searchParams.get('zoom');
-      const hasUrlPosition = initLat != null && initLng != null && Number.isFinite(Number(initLat)) && Number.isFinite(Number(initLng));
-
-      let listingsQuery = supabase
-        .from('listings')
-        .select('*')
-        .is('delisted_at', null);
-
-      if (hasUrlPosition) {
-        const urlBounds = boundsFromCenter(
-          Number(initLat),
-          Number(initLng),
-          initZoom != null && Number.isFinite(Number(initZoom)) ? Number(initZoom) : 13,
-        );
-        listingsQuery = listingsQuery
-          .gte('lat', urlBounds.latMin)
-          .lte('lat', urlBounds.latMax)
-          .gte('lon', urlBounds.lonMin)
-          .lte('lon', urlBounds.lonMax)
-          .order('last_update_date', { ascending: false, nullsFirst: false })
-          .order('created_at', { ascending: false })
-          .limit(500);
-        hasInitialViewportLoad.current = true;
-      } else {
-        // Default NYC viewport — covers all 5 boroughs. Matches the gating
-        // envelope in pipeline.ts. Bounded query + 500-row cap keeps cold
-        // load fast (single round-trip instead of paginating 8k+ rows).
-        listingsQuery = listingsQuery
-          .gte('lat', 40.55)
-          .lte('lat', 40.92)
-          .gte('lon', -74.05)
-          .lte('lon', -73.70)
-          .order('last_update_date', { ascending: false, nullsFirst: false })
-          .order('created_at', { ascending: false })
-          .limit(500);
-        hasInitialViewportLoad.current = true;
-      }
-
-      const { data: listingsData } = await listingsQuery;
-      const dbListings: unknown[] = listingsData ?? [];
-
-      // Supabase returns Postgres `numeric` columns as strings.
-      // Coerce lat, lon, baths (and sqft just in case) to real numbers
-      // so every downstream component receives proper JS numbers.
-      const rawListings: Listing[] =
-        dbListings && dbListings.length > 0
-          ? (dbListings as unknown as Listing[])
-          : SEED_LISTINGS;
-      const allListings = rawListings.map((l) => ({
-        ...l,
-        lat: l.lat != null ? Number(l.lat) : null,
-        lon: l.lon != null ? Number(l.lon) : null,
-        baths: l.baths != null ? Number(l.baths) : null,
-        sqft: l.sqft != null ? Number(l.sqft) : null,
-        price: Number(l.price),
-        beds: Number(l.beds),
-        photos: Number(l.photos),
-        photo_urls: l.photo_urls ?? [],
-      }));
-      setListings(allListings);
+      // Listings are loaded by the map's onBoundsChange callback once the
+      // Leaflet map mounts and fires real viewport bounds. This ensures we
+      // always query the correct geographic area instead of an approximation.
+      // hasInitialViewportLoad starts false so the first onBoundsChange fires
+      // a full loadForViewport() call.
 
       } catch (err) {
         console.error('Failed to load data:', err);
