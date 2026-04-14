@@ -324,6 +324,23 @@ export default function SwipeView({
   const [wishlistDropdownOpen, setWishlistDropdownOpen] = useState(false);
   const [hoveredStation, setHoveredStation] = useState<HoveredStation | null>(null);
   const saveAnchorRef = useRef<HTMLDivElement>(null);
+  const hideBtnRef = useRef<HTMLButtonElement>(null);
+  const laterBtnRef = useRef<HTMLButtonElement>(null);
+  const saveBtnRef = useRef<HTMLButtonElement>(null);
+  const photoBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Flash a button for 500ms to show keyboard activation
+  const flashButton = useCallback((ref: React.RefObject<HTMLButtonElement | null>) => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.backgroundColor = 'rgba(255,255,255,0.15)';
+    el.style.transform = 'scale(0.95)';
+    setTimeout(() => {
+      el.style.backgroundColor = '';
+      el.style.transform = '';
+    }, 500);
+  }, []);
+
   // Track whether the card's photo carousel has keyboard focus
   const photoFocusedRef = useRef(false);
   const enterPhotoFocusRef = useRef<(() => void) | null>(null);
@@ -487,15 +504,15 @@ export default function SwipeView({
 
       switch (e.key) {
         case 'ArrowLeft':
-          // Suppress when photo carousel has focus — SwipeCard handles it
           if (photoFocusedRef.current) return;
           e.preventDefault();
+          flashButton(hideBtnRef);
           handleSwipe('left');
           break;
         case 'ArrowRight':
-          // Suppress when photo carousel has focus — SwipeCard handles it
           if (photoFocusedRef.current) return;
           e.preventDefault();
+          flashButton(saveBtnRef);
           handleSwipe('right');
           break;
         case 'ArrowDown':
@@ -504,10 +521,12 @@ export default function SwipeView({
             exitPhotoFocusRef.current?.();
             return;
           }
+          flashButton(laterBtnRef);
           handleSwipe('down');
           break;
         case 'ArrowUp':
           e.preventDefault();
+          flashButton(photoBtnRef);
           enterPhotoFocusRef.current?.();
           break;
         case 'z':
@@ -663,7 +682,8 @@ export default function SwipeView({
                 {/* Hide ← */}
                 <div className="flex flex-col items-center gap-1">
                   <button
-                    onClick={() => handleSwipe('left')}
+                    ref={hideBtnRef}
+                    onClick={() => { flashButton(hideBtnRef); handleSwipe('left'); }}
                     className="w-11 h-11 rounded-full flex items-center justify-center border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
                     style={{ borderColor: '#3d444d', color: '#8b949e' }}
                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(139,148,158,0.12)'; e.currentTarget.style.borderColor = '#8b949e'; }}
@@ -686,7 +706,8 @@ export default function SwipeView({
                   >
                     {/* Photos ↑ */}
                     <button
-                      onClick={() => enterPhotoFocusRef.current?.()}
+                      ref={photoBtnRef}
+                      onClick={() => { flashButton(photoBtnRef); enterPhotoFocusRef.current?.(); }}
                       className="w-full flex items-center justify-center transition-all active:scale-95 active:bg-white/15 cursor-pointer"
                       style={{ height: 28, color: '#8b949e', background: 'transparent' }}
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(139,148,158,0.12)'; }}
@@ -702,7 +723,8 @@ export default function SwipeView({
                     <div style={{ width: '100%', height: 1, backgroundColor: '#3d444d' }} />
                     {/* Later ↓ */}
                     <button
-                      onClick={() => handleSwipe('down')}
+                      ref={laterBtnRef}
+                      onClick={() => { flashButton(laterBtnRef); handleSwipe('down'); }}
                       className="w-full flex items-center justify-center transition-all active:scale-95 active:bg-white/15 cursor-pointer"
                       style={{ height: 28, color: '#8b949e', background: 'transparent' }}
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(139,148,158,0.12)'; }}
@@ -721,7 +743,8 @@ export default function SwipeView({
                 {/* Save → blue */}
                 <div ref={saveAnchorRef} className="flex flex-col items-center gap-1">
                   <button
-                    onClick={() => handleSwipe('right')}
+                    ref={saveBtnRef}
+                    onClick={() => { flashButton(saveBtnRef); handleSwipe('right'); }}
                     className="w-11 h-11 rounded-full flex items-center justify-center border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
                     style={{ borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,0.1)', color: '#58a6ff' }}
                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.2)'; }}
