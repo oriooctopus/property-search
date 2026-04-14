@@ -314,7 +314,9 @@ export default function SwipeView({
   initialZoom,
   commuteInfoMap,
 }: SwipeViewProps) {
-  const [swipedIds, setSwipedIds] = useState<Set<number>>(() => loadSwipedIds());
+  // Don't persist swipedIds across refreshes — start fresh each session.
+  // The localStorage was causing "You've seen all listings" on every refresh.
+  const [swipedIds, setSwipedIds] = useState<Set<number>>(new Set());
   const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
   const [currentIndex, setCurrentIndex] = useState(0);
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
@@ -360,22 +362,9 @@ export default function SwipeView({
     });
   }
 
-  // When listings change (new viewport, new filters), reset swiped IDs that
-  // aren't in the new set — they're from a different area. Keep IDs that
-  // are still in the current listings (user already swiped on them).
+  // Reset index when listings change (new viewport / filters)
   const listingIds = useMemo(() => new Set(listings.map((l) => l.id)), [listings]);
   useEffect(() => {
-    setSwipedIds((prev) => {
-      const kept = new Set<number>();
-      for (const id of prev) {
-        if (listingIds.has(id)) kept.add(id);
-      }
-      if (kept.size !== prev.size) {
-        localStorage.setItem(SWIPED_IDS_KEY, JSON.stringify([...kept]));
-        return kept;
-      }
-      return prev;
-    });
     setCurrentIndex(0);
   }, [listingIds]);
 
@@ -437,7 +426,6 @@ export default function SwipeView({
         setSwipedIds((prev) => {
           const next = new Set(prev);
           next.add(listing.id);
-          localStorage.setItem(SWIPED_IDS_KEY, JSON.stringify([...next]));
           return next;
         });
 
