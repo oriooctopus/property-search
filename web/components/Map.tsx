@@ -1,12 +1,11 @@
 'use client';
 
-'use client';
-
 import dynamic from 'next/dynamic';
 import type React from 'react';
 import type { Database } from '@/lib/types';
 import type { ViewportBounds } from './MapInner';
 import type { CommuteInfo } from './ListingCard';
+import type { HoveredStation } from './SwipeCard';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -40,9 +39,10 @@ interface MapProps {
   visible?: boolean;
   commuteInfoMap?: Map<number, CommuteInfo>;
   panOffset?: { x: number; y: number };
+  hoveredStation?: HoveredStation | null;
 }
 
-export default function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, initialCenter, initialZoom, visible, commuteInfoMap, panOffset }: MapProps) {
+export default function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, initialCenter, initialZoom, visible, commuteInfoMap, panOffset, hoveredStation }: MapProps) {
   return (
     <MapInner
       listings={listings}
@@ -62,6 +62,7 @@ export default function Map({ listings, selectedId, onMarkerClick, onSelectDetai
       visible={visible}
       commuteInfoMap={commuteInfoMap}
       panOffset={panOffset}
+      hoveredStation={hoveredStation ?? null}
     />
   );
 }

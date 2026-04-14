@@ -88,6 +88,13 @@ interface SwipeCardListing {
   [key: string]: unknown;
 }
 
+export interface HoveredStation {
+  lat: number;
+  lon: number;
+  name: string;
+  lines: string[];
+}
+
 interface SwipeCardProps {
   listing: SwipeCardListing;
   onSwipe: (direction: 'left' | 'right' | 'down') => void;
@@ -99,6 +106,8 @@ interface SwipeCardProps {
   onPhotoFocusChange?: (focused: boolean) => void;
   /** Ref callback so parent can imperatively enter photo focus */
   enterPhotoFocusRef?: React.MutableRefObject<(() => void) | null>;
+  /** Called when hovering over a subway station row */
+  onSubwayHover?: (station: HoveredStation | null) => void;
 }
 
 const SWIPE_X_THRESHOLD = 100;
@@ -113,6 +122,7 @@ export default function SwipeCard({
   layoutOnly = false,
   onPhotoFocusChange,
   enterPhotoFocusRef,
+  onSubwayHover,
 }: SwipeCardProps) {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [photoFocused, setPhotoFocused] = useState(false);
@@ -619,12 +629,25 @@ export default function SwipeCard({
               <div
                 className="rounded-lg px-3 py-2.5 flex flex-col gap-2"
                 style={{ backgroundColor: '#161b22', border: '1px solid #2d333b' }}
+                onMouseLeave={() => onSubwayHover?.(null)}
               >
                 <div className="text-[10px] uppercase tracking-wider font-medium" style={{ color: '#8b949e' }}>
                   Nearest Subway
                 </div>
                 {nearbyStations.map(({ station, distMi }) => (
-                  <div key={station.stopId} className="flex items-center gap-2">
+                  <div
+                    key={station.stopId}
+                    className="flex items-center gap-2 rounded-md px-1.5 py-1 -mx-1.5 transition-colors duration-150"
+                    style={{ cursor: 'pointer' }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLDivElement).style.backgroundColor = 'rgba(88,166,255,0.1)';
+                      onSubwayHover?.({ lat: station.lat, lon: station.lon, name: station.name, lines: station.lines });
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLDivElement).style.backgroundColor = '';
+                      onSubwayHover?.(null);
+                    }}
+                  >
                     <div className="flex gap-0.5 flex-wrap">
                       {station.lines.map((l) => <LineBadge key={l} line={l} />)}
                     </div>

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { createPortal } from 'react-dom';
 import { PrimaryButton } from '@/components/ui';
-import SwipeCard from './SwipeCard';
+import SwipeCard, { type HoveredStation } from './SwipeCard';
 import type { ViewportBounds } from './MapInner';
 import type { CommuteInfo } from './ListingCard';
 import type { Database } from '@/lib/types';
@@ -320,6 +320,7 @@ export default function SwipeView({
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
   const [authToast, setAuthToast] = useState(false);
   const [wishlistDropdownOpen, setWishlistDropdownOpen] = useState(false);
+  const [hoveredStation, setHoveredStation] = useState<HoveredStation | null>(null);
   const saveAnchorRef = useRef<HTMLDivElement>(null);
   // Track whether the card's photo carousel has keyboard focus
   const photoFocusedRef = useRef(false);
@@ -553,6 +554,7 @@ export default function SwipeView({
           visible={true}
           commuteInfoMap={commuteInfoMap}
           panOffset={{ x: 210, y: 0 }}
+          hoveredStation={hoveredStation}
         />
       </div>
 
@@ -610,6 +612,7 @@ export default function SwipeView({
                     isTop={true}
                     onPhotoFocusChange={(focused) => { photoFocusedRef.current = focused; }}
                     enterPhotoFocusRef={enterPhotoFocusRef}
+                    onSubwayHover={setHoveredStation}
                   />
                 </div>
                 {/* Action bar attached to bottom of card */}
