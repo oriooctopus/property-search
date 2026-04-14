@@ -677,10 +677,10 @@ export default function SwipeView({
                 <span className="text-[11px]" style={{ color: '#6e7681' }}>Undo · <span style={{ color: '#8b949e' }}>Z</span></span>
               </div>
 
-              {/* Center: ← Hide, [↑/↓ pill], → Save */}
-              <div className="flex items-center gap-5">
+              {/* Center: ← Hide, [↑/↓ pill], → Save — circles aligned */}
+              <div className="flex items-start gap-7">
                 {/* Hide ← */}
-                <div className="flex flex-col items-center gap-1">
+                <div className="flex flex-col items-center gap-1.5">
                   <button
                     ref={hideBtnRef}
                     onClick={() => { flashButton(hideBtnRef); handleSwipe('left'); }}
@@ -699,17 +699,17 @@ export default function SwipeView({
                 </div>
 
                 {/* ↑/↓ vertical pill */}
-                <div className="flex flex-col items-center gap-1">
+                <div className="flex flex-col items-center gap-1.5">
                   <div
                     className="flex flex-col items-center overflow-hidden border transition-all"
-                    style={{ borderColor: '#3d444d', borderRadius: 22, width: 40 }}
+                    style={{ borderColor: '#3d444d', borderRadius: 24, width: 42 }}
                   >
                     {/* Photos ↑ */}
                     <button
                       ref={photoBtnRef}
                       onClick={() => { flashButton(photoBtnRef); enterPhotoFocusRef.current?.(); }}
                       className="w-full flex items-center justify-center transition-all active:scale-95 active:bg-white/15 cursor-pointer"
-                      style={{ height: 32, color: '#8b949e', background: 'transparent' }}
+                      style={{ height: 34, color: '#8b949e', background: 'transparent' }}
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.color = '#58a6ff'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#8b949e'; }}
                       title="Photos (↑)"
@@ -726,7 +726,7 @@ export default function SwipeView({
                       ref={laterBtnRef}
                       onClick={() => { flashButton(laterBtnRef); handleSwipe('down'); }}
                       className="w-full flex items-center justify-center transition-all active:scale-95 active:bg-white/15 cursor-pointer"
-                      style={{ height: 32, color: '#8b949e', background: 'transparent' }}
+                      style={{ height: 34, color: '#8b949e', background: 'transparent' }}
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.color = '#58a6ff'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#8b949e'; }}
                       title="Later (↓)"
@@ -740,8 +740,8 @@ export default function SwipeView({
                   <span className="text-[11px]" style={{ color: '#8b949e' }}>Photos / Later</span>
                 </div>
 
-                {/* Save → same grey, blue on hover */}
-                <div ref={saveAnchorRef} className="flex flex-col items-center gap-0.5">
+                {/* Save → */}
+                <div ref={saveAnchorRef} className="flex flex-col items-center gap-1.5">
                   <button
                     ref={saveBtnRef}
                     onClick={() => { flashButton(saveBtnRef); handleSwipe('right'); }}
@@ -756,26 +756,27 @@ export default function SwipeView({
                       <polyline points="12 5 19 12 12 19" />
                     </svg>
                   </button>
-                  <span className="text-[11px]" style={{ color: '#8b949e' }}>Save</span>
                   <button
                     onClick={() => setWishlistDropdownOpen((prev) => !prev)}
-                    className="text-[10px] flex items-center gap-0.5 cursor-pointer"
+                    className="text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
                     style={{
-                      color: '#6e7681',
+                      color: '#8b949e',
                       background: 'none',
                       border: 'none',
-                      padding: '1px 4px',
+                      padding: '2px 4px',
                       borderRadius: 4,
                       lineHeight: 1,
-                      maxWidth: 90,
-                      overflow: 'hidden',
+                      maxWidth: 120,
                     }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = '#58a6ff'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = '#8b949e'; }}
                     title="Choose wishlist"
                   >
+                    <span style={{ whiteSpace: 'nowrap' }}>Save to:</span>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 70 }}>
-                      {selectedWishlist ? selectedWishlist.name : 'Save'}
+                      {selectedWishlist ? selectedWishlist.name : 'Wishlist'}
                     </span>
-                    <span style={{ flexShrink: 0 }}> ▾</span>
+                    <span style={{ flexShrink: 0 }}>▾</span>
                   </button>
                   {wishlistDropdownOpen && userId && (
                     <WishlistDropdown
