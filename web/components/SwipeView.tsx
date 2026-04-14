@@ -613,7 +613,7 @@ export default function SwipeView({
                   isTop={false}
                   layoutOnly
                 />
-                <div style={{ height: 96 }} />
+                <div style={{ height: 120 }} />
               </div>
 
               {/* Stack visual: background card */}
@@ -639,7 +639,7 @@ export default function SwipeView({
                 }}
               >
                 {/* Card portion */}
-                <div className="absolute top-0 left-0 right-0" style={{ bottom: 96 }}>
+                <div className="absolute top-0 left-0 right-0" style={{ bottom: 120 }}>
                   <SwipeCard
                     key={currentListing.id}
                     listing={currentListing}
@@ -654,9 +654,9 @@ export default function SwipeView({
                 </div>
                 {/* Action bar attached to bottom of card */}
                 <div
-                  className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-5 py-5"
+                  className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-5 py-4"
                   style={{
-                    height: 96,
+                    height: 120,
                     borderTop: '1px solid #2d333b',
                   }}
                 >
@@ -674,7 +674,7 @@ export default function SwipeView({
                     <path d="M3 13a9 9 0 0 1 15.36-6.36L21 9" />
                   </svg>
                 </button>
-                <span className="text-[9px]" style={{ color: '#6e7681' }}>Undo · <span style={{ color: '#8b949e' }}>Z</span></span>
+                <span className="text-[11px]" style={{ color: '#6e7681' }}>Undo · <span style={{ color: '#8b949e' }}>Z</span></span>
               </div>
 
               {/* Center: ← Hide, [↑/↓ pill], → Save */}
@@ -684,7 +684,7 @@ export default function SwipeView({
                   <button
                     ref={hideBtnRef}
                     onClick={() => { flashButton(hideBtnRef); handleSwipe('left'); }}
-                    className="w-11 h-11 rounded-full flex items-center justify-center border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
+                    className="w-12 h-12 rounded-full flex items-center justify-center border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
                     style={{ borderColor: '#3d444d', color: '#8b949e' }}
                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
@@ -695,21 +695,21 @@ export default function SwipeView({
                       <polyline points="12 19 5 12 12 5" />
                     </svg>
                   </button>
-                  <span className="text-[10px]" style={{ color: '#8b949e' }}>Hide</span>
+                  <span className="text-[11px]" style={{ color: '#8b949e' }}>Hide</span>
                 </div>
 
                 {/* ↑/↓ vertical pill */}
                 <div className="flex flex-col items-center gap-1">
                   <div
                     className="flex flex-col items-center overflow-hidden border transition-all"
-                    style={{ borderColor: '#3d444d', borderRadius: 20, width: 36 }}
+                    style={{ borderColor: '#3d444d', borderRadius: 22, width: 40 }}
                   >
                     {/* Photos ↑ */}
                     <button
                       ref={photoBtnRef}
                       onClick={() => { flashButton(photoBtnRef); enterPhotoFocusRef.current?.(); }}
                       className="w-full flex items-center justify-center transition-all active:scale-95 active:bg-white/15 cursor-pointer"
-                      style={{ height: 28, color: '#8b949e', background: 'transparent' }}
+                      style={{ height: 32, color: '#8b949e', background: 'transparent' }}
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.color = '#58a6ff'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#8b949e'; }}
                       title="Photos (↑)"
@@ -726,7 +726,7 @@ export default function SwipeView({
                       ref={laterBtnRef}
                       onClick={() => { flashButton(laterBtnRef); handleSwipe('down'); }}
                       className="w-full flex items-center justify-center transition-all active:scale-95 active:bg-white/15 cursor-pointer"
-                      style={{ height: 28, color: '#8b949e', background: 'transparent' }}
+                      style={{ height: 32, color: '#8b949e', background: 'transparent' }}
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.color = '#58a6ff'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#8b949e'; }}
                       title="Later (↓)"
@@ -737,7 +737,7 @@ export default function SwipeView({
                       </svg>
                     </button>
                   </div>
-                  <span className="text-[9px]" style={{ color: '#8b949e' }}>Photos / Later</span>
+                  <span className="text-[11px]" style={{ color: '#8b949e' }}>Photos / Later</span>
                 </div>
 
                 {/* Save → same grey, blue on hover */}
@@ -745,7 +745,7 @@ export default function SwipeView({
                   <button
                     ref={saveBtnRef}
                     onClick={() => { flashButton(saveBtnRef); handleSwipe('right'); }}
-                    className="w-11 h-11 rounded-full flex items-center justify-center border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
+                    className="w-12 h-12 rounded-full flex items-center justify-center border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
                     style={{ borderColor: '#3d444d', color: '#8b949e' }}
                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
@@ -756,12 +756,12 @@ export default function SwipeView({
                       <polyline points="12 5 19 12 12 19" />
                     </svg>
                   </button>
-                  <span className="text-[10px]" style={{ color: '#8b949e' }}>Save</span>
+                  <span className="text-[11px]" style={{ color: '#8b949e' }}>Save</span>
                   <button
                     onClick={() => setWishlistDropdownOpen((prev) => !prev)}
-                    className="text-[9px] flex items-center gap-0.5 cursor-pointer"
+                    className="text-[10px] flex items-center gap-0.5 cursor-pointer"
                     style={{
-                      color: '#58a6ff',
+                      color: '#6e7681',
                       background: 'none',
                       border: 'none',
                       padding: '1px 4px',
