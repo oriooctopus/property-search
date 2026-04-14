@@ -613,7 +613,7 @@ export default function SwipeView({
                   isTop={false}
                   layoutOnly
                 />
-                <div style={{ height: 120 }} />
+                <div style={{ height: 96 }} />
               </div>
 
               {/* Stack visual: background card */}
@@ -639,7 +639,7 @@ export default function SwipeView({
                 }}
               >
                 {/* Card portion */}
-                <div className="absolute top-0 left-0 right-0" style={{ bottom: 120 }}>
+                <div className="absolute top-0 left-0 right-0" style={{ bottom: 96 }}>
                   <SwipeCard
                     key={currentListing.id}
                     listing={currentListing}
@@ -654,9 +654,9 @@ export default function SwipeView({
                 </div>
                 {/* Action bar attached to bottom of card */}
                 <div
-                  className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-5 py-4"
+                  className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-5"
                   style={{
-                    height: 120,
+                    height: 96,
                     borderTop: '1px solid #2d333b',
                   }}
                 >
@@ -674,7 +674,7 @@ export default function SwipeView({
                     <path d="M3 13a9 9 0 0 1 15.36-6.36L21 9" />
                   </svg>
                 </button>
-                <span className="text-[11px]" style={{ color: '#6e7681' }}>Undo · <span style={{ color: '#8b949e' }}>Z</span></span>
+                <span className="text-[12px]" style={{ color: '#6e7681' }}>Undo · <span style={{ color: '#8b949e' }}>Z</span></span>
               </div>
 
               {/* Center: 4-circle arrow cluster with tooltips */}
@@ -690,13 +690,13 @@ export default function SwipeView({
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="19" y1="12" x2="5" y2="12" />
                         <polyline points="12 19 5 12 12 5" />
                       </svg>
                     </button>
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ zIndex: 100 }}>
-                      <div style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b', color: '#e1e4e8', fontSize: 11, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
+                      <div style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b', color: '#e1e4e8', fontSize: 12, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
                         Hide
                       </div>
                     </div>
@@ -712,13 +712,13 @@ export default function SwipeView({
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="12" y1="19" x2="12" y2="5" />
                         <polyline points="5 12 12 5 19 12" />
                       </svg>
                     </button>
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ zIndex: 100 }}>
-                      <div style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b', color: '#e1e4e8', fontSize: 11, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
+                      <div style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b', color: '#e1e4e8', fontSize: 12, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
                         Photos
                       </div>
                     </div>
@@ -734,13 +734,13 @@ export default function SwipeView({
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="12" y1="5" x2="12" y2="19" />
                         <polyline points="19 12 12 19 5 12" />
                       </svg>
                     </button>
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ zIndex: 100 }}>
-                      <div style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b', color: '#e1e4e8', fontSize: 11, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
+                      <div style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b', color: '#e1e4e8', fontSize: 12, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
                         Later
                       </div>
                     </div>
@@ -756,13 +756,13 @@ export default function SwipeView({
                       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="5" y1="12" x2="19" y2="12" />
                         <polyline points="12 5 19 12 12 19" />
                       </svg>
                     </button>
                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ zIndex: 100 }}>
-                      <div style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b', color: '#e1e4e8', fontSize: 11, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
+                      <div style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b', color: '#e1e4e8', fontSize: 12, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
                         Save
                       </div>
                     </div>
@@ -772,7 +772,7 @@ export default function SwipeView({
                 {/* Save to: wishlist selector — centered below the 4 circles */}
                 <button
                   onClick={() => setWishlistDropdownOpen((prev) => !prev)}
-                  className="text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+                  className="text-[12px] flex items-center gap-1 cursor-pointer transition-colors"
                   style={{
                     color: '#8b949e',
                     background: 'none',

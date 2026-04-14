@@ -156,7 +156,7 @@ export default function SwipeCard({
 
   // Photo-focus mode: arrow keys cycle photos instead of triggering swipe actions
   const enterPhotoFocus = useCallback(() => {
-    if (!isTop || totalPhotos <= 1) return;
+    if (!isTop || totalPhotos < 1) return;
     setPhotoFocused(true);
     onPhotoFocusChange?.(true);
   }, [isTop, totalPhotos, onPhotoFocusChange]);
@@ -166,11 +166,10 @@ export default function SwipeCard({
     onPhotoFocusChange?.(false);
   }, [onPhotoFocusChange]);
 
-  // Expose enter/exit to parent via refs
-  useEffect(() => {
-    if (enterPhotoFocusRef) enterPhotoFocusRef.current = enterPhotoFocus;
-    if (exitPhotoFocusRef) exitPhotoFocusRef.current = exitPhotoFocus;
-  }, [enterPhotoFocus, exitPhotoFocus, enterPhotoFocusRef, exitPhotoFocusRef]);
+  // Expose enter/exit to parent via refs — assign synchronously so they're
+  // available immediately (useEffect runs after paint, causing timing issues)
+  if (enterPhotoFocusRef) enterPhotoFocusRef.current = enterPhotoFocus;
+  if (exitPhotoFocusRef) exitPhotoFocusRef.current = exitPhotoFocus;
 
   // Keyboard handler for photo-focus mode
   useEffect(() => {
