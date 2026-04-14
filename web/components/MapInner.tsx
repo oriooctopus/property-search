@@ -326,6 +326,9 @@ function BoundsWatcher({ onBoundsChange, onMapMove, suppressBoundsRef }: { onBou
     map.on('moveend', fireBounds);
     map.on('zoomend', fireBounds);
 
+    // Fire once on mount — Leaflet doesn't emit moveend on initial render
+    fireBounds();
+
     return () => {
       map.off('moveend', fireBounds);
       map.off('zoomend', fireBounds);
