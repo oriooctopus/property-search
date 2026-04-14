@@ -333,7 +333,7 @@ export default function SwipeView({
   const flashButton = useCallback((ref: React.RefObject<HTMLButtonElement | null>) => {
     const el = ref.current;
     if (!el) return;
-    el.style.backgroundColor = 'rgba(255,255,255,0.15)';
+    el.style.backgroundColor = 'rgba(88,166,255,0.2)';
     el.style.transform = 'scale(0.95)';
     setTimeout(() => {
       el.style.backgroundColor = '';
@@ -686,8 +686,8 @@ export default function SwipeView({
                     onClick={() => { flashButton(hideBtnRef); handleSwipe('left'); }}
                     className="w-11 h-11 rounded-full flex items-center justify-center border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
                     style={{ borderColor: '#3d444d', color: '#8b949e' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(139,148,158,0.12)'; e.currentTarget.style.borderColor = '#8b949e'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
                     title="Hide (←)"
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -710,8 +710,8 @@ export default function SwipeView({
                       onClick={() => { flashButton(photoBtnRef); enterPhotoFocusRef.current?.(); }}
                       className="w-full flex items-center justify-center transition-all active:scale-95 active:bg-white/15 cursor-pointer"
                       style={{ height: 28, color: '#8b949e', background: 'transparent' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(139,148,158,0.12)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.color = '#58a6ff'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#8b949e'; }}
                       title="Photos (↑)"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -727,8 +727,8 @@ export default function SwipeView({
                       onClick={() => { flashButton(laterBtnRef); handleSwipe('down'); }}
                       className="w-full flex items-center justify-center transition-all active:scale-95 active:bg-white/15 cursor-pointer"
                       style={{ height: 28, color: '#8b949e', background: 'transparent' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(139,148,158,0.12)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.color = '#58a6ff'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = '#8b949e'; }}
                       title="Later (↓)"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -740,15 +740,15 @@ export default function SwipeView({
                   <span className="text-[9px]" style={{ color: '#8b949e' }}>Photos / Later</span>
                 </div>
 
-                {/* Save → blue */}
-                <div ref={saveAnchorRef} className="flex flex-col items-center gap-1">
+                {/* Save → same grey, blue on hover */}
+                <div ref={saveAnchorRef} className="flex flex-col items-center gap-0.5">
                   <button
                     ref={saveBtnRef}
                     onClick={() => { flashButton(saveBtnRef); handleSwipe('right'); }}
                     className="w-11 h-11 rounded-full flex items-center justify-center border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
-                    style={{ borderColor: '#58a6ff', backgroundColor: 'rgba(88,166,255,0.1)', color: '#58a6ff' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.2)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.1)'; }}
+                    style={{ borderColor: '#3d444d', color: '#8b949e' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
                     title="Save (→)"
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -756,14 +756,15 @@ export default function SwipeView({
                       <polyline points="12 5 19 12 12 19" />
                     </svg>
                   </button>
+                  <span className="text-[10px]" style={{ color: '#8b949e' }}>Save</span>
                   <button
                     onClick={() => setWishlistDropdownOpen((prev) => !prev)}
-                    className="text-[10px] flex items-center gap-0.5 cursor-pointer"
+                    className="text-[9px] flex items-center gap-0.5 cursor-pointer"
                     style={{
                       color: '#58a6ff',
                       background: 'none',
                       border: 'none',
-                      padding: '2px 4px',
+                      padding: '1px 4px',
                       borderRadius: 4,
                       lineHeight: 1,
                       maxWidth: 90,
