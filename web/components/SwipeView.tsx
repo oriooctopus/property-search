@@ -7,6 +7,7 @@ import { PrimaryButton } from '@/components/ui';
 import SwipeCard from './SwipeCard';
 import type { ViewportBounds } from './MapInner';
 import type { CommuteInfo } from './ListingCard';
+import type { Database } from '@/lib/types';
 import { useWishlists, useWishlistMutations } from '@/lib/hooks/useWishlists';
 import { getLastUsedWishlistId, setLastUsedWishlistId } from '@/lib/wishlist-storage';
 import { geoSort } from '@/lib/geo-sort';
@@ -538,7 +539,7 @@ export default function SwipeView({
       {/* Full-screen map backdrop */}
       <div className="absolute inset-0 z-0">
         <MapComponent
-          listings={mapListings as any}
+          listings={mapListings as unknown as Database['public']['Tables']['listings']['Row'][]}
           selectedId={currentListing?.id ?? null}
           onMarkerClick={() => {}}
           onSelectDetail={() => {}}
