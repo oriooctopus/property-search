@@ -1,13 +1,27 @@
 'use client';
 
 import { useEffect, useRef, useCallback, useMemo } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, CircleMarker, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Database } from '@/lib/types';
 import type { CommuteInfo } from './ListingCard';
+import type { HoveredStation } from './SwipeCard';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
+
+const LINE_COLORS: Record<string, string> = {
+  '1': '#EE352E', '2': '#EE352E', '3': '#EE352E',
+  '4': '#00933C', '5': '#00933C', '6': '#00933C',
+  '7': '#B933AD',
+  'A': '#0039A6', 'C': '#0039A6', 'E': '#0039A6',
+  'B': '#FF6319', 'D': '#FF6319', 'F': '#FF6319', 'M': '#FF6319',
+  'G': '#6CBE45',
+  'J': '#996633', 'Z': '#996633',
+  'L': '#A7A9AC',
+  'N': '#FCCC0A', 'Q': '#FCCC0A', 'R': '#FCCC0A', 'W': '#FCCC0A',
+  'S': '#808183',
+};
 
 function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
@@ -113,13 +127,64 @@ const POPUP_STYLES = `
   }
 `;
 
+const STATION_PULSE_STYLES = `
+  @keyframes station-pulse {
+    0%   { transform: scale(1);   opacity: 0.8; }
+    100% { transform: scale(2.5); opacity: 0; }
+  }
+  .station-pulse-ring {
+    animation: station-pulse 1.4s ease-out infinite;
+  }
+  .station-hover-tooltip {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+  .station-hover-tooltip::before {
+    display: none !important;
+  }
+`;
+
+function makeStationPulseIcon(color: string): L.DivIcon {
+  const size = 40;
+  return L.divIcon({
+    className: '',
+    html: `
+      <div style="position:relative;width:${size}px;height:${size}px;">
+        <div class="station-pulse-ring" style="
+          position:absolute;
+          inset:0;
+          border-radius:50%;
+          background:${color};
+          opacity:0.8;
+          transform-origin:center;
+        "></div>
+        <div style="
+          position:absolute;
+          top:50%;left:50%;
+          transform:translate(-50%,-50%);
+          width:14px;height:14px;
+          border-radius:50%;
+          background:${color};
+          border:2.5px solid #fff;
+          box-shadow:0 0 8px 2px ${color};
+        "></div>
+      </div>
+    `,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    tooltipAnchor: [0, -(size / 2) - 4],
+  });
+}
+
 function InjectPopupStyles() {
   useEffect(() => {
     const id = 'dwelligence-popup-styles';
     if (document.getElementById(id)) return;
     const style = document.createElement('style');
     style.id = id;
-    style.textContent = POPUP_STYLES;
+    style.textContent = POPUP_STYLES + STATION_PULSE_STYLES;
     document.head.appendChild(style);
     return () => {
       style.remove();
@@ -216,6 +281,8 @@ export interface MapProps {
   commuteInfoMap?: Map<number, CommuteInfo>;
   /** Pixel offset for flyTo — shifts the selected listing's dot away from center */
   panOffset?: { x: number; y: number };
+  /** Hovered subway station from SwipeCard — renders a pulsing marker */
+  hoveredStation?: HoveredStation | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -423,7 +490,7 @@ function buildPopupContent(listing: Listing, isFavorited: boolean, _isWouldLive:
   `;
 }
 
-export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, panOffset }: MapProps) {
+export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, panOffset, hoveredStation }: MapProps) {
   // Fall back to a local ref if the caller doesn't provide one
   const localSuppressBoundsRef = useRef(false);
   const suppressBoundsRef = suppressBoundsRefProp ?? localSuppressBoundsRef;
@@ -804,6 +871,42 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
             </CircleMarker>
           );
         })}
+        {hoveredStation && (() => {
+          const primaryLine = hoveredStation.lines[0] ?? '';
+          const markerColor = LINE_COLORS[primaryLine] ?? '#ffffff';
+          const icon = makeStationPulseIcon(markerColor);
+          return (
+            <Marker
+              key={`hovered-station-${hoveredStation.lat}-${hoveredStation.lon}`}
+              position={[hoveredStation.lat, hoveredStation.lon]}
+              icon={icon}
+              interactive={false}
+              zIndexOffset={1000}
+            >
+              <Tooltip
+                permanent
+                direction="top"
+                offset={[0, -24]}
+                className="station-hover-tooltip"
+              >
+                <span style={{
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: '#e1e4e8',
+                  backgroundColor: '#1c2028',
+                  border: '1px solid #2d333b',
+                  borderRadius: 6,
+                  padding: '3px 8px',
+                  whiteSpace: 'nowrap',
+                  display: 'block',
+                }}>
+                  {hoveredStation.name}
+                </span>
+              </Tooltip>
+            </Marker>
+          );
+        })()}
       </MapContainer>
     </div>
   );
