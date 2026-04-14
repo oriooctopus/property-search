@@ -325,6 +325,10 @@ export default function SwipeView({
   // Track whether the card's photo carousel has keyboard focus
   const photoFocusedRef = useRef(false);
   const enterPhotoFocusRef = useRef<(() => void) | null>(null);
+  const exitPhotoFocusRef = useRef<(() => void) | null>(null);
+  const mapCenterRef = useRef<{ lat: number; lng: number } | null>(
+    initialCenter ? { lat: initialCenter[0], lng: initialCenter[1] } : null
+  );
 
   // Wishlist hooks
   const { data: wishlists = [] } = useWishlists(userId);
@@ -356,9 +360,31 @@ export default function SwipeView({
     });
   }
 
-  // Filtered deck: exclude already-swiped IDs
-  // Geo-sort once when listings change, then filter out swiped IDs
-  const geoSorted = useMemo(() => geoSort(listings), [listings]);
+  // When listings change (new viewport, new filters), reset swiped IDs that
+  // aren't in the new set — they're from a different area. Keep IDs that
+  // are still in the current listings (user already swiped on them).
+  const listingIds = useMemo(() => new Set(listings.map((l) => l.id)), [listings]);
+  useEffect(() => {
+    setSwipedIds((prev) => {
+      const kept = new Set<number>();
+      for (const id of prev) {
+        if (listingIds.has(id)) kept.add(id);
+      }
+      if (kept.size !== prev.size) {
+        localStorage.setItem(SWIPED_IDS_KEY, JSON.stringify([...kept]));
+        return kept;
+      }
+      return prev;
+    });
+    setCurrentIndex(0);
+  }, [listingIds]);
+
+  // Geo-sort once when listings change, seeded from the current map center
+  // so the first listing is nearest to what the user is looking at.
+  const geoSorted = useMemo(() => {
+    const c = mapCenterRef.current;
+    return geoSort(listings, c?.lat, c?.lng);
+  }, [listings]);
   const deck = useMemo(
     () => geoSorted.filter((l) => !swipedIds.has(l.id)),
     [geoSorted, swipedIds],
@@ -485,8 +511,11 @@ export default function SwipeView({
           handleSwipe('right');
           break;
         case 'ArrowDown':
-          if (photoFocusedRef.current) return;
           e.preventDefault();
+          if (photoFocusedRef.current) {
+            exitPhotoFocusRef.current?.();
+            return;
+          }
           handleSwipe('down');
           break;
         case 'ArrowUp':
@@ -547,7 +576,7 @@ export default function SwipeView({
           favoritedIds={savedIds}
           onHideListing={() => {}}
           onBoundsChange={onBoundsChange}
-          onMapMove={onMapMove}
+          onMapMove={(center, zoom) => { mapCenterRef.current = center; onMapMove?.(center, zoom); }}
           suppressBoundsRef={suppressBoundsRef}
           initialCenter={initialCenter}
           initialZoom={initialZoom}
@@ -566,8 +595,8 @@ export default function SwipeView({
         {currentListing ? (
           <>
             {/* Card + action bar — fills available space, content scrolls if needed */}
-            <div className="flex-1 min-h-0 flex items-center pr-3">
-            <div className="relative w-full">
+            <div className="flex-1 min-h-0 overflow-hidden pr-3 flex flex-col">
+            <div className="relative w-full my-auto">
               {/* Invisible layout card to establish natural height (card + action bar) */}
               <div className="invisible">
                 <SwipeCard
@@ -612,6 +641,7 @@ export default function SwipeView({
                     isTop={true}
                     onPhotoFocusChange={(focused) => { photoFocusedRef.current = focused; }}
                     enterPhotoFocusRef={enterPhotoFocusRef}
+                    exitPhotoFocusRef={exitPhotoFocusRef}
                     onSubwayHover={setHoveredStation}
                   />
                 </div>

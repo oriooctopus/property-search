@@ -106,6 +106,8 @@ interface SwipeCardProps {
   onPhotoFocusChange?: (focused: boolean) => void;
   /** Ref callback so parent can imperatively enter photo focus */
   enterPhotoFocusRef?: React.MutableRefObject<(() => void) | null>;
+  /** Ref callback so parent can imperatively exit photo focus */
+  exitPhotoFocusRef?: React.MutableRefObject<(() => void) | null>;
   /** Called when hovering over a subway station row */
   onSubwayHover?: (station: HoveredStation | null) => void;
 }
@@ -122,6 +124,7 @@ export default function SwipeCard({
   layoutOnly = false,
   onPhotoFocusChange,
   enterPhotoFocusRef,
+  exitPhotoFocusRef,
   onSubwayHover,
 }: SwipeCardProps) {
   const [photoIndex, setPhotoIndex] = useState(0);
@@ -158,16 +161,16 @@ export default function SwipeCard({
     onPhotoFocusChange?.(true);
   }, [isTop, totalPhotos, onPhotoFocusChange]);
 
-  // Expose enterPhotoFocus to parent via ref
-  useEffect(() => {
-    if (enterPhotoFocusRef) enterPhotoFocusRef.current = enterPhotoFocus;
-    return () => { if (enterPhotoFocusRef) enterPhotoFocusRef.current = null; };
-  }, [enterPhotoFocus, enterPhotoFocusRef]);
-
   const exitPhotoFocus = useCallback(() => {
     setPhotoFocused(false);
     onPhotoFocusChange?.(false);
   }, [onPhotoFocusChange]);
+
+  // Expose enter/exit to parent via refs
+  useEffect(() => {
+    if (enterPhotoFocusRef) enterPhotoFocusRef.current = enterPhotoFocus;
+    if (exitPhotoFocusRef) exitPhotoFocusRef.current = exitPhotoFocus;
+  }, [enterPhotoFocus, exitPhotoFocus, enterPhotoFocusRef, exitPhotoFocusRef]);
 
   // Keyboard handler for photo-focus mode
   useEffect(() => {

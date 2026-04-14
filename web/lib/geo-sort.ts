@@ -13,7 +13,12 @@ export interface GeoSortable {
  * Distance metric: squared Euclidean on raw lat/lon (no Haversine needed
  * at city scale, and skipping sqrt saves cycles since we only compare).
  */
-export function geoSort<T extends GeoSortable>(listings: T[]): T[] {
+/**
+ * @param seedLat Optional latitude to start the chain from (e.g. map center).
+ *               If provided, the nearest listing to this point is the seed.
+ * @param seedLon Optional longitude to start the chain from.
+ */
+export function geoSort<T extends GeoSortable>(listings: T[], seedLat?: number, seedLon?: number): T[] {
   if (listings.length <= 1) return listings;
 
   // Partition into geo-valid and null-coord listings.
@@ -32,8 +37,18 @@ export function geoSort<T extends GeoSortable>(listings: T[]): T[] {
   const visited = new Uint8Array(valid.length); // 0 = unvisited, 1 = visited
   const ordered: T[] = [];
 
-  // Seed with the first valid listing.
+  // Seed: if a seed point is provided, start from the nearest listing to it.
+  // Otherwise start from the first valid listing.
   let currentIdx = 0;
+  if (seedLat != null && seedLon != null) {
+    let minDist = Infinity;
+    for (let i = 0; i < valid.length; i++) {
+      const dLat = (valid[i].lat as number) - seedLat;
+      const dLon = (valid[i].lon as number) - seedLon;
+      const d = dLat * dLat + dLon * dLon;
+      if (d < minDist) { minDist = d; currentIdx = i; }
+    }
+  }
   visited[currentIdx] = 1;
   ordered.push(valid[currentIdx]);
 
