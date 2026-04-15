@@ -449,6 +449,8 @@ export default function SwipeView({
         }
         onSaveListing(listing.id, wlId ?? 'default');
         setSavedIds((prev) => { const next = new Set(prev); next.add(listing.id); return next; });
+        // Also persist as "seen" so it doesn't reappear after refresh
+        setTimeout(() => onHideListing(listing.id), 1500);
       }
       // 'down' = pass — move to back of queue, no persistent action
 
@@ -492,15 +494,14 @@ export default function SwipeView({
         next.delete(last.listingId);
         return next;
       });
-      if (last.action === 'left') {
-        // Cancel the pending hide timer so it doesn't fire after undo
-        if (hideTimerRef.current) {
-          clearTimeout(hideTimerRef.current);
-          hideTimerRef.current = null;
-        }
-        // Reverse the DB hide if it already fired
-        onUnhideListing?.(last.listingId);
+      // Cancel the pending hide timer so it doesn't fire after undo
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
       }
+      // Reverse the DB hide/seen if it already fired
+      onUnhideListing?.(last.listingId);
+
       if (last.action === 'right') {
         setSavedIds((prev) => { const next = new Set(prev); next.delete(last.listingId); return next; });
         // Remove from wishlist DB
