@@ -1071,6 +1071,7 @@ function HomeInner() {
             listings={filteredListings}
             userId={userId}
             onHideListing={handleHideListing}
+            onUnhideListing={(id) => unhideMutation.mutate(id)}
             onSaveListing={() => {}}
             onExpandDetail={(listing) => { setSelectedId(listing.id); setDetailListing(filteredListings.find(l => l.id === listing.id) ?? null); }}
             onSwitchView={() => setMobileView('list')}
