@@ -482,6 +482,40 @@ export type Database = {
           },
         ];
       };
+      hidden_listings: {
+        Row: {
+          id: number;
+          user_id: string;
+          listing_id: number;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          listing_id: number;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          listing_id?: number;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "hidden_listings_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "hidden_listings_listing_id_fkey";
+            columns: ["listing_id"];
+            isOneToOne: false;
+            referencedRelation: "listings";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {

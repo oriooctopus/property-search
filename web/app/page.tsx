@@ -18,6 +18,7 @@ import { useConversation } from '@/lib/hooks/useConversation';
 import { useConversations } from '@/lib/hooks/useConversations';
 import { useSavedSearches } from '@/lib/hooks/useSavedSearches';
 import { useWishlists, useWishlistMutations, useWishlistedListingIds } from '@/lib/hooks/useWishlists';
+import { useHiddenListings, useHiddenMutations } from '@/lib/hooks/useHiddenListings';
 import WishlistPicker from '@/components/WishlistPicker';
 import { setLastUsedWishlistId } from '@/lib/wishlist-storage';
 
@@ -161,25 +162,12 @@ function HomeInner() {
   const [filterChanging, setFilterChanging] = useState(false);
   const filterMountedRef = useRef(false);
 
-  // Hidden listings — persisted in localStorage
-  const [hiddenIds, setHiddenIds] = useState<Set<number>>(() => {
-    if (typeof window === 'undefined') return new Set();
-    try {
-      const stored = localStorage.getItem('dwelligence_hidden_listings');
-      return stored ? new Set(JSON.parse(stored) as number[]) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
+  // Hidden listings — synced via hook (DB for authed users, localStorage fallback)
+  const { data: hiddenIds = new Set<number>(), isLoading: hiddenLoading } = useHiddenListings(userId);
+  const { hide: hideMutation, unhide: unhideMutation, clearAll: clearAllHidden } = useHiddenMutations(userId);
   const [hidingId, setHidingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ listingId: number; timer: ReturnType<typeof setTimeout> } | null>(null);
   const [showHidden, setShowHidden] = useState(false);
-
-  const persistHidden = useCallback((ids: Set<number>) => {
-    try {
-      localStorage.setItem('dwelligence_hidden_listings', JSON.stringify([...ids]));
-    } catch { /* quota exceeded — silently ignore */ }
-  }, []);
 
   const loadForViewport = useCallback(async (bounds: { latMin: number; latMax: number; lonMin: number; lonMax: number }) => {
     const requestId = ++viewportRequestRef.current;
@@ -247,12 +235,7 @@ function HomeInner() {
 
     // After animation completes, actually hide it
     setTimeout(() => {
-      setHiddenIds((prev) => {
-        const next = new Set(prev);
-        next.add(listingId);
-        persistHidden(next);
-        return next;
-      });
+      hideMutation.mutate(listingId);
       setHidingId(null);
 
       // Show toast with undo
@@ -261,20 +244,15 @@ function HomeInner() {
       }, 5000);
       setToast({ listingId, timer });
     }, 300);
-  }, [toast, persistHidden]);
+  }, [toast, hideMutation]);
 
   const handleUndoHide = useCallback(() => {
     if (!toast) return;
     clearTimeout(toast.timer);
     const restoredId = toast.listingId;
-    setHiddenIds((prev) => {
-      const next = new Set(prev);
-      next.delete(restoredId);
-      persistHidden(next);
-      return next;
-    });
+    unhideMutation.mutate(restoredId);
     setToast(null);
-  }, [toast, persistHidden]);
+  }, [toast, unhideMutation]);
 
   // UI state — initialised from URL query params
   const [selectedId, setSelectedId] = useState<number | null>(null);

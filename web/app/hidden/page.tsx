@@ -4,39 +4,34 @@ import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase-browser";
 import type { Database } from "@/lib/types";
 import { TextButton } from "@/components/ui";
+import { useHiddenListings, useHiddenMutations } from "@/lib/hooks/useHiddenListings";
 
 type Listing = Database["public"]["Tables"]["listings"]["Row"];
-
-const STORAGE_KEY = "dwelligence_hidden_listings";
-
-function readHiddenIds(): Set<number> {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? new Set(JSON.parse(stored) as number[]) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-function persistHiddenIds(ids: Set<number>) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
-  } catch {
-    /* quota exceeded — silently ignore */
-  }
-}
 
 export default function HiddenPage() {
   const supabase = createClient();
 
+  const [userId, setUserId] = useState<string | null>(null);
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function load() {
-      const hiddenIds = readHiddenIds();
+  const { data: hiddenIds, isLoading: hiddenLoading } = useHiddenListings(userId);
+  const { unhide: unhideMutation } = useHiddenMutations(userId);
 
-      if (hiddenIds.size === 0) {
+  // Resolve the current user once on mount
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUserId(user?.id ?? null);
+    });
+  }, [supabase]);
+
+  // Fetch listing details once we know which IDs are hidden
+  useEffect(() => {
+    if (hiddenLoading) return;
+
+    async function load() {
+      if (!hiddenIds || hiddenIds.size === 0) {
+        setListings([]);
         setLoading(false);
         return;
       }
@@ -57,16 +52,17 @@ export default function HiddenPage() {
     }
 
     load();
-  }, [supabase]);
+  }, [hiddenIds, hiddenLoading, supabase]);
 
-  const handleUnhide = useCallback((listingId: number) => {
-    const hiddenIds = readHiddenIds();
-    hiddenIds.delete(listingId);
-    persistHiddenIds(hiddenIds);
-    setListings((prev) => prev.filter((l) => l.id !== listingId));
-  }, []);
+  const handleUnhide = useCallback(
+    (listingId: number) => {
+      unhideMutation.mutate(listingId);
+      setListings((prev) => prev.filter((l) => l.id !== listingId));
+    },
+    [unhideMutation],
+  );
 
-  if (loading) {
+  if (loading || hiddenLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <p style={{ color: "#8b949e" }}>Loading hidden listings...</p>
