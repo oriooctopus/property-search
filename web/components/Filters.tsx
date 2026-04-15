@@ -72,6 +72,7 @@ async function fetchNominatimSuggestions(
 export interface FiltersState {
   selectedBeds: number[] | null;
   minBaths: number | null;
+  includeNaBaths: boolean;
   minRent: number | null;
   maxRent: number | null;
   priceMode: 'total' | 'perRoom';
@@ -1217,6 +1218,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
   const [draftPriceMode, setDraftPriceMode] = useState<'total' | 'perRoom'>(filters.priceMode);
   const [draftSelectedBeds, setDraftSelectedBeds] = useState<number[]>(filters.selectedBeds ?? []);
   const [draftMinBaths, setDraftMinBaths] = useState<number | null>(filters.minBaths);
+  const [draftIncludeNaBaths, setDraftIncludeNaBaths] = useState<boolean>(filters.includeNaBaths);
   const [draftMaxListingAge, setDraftMaxListingAge] = useState<MaxListingAge>(
     filters.maxListingAge,
   );
@@ -1250,6 +1252,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
     setDraftPriceMode(filters.priceMode);
     setDraftSelectedBeds(filters.selectedBeds ?? []);
     setDraftMinBaths(filters.minBaths);
+    setDraftIncludeNaBaths(filters.includeNaBaths);
     setDraftMaxListingAge(filters.maxListingAge);
     setDraftSources(filters.selectedSources);
     setDraftCommuteRules(filters.commuteRules ?? []);
@@ -1258,7 +1261,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
     setDraftMinSqft(filters.minSqft);
     setDraftMaxSqft(filters.maxSqft);
     setDraftExcludeNoSqft(filters.excludeNoSqft);
-  }, [openChip, filters.minRent, filters.maxRent, filters.priceMode, filters.selectedBeds, filters.minBaths, filters.maxListingAge, filters.selectedSources, filters.commuteRules, filters.minYearBuilt, filters.maxYearBuilt, filters.minSqft, filters.maxSqft, filters.excludeNoSqft]);
+  }, [openChip, filters.minRent, filters.maxRent, filters.priceMode, filters.selectedBeds, filters.minBaths, filters.includeNaBaths, filters.maxListingAge, filters.selectedSources, filters.commuteRules, filters.minYearBuilt, filters.maxYearBuilt, filters.minSqft, filters.maxSqft, filters.excludeNoSqft]);
 
   // Click-outside handler — discard drafts
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1286,6 +1289,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
       } else if (chip === 'bedsBaths') {
         setDraftSelectedBeds(filters.selectedBeds ?? []);
         setDraftMinBaths(filters.minBaths);
+        setDraftIncludeNaBaths(filters.includeNaBaths);
       } else if (chip === 'listingAge') {
         setDraftMaxListingAge(filters.maxListingAge);
       } else if (chip === 'source') {
@@ -1621,11 +1625,22 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
                 value={draftMinBaths}
                 onSelect={setDraftMinBaths}
               />
+              {draftMinBaths !== null && (
+                <label className="flex items-center gap-2 cursor-pointer mt-2">
+                  <input
+                    type="checkbox"
+                    checked={draftIncludeNaBaths}
+                    onChange={(e) => setDraftIncludeNaBaths(e.target.checked)}
+                    className="accent-[#58a6ff] w-4 h-4 rounded cursor-pointer"
+                  />
+                  <span className="text-sm" style={{ color: '#8b949e' }}>Include N/A</span>
+                </label>
+              )}
             </div>
 
             <DropdownFooter
               onReset={() => {
-                onChange({ ...filters, selectedBeds: null, minBaths: null });
+                onChange({ ...filters, selectedBeds: null, minBaths: null, includeNaBaths: false });
                 setOpenChip(null);
               }}
               onDone={() => {
@@ -1633,6 +1648,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
                   ...filters,
                   selectedBeds: draftSelectedBeds.length > 0 ? draftSelectedBeds : null,
                   minBaths: draftMinBaths,
+                  includeNaBaths: draftIncludeNaBaths,
                 });
                 setOpenChip(null);
               }}
