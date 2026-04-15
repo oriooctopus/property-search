@@ -79,6 +79,7 @@ function getDefaultValue(key: keyof FiltersState): FiltersState[keyof FiltersSta
     case 'commuteRules':
       return [] as never;
     case 'excludeNoSqft':
+    case 'includeNaBaths':
       return false;
     case 'minYearBuilt':
     case 'maxYearBuilt':

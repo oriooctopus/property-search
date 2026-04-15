@@ -15,6 +15,7 @@ const DEFAULT_FILTERS: FiltersState = {
   sort: 'price',
   selectedBeds: null,
   minBaths: null,
+  includeNaBaths: false,
   minRent: null,
   maxRent: null,
   priceMode: 'total' as const,
@@ -175,6 +176,7 @@ export function useConversation({
       const labelMap: Record<keyof FiltersState, string> = {
         selectedBeds: 'bedrooms',
         minBaths: 'minimum baths',
+        includeNaBaths: 'include N/A baths',
         minRent: 'minimum rent',
         maxRent: 'maximum rent',
         priceMode: 'price mode',
@@ -212,6 +214,7 @@ export function useConversation({
       const labelMap: Record<keyof FiltersState, string> = {
         selectedBeds: 'bedrooms',
         minBaths: 'minimum baths',
+        includeNaBaths: 'include N/A baths',
         minRent: 'minimum rent',
         maxRent: 'maximum rent',
         priceMode: 'price mode',

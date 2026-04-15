@@ -61,6 +61,7 @@ function readFiltersFromParams(params: URLSearchParams): FiltersState {
     sort: (sort && VALID_SORTS.has(sort) ? sort : 'price') as SortField,
     selectedBeds: params.get('beds') ? params.get('beds')!.split(',').map(Number).filter(Number.isFinite) : null,
     minBaths: parseNumOrNull(params.get('minBaths')),
+    includeNaBaths: params.get('includeNaBaths') === '1',
     minRent: parseNumOrNull(params.get('minRent')),
     maxRent: parseNumOrNull(params.get('maxRent')),
     priceMode: params.get('priceMode') === 'perRoom' ? 'perRoom' : 'total',
@@ -95,6 +96,7 @@ function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatM
   if (f.sort !== 'price') p.set('sort', f.sort);
   if (f.selectedBeds != null) p.set('beds', f.selectedBeds.join(','));
   if (f.minBaths != null) p.set('minBaths', String(f.minBaths));
+  if (f.includeNaBaths) p.set('includeNaBaths', '1');
   if (f.minRent != null) p.set('minRent', String(f.minRent));
   if (f.maxRent != null) p.set('maxRent', String(f.maxRent));
   if (f.priceMode === 'perRoom') p.set('priceMode', 'perRoom');
@@ -577,7 +579,10 @@ function HomeInner() {
 
     // Bathroom filter
     if (filters.minBaths !== null) {
-      result = result.filter((l) => (l.baths ?? 0) >= filters.minBaths!);
+      result = result.filter((l) => {
+        if (filters.includeNaBaths && (l.baths === null || l.baths === 0)) return true;
+        return (l.baths ?? 0) >= filters.minBaths!;
+      });
     }
 
     // Year built filter
