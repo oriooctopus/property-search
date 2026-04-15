@@ -38,6 +38,7 @@ export interface SwipeViewProps {
   listings: SwipeListing[];
   userId: string | null;
   onHideListing: (id: number) => void;
+  onUnhideListing?: (id: number) => void;
   onSaveListing: (id: number, wishlistId: string) => void;
   onExpandDetail?: (listing: SwipeListing) => void;
   onSwitchView?: () => void;
@@ -304,6 +305,7 @@ export default function SwipeView({
   listings,
   userId,
   onHideListing,
+  onUnhideListing,
   onSaveListing,
   onExpandDetail,
   onSwitchView,
@@ -349,9 +351,14 @@ export default function SwipeView({
     initialCenter ? { lat: initialCenter[0], lng: initialCenter[1] } : null
   );
 
+  // Timer ref for the delayed onHideListing call — needed to cancel on undo
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // After undo, track which listing id needs its index restored once deck recomputes
+  const pendingUndoId = useRef<number | null>(null);
+
   // Wishlist hooks
   const { data: wishlists = [] } = useWishlists(userId);
-  const { addToWishlist, createWishlist } = useWishlistMutations(userId);
+  const { addToWishlist, removeFromWishlist, createWishlist } = useWishlistMutations(userId);
 
   // Selected wishlist — default to last used, then first available
   const [selectedWishlistId, setSelectedWishlistId] = useState<string | null>(() => getLastUsedWishlistId());
@@ -399,6 +406,16 @@ export default function SwipeView({
   const currentListing = deck[currentIndex] ?? null;
   const totalRemaining = deck.length - currentIndex;
 
+  // After undo-left/right, deck recomputes with the re-inserted item.
+  // Find its new position and restore currentIndex to it.
+  useEffect(() => {
+    if (pendingUndoId.current !== null) {
+      const idx = deck.findIndex((l) => l.id === pendingUndoId.current);
+      if (idx >= 0) setCurrentIndex(idx);
+      pendingUndoId.current = null;
+    }
+  }, [deck]);
+
   // ---------------------------------------------------------------------------
   // Swipe handler
   // ---------------------------------------------------------------------------
@@ -418,7 +435,11 @@ export default function SwipeView({
       // For left swipes: call onHideListing after a delay so the DB persist
       // doesn't cause filteredListings to recompute mid-flyTo animation.
       if (direction === 'left') {
-        setTimeout(() => onHideListing(listing.id), 1500);
+        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = setTimeout(() => {
+          hideTimerRef.current = null;
+          onHideListing(listing.id);
+        }, 1500);
       }
       if (direction === 'right') {
         const wlId = resolvedWishlistId;
@@ -469,12 +490,27 @@ export default function SwipeView({
       setSwipedIds((prev) => {
         const next = new Set(prev);
         next.delete(last.listingId);
-        localStorage.setItem(SWIPED_IDS_KEY, JSON.stringify([...next]));
         return next;
       });
+      if (last.action === 'left') {
+        // Cancel the pending hide timer so it doesn't fire after undo
+        if (hideTimerRef.current) {
+          clearTimeout(hideTimerRef.current);
+          hideTimerRef.current = null;
+        }
+        // Reverse the DB hide if it already fired
+        onUnhideListing?.(last.listingId);
+      }
       if (last.action === 'right') {
         setSavedIds((prev) => { const next = new Set(prev); next.delete(last.listingId); return next; });
+        // Remove from wishlist DB
+        if (resolvedWishlistId) {
+          removeFromWishlist.mutate({ wishlistId: resolvedWishlistId, listingId: last.listingId });
+        }
       }
+      // After removing from swipedIds the deck recomputes; find the re-inserted
+      // item's new index and restore currentIndex to it.
+      pendingUndoId.current = last.listingId;
     }
 
     setUndoStack((prev) => prev.slice(0, -1));
@@ -483,7 +519,7 @@ export default function SwipeView({
     if (last.action === 'down') {
       setCurrentIndex((prev) => Math.max(0, prev - 1));
     }
-  }, [undoStack]);
+  }, [undoStack, onUnhideListing, resolvedWishlistId, removeFromWishlist]);
 
   // ---------------------------------------------------------------------------
   // Reset

@@ -232,6 +232,13 @@ function FlyToSelected({ listing, suppressBoundsRef, panOffset }: { listing: Lis
       const lon = Number(listing.lon);
       const size = map.getSize();
       if (!isNaN(lat) && !isNaN(lon) && size.x > 0 && size.y > 0) {
+        // Only fly if the listing is outside the current visible bounds
+        const bounds = map.getBounds();
+        if (bounds.contains([lat, lon])) {
+          // Listing is already visible — don't move the map
+          suppressBoundsRef.current = false;
+          return;
+        }
         suppressBoundsRef.current = true;
         if (panOffset) {
           const zoom = map.getZoom() || 15;
