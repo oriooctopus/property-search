@@ -29,6 +29,7 @@ export const MOCKS: MockRegistry = {
   search_queries: [],
   isochrones: [],
   listing_isochrones: [],
+  hidden_listings: [],
 };
 
 export { MOCK_LISTINGS } from "./mock-listings";

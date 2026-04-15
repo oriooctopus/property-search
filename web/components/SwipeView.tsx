@@ -415,9 +415,11 @@ export default function SwipeView({
       }
 
       // Execute the action
-      // Note: don't call onHideListing for left swipes — SwipeView tracks
-      // its own swipedIds. Calling the parent would cause filteredListings
-      // to recompute 300ms later, reshuffling the geo-sorted deck mid-flyTo.
+      // For left swipes: call onHideListing after a delay so the DB persist
+      // doesn't cause filteredListings to recompute mid-flyTo animation.
+      if (direction === 'left') {
+        setTimeout(() => onHideListing(listing.id), 1500);
+      }
       if (direction === 'right') {
         const wlId = resolvedWishlistId;
         if (wlId) {
