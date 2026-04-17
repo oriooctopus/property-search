@@ -38,100 +38,47 @@ async function pageFunction(context) {
       return;
     }
 
-    // Scroll down to trigger lazy loading / infinite scroll
-    for (let i = 0; i < 5; i++) {
-      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      await new Promise(r => setTimeout(r, 2000));
-    }
+    // CL paginates at ~200 results per page via a "next" button (cl-next-result).
+    // Loop: extract links from current page, click next, repeat until no more pages.
+    let pageNum = 1;
+    let totalEnqueued = 0;
 
-    // Extract listing links from [data-pid] elements
-    const listingLinks = await page.evaluate(() => {
-      const links = [];
-      const els = document.querySelectorAll('[data-pid]');
-      els.forEach(el => {
-        const anchor = el.querySelector('a[href]') || (el.tagName === 'A' ? el : null);
-        if (anchor) {
-          const href = anchor.getAttribute('href');
+    while (true) {
+      // Scroll to load any lazy content
+      for (let i = 0; i < 3; i++) {
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        await new Promise(r => setTimeout(r, 1000));
+      }
+
+      // Extract listing links
+      const links = await page.evaluate(() => {
+        const found = [];
+        document.querySelectorAll('[data-pid] a[href], .gallery-card a[href], .cl-search-result a[href]').forEach(a => {
+          const href = a.getAttribute('href');
           if (href && /\\/\\d+\\.html/.test(href)) {
-            const fullUrl = href.startsWith('http') ? href : 'https://newyork.craigslist.org' + href;
-            links.push(fullUrl);
+            found.push(href.startsWith('http') ? href : 'https://newyork.craigslist.org' + href);
           }
-        }
+        });
+        return [...new Set(found)];
       });
-      // Also check gallery-card elements
-      document.querySelectorAll('.gallery-card a[href], .cl-search-result a[href]').forEach(a => {
-        const href = a.getAttribute('href');
-        if (href && /\\/\\d+\\.html/.test(href)) {
-          const fullUrl = href.startsWith('http') ? href : 'https://newyork.craigslist.org' + href;
-          links.push(fullUrl);
-        }
-      });
-      return [...new Set(links)];
-    });
 
-    log.info('Found ' + listingLinks.length + ' listing links on search page: ' + url);
-
-    if (listingLinks.length > 0) {
-      await enqueueLinks({
-        urls: listingLinks,
-        userData: { isListing: true },
-      });
-    }
-
-    // Check for next page button and enqueue it
-    const nextUrl = await page.evaluate(() => {
-      const nextBtn = document.querySelector('button.bd-button.cl-next-page, a.button.next, a[title="next page"], .cl-next-page a, a.cl-next-page');
-      if (!nextBtn) return null;
-      // If it's a link, get href
-      if (nextBtn.tagName === 'A') {
-        const href = nextBtn.getAttribute('href');
-        return href ? (href.startsWith('http') ? href : 'https://newyork.craigslist.org' + href) : null;
+      log.info('Page ' + pageNum + ': found ' + links.length + ' listing links');
+      if (links.length > 0) {
+        await enqueueLinks({ urls: links, userData: { isListing: true } });
+        totalEnqueued += links.length;
       }
-      // If it's a button, we need to construct the next page URL from current URL
-      return null;
-    });
 
-    if (nextUrl) {
-      log.info('Enqueueing next search page: ' + nextUrl);
-      await enqueueLinks({
-        urls: [nextUrl],
-        userData: { isSearch: true },
-      });
-    } else {
-      // Try clicking the next button if it exists (for button-based pagination)
-      const hasNextButton = await page.$('button.bd-button.cl-next-page');
-      if (hasNextButton) {
-        try {
-          await hasNextButton.click();
-          await new Promise(r => setTimeout(r, 3000));
-          // After clicking, the URL may have changed — extract more listings
-          const moreLinks = await page.evaluate(() => {
-            const links = [];
-            document.querySelectorAll('[data-pid]').forEach(el => {
-              const anchor = el.querySelector('a[href]') || (el.tagName === 'A' ? el : null);
-              if (anchor) {
-                const href = anchor.getAttribute('href');
-                if (href && /\\/\\d+\\.html/.test(href)) {
-                  const fullUrl = href.startsWith('http') ? href : 'https://newyork.craigslist.org' + href;
-                  links.push(fullUrl);
-                }
-              }
-            });
-            return [...new Set(links)];
-          });
-          if (moreLinks.length > 0) {
-            log.info('Found ' + moreLinks.length + ' more listings after clicking next');
-            await enqueueLinks({
-              urls: moreLinks,
-              userData: { isListing: true },
-            });
-          }
-        } catch (e) {
-          log.info('No more pages — next button click failed');
-        }
-      } else {
-        log.info('No next page found — this is the last search page');
+      // Check for next page button
+      const nextBtn = await page.$('button.bd-button.cl-next-result');
+      if (!nextBtn) {
+        log.info('No more pages after page ' + pageNum + '. Total enqueued: ' + totalEnqueued);
+        break;
       }
+
+      // Click next and wait for new results to load
+      await nextBtn.click();
+      await new Promise(r => setTimeout(r, 3000));
+      pageNum++;
     }
 
     return; // Don't push data for search pages

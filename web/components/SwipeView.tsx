@@ -140,14 +140,6 @@ export default function SwipeView({
     initialCenter ? { lat: initialCenter[0], lng: initialCenter[1] } : null
   );
 
-  // Timer refs for delayed onHideListing calls — one per listing, keyed by listing ID
-  const hideTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
-  // Clean up all pending hide timers on unmount
-  useEffect(() => {
-    return () => {
-      for (const timer of hideTimersRef.current.values()) clearTimeout(timer);
-    };
-  }, []);
   // After undo, track which listing id needs its index restored once deck recomputes
   const pendingUndoId = useRef<number | null>(null);
 
@@ -263,14 +255,10 @@ export default function SwipeView({
       setTimeout(() => setSwipeOverlay(null), 200);
 
       // Execute the action
-      // For left swipes: call onHideListing after a delay so the DB persist
-      // doesn't cause filteredListings to recompute mid-flyTo animation.
+      // For left swipes: persist hide immediately. The currentListingIdRef
+      // approach handles any deck recomputation from filteredListings changing.
       if (direction === 'left') {
-        const timer = setTimeout(() => {
-          hideTimersRef.current.delete(listing.id);
-          onHideListing(listing.id);
-        }, 1500);
-        hideTimersRef.current.set(listing.id, timer);
+        onHideListing(listing.id);
       }
       if (direction === 'right') {
         const wlId = resolvedWishlistId;
@@ -324,15 +312,7 @@ export default function SwipeView({
       });
 
       if (last.action === 'left') {
-        // Cancel the pending hide timer so it doesn't fire after undo
-        const timer = hideTimersRef.current.get(last.listingId);
-        if (timer) {
-          clearTimeout(timer);
-          hideTimersRef.current.delete(last.listingId);
-        } else {
-          // Timer already fired, must reverse the DB write
-          onUnhideListing?.(last.listingId);
-        }
+        onUnhideListing?.(last.listingId);
       }
 
       if (last.action === 'right') {
@@ -363,9 +343,6 @@ export default function SwipeView({
     setSwipedIds(new Set());
     setCurrentIndex(0);
     setUndoStack([]);
-    // Clear all pending hide timers
-    for (const timer of hideTimersRef.current.values()) clearTimeout(timer);
-    hideTimersRef.current.clear();
   };
 
   // ---------------------------------------------------------------------------
