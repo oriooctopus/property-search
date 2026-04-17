@@ -127,7 +127,7 @@ export default function ProfilePage() {
       await queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY });
 
       if (isSetupMode) {
-        router.push("/");
+        router.push("/?tour=1");
       } else {
         setToast({ message: "Profile saved successfully.", type: "success" });
       }
@@ -295,7 +295,7 @@ export default function ProfilePage() {
         {isSetupMode && (
           <TextButton
             variant="muted"
-            onClick={() => router.push("/")}
+            onClick={() => router.push("/?tour=1")}
             className="mt-3 w-full rounded-lg px-4 py-2"
           >
             Skip for now

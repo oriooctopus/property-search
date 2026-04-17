@@ -35,8 +35,8 @@ const BOROUGHS: Array<{ name: string; areas: number[] }> = [
   { name: "Brooklyn", areas: [300] },
 ];
 
-const SE_CAP = 950;
-const SE_MAX_PRICE = 30_000;
+export const SE_CAP = 950;
+export const SE_MAX_PRICE = 30_000;
 const PAGE_DELAY_MS = 2_000;
 const PROBE_DELAY_MS = 1_500;
 const FETCH_DELAY_MS = 10_000;
@@ -124,7 +124,7 @@ async function discoverBedroomBuckets(
 // Recursive price bisection
 // ---------------------------------------------------------------------------
 
-async function fetchSliceRecursive(
+export async function fetchSliceRecursive(
   areas: number[],
   bedroomFilter: Record<string, number> | undefined,
   priceMin: number,

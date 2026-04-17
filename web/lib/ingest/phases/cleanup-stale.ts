@@ -1,13 +1,11 @@
 /**
- * cleanup-stale phase: archive rows that have been delisted for longer than
- * ARCHIVE_DAYS.
+ * cleanup-stale phase: reports how many delisted listings exist in the DB.
  *
- * Earlier versions of this phase deleted rows based on `created_at < now -
- * 45d`, which incorrectly wiped active, re-verified listings whose first
- * scrape was old. The correct semantics — now that verify-stale handles true
- * staleness — is: only delete rows that verify-stale has confirmed delisted
- * AND that have been delisted long enough that keeping them around no longer
- * serves users (historic favorites still see them until this sweep runs).
+ * Previously this phase hard-deleted listings that had been delisted for 90+
+ * days, which broke user references (wishlists, hidden lists) and destroyed
+ * data. Delisted listings are now retained indefinitely — the partial index
+ * on `delisted_at IS NULL` keeps active-listing queries fast regardless of
+ * how many delisted rows accumulate.
  */
 
 import { phaseLogger } from "../logger";
@@ -17,8 +15,6 @@ import type {
   PhaseResult,
 } from "../types";
 
-const ARCHIVE_DAYS = 90;
-
 export async function runCleanupStalePhase(
   deps: OrchestratorDeps,
 ): Promise<PhaseResult<CleanupStaleOutput>> {
@@ -26,48 +22,16 @@ export async function runCleanupStalePhase(
   const startedAt = new Date().toISOString();
   const t0 = Date.now();
 
-  const cutoff = new Date(
-    Date.now() - ARCHIVE_DAYS * 24 * 60 * 60 * 1000,
-  ).toISOString();
-
   const { count, error: countErr } = await deps.supabase
     .from("listings")
     .select("*", { count: "exact", head: true })
-    .not("delisted_at", "is", null)
-    .lt("delisted_at", cutoff);
+    .not("delisted_at", "is", null);
 
   if (countErr) throw new Error(`count failed: ${countErr.message}`);
-  const staleCount = count ?? 0;
+  const delistedCount = count ?? 0;
   log.info(
-    `found ${staleCount} listings delisted more than ${ARCHIVE_DAYS} days ago`,
+    `${delistedCount} delisted listings retained in DB (no longer purged)`,
   );
-
-  if (deps.dryRun) {
-    log.info(`dry-run: skipping archive delete`);
-    return {
-      phase: "cleanup-stale",
-      startedAt,
-      finishedAt: new Date().toISOString(),
-      durationMs: Date.now() - t0,
-      ok: true,
-      warnings: [],
-      errors: [],
-      metrics: { staleDeleted: 0, staleFound: staleCount },
-      output: { staleDeleted: 0 },
-    };
-  }
-
-  let staleDeleted = 0;
-  if (staleCount > 0) {
-    const { error: delErr } = await deps.supabase
-      .from("listings")
-      .delete()
-      .not("delisted_at", "is", null)
-      .lt("delisted_at", cutoff);
-    if (delErr) throw new Error(`delete failed: ${delErr.message}`);
-    staleDeleted = staleCount;
-    log.info(`archived ${staleDeleted} long-delisted listings`);
-  }
 
   return {
     phase: "cleanup-stale",
@@ -77,7 +41,7 @@ export async function runCleanupStalePhase(
     ok: true,
     warnings: [],
     errors: [],
-    metrics: { staleDeleted, staleFound: staleCount },
-    output: { staleDeleted },
+    metrics: { staleDeleted: 0, staleFound: delistedCount },
+    output: { staleDeleted: 0 },
   };
 }

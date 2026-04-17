@@ -39,6 +39,14 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Swipe action overlay flash */
+@keyframes swipeOverlayFlash {
+  0% { opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 /* Hide scrollbar but keep scrollability */
 .scrollbar-hide {
   -ms-overflow-style: none;

@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase-browser';
 import type { Database } from '@/lib/types';
 import Map from '@/components/Map';
@@ -14,12 +15,15 @@ import ChatPanel from '@/components/ChatPanel';
 import SaveSearchModal from '@/components/SaveSearchModal';
 import FilterPills from '@/components/FilterPills';
 import SwipeView from '@/components/SwipeView';
+import TourGuide from '@/components/TourGuide';
 import { useConversation } from '@/lib/hooks/useConversation';
 import { useConversations } from '@/lib/hooks/useConversations';
 import { useSavedSearches } from '@/lib/hooks/useSavedSearches';
+import { useProfile, PROFILE_QUERY_KEY } from '@/lib/hooks/useProfile';
 import { useWishlists, useWishlistMutations, useWishlistedListingIds } from '@/lib/hooks/useWishlists';
 import { useHiddenListings, useHiddenMutations } from '@/lib/hooks/useHiddenListings';
 import WishlistPicker from '@/components/WishlistPicker';
+import AuthModal from '@/components/AuthModal';
 import { setLastUsedWishlistId } from '@/lib/wishlist-storage';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
@@ -125,14 +129,46 @@ function HomeInner() {
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
 
   // Feature flag: conversational search mode
   const chatMode = searchParams.get('chat') === '1';
+
+  // Tour trigger: ?tour=1 in URL
+  const tourParam = searchParams.get('tour') === '1';
 
   // Data state
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [authModal, setAuthModal] = useState<'login' | 'signup' | null>(null);
+
+  // Profile for tour status
+  const { data: profile } = useProfile(userId);
+  const [showTour, setShowTour] = useState(false);
+
+  // Show tour when: ?tour=1 AND user is logged in
+  useEffect(() => {
+    if (tourParam && profile) {
+      setShowTour(true);
+    }
+  }, [tourParam, profile]);
+
+  const handleTourComplete = useCallback(async () => {
+    setShowTour(false);
+    // Remove ?tour=1 from URL
+    const url = new URL(window.location.href);
+    url.searchParams.delete('tour');
+    window.history.replaceState(null, '', url.toString());
+    // Mark tour as completed in DB
+    if (userId) {
+      await supabase
+        .from('profiles')
+        .update({ has_completed_tour: true })
+        .eq('id', userId);
+      queryClient.invalidateQueries({ queryKey: [...PROFILE_QUERY_KEY] });
+    }
+  }, [userId, supabase, queryClient]);
 
   // Wishlist system
   const { data: wishlists } = useWishlists(userId);
@@ -145,9 +181,8 @@ function HomeInner() {
   const [viewportLoading, setViewportLoading] = useState(false);
   const [viewportCount, setViewportCount] = useState<number | null>(null);
   const viewportRequestRef = useRef(0);
-  // Pending bounds from map pan/zoom — shown as "Search this area" button
-  const [pendingBounds, setPendingBounds] = useState<{ latMin: number; latMax: number; lonMin: number; lonMax: number } | null>(null);
   const hasInitialViewportLoad = useRef(false);
+  const lastLoadedBounds = useRef<{ latMin: number; latMax: number; lonMin: number; lonMax: number } | null>(null);
   // Shared ref: BoundsWatcher skips one callback when FlyToSelected sets this
   const suppressBoundsRef = useRef(false);
 
@@ -169,9 +204,12 @@ function HomeInner() {
   const { hide: hideMutation, unhide: unhideMutation, clearAll: clearAllHidden } = useHiddenMutations(userId);
   const [hidingId, setHidingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ listingId: number; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
   const [showHidden, setShowHidden] = useState(false);
 
   const loadForViewport = useCallback(async (bounds: { latMin: number; latMax: number; lonMin: number; lonMax: number }) => {
+    lastLoadedBounds.current = bounds;
     const requestId = ++viewportRequestRef.current;
     setViewportLoading(true);
     try {
@@ -223,17 +261,26 @@ function HomeInner() {
     } finally {
       if (requestId === viewportRequestRef.current) {
         setViewportLoading(false);
-        setPendingBounds(null);
       }
     }
   }, [supabase]);
 
+  // Auto-search on any pan or zoom (swipe-triggered pans are already
+  // suppressed by suppressBoundsRef in BoundsWatcher)
+  const handleBoundsChange = useCallback((bounds: { latMin: number; latMax: number; lonMin: number; lonMax: number }) => {
+    if (!hasInitialViewportLoad.current) {
+      hasInitialViewportLoad.current = true;
+    }
+    loadForViewport(bounds);
+  }, [loadForViewport]);
+
   const handleHideListing = useCallback((listingId: number) => {
+    if (!userId) { setAuthModal('login'); return; }
     // Start fade-out animation
     setHidingId(listingId);
 
     // Clear any existing toast timer
-    if (toast) clearTimeout(toast.timer);
+    if (toastRef.current) clearTimeout(toastRef.current.timer);
 
     // After animation completes, actually hide it
     setTimeout(() => {
@@ -246,7 +293,7 @@ function HomeInner() {
       }, 5000);
       setToast({ listingId, timer });
     }, 300);
-  }, [toast, hideMutation]);
+  }, [userId, hideMutation]);
 
   const handleUndoHide = useCallback(() => {
     if (!toast) return;
@@ -352,11 +399,14 @@ function HomeInner() {
       const uid = user?.id ?? null;
       setUserId(uid);
 
-      // Listings are loaded by the map's onBoundsChange callback once the
-      // Leaflet map mounts and fires real viewport bounds. This ensures we
-      // always query the correct geographic area instead of an approximation.
-      // hasInitialViewportLoad starts false so the first onBoundsChange fires
-      // a full loadForViewport() call.
+      // Load default NYC bounds immediately so listings appear even before
+      // the map mounts (e.g. list view on mobile where the map is hidden).
+      // If the map later fires onBoundsChange with real viewport bounds,
+      // it will replace these with the correct geographic area.
+      if (!hasInitialViewportLoad.current) {
+        hasInitialViewportLoad.current = true;
+        await loadForViewport({ latMin: 40.65, latMax: 40.82, lonMin: -74.05, lonMax: -73.88 });
+      }
 
       } catch (err) {
         console.error('Failed to load data:', err);
@@ -643,9 +693,10 @@ function HomeInner() {
   // Wishlist handlers
   // -----------------------------------------------------------------------
   const handleStarClick = useCallback((listingId: number, anchorRect: DOMRect) => {
+    if (!userId) { setAuthModal('login'); return; }
     setPickerListingId(listingId);
     setPickerAnchorRect(anchorRect);
-  }, []);
+  }, [userId]);
 
   const handleWishlistToggle = useCallback((wishlistId: string, checked: boolean) => {
     if (!pickerListingId) return;
@@ -689,7 +740,12 @@ function HomeInner() {
           {commuteMessage}
         </div>
       )}
-      {filteredListings.length === 0 && !commuteLoading && (
+      {filteredListings.length === 0 && (loading || viewportLoading || commuteLoading) && (
+        <div className="col-span-full flex items-center justify-center min-h-[200px]">
+          <RadarLoader />
+        </div>
+      )}
+      {filteredListings.length === 0 && !commuteLoading && !loading && !viewportLoading && (
         <div className="col-span-full flex items-center justify-center min-h-[200px] text-center text-sm" style={{ color: '#8b949e' }}>
           No listings match your filters.
         </div>
@@ -698,6 +754,7 @@ function HomeInner() {
   );
 
   const viewToggle = (
+    <div data-tour="view-modes">
     <SegmentedControl
       value={mobileView}
       onChange={(v) => setMobileView(v as 'list' | 'map' | 'swipe')}
@@ -707,6 +764,7 @@ function HomeInner() {
         { value: 'map', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> },
       ]}
     />
+    </div>
   );
 
   const isMapView = mobileView === 'map';
@@ -727,16 +785,7 @@ function HomeInner() {
         }}
         onSelectDetail={(listing) => { console.log(`[page] onSelectDetail called for listing #${listing.id} "${listing.address}"`); setDetailListing(listing); }}
         commuteInfoMap={commuteInfoMap ?? undefined}
-        onBoundsChange={(bounds) => {
-          // First bounds event: auto-load to populate the initial view
-          if (!hasInitialViewportLoad.current) {
-            hasInitialViewportLoad.current = true;
-            loadForViewport(bounds);
-          } else {
-            // Subsequent moves: show "Search this area" button
-            setPendingBounds(bounds);
-          }
-        }}
+        onBoundsChange={handleBoundsChange}
         onMapMove={handleMapMove}
         suppressBoundsRef={suppressBoundsRef}
         initialCenter={initialCenter}
@@ -753,55 +802,31 @@ function HomeInner() {
         }}
       />
 
-      {/* Map overlay: "Search this area" button or loading spinner */}
-      {(viewportLoading || commuteLoading || pendingBounds) && (
+      {/* Map overlay: loading spinner */}
+      {(viewportLoading || commuteLoading) && (
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500]">
-          {(viewportLoading || commuteLoading) ? (
-            <div
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium pointer-events-none"
-              style={{
-                backgroundColor: '#1c2028',
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: '#8b949e',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" strokeLinecap="round"
-                style={{ animation: 'spin 0.7s linear infinite', flexShrink: 0 }}>
-                <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.12)" strokeWidth="2.5" />
-                <path d="M21 12a9 9 0 1 1-6.219-8.56" stroke="#38bdf8" strokeWidth="2.5" />
-              </svg>
-              Searching...
-            </div>
-          ) : (
-            <button
-              onClick={() => {
-                if (pendingBounds) {
-                  loadForViewport(pendingBounds);
-                  setPendingBounds(null);
-                }
-              }}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium"
-              style={{
-                backgroundColor: '#1c2028',
-                border: '1px solid rgba(255,255,255,0.15)',
-                color: '#e1e4e8',
-                boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
-                cursor: 'pointer',
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-              </svg>
-              Search this area
-            </button>
-          )}
+          <div
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium pointer-events-none"
+            style={{
+              backgroundColor: '#1c2028',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: '#8b949e',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" strokeLinecap="round"
+              style={{ animation: 'spin 0.7s linear infinite', flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.12)" strokeWidth="2.5" />
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" stroke="#38bdf8" strokeWidth="2.5" />
+            </svg>
+            Searching...
+          </div>
         </div>
       )}
     </div>
   );
 
-  const toastEl = toast && (
+  const toastEl = toast && mobileView !== 'swipe' && (
     <div
       className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[1400] flex items-center gap-3 rounded-lg px-4 py-3 shadow-lg"
       style={{
@@ -968,7 +993,7 @@ function HomeInner() {
             onDeleteSearch={deleteSavedSearch}
             onLoadSearch={setFilters}
             onUpdateSearch={updateSavedSearch}
-            onLoginRequired={() => router.push('/auth/login')}
+            onLoginRequired={() => setAuthModal('login')}
             showHidden={showHidden}
             onToggleShowHidden={() => setShowHidden((v) => !v)}
           />
@@ -1072,68 +1097,37 @@ function HomeInner() {
             userId={userId}
             onHideListing={handleHideListing}
             onUnhideListing={(id) => unhideMutation.mutate(id)}
-            onSaveListing={() => {}}
             onExpandDetail={(listing) => { setSelectedId(listing.id); setDetailListing(filteredListings.find(l => l.id === listing.id) ?? null); }}
             onSwitchView={() => setMobileView('list')}
-            onBoundsChange={(bounds) => {
-              if (!hasInitialViewportLoad.current) {
-                hasInitialViewportLoad.current = true;
-                loadForViewport(bounds);
-              } else {
-                setPendingBounds(bounds);
-              }
-            }}
+            onBoundsChange={handleBoundsChange}
             onMapMove={handleMapMove}
             suppressBoundsRef={suppressBoundsRef}
             initialCenter={initialCenter}
             initialZoom={initialZoom}
             commuteInfoMap={commuteInfoMap ?? undefined}
+            onLoginRequired={() => setAuthModal('login')}
+            showHidden={showHidden}
           />
 
-          {/* "Search this area" pill overlay for swipe mode */}
-          {(viewportLoading || commuteLoading || pendingBounds) && (
+          {/* Loading spinner overlay for swipe mode */}
+          {(viewportLoading || commuteLoading) && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500] pointer-events-none">
-              {(viewportLoading || commuteLoading) ? (
-                <div
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
-                  style={{
-                    backgroundColor: '#1c2028',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    color: '#8b949e',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-                  }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" strokeLinecap="round"
-                    style={{ animation: 'spin 0.7s linear infinite', flexShrink: 0 }}>
-                    <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.12)" strokeWidth="2.5" />
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56" stroke="#38bdf8" strokeWidth="2.5" />
-                  </svg>
-                  Searching...
-                </div>
-              ) : (
-                <button
-                  onClick={() => {
-                    if (pendingBounds) {
-                      loadForViewport(pendingBounds);
-                      setPendingBounds(null);
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium"
-                  style={{
-                    backgroundColor: '#1c2028',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    color: '#e1e4e8',
-                    boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
-                    cursor: 'pointer',
-                    pointerEvents: 'auto',
-                  }}
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-                  </svg>
-                  Search this area
-                </button>
-              )}
+              <div
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
+                style={{
+                  backgroundColor: '#1c2028',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#8b949e',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" strokeLinecap="round"
+                  style={{ animation: 'spin 0.7s linear infinite', flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.12)" strokeWidth="2.5" />
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" stroke="#38bdf8" strokeWidth="2.5" />
+                </svg>
+                Searching...
+              </div>
             </div>
           )}
         </div>
@@ -1170,6 +1164,27 @@ function HomeInner() {
             setSaveSearchOpen(false);
           }}
           onCancel={() => setSaveSearchOpen(false)}
+        />
+      )}
+
+      {/* Tour guide overlay */}
+      {showTour && (
+        <TourGuide
+          onComplete={handleTourComplete}
+          setMobileView={setMobileView}
+        />
+      )}
+
+      {/* Auth modal overlay */}
+      {authModal && (
+        <AuthModal
+          mode={authModal}
+          onClose={() => setAuthModal(null)}
+          onSuccess={async () => {
+            setAuthModal(null);
+            const { data: { user } } = await supabase.auth.getUser();
+            setUserId(user?.id ?? null);
+          }}
         />
       )}
     </div>

@@ -159,7 +159,7 @@ export async function fetchFacebookMarketplaceListings(
 
   const input = {
     startUrls: [{ url: fbUrl.toString() }],
-    resultsLimit: 200,
+    resultsLimit: 400,
   };
 
   console.log(`[FacebookMarketplace] Starting Apify actor run for ${fbUrl.toString()}`);

@@ -187,6 +187,16 @@ export default function Navbar() {
                   >
                     Hidden
                   </Link>
+                  <button
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      router.push("/?tour=1");
+                    }}
+                    className="block w-full px-4 py-2 text-left text-sm transition-colors hover:opacity-80 cursor-pointer"
+                    style={{ color: "#8b949e" }}
+                  >
+                    Take a tour
+                  </button>
                   <div style={{ borderTop: "1px solid #2d333b", margin: "4px 0" }} />
                   <button
                     onClick={() => {
