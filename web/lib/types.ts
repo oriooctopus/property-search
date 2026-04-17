@@ -8,6 +8,7 @@ export type Database = {
           bio: string | null;
           avatar_url: string | null;
           phone: string | null;
+          has_completed_tour: boolean;
           created_at: string;
         };
         Insert: {
@@ -16,6 +17,7 @@ export type Database = {
           bio?: string | null;
           avatar_url?: string | null;
           phone?: string | null;
+          has_completed_tour?: boolean;
           created_at?: string;
         };
         Update: {
@@ -24,6 +26,7 @@ export type Database = {
           bio?: string | null;
           avatar_url?: string | null;
           phone?: string | null;
+          has_completed_tour?: boolean;
           created_at?: string;
         };
         Relationships: [

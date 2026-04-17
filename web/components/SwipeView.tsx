@@ -11,9 +11,11 @@ import type { Database } from '@/lib/types';
 import { useWishlists, useWishlistMutations } from '@/lib/hooks/useWishlists';
 import { getLastUsedWishlistId, setLastUsedWishlistId } from '@/lib/wishlist-storage';
 import { geoSort } from '@/lib/geo-sort';
+import WishlistPicker from './WishlistPicker';
 
 // Dynamically import MapComponent to avoid SSR issues (uses Leaflet)
 const MapComponent = dynamic(() => import('./Map'), { ssr: false });
+const MiniMap = dynamic(() => import('./MiniMapInner'), { ssr: false });
 
 export interface SwipeListing {
   id: number;
@@ -39,7 +41,6 @@ export interface SwipeViewProps {
   userId: string | null;
   onHideListing: (id: number) => void;
   onUnhideListing?: (id: number) => void;
-  onSaveListing: (id: number, wishlistId: string) => void;
   onExpandDetail?: (listing: SwipeListing) => void;
   onSwitchView?: () => void;
   // Map props passthrough
@@ -49,256 +50,42 @@ export interface SwipeViewProps {
   initialCenter?: [number, number];
   initialZoom?: number;
   commuteInfoMap?: Map<number, CommuteInfo>;
+  onLoginRequired?: () => void;
+  showHidden?: boolean;
 }
 
 interface UndoEntry {
   index: number;
   listingId: number;
   action: 'left' | 'right' | 'down';
+  wishlistId?: string;  // which wishlist was used for right-swipe
 }
 
-const SWIPED_IDS_KEY = 'dwelligence_swiped_ids';
-
-// ---------------------------------------------------------------------------
-// WishlistDropdown — anchored above the Save label, portal-rendered
-// ---------------------------------------------------------------------------
-interface WishlistDropdownProps {
-  wishlists: Array<{ id: string; name: string; wishlist_items: Array<{ listing_id: number }> }>;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  onCreate: (name: string) => void;
-  onClose: () => void;
-  anchorRef: React.RefObject<HTMLDivElement | null>;
-}
-
-function WishlistDropdown({ wishlists, selectedId, onSelect, onCreate, onClose, anchorRef }: WishlistDropdownProps) {
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const [showInput, setShowInput] = useState(false);
-  const [newName, setNewName] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [pos, setPos] = useState<{ bottom: number; left: number } | null>(null);
-
-  // Compute position above anchor
-  useEffect(() => {
-    if (!anchorRef.current) return;
-    const rect = anchorRef.current.getBoundingClientRect();
-    const DROPDOWN_HEIGHT = 260;
-    const DROPDOWN_WIDTH = 260;
-    const bottom = window.innerHeight - rect.top + 8;
-    const left = Math.max(8, Math.min(rect.left + rect.width / 2 - DROPDOWN_WIDTH / 2, window.innerWidth - DROPDOWN_WIDTH - 8));
-    setPos({ bottom, left });
-    // Suppress unused variable warning
-    void DROPDOWN_HEIGHT;
-  }, [anchorRef]);
-
-  // Click-outside to close
-  useEffect(() => {
-    function handleMouseDown(e: MouseEvent) {
-      const target = e.target as Node;
-      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
-        // Don't close if click was on the anchor itself (parent handles toggle)
-        if (anchorRef.current && anchorRef.current.contains(target)) return;
-        onClose();
-      }
-    }
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    document.addEventListener('mousedown', handleMouseDown, true);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handleMouseDown, true);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [onClose, anchorRef]);
-
-  useEffect(() => {
-    if (showInput && inputRef.current) inputRef.current.focus();
-  }, [showInput]);
-
-  if (!pos || typeof document === 'undefined') return null;
-
-  const content = (
-    <div
-      ref={dropdownRef}
-      style={{
-        position: 'fixed',
-        bottom: pos.bottom,
-        left: pos.left,
-        width: 260,
-        backgroundColor: '#1c2028',
-        border: '1px solid #2d333b',
-        borderRadius: '12px',
-        boxShadow: '0 16px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
-        zIndex: 1500,
-        overflow: 'hidden',
-      }}
-    >
-      {/* Header */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '12px 14px 10px',
-        borderBottom: '1px solid #2d333b',
-      }}>
-        <span style={{ color: '#e1e4e8', fontSize: '13px', fontWeight: 600 }}>Save to list</span>
-        <button
-          onClick={onClose}
-          style={{ background: 'none', border: 'none', color: '#8b949e', cursor: 'pointer', padding: '2px', lineHeight: 1, fontSize: 16 }}
-        >
-          ✕
-        </button>
-      </div>
-
-      {/* Wishlist rows */}
-      <div style={{ padding: '6px 0', maxHeight: 180, overflowY: 'auto' }}>
-        {wishlists.length === 0 ? (
-          <div style={{ color: '#8b949e', fontSize: '13px', padding: '8px 14px' }}>No wishlists yet</div>
-        ) : (
-          wishlists.map((wl) => {
-            const isSelected = wl.id === selectedId;
-            return (
-              <button
-                key={wl.id}
-                onClick={() => { onSelect(wl.id); onClose(); }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  width: '100%',
-                  padding: '8px 14px',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'background-color 100ms',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-              >
-                {/* Radio dot */}
-                <div style={{
-                  width: 16,
-                  height: 16,
-                  borderRadius: '50%',
-                  border: isSelected ? 'none' : '1.5px solid #3d444d',
-                  backgroundColor: isSelected ? '#58a6ff' : 'transparent',
-                  flexShrink: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 100ms',
-                }}>
-                  {isSelected && (
-                    <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#0d1117' }} />
-                  )}
-                </div>
-                <span style={{ color: '#e1e4e8', fontSize: '13px', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {wl.name}
-                </span>
-                <span style={{ color: '#8b949e', fontSize: '11px', flexShrink: 0 }}>
-                  {wl.wishlist_items.length}
-                </span>
-              </button>
-            );
-          })
-        )}
-      </div>
-
-      {/* Divider */}
-      <div style={{ height: 1, backgroundColor: '#2d333b', margin: '0' }} />
-
-      {/* Create new */}
-      <div style={{ padding: '6px 10px 8px' }}>
-        {showInput ? (
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <input
-              ref={inputRef}
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && newName.trim()) {
-                  onCreate(newName.trim());
-                  setNewName('');
-                  setShowInput(false);
-                  onClose();
-                } else if (e.key === 'Escape') {
-                  setShowInput(false);
-                  setNewName('');
-                }
-              }}
-              placeholder="List name"
-              style={{
-                flex: 1,
-                backgroundColor: '#0d1117',
-                border: '1px solid #3d444d',
-                borderRadius: 6,
-                color: '#e1e4e8',
-                fontSize: '13px',
-                padding: '5px 8px',
-                outline: 'none',
-                minWidth: 0,
-              }}
-            />
-            <button
-              onClick={() => {
-                if (newName.trim()) {
-                  onCreate(newName.trim());
-                  setNewName('');
-                  setShowInput(false);
-                  onClose();
-                }
-              }}
-              style={{
-                backgroundColor: '#58a6ff',
-                color: '#0d1117',
-                border: 'none',
-                borderRadius: 6,
-                fontSize: '12px',
-                fontWeight: 600,
-                padding: '5px 10px',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Add
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setShowInput(true)}
-            style={{
-              color: '#58a6ff',
-              fontSize: '13px',
-              background: 'none',
-              border: 'none',
-              padding: '4px 4px',
-              cursor: 'pointer',
-              borderRadius: 6,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.08)'; e.currentTarget.style.width = '100%'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
-          >
-            + Create new list
-          </button>
-        )}
+function SwipeActionButton({ buttonRef, onClick, tooltip, children }: {
+  buttonRef: React.RefObject<HTMLButtonElement | null>;
+  onClick: () => void;
+  tooltip: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative group">
+      <button
+        ref={buttonRef}
+        onClick={onClick}
+        className="flex items-center justify-center rounded-full border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
+        style={{ width: 38, height: 38, borderColor: '#3d444d', color: '#8b949e', background: 'transparent' }}
+        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
+      >
+        {children}
+      </button>
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ zIndex: 100 }}>
+        <div style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b', color: '#e1e4e8', fontSize: 12, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
+          {tooltip}
+        </div>
       </div>
     </div>
   );
-
-  return createPortal(content, document.body);
-}
-
-function loadSwipedIds(): Set<number> {
-  try {
-    const raw = localStorage.getItem(SWIPED_IDS_KEY);
-    if (raw) return new Set(JSON.parse(raw) as number[]);
-  } catch { /* ignore */ }
-  return new Set();
 }
 
 export default function SwipeView({
@@ -306,7 +93,6 @@ export default function SwipeView({
   userId,
   onHideListing,
   onUnhideListing,
-  onSaveListing,
   onExpandDetail,
   onSwitchView,
   onBoundsChange,
@@ -315,6 +101,8 @@ export default function SwipeView({
   initialCenter,
   initialZoom,
   commuteInfoMap,
+  onLoginRequired,
+  showHidden,
 }: SwipeViewProps) {
   // Don't persist swipedIds across refreshes — start fresh each session.
   // The localStorage was causing "You've seen all listings" on every refresh.
@@ -322,9 +110,10 @@ export default function SwipeView({
   const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
   const [currentIndex, setCurrentIndex] = useState(0);
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
-  const [authToast, setAuthToast] = useState(false);
   const [wishlistDropdownOpen, setWishlistDropdownOpen] = useState(false);
   const [hoveredStation, setHoveredStation] = useState<HoveredStation | null>(null);
+  const [showMobileMap, setShowMobileMap] = useState(false);
+  const [swipeOverlay, setSwipeOverlay] = useState<'left' | 'right' | 'down' | null>(null);
   const saveAnchorRef = useRef<HTMLDivElement>(null);
   const hideBtnRef = useRef<HTMLButtonElement>(null);
   const laterBtnRef = useRef<HTMLButtonElement>(null);
@@ -351,8 +140,14 @@ export default function SwipeView({
     initialCenter ? { lat: initialCenter[0], lng: initialCenter[1] } : null
   );
 
-  // Timer ref for the delayed onHideListing call — needed to cancel on undo
-  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Timer refs for delayed onHideListing calls — one per listing, keyed by listing ID
+  const hideTimersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  // Clean up all pending hide timers on unmount
+  useEffect(() => {
+    return () => {
+      for (const timer of hideTimersRef.current.values()) clearTimeout(timer);
+    };
+  }, []);
   // After undo, track which listing id needs its index restored once deck recomputes
   const pendingUndoId = useRef<number | null>(null);
 
@@ -386,14 +181,26 @@ export default function SwipeView({
     });
   }
 
-  // Reset index when listings change (new viewport / filters)
-  const listingIds = useMemo(() => new Set(listings.map((l) => l.id)), [listings]);
+  // When "Show hidden" toggles on, clear swipedIds so previously-hidden
+  // listings re-enter the deck (they're already in filteredListings).
+  // When toggled off, reset index since the deck shrinks due to filter change.
+  const prevShowHidden = useRef(showHidden);
   useEffect(() => {
-    setCurrentIndex(0);
-  }, [listingIds]);
+    if (prevShowHidden.current && !showHidden) {
+      // Toggled off — reset since deck is shrinking due to filter, not swipe
+      setCurrentIndex(0);
+    }
+    if (showHidden) {
+      setSwipedIds(new Set());
+      setCurrentIndex(0);
+    }
+    prevShowHidden.current = showHidden;
+  }, [showHidden]);
 
-  // Geo-sort once when listings change, seeded from the current map center
-  // so the first listing is nearest to what the user is looking at.
+  // Track current listing by ID so we can restore position after re-sorts
+  const currentListingIdRef = useRef<number | null>(null);
+
+  // Geo-sort when listings change
   const geoSorted = useMemo(() => {
     const c = mapCenterRef.current;
     return geoSort(listings, c?.lat, c?.lng);
@@ -403,8 +210,29 @@ export default function SwipeView({
     [geoSorted, swipedIds],
   );
 
+  // After deck recomputes, restore position to the listing the user was viewing.
+  // If that listing is gone (swiped/hidden), stay at the same index (next in line).
+  useEffect(() => {
+    const trackedId = currentListingIdRef.current;
+    if (trackedId === null) return;
+    const newIdx = deck.findIndex((l) => l.id === trackedId);
+    if (newIdx >= 0 && newIdx !== currentIndex) {
+      setCurrentIndex(newIdx);
+    } else if (newIdx === -1) {
+      // Listing was removed — clamp index to deck bounds
+      if (currentIndex >= deck.length && deck.length > 0) {
+        setCurrentIndex(deck.length - 1);
+      }
+    }
+  }, [deck]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const currentListing = deck[currentIndex] ?? null;
   const totalRemaining = deck.length - currentIndex;
+
+  // Keep tracked ID in sync with what's currently displayed
+  useEffect(() => {
+    currentListingIdRef.current = currentListing?.id ?? null;
+  }, [currentListing?.id]);
 
   // After undo-left/right, deck recomputes with the re-inserted item.
   // Find its new position and restore currentIndex to it.
@@ -424,22 +252,25 @@ export default function SwipeView({
       const listing = deck[currentIndex];
       if (!listing) return;
 
-      // Auth check for save (right)
-      if (direction === 'right' && !userId) {
-        setAuthToast(true);
-        setTimeout(() => setAuthToast(false), 3000);
+      // Auth check — all swipe actions require login (before overlay flash)
+      if (!userId) {
+        onLoginRequired?.();
         return;
       }
+
+      // Flash the swipe overlay
+      setSwipeOverlay(direction);
+      setTimeout(() => setSwipeOverlay(null), 200);
 
       // Execute the action
       // For left swipes: call onHideListing after a delay so the DB persist
       // doesn't cause filteredListings to recompute mid-flyTo animation.
       if (direction === 'left') {
-        if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
-        hideTimerRef.current = setTimeout(() => {
-          hideTimerRef.current = null;
+        const timer = setTimeout(() => {
+          hideTimersRef.current.delete(listing.id);
           onHideListing(listing.id);
         }, 1500);
+        hideTimersRef.current.set(listing.id, timer);
       }
       if (direction === 'right') {
         const wlId = resolvedWishlistId;
@@ -447,10 +278,7 @@ export default function SwipeView({
           addToWishlist.mutate({ wishlistId: wlId, listingId: listing.id });
           setLastUsedWishlistId(wlId);
         }
-        onSaveListing(listing.id, wlId ?? 'default');
         setSavedIds((prev) => { const next = new Set(prev); next.add(listing.id); return next; });
-        // Also persist as "seen" so it doesn't reappear after refresh
-        setTimeout(() => onHideListing(listing.id), 1500);
       }
       // 'down' = pass — move to back of queue, no persistent action
 
@@ -473,11 +301,11 @@ export default function SwipeView({
 
         setUndoStack((prev) => [
           ...prev.slice(-9),
-          { index: currentIndex, listingId: listing.id, action: direction },
+          { index: currentIndex, listingId: listing.id, action: direction, wishlistId: direction === 'right' ? (resolvedWishlistId ?? undefined) : undefined },
         ]);
       }
     },
-    [currentIndex, deck, userId, onHideListing, onSaveListing, resolvedWishlistId, addToWishlist],
+    [currentIndex, deck, userId, onHideListing, resolvedWishlistId, addToWishlist, onLoginRequired],
   );
 
   // ---------------------------------------------------------------------------
@@ -494,19 +322,25 @@ export default function SwipeView({
         next.delete(last.listingId);
         return next;
       });
-      // Cancel the pending hide timer so it doesn't fire after undo
-      if (hideTimerRef.current) {
-        clearTimeout(hideTimerRef.current);
-        hideTimerRef.current = null;
+
+      if (last.action === 'left') {
+        // Cancel the pending hide timer so it doesn't fire after undo
+        const timer = hideTimersRef.current.get(last.listingId);
+        if (timer) {
+          clearTimeout(timer);
+          hideTimersRef.current.delete(last.listingId);
+        } else {
+          // Timer already fired, must reverse the DB write
+          onUnhideListing?.(last.listingId);
+        }
       }
-      // Reverse the DB hide/seen if it already fired
-      onUnhideListing?.(last.listingId);
 
       if (last.action === 'right') {
         setSavedIds((prev) => { const next = new Set(prev); next.delete(last.listingId); return next; });
-        // Remove from wishlist DB
-        if (resolvedWishlistId) {
-          removeFromWishlist.mutate({ wishlistId: resolvedWishlistId, listingId: last.listingId });
+        // Remove from the wishlist that was used at save time
+        const wlId = last.wishlistId ?? resolvedWishlistId;
+        if (wlId) {
+          removeFromWishlist.mutate({ wishlistId: wlId, listingId: last.listingId });
         }
       }
       // After removing from swipedIds the deck recomputes; find the re-inserted
@@ -527,9 +361,11 @@ export default function SwipeView({
   // ---------------------------------------------------------------------------
   const handleReset = () => {
     setSwipedIds(new Set());
-    localStorage.removeItem(SWIPED_IDS_KEY);
     setCurrentIndex(0);
     setUndoStack([]);
+    // Clear all pending hide timers
+    for (const timer of hideTimersRef.current.values()) clearTimeout(timer);
+    hideTimersRef.current.clear();
   };
 
   // ---------------------------------------------------------------------------
@@ -612,8 +448,8 @@ export default function SwipeView({
 
   return (
     <div className="relative flex-1 min-h-0 flex overflow-hidden" style={{ height: '100%' }}>
-      {/* Full-screen map backdrop */}
-      <div className="absolute inset-0 z-0">
+      {/* Full-screen map backdrop (desktop only — on mobile the mini-map handles it) */}
+      <div className="absolute inset-0 z-0 hidden min-[600px]:block">
         <MapComponent
           listings={mapListings as unknown as Database['public']['Tables']['listings']['Row'][]}
           selectedId={currentListing?.id ?? null}
@@ -633,15 +469,44 @@ export default function SwipeView({
         />
       </div>
 
+      {/* Expanded mobile map overlay — portal to escape parent stacking context */}
+      {showMobileMap && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 min-[600px]:hidden" style={{ zIndex: 1400 }}>
+          <MapComponent
+            listings={mapListings as unknown as Database['public']['Tables']['listings']['Row'][]}
+            selectedId={currentListing?.id ?? null}
+            onMarkerClick={() => {}}
+            onSelectDetail={() => {}}
+            favoritedIds={savedIds}
+            onHideListing={() => {}}
+            visible={true}
+            commuteInfoMap={commuteInfoMap}
+            initialCenter={currentListing?.lat && currentListing?.lon ? [currentListing.lat, currentListing.lon] : initialCenter}
+            initialZoom={15}
+          />
+          <button
+            onClick={() => setShowMobileMap(false)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center cursor-pointer transition-colors"
+            style={{ backgroundColor: 'rgba(28,32,40,0.9)', border: '1px solid rgba(255,255,255,0.15)', zIndex: 1401 }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e1e4e8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>,
+        document.body,
+      )}
+
       {/* Floating detail panel on the right */}
       <div
-        className="absolute right-0 bottom-0 z-10 flex flex-col"
-        style={{ width: 440, top: 76 }}
+        className="absolute right-0 bottom-0 z-10 flex flex-col w-full min-[600px]:w-[440px]"
+        style={{ top: 76 }}
       >
         {currentListing ? (
           <>
             {/* Card + action bar — fills available space, content scrolls if needed */}
-            <div className="flex-1 min-h-0 overflow-hidden pr-3 flex flex-col">
+            <div className="flex-1 min-h-0 overflow-hidden min-[600px]:pr-3 flex flex-col">
             <div className="relative w-full my-auto" style={{ maxHeight: 'calc(100% - 40px)' }}>
               {/* Invisible layout card to establish natural height (card + action bar) */}
               <div className="invisible">
@@ -670,13 +535,48 @@ export default function SwipeView({
 
               {/* Top card + attached action bar — unified container */}
               <div
+                data-tour="swipe-card"
                 className="absolute inset-0 rounded-xl overflow-hidden"
                 style={{
                   zIndex: 2,
                   backgroundColor: 'rgba(28, 32, 40, 0.97)',
-                  border: '1px solid #2d333b',
+                  border: swipeOverlay === 'left'
+                    ? '2px solid rgba(220, 38, 38, 0.8)'
+                    : swipeOverlay === 'right'
+                      ? '2px solid rgba(34, 197, 94, 0.8)'
+                      : swipeOverlay === 'down'
+                        ? '2px solid rgba(107, 114, 128, 0.7)'
+                        : '1px solid #2d333b',
+                  boxShadow: swipeOverlay === 'left'
+                    ? '0 0 20px rgba(220, 38, 38, 0.4), inset 0 0 20px rgba(220, 38, 38, 0.1)'
+                    : swipeOverlay === 'right'
+                      ? '0 0 20px rgba(34, 197, 94, 0.4), inset 0 0 20px rgba(34, 197, 94, 0.1)'
+                      : swipeOverlay === 'down'
+                        ? '0 0 20px rgba(107, 114, 128, 0.3), inset 0 0 20px rgba(107, 114, 128, 0.1)'
+                        : 'none',
+                  transition: 'border 150ms ease, box-shadow 150ms ease',
                 }}
               >
+
+                {/* Mini-map inset — mobile only, overlaid on photo area */}
+                {currentListing.lat != null && currentListing.lon != null && (
+                  <div
+                    onClick={() => setShowMobileMap(true)}
+                    className="absolute top-3 right-3 min-[600px]:hidden rounded-xl overflow-hidden cursor-pointer"
+                    style={{
+                      zIndex: 6,
+                      width: 140,
+                      height: 110,
+                      border: '2px solid rgba(255,255,255,0.15)',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+                    }}
+                  >
+                    <div style={{ pointerEvents: 'none', width: '100%', height: '100%' }}>
+                      <MiniMap lat={currentListing.lat!} lon={currentListing.lon!} hoveredStation={hoveredStation} />
+                    </div>
+                  </div>
+                )}
+
                 {/* Card portion */}
                 <div className="absolute top-0 left-0 right-0" style={{ bottom: 96 }}>
                   <SwipeCard
@@ -719,93 +619,30 @@ export default function SwipeView({
               {/* Center: 4-circle arrow cluster with tooltips */}
               <div ref={saveAnchorRef} className="flex flex-col items-center gap-1.5">
                 <div className="flex items-center gap-1.5">
-                  {/* Hide ← */}
-                  <div className="relative group">
-                    <button
-                      ref={hideBtnRef}
-                      onClick={() => { flashButton(hideBtnRef); handleSwipe('left'); }}
-                      className="flex items-center justify-center rounded-full border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
-                      style={{ width: 38, height: 38, borderColor: '#3d444d', color: '#8b949e', background: 'transparent' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
-                    >
-                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="19" y1="12" x2="5" y2="12" />
-                        <polyline points="12 19 5 12 12 5" />
-                      </svg>
-                    </button>
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ zIndex: 100 }}>
-                      <div style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b', color: '#e1e4e8', fontSize: 12, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
-                        Hide
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Photos ↑ */}
-                  <div className="relative group">
-                    <button
-                      ref={photoBtnRef}
-                      onClick={() => { flashButton(photoBtnRef); enterPhotoFocusRef.current?.(); }}
-                      className="flex items-center justify-center rounded-full border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
-                      style={{ width: 38, height: 38, borderColor: '#3d444d', color: '#8b949e', background: 'transparent' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
-                    >
-                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="12" y1="19" x2="12" y2="5" />
-                        <polyline points="5 12 12 5 19 12" />
-                      </svg>
-                    </button>
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ zIndex: 100 }}>
-                      <div style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b', color: '#e1e4e8', fontSize: 12, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
-                        Photos
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Later ↓ */}
-                  <div className="relative group">
-                    <button
-                      ref={laterBtnRef}
-                      onClick={() => { flashButton(laterBtnRef); handleSwipe('down'); }}
-                      className="flex items-center justify-center rounded-full border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
-                      style={{ width: 38, height: 38, borderColor: '#3d444d', color: '#8b949e', background: 'transparent' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
-                    >
-                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19" />
-                        <polyline points="19 12 12 19 5 12" />
-                      </svg>
-                    </button>
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ zIndex: 100 }}>
-                      <div style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b', color: '#e1e4e8', fontSize: 12, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
-                        Later
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Save → */}
-                  <div className="relative group">
-                    <button
-                      ref={saveBtnRef}
-                      onClick={() => { flashButton(saveBtnRef); handleSwipe('right'); }}
-                      className="flex items-center justify-center rounded-full border transition-all active:scale-95 active:bg-white/15 cursor-pointer"
-                      style={{ width: 38, height: 38, borderColor: '#3d444d', color: '#8b949e', background: 'transparent' }}
-                      onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(88,166,255,0.12)'; e.currentTarget.style.borderColor = '#58a6ff'; e.currentTarget.style.color = '#58a6ff'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = '#3d444d'; e.currentTarget.style.color = '#8b949e'; }}
-                    >
-                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                        <polyline points="12 5 19 12 12 19" />
-                      </svg>
-                    </button>
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" style={{ zIndex: 100 }}>
-                      <div style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b', color: '#e1e4e8', fontSize: 12, padding: '3px 8px', borderRadius: 6, whiteSpace: 'nowrap' }}>
-                        Save
-                      </div>
-                    </div>
-                  </div>
+                  <SwipeActionButton buttonRef={hideBtnRef} onClick={() => { flashButton(hideBtnRef); handleSwipe('left'); }} tooltip="Hide">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="19" y1="12" x2="5" y2="12" />
+                      <polyline points="12 19 5 12 12 5" />
+                    </svg>
+                  </SwipeActionButton>
+                  <SwipeActionButton buttonRef={photoBtnRef} onClick={() => { flashButton(photoBtnRef); enterPhotoFocusRef.current?.(); }} tooltip="Photo view">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="19" x2="12" y2="5" />
+                      <polyline points="5 12 12 5 19 12" />
+                    </svg>
+                  </SwipeActionButton>
+                  <SwipeActionButton buttonRef={laterBtnRef} onClick={() => { flashButton(laterBtnRef); handleSwipe('down'); }} tooltip="Later">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <polyline points="19 12 12 19 5 12" />
+                    </svg>
+                  </SwipeActionButton>
+                  <SwipeActionButton buttonRef={saveBtnRef} onClick={() => { flashButton(saveBtnRef); handleSwipe('right'); }} tooltip="Save">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                      <polyline points="12 5 19 12 12 19" />
+                    </svg>
+                  </SwipeActionButton>
                 </div>
 
                 {/* Save to: wishlist selector — centered below the 4 circles */}
@@ -831,14 +668,19 @@ export default function SwipeView({
                   </span>
                   <span style={{ flexShrink: 0 }}>▾</span>
                 </button>
-                {wishlistDropdownOpen && userId && (
-                  <WishlistDropdown
+                {wishlistDropdownOpen && userId && currentListing && (
+                  <WishlistPicker
+                    listingId={currentListing.id}
                     wishlists={wishlists}
-                    selectedId={resolvedWishlistId}
-                    onSelect={handleSelectWishlist}
-                    onCreate={handleCreateWishlist}
+                    onToggle={(wishlistId, checked) => {
+                      if (checked) {
+                        handleSelectWishlist(wishlistId);
+                      }
+                      setWishlistDropdownOpen(false);
+                    }}
+                    onCreateNew={handleCreateWishlist}
                     onClose={() => setWishlistDropdownOpen(false)}
-                    anchorRef={saveAnchorRef}
+                    anchorRect={saveAnchorRef.current?.getBoundingClientRect() ?? null}
                   />
                 )}
               </div>
@@ -897,18 +739,6 @@ export default function SwipeView({
         )}
       </div>
 
-      {/* Auth toast */}
-      {authToast && (
-        <div
-          className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#2a2d3a] text-white text-sm px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2"
-          style={{ zIndex: 1400 }}
-        >
-          Sign in to save listings
-          <a href="/auth/login" className="font-medium hover:underline ml-1" style={{ color: '#58a6ff' }}>
-            Log in
-          </a>
-        </div>
-      )}
     </div>
   );
 }

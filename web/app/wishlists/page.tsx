@@ -16,7 +16,12 @@ export default function WishlistsPage() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [newName, setNewName] = useState('');
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
   const newInputRef = useRef<HTMLInputElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -36,8 +41,26 @@ export default function WishlistsPage() {
     }
   }, [showNewModal]);
 
+  useEffect(() => {
+    if (renamingId) {
+      setTimeout(() => renameInputRef.current?.focus(), 50);
+    }
+  }, [renamingId]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!openMenuId) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openMenuId]);
+
   const { data: wishlists, isLoading: wishlistsLoading } = useWishlists(userId);
-  const { createWishlist } = useWishlistMutations(userId);
+  const { createWishlist, renameWishlist, deleteWishlist } = useWishlistMutations(userId);
 
   function handleCreate() {
     const trimmed = newName.trim();
@@ -55,6 +78,36 @@ export default function WishlistsPage() {
     if (e.key === 'Escape') {
       setShowNewModal(false);
       setNewName('');
+    }
+  }
+
+  function startRename(id: string, currentName: string) {
+    setOpenMenuId(null);
+    setRenamingId(id);
+    setRenameValue(currentName);
+  }
+
+  function commitRename(id: string) {
+    const trimmed = renameValue.trim();
+    if (trimmed && trimmed !== wishlists?.find(w => w.id === id)?.name) {
+      renameWishlist.mutate({ id, name: trimmed });
+    }
+    setRenamingId(null);
+    setRenameValue('');
+  }
+
+  function handleRenameKeyDown(e: React.KeyboardEvent, id: string) {
+    if (e.key === 'Enter') commitRename(id);
+    if (e.key === 'Escape') {
+      setRenamingId(null);
+      setRenameValue('');
+    }
+  }
+
+  function handleDelete(id: string) {
+    setOpenMenuId(null);
+    if (window.confirm('Delete this wishlist? This cannot be undone.')) {
+      deleteWishlist.mutate(id);
     }
   }
 
@@ -97,55 +150,189 @@ export default function WishlistsPage() {
               const itemCount = wishlist.wishlist_items?.length ?? 0;
               const shareCount = wishlist.wishlist_shares?.length ?? 0;
               const isHovered = hoveredId === wishlist.id;
+              const isMenuOpen = openMenuId === wishlist.id;
+              const isRenaming = renamingId === wishlist.id;
 
               return (
-                <Link
-                  key={wishlist.id}
-                  href={`/wishlists/${wishlist.id}`}
-                  style={{ textDecoration: 'none' }}
-                >
-                  <div
-                    onMouseEnter={() => setHoveredId(wishlist.id)}
-                    onMouseLeave={() => setHoveredId(null)}
-                    style={{
-                      backgroundColor: '#1c2028',
-                      border: `1px solid ${isHovered ? '#58a6ff' : '#2d333b'}`,
-                      borderRadius: '12px',
-                      padding: '16px',
-                      cursor: 'pointer',
-                      transition: 'border-color 150ms ease',
-                    }}
+                <div key={wishlist.id} style={{ position: 'relative' }}>
+                  <Link
+                    href={`/wishlists/${wishlist.id}`}
+                    style={{ textDecoration: 'none', display: 'block' }}
                   >
-                    {/* Name row */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                      {isDefault && (
-                        <span style={{ color: '#fbbf24', fontSize: '14px', flexShrink: 0 }}>★</span>
-                      )}
-                      <span style={{ color: '#e1e4e8', fontWeight: 600, fontSize: '15px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {wishlist.name}
-                      </span>
-                    </div>
-
-                    {/* Count */}
-                    <div style={{ color: '#8b949e', fontSize: '13px' }}>
-                      {itemCount === 1 ? '1 listing' : `${itemCount} listings`}
-                    </div>
-
-                    {/* Shared indicator */}
-                    {shareCount > 0 && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', color: '#8b949e', fontSize: '12px' }}>
-                        {/* People icon */}
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b949e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                          <circle cx="9" cy="7" r="4" />
-                          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                        </svg>
-                        <span>Shared with {shareCount}</span>
+                    <div
+                      onMouseEnter={() => setHoveredId(wishlist.id)}
+                      onMouseLeave={() => setHoveredId(null)}
+                      style={{
+                        backgroundColor: '#1c2028',
+                        border: `1px solid ${isHovered ? '#58a6ff' : '#2d333b'}`,
+                        borderRadius: '12px',
+                        padding: '16px',
+                        cursor: 'pointer',
+                        transition: 'border-color 150ms ease',
+                      }}
+                    >
+                      {/* Name row */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px', paddingRight: '28px' }}>
+                        {isDefault && (
+                          <span style={{ color: '#fbbf24', fontSize: '14px', flexShrink: 0 }}>★</span>
+                        )}
+                        {isRenaming ? (
+                          <input
+                            ref={renameInputRef}
+                            type="text"
+                            value={renameValue}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            onKeyDown={(e) => handleRenameKeyDown(e, wishlist.id)}
+                            onBlur={() => commitRename(wishlist.id)}
+                            onClick={(e) => e.preventDefault()}
+                            style={{
+                              backgroundColor: '#0f1117',
+                              border: '1px solid #58a6ff',
+                              borderRadius: '4px',
+                              padding: '2px 6px',
+                              color: '#e1e4e8',
+                              fontWeight: 600,
+                              fontSize: '15px',
+                              outline: 'none',
+                              width: '100%',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                        ) : (
+                          <span style={{ color: '#e1e4e8', fontWeight: 600, fontSize: '15px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {wishlist.name}
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </Link>
+
+                      {/* Count */}
+                      <div style={{ color: '#8b949e', fontSize: '13px' }}>
+                        {itemCount === 1 ? '1 listing' : `${itemCount} listings`}
+                      </div>
+
+                      {/* Shared indicator */}
+                      {shareCount > 0 && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px', color: '#8b949e', fontSize: '12px' }}>
+                          {/* People icon */}
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b949e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                            <circle cx="9" cy="7" r="4" />
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                          </svg>
+                          <span>Shared with {shareCount}</span>
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+
+                  {/* Three-dot menu button — sits outside the Link */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenMenuId(isMenuOpen ? null : wishlist.id);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: '12px',
+                      right: '12px',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: isMenuOpen ? '#e1e4e8' : '#8b949e',
+                      fontSize: '16px',
+                      lineHeight: 1,
+                      padding: '2px 4px',
+                      borderRadius: '4px',
+                      transition: 'color 150ms ease',
+                      zIndex: 2,
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#e1e4e8'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = isMenuOpen ? '#e1e4e8' : '#8b949e'; }}
+                    aria-label="Wishlist options"
+                  >
+                    ⋯
+                  </button>
+
+                  {/* Dropdown menu */}
+                  {isMenuOpen && (
+                    <div
+                      ref={menuRef}
+                      style={{
+                        position: 'absolute',
+                        top: '36px',
+                        right: '8px',
+                        backgroundColor: '#1c2028',
+                        border: '1px solid #2d333b',
+                        borderRadius: '8px',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                        zIndex: 100,
+                        minWidth: '148px',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {/* Rename */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startRename(wishlist.id, wishlist.name);
+                        }}
+                        style={menuItemStyle}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#2d333b'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                        Rename
+                      </button>
+
+                      {/* Share */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(null);
+                          router.push(`/wishlists/${wishlist.id}`);
+                        }}
+                        style={menuItemStyle}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#2d333b'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                        </svg>
+                        Share
+                      </button>
+
+                      {/* Delete — hidden for Favorites */}
+                      {!isDefault && (
+                        <>
+                          <div style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }} />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(wishlist.id);
+                            }}
+                            style={{ ...menuItemStyle, color: '#f85149' }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#2d333b'; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; }}
+                          >
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f85149" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                              <path d="M10 11v6" />
+                              <path d="M14 11v6" />
+                              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                            </svg>
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -222,3 +409,19 @@ export default function WishlistsPage() {
     </div>
   );
 }
+
+const menuItemStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  width: '100%',
+  padding: '8px 12px',
+  background: 'transparent',
+  border: 'none',
+  color: '#c9d1d9',
+  fontSize: '13px',
+  cursor: 'pointer',
+  textAlign: 'left',
+  transition: 'background-color 150ms ease',
+  boxSizing: 'border-box',
+};

@@ -1507,16 +1507,18 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
           </div>
 
           {/* Filters toggle button */}
-          <FilterToggleButton
-            activeCount={activeCount}
-            expanded={filtersExpanded}
-            onClick={() => {
-              setFiltersExpanded((prev) => !prev);
-              if (filtersExpanded) {
-                setOpenChip(null);
-              }
-            }}
-          />
+          <div data-tour="filters" className="shrink-0">
+            <FilterToggleButton
+              activeCount={activeCount}
+              expanded={filtersExpanded}
+              onClick={() => {
+                setFiltersExpanded((prev) => !prev);
+                if (filtersExpanded) {
+                  setOpenChip(null);
+                }
+              }}
+            />
+          </div>
 
         </div>
 
@@ -1626,15 +1628,20 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
                 onSelect={setDraftMinBaths}
               />
               {draftMinBaths !== null && (
-                <label className="flex items-center gap-2 cursor-pointer mt-2">
-                  <input
-                    type="checkbox"
-                    checked={draftIncludeNaBaths}
-                    onChange={(e) => setDraftIncludeNaBaths(e.target.checked)}
-                    className="accent-[#58a6ff] w-4 h-4 rounded cursor-pointer"
-                  />
-                  <span className="text-sm" style={{ color: '#8b949e' }}>Include N/A</span>
-                </label>
+                <>
+                  <label className="flex items-center gap-2 cursor-pointer mt-2">
+                    <input
+                      type="checkbox"
+                      checked={draftIncludeNaBaths}
+                      onChange={(e) => setDraftIncludeNaBaths(e.target.checked)}
+                      className="accent-[#58a6ff] w-4 h-4 rounded cursor-pointer"
+                    />
+                    <span className="text-sm" style={{ color: '#8b949e' }}>Include N/A</span>
+                  </label>
+                  <p className="text-xs mt-1 ml-6" style={{ color: '#6e7681', fontStyle: 'italic' }}>
+                    Some listings on Craigslist or Marketplace may not have bathroom data
+                  </p>
+                </>
               )}
             </div>
 

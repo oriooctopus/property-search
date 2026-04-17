@@ -210,21 +210,51 @@ export default function WishlistDetailPage() {
             }}
           />
         ) : (
-          <span
-            onDoubleClick={handleNameDoubleClick}
-            title={isOwner ? 'Double-click to rename' : undefined}
-            style={{
-              fontWeight: 700,
-              fontSize: '18px',
-              color: '#e1e4e8',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              cursor: isOwner ? 'text' : 'default',
-            }}
-          >
-            {wishlist.name}
-          </span>
+          <>
+            <span
+              onDoubleClick={handleNameDoubleClick}
+              title={isOwner ? 'Double-click to rename' : undefined}
+              style={{
+                fontWeight: 700,
+                fontSize: '18px',
+                color: '#e1e4e8',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                cursor: isOwner ? 'text' : 'default',
+              }}
+            >
+              {wishlist.name}
+            </span>
+
+            {/* Pencil / edit icon — owner only */}
+            {isOwner && (
+              <button
+                onClick={handleNameDoubleClick}
+                title="Rename wishlist"
+                aria-label="Rename wishlist"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'none',
+                  border: 'none',
+                  padding: '2px',
+                  marginLeft: '2px',
+                  color: '#8b949e',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  transition: 'color 150ms ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#58a6ff'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = '#8b949e'; }}
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm1.414 1.06a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354l-1.086-1.086ZM11.189 6.25 9.75 4.81 3.34 11.22c-.044.044-.072.099-.084.16l-.608 2.126 2.126-.608a.253.253 0 0 0 .16-.084l6.41-6.41-.155-.154Z" />
+                </svg>
+              </button>
+            )}
+          </>
         )}
 
         {/* Listing count badge */}

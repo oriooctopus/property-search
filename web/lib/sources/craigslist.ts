@@ -1,24 +1,274 @@
 /**
- * Craigslist NYC apartment scraper via Apify (ivanvs/craigslist-scraper).
+ * Craigslist NYC apartment scraper via Apify Web Scraper (Puppeteer-based).
  *
- * Uses the Apify actor with proxy support to bypass CL's bot protection.
- * Returns photos, lat/lng, and availability dates directly.
+ * Uses the generic apify/web-scraper actor with a custom pageFunction
+ * to scrape both search result pages and individual listing pages.
+ * The browser-based scraper is required because Craigslist NYC now renders
+ * listings dynamically via JavaScript (gallery-card / cl-search-result elements
+ * with [data-pid] attributes). A static HTML scraper only sees the fallback.
+ * Automatically paginates through all search result pages.
+ * Cost is based on compute time (~$0.10-0.20/run) instead of per-result.
  */
 
 import type { AdapterOutput, SearchParams } from "./types";
 import { extractBaths, extractBeds, parsePrice } from "./parse-utils";
 
-// maxItems is a platform-level run option (not an actor input param), so it's
-// appended as a query parameter on the run URL to cap pay-per-result costs.
-const CL_MAX_ITEMS = 50;
 const APIFY_START_URL =
-  `https://api.apify.com/v2/acts/ivanvs~craigslist-scraper-pay-per-result/runs?maxItems=${CL_MAX_ITEMS}`;
+  "https://api.apify.com/v2/acts/apify~web-scraper/runs";
 
 const POLL_INTERVAL_MS = 5_000;
-const MAX_WAIT_MS = 300_000; // 5 min max
+const MAX_WAIT_MS = 900_000; // 15 min max (browser scraping is slower)
 
 // ---------------------------------------------------------------------------
-// Apify response shape for housing listings
+// pageFunction — runs inside the Web Scraper (Puppeteer) for each page
+// ---------------------------------------------------------------------------
+
+const PAGE_FUNCTION = `
+async function pageFunction(context) {
+  const { page, request, enqueueLinks, log } = context;
+  const url = request.url;
+
+  // --- Search results page ---
+  if (url.includes('/search/') || url.includes('search=')) {
+    // Wait for JS-rendered results
+    try {
+      await page.waitForSelector('[data-pid], .gallery-card, .cl-search-result', { timeout: 15000 });
+    } catch (e) {
+      log.warning('No search results found on page: ' + url);
+      return;
+    }
+
+    // Scroll down to trigger lazy loading / infinite scroll
+    for (let i = 0; i < 5; i++) {
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await new Promise(r => setTimeout(r, 2000));
+    }
+
+    // Extract listing links from [data-pid] elements
+    const listingLinks = await page.evaluate(() => {
+      const links = [];
+      const els = document.querySelectorAll('[data-pid]');
+      els.forEach(el => {
+        const anchor = el.querySelector('a[href]') || (el.tagName === 'A' ? el : null);
+        if (anchor) {
+          const href = anchor.getAttribute('href');
+          if (href && /\\/\\d+\\.html/.test(href)) {
+            const fullUrl = href.startsWith('http') ? href : 'https://newyork.craigslist.org' + href;
+            links.push(fullUrl);
+          }
+        }
+      });
+      // Also check gallery-card elements
+      document.querySelectorAll('.gallery-card a[href], .cl-search-result a[href]').forEach(a => {
+        const href = a.getAttribute('href');
+        if (href && /\\/\\d+\\.html/.test(href)) {
+          const fullUrl = href.startsWith('http') ? href : 'https://newyork.craigslist.org' + href;
+          links.push(fullUrl);
+        }
+      });
+      return [...new Set(links)];
+    });
+
+    log.info('Found ' + listingLinks.length + ' listing links on search page: ' + url);
+
+    if (listingLinks.length > 0) {
+      await enqueueLinks({
+        urls: listingLinks,
+        userData: { isListing: true },
+      });
+    }
+
+    // Check for next page button and enqueue it
+    const nextUrl = await page.evaluate(() => {
+      const nextBtn = document.querySelector('button.bd-button.cl-next-page, a.button.next, a[title="next page"], .cl-next-page a, a.cl-next-page');
+      if (!nextBtn) return null;
+      // If it's a link, get href
+      if (nextBtn.tagName === 'A') {
+        const href = nextBtn.getAttribute('href');
+        return href ? (href.startsWith('http') ? href : 'https://newyork.craigslist.org' + href) : null;
+      }
+      // If it's a button, we need to construct the next page URL from current URL
+      return null;
+    });
+
+    if (nextUrl) {
+      log.info('Enqueueing next search page: ' + nextUrl);
+      await enqueueLinks({
+        urls: [nextUrl],
+        userData: { isSearch: true },
+      });
+    } else {
+      // Try clicking the next button if it exists (for button-based pagination)
+      const hasNextButton = await page.$('button.bd-button.cl-next-page');
+      if (hasNextButton) {
+        try {
+          await hasNextButton.click();
+          await page.waitForTimeout(3000);
+          // After clicking, the URL may have changed — extract more listings
+          const moreLinks = await page.evaluate(() => {
+            const links = [];
+            document.querySelectorAll('[data-pid]').forEach(el => {
+              const anchor = el.querySelector('a[href]') || (el.tagName === 'A' ? el : null);
+              if (anchor) {
+                const href = anchor.getAttribute('href');
+                if (href && /\\/\\d+\\.html/.test(href)) {
+                  const fullUrl = href.startsWith('http') ? href : 'https://newyork.craigslist.org' + href;
+                  links.push(fullUrl);
+                }
+              }
+            });
+            return [...new Set(links)];
+          });
+          if (moreLinks.length > 0) {
+            log.info('Found ' + moreLinks.length + ' more listings after clicking next');
+            await enqueueLinks({
+              urls: moreLinks,
+              userData: { isListing: true },
+            });
+          }
+        } catch (e) {
+          log.info('No more pages — next button click failed');
+        }
+      } else {
+        log.info('No next page found — this is the last search page');
+      }
+    }
+
+    return; // Don't push data for search pages
+  }
+
+  // --- Individual listing page ---
+
+  // Wait for content to load
+  try {
+    await page.waitForSelector('#postingbody, .posting-title, span#titletextonly', { timeout: 10000 });
+  } catch (e) {
+    log.warning('Listing page did not load expected content: ' + url);
+  }
+
+  const data = await page.evaluate(() => {
+    // Try JSON-LD structured data
+    let ld = null;
+    document.querySelectorAll('script[type="application/ld+json"]').forEach(el => {
+      try {
+        const parsed = JSON.parse(el.textContent || '');
+        if (parsed && (parsed['@type'] || parsed.name)) {
+          ld = parsed;
+        }
+      } catch (e) { /* ignore */ }
+    });
+
+    const titleEl = document.querySelector('span#titletextonly, .postingtitletext');
+    const titleTag = document.querySelector('title');
+    const title = (ld && ld.name)
+      || (titleEl ? titleEl.textContent.trim() : '')
+      || (titleTag ? titleTag.textContent.split('|')[0].trim() : '');
+
+    const priceEl = document.querySelector('span.price');
+    const priceText = priceEl ? priceEl.textContent.trim() : '';
+
+    // Location
+    let locationStr = '';
+    if (ld && ld.address) {
+      if (typeof ld.address === 'string') {
+        locationStr = ld.address;
+      } else if (ld.address.streetAddress) {
+        const parts = [ld.address.streetAddress, ld.address.addressLocality, ld.address.addressRegion].filter(Boolean);
+        locationStr = parts.join(', ');
+      }
+    }
+    if (!locationStr) {
+      const smallEl = document.querySelector('small');
+      const mapAddrEl = document.querySelector('div.mapaddress');
+      locationStr = (smallEl ? smallEl.textContent.replace(/[()]/g, '').trim() : '')
+        || (mapAddrEl ? mapAddrEl.textContent.trim() : '')
+        || '';
+    }
+
+    // Lat/lng
+    let lat = '';
+    let lng = '';
+    if (ld && ld.latitude) {
+      lat = String(ld.latitude);
+      lng = String(ld.longitude || '');
+    } else if (ld && ld.geo) {
+      lat = String(ld.geo.latitude || '');
+      lng = String(ld.geo.longitude || '');
+    }
+    if (!lat) {
+      const mapEl = document.querySelector('div#map');
+      if (mapEl) {
+        lat = mapEl.getAttribute('data-latitude') || '';
+        lng = mapEl.getAttribute('data-longitude') || '';
+      }
+    }
+
+    // Beds/baths from JSON-LD
+    let ldBeds = '';
+    let ldBaths = '';
+    if (ld) {
+      if (ld.numberOfBedrooms != null) ldBeds = String(ld.numberOfBedrooms);
+      if (ld.numberOfBathroomsTotal != null) ldBaths = String(ld.numberOfBathroomsTotal);
+    }
+
+    // Photos
+    const photos = [];
+    document.querySelectorAll('a.thumb, div.gallery img, img[src*="images.craigslist"]').forEach(el => {
+      const src = el.getAttribute('href') || el.getAttribute('src') || '';
+      if (src && src.includes('craigslist')) {
+        const fullSize = src.replace(/_\\d+x\\d+\\./, '_600x450.');
+        photos.push(fullSize);
+      }
+    });
+
+    // Post body
+    const postBodyEl = document.querySelector('section#postingbody');
+    const postBody = postBodyEl
+      ? postBodyEl.textContent.trim().replace(/QR Code Link to This Post/gi, '').trim()
+      : '';
+
+    // Datetime
+    const timeEl = document.querySelector('time.date.timeago, time.posting-info-date');
+    const datetime = timeEl ? (timeEl.getAttribute('datetime') || '') : '';
+
+    // Availability date
+    const availEl = document.querySelector('span.housing_movein_now, span.availabilitytext');
+    const availText = availEl ? availEl.textContent.trim() : '';
+    const availMatch = availText.match(/available\\s+(\\S+)/i);
+    const availableFrom = availMatch ? availMatch[1] : '';
+
+    // Housing info
+    const housingEl = document.querySelector('span.shared-line-bubble, span.housing');
+    const housingSpan = housingEl ? housingEl.textContent : '';
+
+    // Post ID from URL
+    const idMatch = window.location.href.match(/(\\d+)\\.html/);
+    const postId = idMatch ? idMatch[1] : '';
+
+    return {
+      url: window.location.href,
+      title,
+      price: priceText,
+      location: locationStr,
+      latitude: lat,
+      longitude: lng,
+      pics: photos,
+      post: postBody,
+      datetime,
+      availableFrom,
+      housing: housingSpan,
+      ldBeds,
+      ldBaths,
+      id: postId,
+    };
+  });
+
+  await context.pushData(data);
+}
+`;
+
+// ---------------------------------------------------------------------------
+// Apify dataset item shape (matches what pageFunction pushes)
 // ---------------------------------------------------------------------------
 
 interface ApifyCLItem {
@@ -27,14 +277,15 @@ interface ApifyCLItem {
   title?: string;
   datetime?: string;
   location?: string;
-  category?: string;
   price?: string;
   longitude?: string;
   latitude?: string;
   post?: string;
   pics?: string[];
-  amenities?: string[];
+  housing?: string;
   availableFrom?: string;
+  ldBeds?: string;
+  ldBaths?: string;
   [key: string]: unknown;
 }
 
@@ -45,7 +296,7 @@ interface ApifyCLItem {
 export async function fetchCraigslistListings(
   params: SearchParams,
 ): Promise<{ listings: AdapterOutput[]; total: number }> {
-  const { city, bedsMin, priceMax, priceMin } = params;
+  const { bedsMin, priceMax, priceMin } = params;
 
   const token = process.env.APIFY_TOKEN;
   if (!token) {
@@ -59,16 +310,18 @@ export async function fetchCraigslistListings(
   if (bedsMin != null) queryParams.set("min_bedrooms", String(bedsMin));
   queryParams.set("availabilityMode", "0");
 
-  const clUrl = `https://newyork.craigslist.org/search/apa?${queryParams.toString()}#search=1~list~0~0`;
+  const clUrl = `https://newyork.craigslist.org/search/apa?${queryParams.toString()}`;
 
   const input = {
-    urls: [{ url: clUrl }],
+    startUrls: [{ url: clUrl }],
+    pageFunction: PAGE_FUNCTION,
     proxyConfiguration: { useApifyProxy: true },
-    maxAge: 30,
-    maxConcurrency: 4,
+    maxRequestsPerCrawl: 5000,
+    maxConcurrency: 5,
+    waitUntil: "networkidle",
   };
 
-  console.log(`[Craigslist] Starting Apify actor run for ${clUrl}`);
+  console.log(`[Craigslist] Starting Web Scraper (Puppeteer) for ${clUrl}`);
 
   // 1. Start the actor run (async)
   const startRes = await fetch(APIFY_START_URL, {
@@ -86,11 +339,15 @@ export async function fetchCraigslistListings(
     throw new Error(`Apify start failed ${startRes.status}: ${body.slice(0, 500)}`);
   }
 
-  const runInfo = (await startRes.json()) as { data?: { id?: string; defaultDatasetId?: string } };
+  const runInfo = (await startRes.json()) as {
+    data?: { id?: string; defaultDatasetId?: string };
+  };
   const runId = runInfo.data?.id;
   const datasetId = runInfo.data?.defaultDatasetId;
   if (!runId || !datasetId) {
-    throw new Error(`Apify run missing id/datasetId: ${JSON.stringify(runInfo).slice(0, 300)}`);
+    throw new Error(
+      `Apify run missing id/datasetId: ${JSON.stringify(runInfo).slice(0, 300)}`,
+    );
   }
   console.log(`[Craigslist] Run started: ${runId}, dataset: ${datasetId}`);
 
@@ -98,16 +355,25 @@ export async function fetchCraigslistListings(
   const deadline = Date.now() + MAX_WAIT_MS;
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-    const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(10_000),
-    });
+    const statusRes = await fetch(
+      `https://api.apify.com/v2/actor-runs/${runId}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
     if (!statusRes.ok) continue;
-    const statusData = (await statusRes.json()) as { data?: { status?: string } };
+    const statusData = (await statusRes.json()) as {
+      data?: { status?: string };
+    };
     const status = statusData.data?.status;
     console.log(`[Craigslist] Run status: ${status}`);
     if (status === "SUCCEEDED") break;
-    if (status === "FAILED" || status === "ABORTED" || status === "TIMED-OUT") {
+    if (
+      status === "FAILED" ||
+      status === "ABORTED" ||
+      status === "TIMED-OUT"
+    ) {
       throw new Error(`Apify run ${status}`);
     }
   }
@@ -130,7 +396,7 @@ export async function fetchCraigslistListings(
   }
 
   const items: ApifyCLItem[] = data;
-  console.log(`[Craigslist] Apify returned ${items.length} raw items`);
+  console.log(`[Craigslist] Web Scraper returned ${items.length} raw items`);
 
   const listings: AdapterOutput[] = [];
 
@@ -140,16 +406,18 @@ export async function fetchCraigslistListings(
     const price = parsePrice(item.price);
     if (price == null || price === 0) continue;
 
-    // Extract beds/baths from title + post body
-    const combinedText = `${item.title} ${item.post ?? ""}`;
-    const beds = extractBeds(combinedText);
-    const baths = extractBaths(combinedText);
+    // Prefer JSON-LD beds/baths, fall back to text extraction
+    const ldBedsNum = item.ldBeds ? parseFloat(item.ldBeds) : NaN;
+    const ldBathsNum = item.ldBaths ? parseFloat(item.ldBaths) : NaN;
+    const combinedText = `${item.title} ${item.housing ?? ""} ${item.post ?? ""}`;
+    const beds = !isNaN(ldBedsNum) ? ldBedsNum : extractBeds(combinedText);
+    const baths = !isNaN(ldBathsNum) ? ldBathsNum : extractBaths(combinedText);
 
     const lat = item.latitude ? parseFloat(item.latitude) : null;
     const lon = item.longitude ? parseFloat(item.longitude) : null;
 
     listings.push({
-      address: item.title,
+      address: item.location || item.title,
       area: item.location || "New York, NY",
       price,
       beds,

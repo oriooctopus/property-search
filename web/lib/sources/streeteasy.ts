@@ -9,6 +9,8 @@
  */
 
 import type { AdapterOutput, SearchParams } from "./types";
+import { resolveApifyProxyUrl, makeProxyFetch } from "./proxy";
+import { fetchSliceRecursive, SE_CAP } from "./streeteasy-bisection";
 
 const SE_API_URL = "https://api-v6.streeteasy.com/";
 const SE_PAGE_SIZE = 100;
@@ -326,38 +328,125 @@ function nodesToListings(nodes: SENode[], city: string): AdapterOutput[] {
 
 const SE_BEDROOM_SLICES = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 const SE_SLICE_DELAY_MS = 5_000; // delay between bedroom slices
+const SE_403_RETRY_DELAYS = [30_000, 60_000, 120_000]; // exponential backoff for 403s
+
+/**
+ * Creates a fetch wrapper with 403 retry + Apify proxy fallback.
+ * Used by bisection calls so they get the same resilience as top-level pagination.
+ */
+function makeResilientFetch(
+  getProxyFetch: () => typeof fetch | null,
+): typeof fetch {
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
+    for (let attempt = 0; ; attempt++) {
+      // Fresh timeout on each attempt — reusing the original AbortSignal fails
+      // because it's already expired after the first 15s + retry delay
+      const freshInit = { ...init, signal: AbortSignal.timeout(15_000) };
+      let res: Response;
+      try {
+        res = await fetch(input, freshInit);
+      } catch (err) {
+        if (attempt < SE_403_RETRY_DELAYS.length) {
+          const delayMs = SE_403_RETRY_DELAYS[attempt];
+          console.warn(
+            `[StreetEasy] Bisection request failed (${err instanceof Error ? err.message : err}) — retry ${attempt + 1}/${SE_403_RETRY_DELAYS.length} after ${delayMs / 1000}s`,
+          );
+          await new Promise((r) => setTimeout(r, delayMs));
+          continue;
+        }
+        throw err;
+      }
+      if (res.status === 403 && attempt < SE_403_RETRY_DELAYS.length) {
+        const delayMs = SE_403_RETRY_DELAYS[attempt];
+        console.warn(
+          `[StreetEasy] Bisection request got 403 — retry ${attempt + 1}/${SE_403_RETRY_DELAYS.length} after ${delayMs / 1000}s`,
+        );
+        await new Promise((r) => setTimeout(r, delayMs));
+        continue;
+      }
+      if (res.status === 403) {
+        const pf = getProxyFetch();
+        if (pf) {
+          console.log("[StreetEasy] Bisection: falling back to Apify proxy");
+          return pf(input, { ...init, signal: AbortSignal.timeout(30_000) });
+        }
+      }
+      return res;
+    }
+  }) as typeof fetch;
+}
 
 export async function fetchStreetEasyListings(
   params: SearchParams,
   _apiKey?: string,
   existingUrls?: Set<string>,
-): Promise<{ listings: AdapterOutput[]; total: number }> {
+): Promise<{ listings: AdapterOutput[]; total: number; warnings: string[] }> {
   const { city } = params;
   const cityLower = city.toLowerCase();
   const areas = AREA_CODES[cityLower] ?? AREA_CODES["new york"];
   const known = existingUrls ?? new Set<string>();
 
+  // Lazy Apify proxy — only created if needed (costs money)
+  const proxyUrl = resolveApifyProxyUrl();
+  let _proxyFetch: typeof fetch | null = null;
+  function getProxyFetch(): typeof fetch | null {
+    if (!_proxyFetch && proxyUrl) {
+      _proxyFetch = makeProxyFetch(proxyUrl);
+    }
+    return _proxyFetch;
+  }
+
   const allNodes: SENode[] = [];
   const seenUrlPaths = new Set<string>();
   let grandTotal = 0;
+  const skippedSlices: string[] = [];
 
   for (const bedrooms of SE_BEDROOM_SLICES) {
     const label = bedrooms === 0 ? "studio" : `${bedrooms}BR`;
     const filters = buildFilters(areas, bedrooms);
 
-    // Probe totalCount first to skip empty slices
-    let sliceTotal: number;
-    try {
-      sliceTotal = await probeTotalCount(areas, filters);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error(`[StreetEasy] ${label} probe failed: ${msg}`);
-      if (msg.includes("403")) {
-        console.error(`[StreetEasy] Rate limited — returning what we have so far`);
-        break; // Stop all slices, return partial results
+    // Probe totalCount first to skip empty slices (with 403 retry)
+    let sliceTotal = 0;
+    let probeSuccess = false;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        sliceTotal = await probeTotalCount(areas, filters);
+        probeSuccess = true;
+        break;
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("403") && attempt < SE_403_RETRY_DELAYS.length) {
+          const delayMs = SE_403_RETRY_DELAYS[attempt];
+          console.warn(
+            `[StreetEasy] ${label} probe got 403 — retry ${attempt + 1}/${SE_403_RETRY_DELAYS.length} after ${delayMs / 1000}s`,
+          );
+          await new Promise((r) => setTimeout(r, delayMs));
+          continue;
+        }
+        console.error(`[StreetEasy] ${label} probe failed: ${msg}`);
+        if (msg.includes("403")) {
+          // Try once through Apify proxy before giving up
+          const pf = getProxyFetch();
+          if (pf) {
+            console.log(`[StreetEasy] ${label} probe: falling back to Apify proxy`);
+            try {
+              sliceTotal = await probeTotalCount(areas, filters, pf);
+              probeSuccess = true;
+              break;
+            } catch (proxyErr: unknown) {
+              const proxyMsg = proxyErr instanceof Error ? proxyErr.message : String(proxyErr);
+              console.error(`[StreetEasy] ${label} probe via proxy also failed: ${proxyMsg}`);
+            }
+          }
+          console.error(
+            `[StreetEasy] WARNING: ${label} probe rate-limited after ${SE_403_RETRY_DELAYS.length} retries — skipping slice`,
+          );
+          skippedSlices.push(label);
+        }
+        break; // non-403 error or exhausted retries
       }
-      continue; // Skip this slice on other errors
     }
+    if (!probeSuccess) continue; // skip to next slice
     if (sliceTotal === 0) {
       console.log(`[StreetEasy] ${label}: 0 listings — skipping`);
       continue;
@@ -366,108 +455,214 @@ export async function fetchStreetEasyListings(
     grandTotal += sliceTotal;
     console.log(`[StreetEasy] ${label}: ${sliceTotal} listings — fetching`);
 
-    if (sliceTotal > 1100) {
-      console.warn(
-        `[StreetEasy] WARNING: ${label} has ${sliceTotal} listings, exceeds ~1,100 cap. Some may be missed.`,
+    if (sliceTotal > SE_CAP) {
+      // Over the API cap — use recursive price bisection to get ALL listings
+      console.log(
+        `[StreetEasy] ${label} has ${sliceTotal} listings (>${SE_CAP} cap) — using price bisection`,
       );
-    }
 
-    // Paginate this bedroom slice with incremental early-stop logic
-    const searchToken = crypto.randomUUID();
-    let rateLimited = false;
+      // Convert seenUrlPaths (paths) to full URLs for bisection compatibility
+      const seenFullUrls = new Set<string>();
+      for (const p of seenUrlPaths) {
+        seenFullUrls.add(`https://streeteasy.com${p}`);
+      }
 
-    for (let page = 1; ; page++) {
-      console.log(`[StreetEasy] ${label} page ${page}`);
+      const bedroomFilter = { lowerBound: bedrooms, upperBound: bedrooms };
 
-      let res: Response;
       try {
-        res = await fetch(SE_API_URL, {
-          method: "POST",
-          headers: SE_HEADERS,
-          body: JSON.stringify({
-            query: SE_QUERY,
-            variables: {
-              input: {
-                filters,
-                page,
-                perPage: SE_PAGE_SIZE,
-                sorting: { attribute: "LISTED_AT", direction: "DESCENDING" },
-                userSearchToken: searchToken,
-                adStrategy: "NONE",
-              },
-            },
-          }),
-          signal: AbortSignal.timeout(15_000),
-        });
+        const beforeCount = allNodes.length;
+        await fetchSliceRecursive(
+          areas,
+          bedroomFilter,
+          0,
+          null,
+          label,
+          0,
+          allNodes,
+          seenFullUrls,
+          makeResilientFetch(getProxyFetch),
+          (msg: string) => console.log(`[StreetEasy] ${msg}`),
+        );
+
+        // Sync back: add any new URL paths from bisection into seenUrlPaths
+        for (let i = beforeCount; i < allNodes.length; i++) {
+          const n = allNodes[i];
+          if (n.urlPath) seenUrlPaths.add(n.urlPath);
+        }
+
+        console.log(
+          `[StreetEasy] ${label} bisection done: ${allNodes.length - beforeCount} new listings`,
+        );
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[StreetEasy] ${label} page ${page} fetch error: ${msg}`);
-        break;
+        console.error(`[StreetEasy] ${label} bisection failed: ${msg}`);
+        skippedSlices.push(label);
       }
+    } else {
+      // Under the cap — use direct pagination (existing logic)
 
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        console.error(`[StreetEasy] ${label} page ${page} HTTP ${res.status}: ${text.slice(0, 200)}`);
-        if (res.status === 403) {
-          rateLimited = true;
+      // Paginate this bedroom slice with incremental early-stop logic
+      const searchToken = crypto.randomUUID();
+      let sliceRateLimited = false;
+
+      for (let page = 1; ; page++) {
+        console.log(`[StreetEasy] ${label} page ${page}`);
+
+        let res: Response | undefined;
+        let pageFetchOk = false;
+
+        for (let attempt = 0; ; attempt++) {
+          try {
+            res = await fetch(SE_API_URL, {
+              method: "POST",
+              headers: SE_HEADERS,
+              body: JSON.stringify({
+                query: SE_QUERY,
+                variables: {
+                  input: {
+                    filters,
+                    page,
+                    perPage: SE_PAGE_SIZE,
+                    sorting: { attribute: "LISTED_AT", direction: "DESCENDING" },
+                    userSearchToken: searchToken,
+                    adStrategy: "NONE",
+                  },
+                },
+              }),
+              signal: AbortSignal.timeout(15_000),
+            });
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[StreetEasy] ${label} page ${page} fetch error: ${msg}`);
+            break; // network error — stop retrying this page
+          }
+
+          if (res.status === 403 && attempt < SE_403_RETRY_DELAYS.length) {
+            const delayMs = SE_403_RETRY_DELAYS[attempt];
+            console.warn(
+              `[StreetEasy] ${label} page ${page} got 403 — retry ${attempt + 1}/${SE_403_RETRY_DELAYS.length} after ${delayMs / 1000}s`,
+            );
+            await new Promise((r) => setTimeout(r, delayMs));
+            continue;
+          }
+
+          if (!res.ok) {
+            const text = await res.text().catch(() => "");
+            console.error(`[StreetEasy] ${label} page ${page} HTTP ${res.status}: ${text.slice(0, 200)}`);
+            if (res.status === 403) {
+              // Try once through Apify proxy before giving up on this page
+              const pf = getProxyFetch();
+              if (pf) {
+                console.log(`[StreetEasy] ${label} page ${page}: falling back to Apify proxy`);
+                try {
+                  const proxyRes = await pf(SE_API_URL, {
+                    method: "POST",
+                    headers: SE_HEADERS,
+                    body: JSON.stringify({
+                      query: SE_QUERY,
+                      variables: {
+                        input: {
+                          filters,
+                          page,
+                          perPage: SE_PAGE_SIZE,
+                          sorting: { attribute: "LISTED_AT", direction: "DESCENDING" },
+                          userSearchToken: searchToken,
+                          adStrategy: "NONE",
+                        },
+                      },
+                    }),
+                    signal: AbortSignal.timeout(15_000),
+                  });
+                  if (proxyRes.ok) {
+                    console.log(`[StreetEasy] ${label} page ${page}: Apify proxy succeeded`);
+                    res = proxyRes;
+                    pageFetchOk = true;
+                  } else {
+                    const proxyText = await proxyRes.text().catch(() => "");
+                    console.error(`[StreetEasy] ${label} page ${page} proxy HTTP ${proxyRes.status}: ${proxyText.slice(0, 200)}`);
+                    sliceRateLimited = true;
+                  }
+                } catch (proxyErr: unknown) {
+                  const proxyMsg = proxyErr instanceof Error ? proxyErr.message : String(proxyErr);
+                  console.error(`[StreetEasy] ${label} page ${page} proxy error: ${proxyMsg}`);
+                  sliceRateLimited = true;
+                }
+              } else {
+                sliceRateLimited = true;
+              }
+            }
+          } else {
+            pageFetchOk = true;
+          }
+          break;
         }
-        break;
-      }
 
-      const data: SEResponse = await res.json();
+        if (!pageFetchOk || !res) break; // stop paginating this slice
 
-      if (data.errors?.length) {
-        console.error(`[StreetEasy] ${label} GraphQL error: ${data.errors[0].message}`);
-        break;
-      }
+        const data: SEResponse = await res.json();
 
-      const edges = data.data?.searchRentals?.edges ?? [];
+        if (data.errors?.length) {
+          console.error(`[StreetEasy] ${label} GraphQL error: ${data.errors[0].message}`);
+          break;
+        }
 
-      if (edges.length === 0) {
-        console.log(`[StreetEasy] ${label} empty page — done`);
-        break;
-      }
+        const edges = data.data?.searchRentals?.edges ?? [];
 
-      let newCount = 0;
-      for (const edge of edges) {
-        const n = edge.node;
-        if (!n?.urlPath) continue;
-        // Deduplicate across bedroom slices
-        if (seenUrlPaths.has(n.urlPath)) continue;
-        seenUrlPaths.add(n.urlPath);
+        if (edges.length === 0) {
+          console.log(`[StreetEasy] ${label} empty page — done`);
+          break;
+        }
 
-        const fullUrl = `https://streeteasy.com${n.urlPath}`;
-        if (!known.has(fullUrl)) newCount++;
-        allNodes.push(n);
-      }
+        let newCount = 0;
+        for (const edge of edges) {
+          const n = edge.node;
+          if (!n?.urlPath) continue;
+          // Deduplicate across bedroom slices
+          if (seenUrlPaths.has(n.urlPath)) continue;
+          seenUrlPaths.add(n.urlPath);
 
-      console.log(
-        `[StreetEasy] ${label} page ${page}: ${edges.length} results, ${newCount} new`,
-      );
+          const fullUrl = `https://streeteasy.com${n.urlPath}`;
+          if (!known.has(fullUrl)) newCount++;
+          allNodes.push(n);
+        }
 
-      // Incremental early-stop: if >70% are already known, stop this slice
-      if (known.size > 0 && newCount < edges.length * 0.3) {
         console.log(
-          `[StreetEasy] ${label} caught up with existing data — stopping slice`,
+          `[StreetEasy] ${label} page ${page}: ${edges.length} results, ${newCount} new`,
         );
-        break;
+
+        // Incremental early-stop: if >70% are already known, stop this slice
+        if (known.size > 0 && newCount < edges.length * 0.3) {
+          console.log(
+            `[StreetEasy] ${label} caught up with existing data — stopping slice`,
+          );
+          break;
+        }
+
+        if (page * SE_PAGE_SIZE >= sliceTotal) {
+          console.log(`[StreetEasy] ${label} all pages fetched`);
+          break;
+        }
+
+        await new Promise((r) => setTimeout(r, SE_DELAY_MS));
       }
 
-      if (page * SE_PAGE_SIZE >= sliceTotal) {
-        console.log(`[StreetEasy] ${label} all pages fetched`);
-        break;
+      if (sliceRateLimited) {
+        console.error(
+          `[StreetEasy] WARNING: ${label} pagination rate-limited after retries — skipping remainder of slice`,
+        );
+        skippedSlices.push(label);
+        // Continue to next slice instead of breaking all slices
       }
-
-      await new Promise((r) => setTimeout(r, SE_DELAY_MS));
-    }
-
-    if (rateLimited) {
-      console.error(`[StreetEasy] Rate limited on ${label} — returning partial results`);
-      break; // Stop all slices
     }
 
     // Delay between bedroom slices to avoid rate limiting
     await new Promise((r) => setTimeout(r, SE_SLICE_DELAY_MS));
+  }
+
+  if (skippedSlices.length > 0) {
+    console.warn(
+      `[StreetEasy] WARNING: ${skippedSlices.length} slice(s) skipped or incomplete due to rate limiting: ${skippedSlices.join(", ")}. Results are PARTIAL.`,
+    );
   }
 
   console.log(
@@ -479,7 +674,14 @@ export async function fetchStreetEasyListings(
     `[StreetEasy] ${listings.length} unique listings (${allNodes.length - listings.length} dupes removed)`,
   );
 
-  return { listings, total: listings.length };
+  const warnings: string[] =
+    skippedSlices.length > 0
+      ? [
+          `Rate-limited: skipped ${skippedSlices.length} slice(s) — ${skippedSlices.join(", ")}`,
+        ]
+      : [];
+
+  return { listings, total: listings.length, warnings };
 }
 
 // ---------------------------------------------------------------------------

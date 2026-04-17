@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase-browser';
 
@@ -99,12 +100,12 @@ export function useWishlistMutations(userId: string | null) {
 
 export function useWishlistedListingIds(userId: string | null): Set<number> {
   const { data: wishlists } = useWishlists(userId);
-  if (!wishlists) return new Set();
-  const ids = new Set<number>();
-  for (const wl of wishlists) {
-    for (const item of wl.wishlist_items) {
-      ids.add(item.listing_id);
+  return useMemo(() => {
+    if (!wishlists) return new Set<number>();
+    const ids = new Set<number>();
+    for (const wl of wishlists) {
+      for (const item of wl.wishlist_items) ids.add(item.listing_id);
     }
-  }
-  return ids;
+    return ids;
+  }, [wishlists]);
 }

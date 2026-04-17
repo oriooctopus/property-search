@@ -1,5 +1,15 @@
 # Property Search
 
+## BLOCKING: Before Reporting ANY Change as Done
+
+Do NOT tell the user a change is done until ALL of these are true:
+- [ ] Verify agent spawned and returned PASS
+- [ ] Screenshot/report link included in status table
+- [ ] If the verify agent used DOM measurements for spacing/layout, it ALSO took a screenshot and visually confirmed
+
+If the verify agent fails, fix the issue and re-verify. Do NOT report as done with a failing verify.
+This is not optional. This is not skippable for "small" changes. TSC passing and build passing are NOT verification.
+
 ## CRITICAL: Visual Regression Check
 
 Any agent modifying files in `web/components/` or `web/app/` that contain JSX:

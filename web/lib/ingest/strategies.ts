@@ -20,6 +20,7 @@ import { fetchCraigslistListings } from "../sources/craigslist";
 import { fetchStreetEasyListings } from "../sources/streeteasy";
 import { fetchStreetEasyFullBisection } from "../sources/streeteasy-bisection";
 import { fetchFacebookMarketplaceListings } from "../sources/facebook-marketplace";
+import { sendIngestAlert } from "./alert";
 
 // ---------------------------------------------------------------------------
 // Shared source dispatch
@@ -42,12 +43,24 @@ async function runAdapter(source: ListingSource): Promise<AdapterOutput[]> {
     }
     case "streeteasy": {
       const out: AdapterOutput[] = [];
-      for (const borough of ["Manhattan", "Brooklyn"]) {
+      const allWarnings: string[] = [];
+      for (const borough of ["Brooklyn", "Manhattan"]) {
         const res = await fetchStreetEasyListings(
           { city: borough, stateCode: "NY" },
           RAPIDAPI_KEY,
         );
         out.push(...res.listings);
+        if (res.warnings.length > 0) {
+          allWarnings.push(`${borough}: ${res.warnings.join("; ")}`);
+        }
+      }
+      if (allWarnings.length > 0) {
+        console.warn(`[StreetEasy] PARTIAL FETCH WARNING: ${allWarnings.join("; ")}. Returning ${out.length} partial results for upsert.`);
+        // Fire-and-forget alert so partial results still get upserted
+        sendIngestAlert(
+          "[Dwelligence] StreetEasy partial fetch",
+          `StreetEasy fetch was partial. ${out.length} listings returned.\n\nWarnings:\n${allWarnings.join("\n")}`,
+        ).catch(() => {});
       }
       return out;
     }

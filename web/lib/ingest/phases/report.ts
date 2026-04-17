@@ -6,6 +6,7 @@
  */
 
 import { phaseLogger } from "../logger";
+import { sendIngestAlert } from "../alert";
 import type {
   IntegrityReport,
   OrchestratorDeps,
@@ -59,6 +60,27 @@ export async function runReportPhase(
   for (const w of softWarnings) {
     log.warn(`[WARN] ${w}`);
     r.warnings.push(w);
+  }
+
+  // Send email alert if any sources failed
+  const failedSources = input.perSourceResults.filter((ps) => !ps.ok);
+  if (failedSources.length > 0) {
+    const subject = `[Dwelligence] Ingest alert: ${failedSources.length} source(s) failed`;
+    const body = [
+      `Ingest run ${r.runId} completed with failures.`,
+      `Strategy: ${r.fetchStrategy}`,
+      `Started: ${r.startedAt}`,
+      "",
+      "Failed sources:",
+      ...failedSources.map(
+        (fs) => `  - ${fs.source}: ${fs.error ?? "unknown error"}`,
+      ),
+      "",
+      "All warnings:",
+      ...softWarnings.map((w) => `  - ${w}`),
+    ].join("\n");
+    // Fire-and-forget — don't block the report phase on email delivery
+    sendIngestAlert(subject, body).catch(() => {});
   }
 
   // Markdown summary
