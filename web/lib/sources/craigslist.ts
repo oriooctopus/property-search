@@ -1,5 +1,5 @@
 /**
- * Craigslist NYC apartment scraper via Apify Web Scraper (Puppeteer-based).
+ * Craigslist NYC apartment scraper via Apify Puppeteer Scraper.
  *
  * Uses the generic apify/web-scraper actor with a custom pageFunction
  * to scrape both search result pages and individual listing pages.
@@ -14,13 +14,13 @@ import type { AdapterOutput, SearchParams } from "./types";
 import { extractBaths, extractBeds, parsePrice } from "./parse-utils";
 
 const APIFY_START_URL =
-  "https://api.apify.com/v2/acts/apify~web-scraper/runs";
+  "https://api.apify.com/v2/acts/apify~puppeteer-scraper/runs";
 
 const POLL_INTERVAL_MS = 5_000;
 const MAX_WAIT_MS = 900_000; // 15 min max (browser scraping is slower)
 
 // ---------------------------------------------------------------------------
-// pageFunction — runs inside the Web Scraper (Puppeteer) for each page
+// pageFunction — runs inside the Puppeteer Scraper (Node.js context with page object)
 // ---------------------------------------------------------------------------
 
 const PAGE_FUNCTION = `
@@ -103,7 +103,7 @@ async function pageFunction(context) {
       if (hasNextButton) {
         try {
           await hasNextButton.click();
-          await page.waitForTimeout(3000);
+          await new Promise(r => setTimeout(r, 3000));
           // After clicking, the URL may have changed — extract more listings
           const moreLinks = await page.evaluate(() => {
             const links = [];
@@ -318,7 +318,7 @@ export async function fetchCraigslistListings(
     proxyConfiguration: { useApifyProxy: true },
     maxRequestsPerCrawl: 5000,
     maxConcurrency: 5,
-    waitUntil: ["networkidle"],
+    waitUntil: ["networkidle2"],
   };
 
   console.log(`[Craigslist] Starting Web Scraper (Puppeteer) for ${clUrl}`);
