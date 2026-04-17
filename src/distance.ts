@@ -59,7 +59,7 @@ export interface Destination {
 }
 
 export interface TravelInfo {
-  mode: "bicycling" | "transit";
+  mode: "bicycling" | "transit" | "walking";
   distanceMiles: number;
   durationMinutes: number;
   transfers: number | null; // only for transit
