@@ -318,7 +318,7 @@ export async function fetchCraigslistListings(
     proxyConfiguration: { useApifyProxy: true },
     maxRequestsPerCrawl: 5000,
     maxConcurrency: 5,
-    waitUntil: "networkidle",
+    waitUntil: ["networkidle"],
   };
 
   console.log(`[Craigslist] Starting Web Scraper (Puppeteer) for ${clUrl}`);
