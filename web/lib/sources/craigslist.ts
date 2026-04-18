@@ -17,7 +17,7 @@ const APIFY_START_URL =
   "https://api.apify.com/v2/acts/apify~puppeteer-scraper/runs";
 
 const POLL_INTERVAL_MS = 5_000;
-const MAX_WAIT_MS = 900_000; // 15 min max (browser scraping is slower)
+const MAX_WAIT_MS = 1_800_000; // 30 min max (each borough runs independently)
 
 // ---------------------------------------------------------------------------
 // pageFunction — runs inside the Puppeteer Scraper (Node.js context with page object)
@@ -250,9 +250,9 @@ export async function fetchCraigslistListings(
     throw new Error("APIFY_TOKEN not set — cannot query Craigslist via Apify");
   }
 
-  // Build per-borough start URLs so each borough's pagination runs independently.
-  // CL paginates at 200 results per page; splitting by borough keeps each
-  // search page count manageable and ensures the click-through pagination works.
+  // Launch each borough as a SEPARATE Apify run in parallel. This avoids the
+  // single-run timeout problem: one run with 5 boroughs means 3000+ pages,
+  // which exceeds the polling timeout. Parallel runs each handle ~600 listings.
   const CL_BOROUGHS = ["brk", "mnh", "que", "brx", "stn"];
   const queryParams = new URLSearchParams();
   if (priceMin != null) queryParams.set("min_price", String(priceMin));
@@ -261,96 +261,148 @@ export async function fetchCraigslistListings(
   queryParams.set("availabilityMode", "0");
 
   const qs = queryParams.toString();
-  const startUrls = CL_BOROUGHS.map((b) => ({
-    url: `https://newyork.craigslist.org/search/${b}/apa?${qs}`,
-  }));
-  console.log(`[Craigslist] Starting with ${startUrls.length} borough URLs`);
+  console.log(`[Craigslist] Launching ${CL_BOROUGHS.length} parallel borough runs`);
 
-  const input = {
-    startUrls,
-    pageFunction: PAGE_FUNCTION,
-    proxyConfiguration: { useApifyProxy: true },
-    maxRequestsPerCrawl: 5000,
-    maxConcurrency: 5,
-    waitUntil: ["networkidle2"],
-  };
-
-  console.log(`[Craigslist] Starting Puppeteer Scraper for ${CL_BOROUGHS.length} boroughs`);
-
-  // 1. Start the actor run (async)
-  const startRes = await fetch(APIFY_START_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(input),
-    signal: AbortSignal.timeout(30_000),
-  });
-
-  if (!startRes.ok) {
-    const body = await startRes.text().catch(() => "");
-    throw new Error(`Apify start failed ${startRes.status}: ${body.slice(0, 500)}`);
+  // 1. Start one Apify run per borough in parallel
+  interface BoroughRun {
+    borough: string;
+    runId: string;
+    datasetId: string;
+    done: boolean;
+    items: ApifyCLItem[];
   }
 
-  const runInfo = (await startRes.json()) as {
-    data?: { id?: string; defaultDatasetId?: string };
-  };
-  const runId = runInfo.data?.id;
-  const datasetId = runInfo.data?.defaultDatasetId;
-  if (!runId || !datasetId) {
-    throw new Error(
-      `Apify run missing id/datasetId: ${JSON.stringify(runInfo).slice(0, 300)}`,
-    );
-  }
-  console.log(`[Craigslist] Run started: ${runId}, dataset: ${datasetId}`);
+  const boroughRuns: BoroughRun[] = [];
 
-  // 2. Poll for completion
-  const deadline = Date.now() + MAX_WAIT_MS;
-  while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-    const statusRes = await fetch(
-      `https://api.apify.com/v2/actor-runs/${runId}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(10_000),
-      },
-    );
-    if (!statusRes.ok) continue;
-    const statusData = (await statusRes.json()) as {
-      data?: { status?: string };
-    };
-    const status = statusData.data?.status;
-    console.log(`[Craigslist] Run status: ${status}`);
-    if (status === "SUCCEEDED") break;
-    if (
-      status === "FAILED" ||
-      status === "ABORTED" ||
-      status === "TIMED-OUT"
-    ) {
-      throw new Error(`Apify run ${status}`);
-    }
-  }
+  await Promise.all(
+    CL_BOROUGHS.map(async (borough) => {
+      const startUrl = `https://newyork.craigslist.org/search/${borough}/apa?${qs}`;
+      const input = {
+        startUrls: [{ url: startUrl }],
+        pageFunction: PAGE_FUNCTION,
+        proxyConfiguration: { useApifyProxy: true },
+        maxRequestsPerCrawl: 1500,
+        maxConcurrency: 5,
+        waitUntil: ["networkidle2"],
+      };
 
-  // 3. Fetch dataset items
-  const datasetRes = await fetch(
-    `https://api.apify.com/v2/datasets/${datasetId}/items?format=json`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(30_000),
-    },
+      const startRes = await fetch(APIFY_START_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(input),
+        signal: AbortSignal.timeout(30_000),
+      });
+
+      if (!startRes.ok) {
+        const body = await startRes.text().catch(() => "");
+        throw new Error(
+          `Apify start failed for borough ${borough} (${startRes.status}): ${body.slice(0, 500)}`,
+        );
+      }
+
+      const runInfo = (await startRes.json()) as {
+        data?: { id?: string; defaultDatasetId?: string };
+      };
+      const runId = runInfo.data?.id;
+      const datasetId = runInfo.data?.defaultDatasetId;
+      if (!runId || !datasetId) {
+        throw new Error(
+          `Apify run missing id/datasetId for borough ${borough}: ${JSON.stringify(runInfo).slice(0, 300)}`,
+        );
+      }
+
+      console.log(`[Craigslist] Borough ${borough}: run started (${runId})`);
+      boroughRuns.push({ borough, runId, datasetId, done: false, items: [] });
+    }),
   );
-  if (!datasetRes.ok) {
-    throw new Error(`Apify dataset fetch failed: ${datasetRes.status}`);
+
+  // 2. Poll all runs in a single loop until all complete or timeout
+  const deadline = Date.now() + MAX_WAIT_MS;
+
+  while (Date.now() < deadline) {
+    const pending = boroughRuns.filter((r) => !r.done);
+    if (pending.length === 0) break;
+
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+
+    await Promise.all(
+      pending.map(async (run) => {
+        try {
+          const statusRes = await fetch(
+            `https://api.apify.com/v2/actor-runs/${run.runId}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              signal: AbortSignal.timeout(10_000),
+            },
+          );
+          if (!statusRes.ok) return;
+
+          const statusData = (await statusRes.json()) as {
+            data?: { status?: string };
+          };
+          const status = statusData.data?.status;
+
+          if (status === "SUCCEEDED") {
+            // Fetch dataset items immediately
+            const datasetRes = await fetch(
+              `https://api.apify.com/v2/datasets/${run.datasetId}/items?format=json`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+                signal: AbortSignal.timeout(30_000),
+              },
+            );
+            if (datasetRes.ok) {
+              const data = await datasetRes.json();
+              if (Array.isArray(data)) {
+                run.items = data as ApifyCLItem[];
+              }
+            }
+            run.done = true;
+            console.log(
+              `[Craigslist] Borough ${run.borough}: completed, ${run.items.length} items`,
+            );
+          } else if (
+            status === "FAILED" ||
+            status === "ABORTED" ||
+            status === "TIMED-OUT"
+          ) {
+            console.error(
+              `[Craigslist] Borough ${run.borough}: run ${status}`,
+            );
+            run.done = true; // Mark done so we don't block other boroughs
+          }
+        } catch (err) {
+          // Non-fatal — will retry on next poll
+          console.warn(
+            `[Craigslist] Borough ${run.borough}: poll error — ${err}`,
+          );
+        }
+      }),
+    );
+
+    // Log overall progress
+    const doneCount = boroughRuns.filter((r) => r.done).length;
+    console.log(
+      `[Craigslist] Progress: ${doneCount}/${boroughRuns.length} boroughs complete`,
+    );
   }
 
-  const data = await datasetRes.json();
-  if (!Array.isArray(data)) {
-    throw new Error(`Unexpected Apify response: ${typeof data}`);
+  // Warn about any boroughs that didn't finish in time
+  const timedOut = boroughRuns.filter((r) => !r.done);
+  if (timedOut.length > 0) {
+    console.warn(
+      `[Craigslist] ${timedOut.length} borough(s) timed out: ${timedOut.map((r) => r.borough).join(", ")}`,
+    );
   }
 
-  const items: ApifyCLItem[] = data;
-  console.log(`[Craigslist] Web Scraper returned ${items.length} raw items`);
+  // 3. Merge items from all borough runs
+  const items: ApifyCLItem[] = boroughRuns.flatMap((r) => r.items);
+  console.log(
+    `[Craigslist] Total raw items from all boroughs: ${items.length}`,
+  );
 
   const listings: AdapterOutput[] = [];
 
