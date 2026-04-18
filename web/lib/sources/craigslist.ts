@@ -7,9 +7,17 @@
  * listings dynamically via JavaScript (gallery-card / cl-search-result elements
  * with [data-pid] attributes). A static HTML scraper only sees the fallback.
  * Automatically paginates through all search result pages.
- * Cost is based on compute time (~$0.10-0.20/run) instead of per-result.
+ *
+ * Incremental mode (when supabase client is provided):
+ * 1. Phase 1 — Search-page scan (~$0.10): scrapes search result pages only,
+ *    extracting listing URLs without visiting individual pages.
+ * 2. DB check: queries Supabase for which URLs already exist.
+ * 3. Bumps last_seen_at for existing URLs.
+ * 4. Phase 2 — Detail scrape: only visits NEW listing pages for full data.
+ * 5. Returns only new listings for the upsert pipeline.
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AdapterOutput, SearchParams } from "./types";
 import { extractBaths, extractBeds, parsePrice } from "./parse-utils";
 
@@ -17,74 +25,88 @@ const APIFY_START_URL =
   "https://api.apify.com/v2/acts/apify~puppeteer-scraper/runs";
 
 const POLL_INTERVAL_MS = 5_000;
-const MAX_WAIT_MS = 1_800_000; // 30 min max (each borough runs independently)
+const MAX_WAIT_MS = 3_600_000; // 60 min max (detail scrape for ~1000 URLs needs ~50 min)
 
 // ---------------------------------------------------------------------------
-// pageFunction — runs inside the Puppeteer Scraper (Node.js context with page object)
+// SEARCH_ONLY_PAGE_FUNCTION — only scrapes search result pages, extracts URLs
 // ---------------------------------------------------------------------------
 
-const PAGE_FUNCTION = `
+const SEARCH_ONLY_PAGE_FUNCTION = `
 async function pageFunction(context) {
-  const { page, request, enqueueLinks, log } = context;
+  const { page, request, log } = context;
   const url = request.url;
 
-  // --- Search results page ---
-  if (url.includes('/search/') || url.includes('search=')) {
-    // Wait for JS-rendered results
-    try {
-      await page.waitForSelector('[data-pid], .gallery-card, .cl-search-result', { timeout: 15000 });
-    } catch (e) {
-      log.warning('No search results found on page: ' + url);
-      return;
-    }
-
-    // CL paginates at ~200 results per page via a "next" button (cl-next-result).
-    // Loop: extract links from current page, click next, repeat until no more pages.
-    let pageNum = 1;
-    let totalEnqueued = 0;
-
-    while (true) {
-      // Scroll to load any lazy content
-      for (let i = 0; i < 3; i++) {
-        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-        await new Promise(r => setTimeout(r, 1000));
-      }
-
-      // Extract listing links
-      const links = await page.evaluate(() => {
-        const found = [];
-        document.querySelectorAll('[data-pid] a[href], .gallery-card a[href], .cl-search-result a[href]').forEach(a => {
-          const href = a.getAttribute('href');
-          if (href && /\\/\\d+\\.html/.test(href)) {
-            found.push(href.startsWith('http') ? href : 'https://newyork.craigslist.org' + href);
-          }
-        });
-        return [...new Set(found)];
-      });
-
-      log.info('Page ' + pageNum + ': found ' + links.length + ' listing links');
-      if (links.length > 0) {
-        await enqueueLinks({ urls: links, userData: { isListing: true } });
-        totalEnqueued += links.length;
-      }
-
-      // Check for next page button
-      const nextBtn = await page.$('button.bd-button.cl-next-result');
-      if (!nextBtn) {
-        log.info('No more pages after page ' + pageNum + '. Total enqueued: ' + totalEnqueued);
-        break;
-      }
-
-      // Click next and wait for new results to load
-      await nextBtn.click();
-      await new Promise(r => setTimeout(r, 3000));
-      pageNum++;
-    }
-
-    return; // Don't push data for search pages
+  // Only handle search result pages
+  if (!url.includes('/search/') && !url.includes('search=')) {
+    log.warning('Unexpected non-search URL: ' + url);
+    return;
   }
 
-  // --- Individual listing page ---
+  // Wait for JS-rendered results
+  try {
+    await page.waitForSelector('[data-pid], .gallery-card, .cl-search-result', { timeout: 15000 });
+  } catch (e) {
+    log.warning('No search results found on page: ' + url);
+    return;
+  }
+
+  // CL paginates at ~200 results per page via a "next" button (cl-next-result).
+  // Loop: extract links from current page, click next, repeat until no more pages.
+  let pageNum = 1;
+  let totalFound = 0;
+
+  while (true) {
+    // Scroll to load any lazy content
+    for (let i = 0; i < 3; i++) {
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+      await new Promise(r => setTimeout(r, 1000));
+    }
+
+    // Extract listing links
+    const links = await page.evaluate(() => {
+      const found = [];
+      document.querySelectorAll('[data-pid] a[href], .gallery-card a[href], .cl-search-result a[href]').forEach(a => {
+        const href = a.getAttribute('href');
+        if (href && /\\/\\d+\\.html/.test(href)) {
+          found.push(href.startsWith('http') ? href : 'https://newyork.craigslist.org' + href);
+        }
+      });
+      return [...new Set(found)];
+    });
+
+    log.info('Page ' + pageNum + ': found ' + links.length + ' listing URLs');
+    if (links.length > 0) {
+      // Push each URL as data (NOT enqueueLinks — we don't visit them)
+      for (const link of links) {
+        await context.pushData({ url: link });
+      }
+      totalFound += links.length;
+    }
+
+    // Check for next page button
+    const nextBtn = await page.$('button.bd-button.cl-next-result');
+    if (!nextBtn) {
+      log.info('No more pages after page ' + pageNum + '. Total URLs found: ' + totalFound);
+      break;
+    }
+
+    // Scroll into view and click via JS (Puppeteer's native click fails
+    // when the button is off-screen or overlapped)
+    await page.evaluate(el => { el.scrollIntoView(); el.click(); }, nextBtn);
+    await new Promise(r => setTimeout(r, 3000));
+    pageNum++;
+  }
+}
+`;
+
+// ---------------------------------------------------------------------------
+// DETAIL_PAGE_FUNCTION — only handles individual listing pages
+// ---------------------------------------------------------------------------
+
+const DETAIL_PAGE_FUNCTION = `
+async function pageFunction(context) {
+  const { page, request, log } = context;
+  const url = request.url;
 
   // Wait for content to load
   try {
@@ -215,7 +237,7 @@ async function pageFunction(context) {
 `;
 
 // ---------------------------------------------------------------------------
-// Apify dataset item shape (matches what pageFunction pushes)
+// Apify dataset item shape (matches what DETAIL_PAGE_FUNCTION pushes)
 // ---------------------------------------------------------------------------
 
 interface ApifyCLItem {
@@ -236,12 +258,124 @@ interface ApifyCLItem {
   [key: string]: unknown;
 }
 
+/** Shape returned by SEARCH_ONLY_PAGE_FUNCTION */
+interface ApifySearchItem {
+  url?: string;
+  [key: string]: unknown;
+}
+
+// ---------------------------------------------------------------------------
+// Apify helper functions
+// ---------------------------------------------------------------------------
+
+interface ApifyRunResult {
+  runId: string;
+  datasetId: string;
+}
+
+/** Starts an Apify puppeteer-scraper run, returns runId + datasetId. */
+async function launchApifyRun(
+  token: string,
+  input: Record<string, unknown>,
+): Promise<ApifyRunResult> {
+  const startRes = await fetch(APIFY_START_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(input),
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  if (!startRes.ok) {
+    const body = await startRes.text().catch(() => "");
+    throw new Error(
+      `Apify start failed (${startRes.status}): ${body.slice(0, 500)}`,
+    );
+  }
+
+  const runInfo = (await startRes.json()) as {
+    data?: { id?: string; defaultDatasetId?: string };
+  };
+  const runId = runInfo.data?.id;
+  const datasetId = runInfo.data?.defaultDatasetId;
+  if (!runId || !datasetId) {
+    throw new Error(
+      `Apify run missing id/datasetId: ${JSON.stringify(runInfo).slice(0, 300)}`,
+    );
+  }
+
+  return { runId, datasetId };
+}
+
+/** Polls an Apify run until it reaches a terminal state or timeout. Returns the final status. */
+async function pollApifyRun(
+  token: string,
+  runId: string,
+  maxWaitMs: number,
+): Promise<string> {
+  const deadline = Date.now() + maxWaitMs;
+
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+
+    try {
+      const statusRes = await fetch(
+        `https://api.apify.com/v2/actor-runs/${runId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: AbortSignal.timeout(10_000),
+        },
+      );
+      if (!statusRes.ok) continue;
+
+      const statusData = (await statusRes.json()) as {
+        data?: { status?: string };
+      };
+      const status = statusData.data?.status;
+
+      if (
+        status === "SUCCEEDED" ||
+        status === "FAILED" ||
+        status === "ABORTED" ||
+        status === "TIMED-OUT"
+      ) {
+        return status;
+      }
+    } catch {
+      // Non-fatal — will retry on next poll
+    }
+  }
+
+  return "TIMED-OUT";
+}
+
+/** Fetches all items from an Apify dataset. */
+async function fetchDatasetItems<T>(
+  token: string,
+  datasetId: string,
+): Promise<T[]> {
+  const datasetRes = await fetch(
+    `https://api.apify.com/v2/datasets/${datasetId}/items?format=json`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(30_000),
+    },
+  );
+  if (!datasetRes.ok) return [];
+
+  const data = await datasetRes.json();
+  return Array.isArray(data) ? (data as T[]) : [];
+}
+
 // ---------------------------------------------------------------------------
 // Main fetch function
 // ---------------------------------------------------------------------------
 
 export async function fetchCraigslistListings(
   params: SearchParams,
+  opts?: { supabase?: SupabaseClient },
 ): Promise<{ listings: AdapterOutput[]; total: number }> {
   const { bedsMin, priceMax, priceMin } = params;
 
@@ -250,9 +384,6 @@ export async function fetchCraigslistListings(
     throw new Error("APIFY_TOKEN not set — cannot query Craigslist via Apify");
   }
 
-  // Launch each borough as a SEPARATE Apify run in parallel. This avoids the
-  // single-run timeout problem: one run with 5 boroughs means 3000+ pages,
-  // which exceeds the polling timeout. Parallel runs each handle ~600 listings.
   const CL_BOROUGHS = ["brk", "mnh", "que", "brx", "stn"];
   const queryParams = new URLSearchParams();
   if (priceMin != null) queryParams.set("min_price", String(priceMin));
@@ -261,149 +392,212 @@ export async function fetchCraigslistListings(
   queryParams.set("availabilityMode", "0");
 
   const qs = queryParams.toString();
-  console.log(`[Craigslist] Launching ${CL_BOROUGHS.length} parallel borough runs`);
+  const supabase = opts?.supabase;
 
-  // 1. Start one Apify run per borough in parallel
-  interface BoroughRun {
+  // =========================================================================
+  // Phase 1 — Search-page scan (discover listing URLs without visiting them)
+  // =========================================================================
+  console.log(
+    `[Craigslist] Phase 1: search-page scan across ${CL_BOROUGHS.length} boroughs`,
+  );
+
+  const searchRuns: Array<{
     borough: string;
     runId: string;
     datasetId: string;
-    done: boolean;
-    items: ApifyCLItem[];
-  }
+  }> = [];
 
-  const boroughRuns: BoroughRun[] = [];
-
+  // Launch one search-only Apify run per borough in parallel
   await Promise.all(
     CL_BOROUGHS.map(async (borough) => {
       const startUrl = `https://newyork.craigslist.org/search/${borough}/apa?${qs}`;
       const input = {
         startUrls: [{ url: startUrl }],
-        pageFunction: PAGE_FUNCTION,
+        pageFunction: SEARCH_ONLY_PAGE_FUNCTION,
         proxyConfiguration: { useApifyProxy: true },
-        maxRequestsPerCrawl: 1500,
-        maxConcurrency: 5,
+        maxRequestsPerCrawl: 50,
+        maxConcurrency: 3,
         waitUntil: ["networkidle2"],
       };
 
-      const startRes = await fetch(APIFY_START_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(input),
-        signal: AbortSignal.timeout(30_000),
-      });
-
-      if (!startRes.ok) {
-        const body = await startRes.text().catch(() => "");
-        throw new Error(
-          `Apify start failed for borough ${borough} (${startRes.status}): ${body.slice(0, 500)}`,
-        );
-      }
-
-      const runInfo = (await startRes.json()) as {
-        data?: { id?: string; defaultDatasetId?: string };
-      };
-      const runId = runInfo.data?.id;
-      const datasetId = runInfo.data?.defaultDatasetId;
-      if (!runId || !datasetId) {
-        throw new Error(
-          `Apify run missing id/datasetId for borough ${borough}: ${JSON.stringify(runInfo).slice(0, 300)}`,
-        );
-      }
-
-      console.log(`[Craigslist] Borough ${borough}: run started (${runId})`);
-      boroughRuns.push({ borough, runId, datasetId, done: false, items: [] });
+      const { runId, datasetId } = await launchApifyRun(token, input);
+      console.log(
+        `[Craigslist] Phase 1 — borough ${borough}: run started (${runId})`,
+      );
+      searchRuns.push({ borough, runId, datasetId });
     }),
   );
 
-  // 2. Poll all runs in a single loop until all complete or timeout
-  const deadline = Date.now() + MAX_WAIT_MS;
-
-  while (Date.now() < deadline) {
-    const pending = boroughRuns.filter((r) => !r.done);
-    if (pending.length === 0) break;
-
-    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-
-    await Promise.all(
-      pending.map(async (run) => {
-        try {
-          const statusRes = await fetch(
-            `https://api.apify.com/v2/actor-runs/${run.runId}`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-              signal: AbortSignal.timeout(10_000),
-            },
-          );
-          if (!statusRes.ok) return;
-
-          const statusData = (await statusRes.json()) as {
-            data?: { status?: string };
-          };
-          const status = statusData.data?.status;
-
-          if (status === "SUCCEEDED") {
-            // Fetch dataset items immediately
-            const datasetRes = await fetch(
-              `https://api.apify.com/v2/datasets/${run.datasetId}/items?format=json`,
-              {
-                headers: { Authorization: `Bearer ${token}` },
-                signal: AbortSignal.timeout(30_000),
-              },
-            );
-            if (datasetRes.ok) {
-              const data = await datasetRes.json();
-              if (Array.isArray(data)) {
-                run.items = data as ApifyCLItem[];
-              }
-            }
-            run.done = true;
-            console.log(
-              `[Craigslist] Borough ${run.borough}: completed, ${run.items.length} items`,
-            );
-          } else if (
-            status === "FAILED" ||
-            status === "ABORTED" ||
-            status === "TIMED-OUT"
-          ) {
-            console.error(
-              `[Craigslist] Borough ${run.borough}: run ${status}`,
-            );
-            run.done = true; // Mark done so we don't block other boroughs
-          }
-        } catch (err) {
-          // Non-fatal — will retry on next poll
-          console.warn(
-            `[Craigslist] Borough ${run.borough}: poll error — ${err}`,
-          );
-        }
-      }),
-    );
-
-    // Log overall progress
-    const doneCount = boroughRuns.filter((r) => r.done).length;
-    console.log(
-      `[Craigslist] Progress: ${doneCount}/${boroughRuns.length} boroughs complete`,
-    );
-  }
-
-  // Warn about any boroughs that didn't finish in time
-  const timedOut = boroughRuns.filter((r) => !r.done);
-  if (timedOut.length > 0) {
-    console.warn(
-      `[Craigslist] ${timedOut.length} borough(s) timed out: ${timedOut.map((r) => r.borough).join(", ")}`,
-    );
-  }
-
-  // 3. Merge items from all borough runs
-  const items: ApifyCLItem[] = boroughRuns.flatMap((r) => r.items);
-  console.log(
-    `[Craigslist] Total raw items from all boroughs: ${items.length}`,
+  // Poll all search runs until complete
+  const searchRunStatuses = await Promise.all(
+    searchRuns.map(async (run) => {
+      const status = await pollApifyRun(token, run.runId, MAX_WAIT_MS);
+      console.log(
+        `[Craigslist] Phase 1 — borough ${run.borough}: ${status}`,
+      );
+      return { ...run, status };
+    }),
   );
 
+  // Collect all discovered URLs from search datasets
+  const allDiscoveredUrls: string[] = [];
+  await Promise.all(
+    searchRunStatuses
+      .filter((r) => r.status === "SUCCEEDED")
+      .map(async (run) => {
+        const items = await fetchDatasetItems<ApifySearchItem>(
+          token,
+          run.datasetId,
+        );
+        const urls = items
+          .map((item) => item.url)
+          .filter((u): u is string => !!u);
+        console.log(
+          `[Craigslist] Phase 1 — borough ${run.borough}: ${urls.length} URLs discovered`,
+        );
+        allDiscoveredUrls.push(...urls);
+      }),
+  );
+
+  // Deduplicate URLs across boroughs
+  const uniqueUrls = [...new Set(allDiscoveredUrls)];
+  console.log(
+    `[Craigslist] Phase 1 complete: ${uniqueUrls.length} unique URLs discovered (${allDiscoveredUrls.length} total before dedup)`,
+  );
+
+  // Warn about boroughs that failed
+  const failedBoroughs = searchRunStatuses.filter(
+    (r) => r.status !== "SUCCEEDED",
+  );
+  if (failedBoroughs.length > 0) {
+    console.warn(
+      `[Craigslist] Phase 1: ${failedBoroughs.length} borough(s) failed: ${failedBoroughs.map((r) => `${r.borough} (${r.status})`).join(", ")}`,
+    );
+  }
+
+  if (uniqueUrls.length === 0) {
+    console.log("[Craigslist] No URLs discovered — nothing to do");
+    return { listings: [], total: 0 };
+  }
+
+  // =========================================================================
+  // DB check — filter to only new URLs (if supabase is available)
+  // =========================================================================
+  let urlsToFetch: string[];
+
+  if (supabase) {
+    console.log(
+      `[Craigslist] Checking DB for existing URLs (${uniqueUrls.length} to check)`,
+    );
+
+    // Query existing URLs in batches of 100 (CL URLs are long and
+    // 500 exceeds PostgREST's URL length limit for .in() queries)
+    const BATCH_SIZE = 100;
+    const existingUrls = new Set<string>();
+
+    for (let i = 0; i < uniqueUrls.length; i += BATCH_SIZE) {
+      const chunk = uniqueUrls.slice(i, i + BATCH_SIZE);
+      const { data, error } = await supabase
+        .from("listings")
+        .select("url")
+        .eq("source", "craigslist")
+        .in("url", chunk);
+
+      if (error) {
+        console.warn(
+          `[Craigslist] DB query error (batch ${Math.floor(i / BATCH_SIZE) + 1}): ${error.message}`,
+        );
+        continue;
+      }
+      if (data) {
+        for (const row of data) {
+          existingUrls.add(row.url);
+        }
+      }
+    }
+
+    // Bump last_seen_at for existing URLs
+    if (existingUrls.size > 0) {
+      console.log(
+        `[Craigslist] Bumping last_seen_at for ${existingUrls.size} existing listings`,
+      );
+      const existingUrlArray = [...existingUrls];
+      for (let i = 0; i < existingUrlArray.length; i += BATCH_SIZE) {
+        const chunk = existingUrlArray.slice(i, i + BATCH_SIZE);
+        const { error } = await supabase
+          .from("listings")
+          .update({ last_seen_at: new Date().toISOString() })
+          .eq("source", "craigslist")
+          .in("url", chunk);
+
+        if (error) {
+          console.warn(
+            `[Craigslist] last_seen_at bump error (batch ${Math.floor(i / BATCH_SIZE) + 1}): ${error.message}`,
+          );
+        }
+      }
+    }
+
+    // Filter to only new URLs
+    urlsToFetch = uniqueUrls.filter((u) => !existingUrls.has(u));
+    console.log(
+      `[Craigslist] Found ${uniqueUrls.length} total URLs, ${existingUrls.size} already in DB, ${urlsToFetch.length} new to fetch`,
+    );
+  } else {
+    // No supabase — fetch all discovered URLs (standalone mode)
+    urlsToFetch = uniqueUrls;
+    console.log(
+      `[Craigslist] No supabase client — fetching all ${urlsToFetch.length} URLs`,
+    );
+  }
+
+  // =========================================================================
+  // Phase 2 — Detail scrape (only new listing pages)
+  // =========================================================================
+  if (urlsToFetch.length === 0) {
+    console.log(
+      "[Craigslist] Phase 2: no new listings to fetch — all existing listings had last_seen_at bumped",
+    );
+    return { listings: [], total: 0 };
+  }
+
+  console.log(
+    `[Craigslist] Phase 2: fetching ${urlsToFetch.length} new listing details`,
+  );
+
+  const detailInput = {
+    startUrls: urlsToFetch.map((url) => ({ url })),
+    pageFunction: DETAIL_PAGE_FUNCTION,
+    proxyConfiguration: { useApifyProxy: true },
+    maxRequestsPerCrawl: urlsToFetch.length + 100,
+    maxConcurrency: 10,
+    waitUntil: ["networkidle2"],
+  };
+
+  const { runId: detailRunId, datasetId: detailDatasetId } =
+    await launchApifyRun(token, detailInput);
+  console.log(
+    `[Craigslist] Phase 2: detail run started (${detailRunId}) for ${urlsToFetch.length} URLs`,
+  );
+
+  const detailStatus = await pollApifyRun(token, detailRunId, MAX_WAIT_MS);
+  console.log(`[Craigslist] Phase 2: detail run ${detailStatus}`);
+
+  if (detailStatus !== "SUCCEEDED") {
+    console.error(
+      `[Craigslist] Phase 2: detail run ${detailStatus} — returning empty`,
+    );
+    return { listings: [], total: 0 };
+  }
+
+  const items = await fetchDatasetItems<ApifyCLItem>(token, detailDatasetId);
+  console.log(
+    `[Craigslist] Phase 2: ${items.length} detail items retrieved`,
+  );
+
+  // =========================================================================
+  // Map detail items to AdapterOutput[]
+  // =========================================================================
   const listings: AdapterOutput[] = [];
 
   for (const item of items) {
@@ -440,6 +634,10 @@ export async function fetchCraigslistListings(
       external_id: item.id ?? null,
     });
   }
+
+  console.log(
+    `[Craigslist] Done: ${listings.length} new listings ready for pipeline`,
+  );
 
   return { listings, total: listings.length };
 }

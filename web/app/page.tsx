@@ -189,8 +189,9 @@ function HomeInner() {
   // Viewport version counter — triggers commute filter re-run after viewport loads
   const [viewportVersion, setViewportVersion] = useState(0);
 
-  // Commute filter state
-  const [commuteMatchIds, setCommuteMatchIds] = useState<Set<number> | null>(null);
+  // Commute filter state — the server now pre-intersects listings with
+  // commute rules, so we only keep the per-listing metadata map for UI
+  // badges and the message string for the "no data" banner.
   const [commuteInfoMap, setCommuteInfoMap] = useState<globalThis.Map<number, CommuteInfo> | null>(null);
   const [commuteMessage, setCommuteMessage] = useState<string | null>(null);
   const [commuteLoading, setCommuteLoading] = useState(false);
@@ -208,62 +209,143 @@ function HomeInner() {
   toastRef.current = toast;
   const [showHidden, setShowHidden] = useState(false);
 
+  // Keep a ref to the latest filters so loadForViewport (stable across
+  // renders) always sees the most recent filter state without needing to
+  // be re-created.
+  const filtersRef = useRef<FiltersState | null>(null);
+  // Populate synchronously during render so the first async loadForViewport
+  // (kicked off from the initial boot useEffect) sees the URL-derived filters.
+  // The matching useEffect below keeps this in sync on subsequent changes.
+
   const loadForViewport = useCallback(async (bounds: { latMin: number; latMax: number; lonMin: number; lonMax: number }) => {
     lastLoadedBounds.current = bounds;
     const requestId = ++viewportRequestRef.current;
     setViewportLoading(true);
+    const currentFilters = filtersRef.current;
+    const commuteRules = currentFilters?.commuteRules ?? [];
+    if (commuteRules.length > 0) setCommuteLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('listings')
-        .select('*')
-        .is('delisted_at', null)
-        .gte('lat', bounds.latMin)
-        .lte('lat', bounds.latMax)
-        .gte('lon', bounds.lonMin)
-        .lte('lon', bounds.lonMax)
-        .order('last_update_date', { ascending: false, nullsFirst: false })
-        .order('created_at', { ascending: false })
-        .limit(500);
+      const res = await fetch('/api/listings/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bounds,
+          filters: currentFilters ? {
+            selectedBeds: currentFilters.selectedBeds,
+            minBaths: currentFilters.minBaths,
+            includeNaBaths: currentFilters.includeNaBaths,
+            minRent: currentFilters.minRent,
+            maxRent: currentFilters.maxRent,
+            priceMode: currentFilters.priceMode,
+            maxListingAge: currentFilters.maxListingAge,
+            selectedSources: currentFilters.selectedSources,
+            minYearBuilt: currentFilters.minYearBuilt,
+            maxYearBuilt: currentFilters.maxYearBuilt,
+            minSqft: currentFilters.minSqft,
+            maxSqft: currentFilters.maxSqft,
+            excludeNoSqft: currentFilters.excludeNoSqft,
+          } : {},
+          commuteRules,
+          limit: 2000,
+        }),
+      });
       // Discard stale responses from superseded requests
       if (requestId !== viewportRequestRef.current) return;
-      if (error) {
-        console.error('[viewport] query error:', error.message);
+      if (!res.ok) {
+        console.error('[viewport] query error:', res.status, await res.text().catch(() => ''));
         return;
       }
-      if (data) {
-        const newListings = (data as unknown as Listing[]).map((l) => ({
-          ...l,
-          lat: l.lat != null ? Number(l.lat) : null,
-          lon: l.lon != null ? Number(l.lon) : null,
-          baths: l.baths != null ? Number(l.baths) : null,
-          sqft: l.sqft != null ? Number(l.sqft) : null,
-          price: Number(l.price),
-          beds: Number(l.beds),
-          photos: Number(l.photos),
-          photo_urls: l.photo_urls ?? [],
-        }));
-        // Only replace listings if results were found; keep existing pins when
-        // panning to empty areas (parks, water, outside city).
-        if (newListings.length > 0) {
-          setListings(newListings);
-          setViewportVersion(v => v + 1);
-          // Null out viewport count so the badge falls back to the accurate
-          // filtered count (client-side filters have not been applied to
-          // newListings yet at this point).
-          setViewportCount(null);
-        } else {
-          // Empty area — keep existing listings but show "0 rentals" in badge
-          setViewportCount(0);
+      const data = await res.json() as {
+        listings: Listing[];
+        commuteInfo: Record<number, { minutes: number; station: string; mode: string }>;
+        total: number;
+        commuteMessage: string | null;
+      };
+      if (requestId !== viewportRequestRef.current) return;
+
+      const newListings = (data.listings ?? []).map((l) => ({
+        ...l,
+        lat: l.lat != null ? Number(l.lat) : null,
+        lon: l.lon != null ? Number(l.lon) : null,
+        baths: l.baths != null ? Number(l.baths) : null,
+        sqft: l.sqft != null ? Number(l.sqft) : null,
+        price: Number(l.price),
+        beds: Number(l.beds),
+        photos: Number(l.photos),
+        photo_urls: l.photo_urls ?? [],
+      }));
+
+      // Commute info handling (server side has already intersected):
+      // - If commute rules are active, always update commute state — even
+      //   for empty results — so filtering is reactive. Otherwise clear it.
+      if (commuteRules.length > 0) {
+        // Determine route letter and color from the first subway-line/station rule
+        const SUBWAY_COLORS: Record<string, string> = {
+          '1': '#EE352E', '2': '#EE352E', '3': '#EE352E',
+          '4': '#00933C', '5': '#00933C', '6': '#00933C',
+          '7': '#B933AD',
+          'A': '#0039A6', 'C': '#0039A6', 'E': '#0039A6',
+          'B': '#FF6319', 'D': '#FF6319', 'F': '#FF6319', 'M': '#FF6319',
+          'G': '#6CBE45',
+          'J': '#996633', 'Z': '#996633',
+          'L': '#A7A9AC',
+          'N': '#FCCC0A', 'Q': '#FCCC0A', 'R': '#FCCC0A', 'W': '#FCCC0A',
+          'S': '#808183',
+        };
+        let routeLetter: string | undefined;
+        let routeColor: string | undefined;
+        for (const rule of commuteRules) {
+          if ((rule.type === 'subway-line' || rule.type === 'station') && rule.lines && rule.lines.length > 0) {
+            routeLetter = rule.lines[0];
+            routeColor = SUBWAY_COLORS[routeLetter] ?? '#8b949e';
+            break;
+          }
         }
+        const infoMap: globalThis.Map<number, CommuteInfo> = new globalThis.Map();
+        for (const [idStr, meta] of Object.entries(data.commuteInfo ?? {})) {
+          infoMap.set(Number(idStr), {
+            minutes: meta.minutes,
+            route: routeLetter,
+            routeColor,
+            destination: meta.station,
+          });
+        }
+        // Build the commute match ID set from the returned listings (they
+        // are, by definition, the intersection of bounds ∩ filters ∩ commute).
+        setCommuteInfoMap(infoMap.size > 0 ? infoMap : null);
+        setCommuteMessage(data.commuteMessage);
+      } else {
+        setCommuteInfoMap(null);
+        setCommuteMessage(null);
+      }
+
+      // Only replace listings if results were found; keep existing pins when
+      // panning to empty areas (parks, water, outside city).
+      if (newListings.length > 0) {
+        setListings(newListings);
+        setViewportVersion(v => v + 1);
+        // Null out viewport count so the badge falls back to the accurate
+        // filtered count.
+        setViewportCount(null);
+      } else if (commuteRules.length > 0) {
+        // Commute filter active and nothing matched — clear listings so the
+        // "no match" state is honest.
+        setListings([]);
+        setViewportVersion(v => v + 1);
+        setViewportCount(0);
+      } else {
+        // Empty area (no commute) — keep existing listings, update badge
+        setViewportCount(0);
       }
     } catch (err) {
       console.error('[viewport] fetch failed:', err);
     } finally {
       if (requestId === viewportRequestRef.current) {
         setViewportLoading(false);
+        setCommuteLoading(false);
       }
     }
-  }, [supabase]);
+  }, []);
 
   // Auto-search on any pan or zoom (swipe-triggered pans are already
   // suppressed by suppressBoundsRef in BoundsWatcher)
@@ -314,6 +396,9 @@ function HomeInner() {
   const [filters, setFilters] = useState<FiltersState>(() =>
     readFiltersFromParams(searchParams),
   );
+  // Sync the ref synchronously on every render so the stable loadForViewport
+  // callback always reads the latest filter state without re-creating.
+  filtersRef.current = filters;
 
   // Map position — read initial values from URL params if present and valid
   const [mapPosition, setMapPosition] = useState<MapPosition | null>(() => {
@@ -420,102 +505,24 @@ function HomeInner() {
   }, []);
 
   // -----------------------------------------------------------------------
-  // Commute filter: call API when commuteRules change
+  // Server-side search: when filters change, re-run loadForViewport so the
+  // 2000-row server cap is shared across ALL active filters (not just
+  // bounds+delisted_at). Debounced to avoid hammering the API on every
+  // keystroke in a min/max input.
   // -----------------------------------------------------------------------
+  const filterChangeFirstRunRef = useRef(true);
   useEffect(() => {
-    const rules = filters.commuteRules;
-    if (!rules || rules.length === 0) {
-      setCommuteMatchIds(null);
-      setCommuteInfoMap(null);
-      setCommuteMessage(null);
-      setCommuteLoading(false);
+    // filtersRef is updated synchronously during render; no need to update it here.
+    if (filterChangeFirstRunRef.current) {
+      filterChangeFirstRunRef.current = false;
       return;
     }
-
-    let cancelled = false;
-    setCommuteLoading(true);
-
-    // NYC subway line colors for commute badges
-    const SUBWAY_COLORS: Record<string, string> = {
-      '1': '#EE352E', '2': '#EE352E', '3': '#EE352E',
-      '4': '#00933C', '5': '#00933C', '6': '#00933C',
-      '7': '#B933AD',
-      'A': '#0039A6', 'C': '#0039A6', 'E': '#0039A6',
-      'B': '#FF6319', 'D': '#FF6319', 'F': '#FF6319', 'M': '#FF6319',
-      'G': '#6CBE45',
-      'J': '#996633', 'Z': '#996633',
-      'L': '#A7A9AC',
-      'N': '#FCCC0A', 'Q': '#FCCC0A', 'R': '#FCCC0A', 'W': '#FCCC0A',
-      'S': '#808183',
-    };
-
-    // Determine the route letter and color from the commute rules
-    // Use the first subway-line or station rule's first line
-    let routeLetter: string | undefined;
-    let routeColor: string | undefined;
-    let destination: string | undefined;
-    for (const rule of rules) {
-      if ((rule.type === 'subway-line' || rule.type === 'station') && rule.lines && rule.lines.length > 0) {
-        routeLetter = rule.lines[0];
-        routeColor = SUBWAY_COLORS[routeLetter] ?? '#8b949e';
-        break;
-      }
-    }
-
-    (async () => {
-      try {
-        const res = await fetch('/api/commute-filter', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ commuteRules: rules }),
-        });
-        if (cancelled) return;
-        const data = await res.json();
-        if (cancelled) return;
-
-        if (data.listingIds != null) {
-          setCommuteMatchIds(new Set(data.listingIds as number[]));
-          setCommuteMessage(null);
-
-          // Build CommuteInfo map from API response
-          // Use globalThis.Map because the local `Map` import shadows the global Map constructor
-          const infoMap: globalThis.Map<number, CommuteInfo> = new globalThis.Map();
-          const apiMeta = data.commuteInfo as Record<string, { minutes: number; station: string; mode: string }> | null;
-          if (apiMeta) {
-            for (const [idStr, meta] of Object.entries(apiMeta)) {
-              const id = Number(idStr);
-              // Determine destination: use station name from API
-              destination = meta.station;
-
-              infoMap.set(id, {
-                minutes: meta.minutes,
-                route: routeLetter,
-                routeColor,
-                destination,
-              });
-            }
-          }
-          setCommuteInfoMap(infoMap.size > 0 ? infoMap : null);
-        } else {
-          setCommuteMatchIds(null);
-          setCommuteInfoMap(null);
-          setCommuteMessage(data.message ?? null);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('[commute-filter] fetch failed:', err);
-          setCommuteMatchIds(null);
-          setCommuteInfoMap(null);
-          setCommuteMessage('Failed to apply commute filter');
-        }
-      } finally {
-        if (!cancelled) setCommuteLoading(false);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.commuteRules]);
+    const bounds = lastLoadedBounds.current ?? { latMin: 40.65, latMax: 40.82, lonMin: -74.05, lonMax: -73.88 };
+    const t = setTimeout(() => {
+      loadForViewport(bounds);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [filters, loadForViewport]);
 
   // -----------------------------------------------------------------------
   // Deep-link: auto-open listing from ?listing=ID on page load
@@ -568,104 +575,21 @@ function HomeInner() {
 
   // -----------------------------------------------------------------------
   // Filter + sort
+  //
+  // Server-side filtering (via /api/listings/search) now handles beds, baths,
+  // price, listing age, year built, sqft, sources, commute intersection, the
+  // scam filter, and bounds — all in SQL with a shared 2000-row cap. That
+  // fixes the old bug where a 500-row viewport cap would truncate results
+  // before client-side filters saw them (e.g. "1 of 1" in swipe view).
+  //
+  // The only work left on the client is cheap UI-only stuff:
+  //   - `showHidden` toggle (user-specific, per-device, no point round-tripping)
+  //   - `photosFirst` + final sort (tiny in-memory sort)
   // -----------------------------------------------------------------------
   const filteredListings = useMemo(() => {
-    let result = [...listings];
+    let result = showHidden ? [...listings] : listings.filter((l) => !hiddenIds.has(l.id));
 
-    // Filter out hidden listings (unless showHidden is active)
-    if (!showHidden) {
-      result = result.filter((l) => !hiddenIds.has(l.id));
-    }
-
-    // Scam filter: remove per-room listings (price per bedroom below $800)
-    result = result.filter((l) => l.beds === 0 || l.price / l.beds >= 800);
-
-    if (filters.selectedBeds !== null && filters.selectedBeds.length > 0) {
-      result = result.filter((l) => {
-        // If 7 is selected, include listings with 7+ beds
-        if (filters.selectedBeds!.includes(7) && l.beds >= 7) return true;
-        return filters.selectedBeds!.includes(l.beds);
-      });
-    }
-    if (filters.minRent !== null) {
-      result = result.filter((l) => {
-        const effectivePrice = filters.priceMode === 'perRoom'
-          ? l.price / Math.max(l.beds ?? 1, 1)
-          : l.price;
-        return effectivePrice >= filters.minRent!;
-      });
-    }
-    if (filters.maxRent !== null) {
-      result = result.filter((l) => {
-        const effectivePrice = filters.priceMode === 'perRoom'
-          ? l.price / Math.max(l.beds ?? 1, 1)
-          : l.price;
-        return effectivePrice <= filters.maxRent!;
-      });
-    }
-
-    // Listing age filter
-    if (filters.maxListingAge !== null) {
-      const now = Date.now();
-      const msMap: Record<string, number> = {
-        '1h': 3_600_000,
-        '3h': 10_800_000,
-        '6h': 21_600_000,
-        '12h': 43_200_000,
-        '1d': 86_400_000,
-        '2d': 172_800_000,
-        '3d': 259_200_000,
-        '1w': 604_800_000,
-        '2w': 1_209_600_000,
-        '1m': 2_592_000_000,
-      };
-      const cutoff = now - (msMap[filters.maxListingAge] ?? 0);
-      result = result.filter((l) => {
-        const dateStr = l.list_date ?? l.created_at;
-        if (!dateStr) return true;
-        return new Date(dateStr).getTime() >= cutoff;
-      });
-    }
-
-    // Bathroom filter
-    if (filters.minBaths !== null) {
-      result = result.filter((l) => {
-        if (filters.includeNaBaths && (l.baths === null || l.baths === 0)) return true;
-        return (l.baths ?? 0) >= filters.minBaths!;
-      });
-    }
-
-    // Year built filter
-    if (filters.minYearBuilt !== null) {
-      result = result.filter((l) => (l.year_built ?? 0) >= filters.minYearBuilt!);
-    }
-    if (filters.maxYearBuilt !== null) {
-      result = result.filter((l) => (l.year_built ?? new Date().getFullYear()) <= filters.maxYearBuilt!);
-    }
-
-    // Sqft filter
-    if (filters.excludeNoSqft) {
-      result = result.filter((l) => l.sqft != null);
-    }
-    if (filters.minSqft !== null) {
-      result = result.filter((l) => l.sqft != null && l.sqft >= filters.minSqft!);
-    }
-    if (filters.maxSqft !== null) {
-      result = result.filter((l) => l.sqft != null && l.sqft <= filters.maxSqft!);
-    }
-
-    // Source filter
-    if (filters.selectedSources !== null) {
-      const srcSet = new Set(filters.selectedSources);
-      result = result.filter((l) => l.source && srcSet.has(l.source));
-    }
-
-    // Commute filter: restrict to listings matching commute rules
-    if (commuteMatchIds !== null) {
-      result = result.filter((l) => commuteMatchIds.has(l.id));
-    }
-
-    result.sort((a, b) => {
+    result = [...result].sort((a, b) => {
       if (filters.photosFirst) {
         const aHasPhotos = (a.photos ?? 0) > 0 ? 0 : 1;
         const bHasPhotos = (b.photos ?? 0) > 0 ? 0 : 1;
@@ -684,7 +608,7 @@ function HomeInner() {
     });
 
     return result;
-  }, [listings, filters, hiddenIds, showHidden, commuteMatchIds]);
+  }, [listings, filters.photosFirst, filters.sort, hiddenIds, showHidden]);
 
   // Keep the ref in sync so the chat hook's getListingCount stays current
   filteredListingsRef.current = filteredListings;
@@ -1108,6 +1032,7 @@ function HomeInner() {
             onLoginRequired={() => setAuthModal('login')}
             showHidden={showHidden}
             isLoading={viewportLoading}
+            wishlistedIds={wishlistedIds}
           />
 
           {/* Loading spinner overlay for swipe mode */}
