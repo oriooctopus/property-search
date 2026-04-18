@@ -250,17 +250,24 @@ export async function fetchCraigslistListings(
     throw new Error("APIFY_TOKEN not set — cannot query Craigslist via Apify");
   }
 
-  // Build Craigslist search URL with filters
+  // Build per-borough start URLs so each borough's pagination runs independently.
+  // CL paginates at 200 results per page; splitting by borough keeps each
+  // search page count manageable and ensures the click-through pagination works.
+  const CL_BOROUGHS = ["brk", "mnh", "que", "brx", "stn"];
   const queryParams = new URLSearchParams();
   if (priceMin != null) queryParams.set("min_price", String(priceMin));
   if (priceMax != null) queryParams.set("max_price", String(priceMax));
   if (bedsMin != null) queryParams.set("min_bedrooms", String(bedsMin));
   queryParams.set("availabilityMode", "0");
 
-  const clUrl = `https://newyork.craigslist.org/search/apa?${queryParams.toString()}`;
+  const qs = queryParams.toString();
+  const startUrls = CL_BOROUGHS.map((b) => ({
+    url: `https://newyork.craigslist.org/search/${b}/apa?${qs}`,
+  }));
+  console.log(`[Craigslist] Starting with ${startUrls.length} borough URLs`);
 
   const input = {
-    startUrls: [{ url: clUrl }],
+    startUrls,
     pageFunction: PAGE_FUNCTION,
     proxyConfiguration: { useApifyProxy: true },
     maxRequestsPerCrawl: 5000,
@@ -268,7 +275,7 @@ export async function fetchCraigslistListings(
     waitUntil: ["networkidle2"],
   };
 
-  console.log(`[Craigslist] Starting Web Scraper (Puppeteer) for ${clUrl}`);
+  console.log(`[Craigslist] Starting Puppeteer Scraper for ${CL_BOROUGHS.length} boroughs`);
 
   // 1. Start the actor run (async)
   const startRes = await fetch(APIFY_START_URL, {

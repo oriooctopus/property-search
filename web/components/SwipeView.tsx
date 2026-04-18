@@ -52,6 +52,7 @@ export interface SwipeViewProps {
   commuteInfoMap?: Map<number, CommuteInfo>;
   onLoginRequired?: () => void;
   showHidden?: boolean;
+  isLoading?: boolean;
 }
 
 interface UndoEntry {
@@ -103,6 +104,7 @@ export default function SwipeView({
   commuteInfoMap,
   onLoginRequired,
   showHidden,
+  isLoading,
 }: SwipeViewProps) {
   // Don't persist swipedIds across refreshes — start fresh each session.
   // The localStorage was causing "You've seen all listings" on every refresh.
@@ -671,7 +673,7 @@ export default function SwipeView({
             </div>{/* relative w-full */}
             </div>{/* flex-1 centering */}
           </>
-        ) : listings.length === 0 ? (
+        ) : listings.length === 0 && isLoading ? (
           /* Loading state — listings haven't loaded yet */
           <div
             className="flex-1 flex flex-col items-center justify-center gap-3 text-center m-3 rounded-xl"
@@ -687,6 +689,27 @@ export default function SwipeView({
             <div className="text-sm" style={{ color: '#8b949e' }}>
               Loading listings...
             </div>
+          </div>
+        ) : listings.length === 0 ? (
+          /* No results for current filters */
+          <div
+            className="flex-1 flex flex-col items-center justify-center gap-4 text-center m-3 rounded-xl"
+            style={{
+              backgroundColor: 'rgba(28, 32, 40, 0.97)',
+              border: '1px solid #2d333b',
+            }}
+          >
+            <div className="text-white text-lg font-semibold">
+              No listings found
+            </div>
+            <div className="text-sm" style={{ color: '#8b949e' }}>
+              Try adjusting your filters or moving the map.
+            </div>
+            {onSwitchView && (
+              <PrimaryButton onClick={onSwitchView}>
+                Switch to list view
+              </PrimaryButton>
+            )}
           </div>
         ) : (
           /* Empty state — user has swiped through everything */

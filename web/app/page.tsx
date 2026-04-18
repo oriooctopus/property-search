@@ -1107,6 +1107,7 @@ function HomeInner() {
             commuteInfoMap={commuteInfoMap ?? undefined}
             onLoginRequired={() => setAuthModal('login')}
             showHidden={showHidden}
+            isLoading={viewportLoading}
           />
 
           {/* Loading spinner overlay for swipe mode */}
