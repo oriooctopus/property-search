@@ -9,7 +9,7 @@ import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
 const MI_PER_DEG_LAT = 69;
 const MI_PER_DEG_LON = 52;
 
-function getClosestStations(lat: number, lon: number, count: number) {
+export function getClosestStations(lat: number, lon: number, count: number) {
   return SUBWAY_STATIONS
     .map((s) => {
       const dLat = (s.lat - lat) * MI_PER_DEG_LAT;
@@ -110,6 +110,8 @@ interface SwipeCardProps {
   exitPhotoFocusRef?: React.MutableRefObject<(() => void) | null>;
   /** Called when hovering over a subway station row */
   onSubwayHover?: (station: HoveredStation | null) => void;
+  /** Called when drag state changes (true = actively dragging, false = released) */
+  onDragStateChange?: (dragging: boolean) => void;
 }
 
 const SWIPE_X_THRESHOLD = 100;
@@ -126,6 +128,7 @@ export default function SwipeCard({
   enterPhotoFocusRef,
   exitPhotoFocusRef,
   onSubwayHover,
+  onDragStateChange,
 }: SwipeCardProps) {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [photoFocused, setPhotoFocused] = useState(false);
@@ -152,6 +155,8 @@ export default function SwipeCard({
   const bottomTint = useTransform(y, [0, SWIPE_Y_THRESHOLD], [0, 0.25]);
 
   const isDragging = useRef(false);
+  const notifiedDragging = useRef(false);
+  const photoSwipeActive = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Photo-focus mode: arrow keys cycle photos instead of triggering swipe actions
@@ -226,12 +231,19 @@ export default function SwipeCard({
   const bind = useDrag(
     ({ movement: [mx, my], down, velocity: [vx, vy] }) => {
       if (!isTop) return;
+      // Don't process card swipe when touch originated in the photo area
+      if (photoSwipeActive.current) return;
 
       if (down) {
         // Only allow dragging down (positive y) for pass gesture
         // For left/right, track x movement
         const allowedY = my > 0 ? my : 0;
         isDragging.current = Math.abs(mx) > 5 || allowedY > 5;
+        // Notify parent when drag begins (movement exceeds threshold)
+        if (isDragging.current && !notifiedDragging.current) {
+          notifiedDragging.current = true;
+          onDragStateChange?.(true);
+        }
         x.set(mx);
         y.set(allowedY);
       } else {
@@ -249,6 +261,11 @@ export default function SwipeCard({
           animate(y, 0, springBack);
         }
 
+        // Notify parent drag ended
+        if (notifiedDragging.current) {
+          notifiedDragging.current = false;
+          onDragStateChange?.(false);
+        }
         setTimeout(() => { isDragging.current = false; }, 50);
       }
     },
@@ -269,8 +286,31 @@ export default function SwipeCard({
     setPhotoIndex((i) => (i + 1) % totalPhotos);
   }, [totalPhotos]);
 
+  // Touch-based photo swiping for mobile
+  const photoSwipeBind = useDrag(
+    ({ movement: [mx], down, first, event }) => {
+      if (!isTop || totalPhotos <= 1) return;
+      if (first) {
+        // Prevent the card swipe from processing this gesture
+        event?.stopPropagation();
+      }
+      if (!down) {
+        // Swipe completed — check if threshold met
+        if (mx < -50) {
+          setPhotoIndex((i) => (i + 1) % totalPhotos);
+        } else if (mx > 50) {
+          setPhotoIndex((i) => (i - 1 + totalPhotos) % totalPhotos);
+        }
+      }
+    },
+    {
+      filterTaps: true,
+      pointer: { touch: true },
+      axis: 'x',
+    }
+  );
+
   const gestureBindings = isTop ? bind() : {};
-  const perBedPrice = listing.beds > 0 ? Math.round(listing.price / listing.beds) : null;
 
   const nearbyStations = useMemo(() => {
     if (listing.lat == null || listing.lon == null) return [];
@@ -430,13 +470,18 @@ export default function SwipeCard({
           {/* Photo carousel */}
           <div
             ref={photoAreaRef}
+            {...(isTop && totalPhotos > 1 ? photoSwipeBind() : {})}
             className="relative w-full overflow-hidden flex-shrink-0"
             style={{
               height: 220,
               outline: photoFocused ? '2px solid rgba(88,166,255,0.7)' : 'none',
               outlineOffset: '-2px',
               cursor: totalPhotos > 1 && !photoFocused ? 'zoom-in' : 'default',
+              touchAction: 'pan-y',
             }}
+            onPointerDown={() => { photoSwipeActive.current = true; }}
+            onPointerUp={() => { photoSwipeActive.current = false; }}
+            onPointerCancel={() => { photoSwipeActive.current = false; }}
             onClick={!photoFocused ? enterPhotoFocus : undefined}
             title={totalPhotos > 1 && !photoFocused ? 'Click to browse photos with arrow keys' : undefined}
           >
@@ -557,11 +602,6 @@ export default function SwipeCard({
               <span className="text-2xl font-bold" style={{ color: '#7ee787' }}>
                 ${listing.price.toLocaleString()}/mo
               </span>
-              {perBedPrice && (
-                <span className="text-sm" style={{ color: '#8b949e' }}>
-                  · ${perBedPrice.toLocaleString()}/bed
-                </span>
-              )}
             </div>
 
             {/* Listed date */}
