@@ -156,6 +156,7 @@ export default function SwipeCard({
 
   const isDragging = useRef(false);
   const notifiedDragging = useRef(false);
+  const touchInPhoto = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Photo-focus mode: arrow keys cycle photos instead of triggering swipe actions
@@ -228,14 +229,33 @@ export default function SwipeCard({
   }, [onSwipe, x, y]);
 
   const bind = useDrag(
-    ({ movement: [mx, my], down, velocity: [vx, vy] }) => {
+    ({ movement: [mx, my], down, first, event }) => {
       if (!isTop) return;
+
+      if (first) {
+        const target = event?.target as HTMLElement | null;
+        touchInPhoto.current = !!(
+          totalPhotos > 1 &&
+          photoAreaRef.current &&
+          target &&
+          photoAreaRef.current.contains(target)
+        );
+      }
+
+      if (touchInPhoto.current) {
+        if (!down && Math.abs(mx) > 30) {
+          if (mx < 0) {
+            setPhotoIndex((i) => (i + 1) % totalPhotos);
+          } else {
+            setPhotoIndex((i) => (i - 1 + totalPhotos) % totalPhotos);
+          }
+        }
+        return;
+      }
+
       if (down) {
-        // Only allow dragging down (positive y) for pass gesture
-        // For left/right, track x movement
         const allowedY = my > 0 ? my : 0;
         isDragging.current = Math.abs(mx) > 5 || allowedY > 5;
-        // Notify parent when drag begins (movement exceeds threshold)
         if (isDragging.current && !notifiedDragging.current) {
           notifiedDragging.current = true;
           onDragStateChange?.(true);
@@ -251,13 +271,11 @@ export default function SwipeCard({
         } else if (curY > SWIPE_Y_THRESHOLD && curY > absX) {
           commitSwipe('down');
         } else {
-          // Spring back
           const springBack = { type: 'spring' as const, stiffness: 500, damping: 30 };
           animate(x, 0, springBack);
           animate(y, 0, springBack);
         }
 
-        // Notify parent drag ended
         if (notifiedDragging.current) {
           notifiedDragging.current = false;
           onDragStateChange?.(false);
