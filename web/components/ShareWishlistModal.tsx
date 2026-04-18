@@ -80,7 +80,7 @@ export default function ShareWishlistModal({
   };
 
   const handleCopyLink = async () => {
-    const link = `${window.location.origin}/wishlists/${wishlistId}`;
+    const link = `${window.location.origin}/?wishlist=${wishlistId}`;
     await navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);

@@ -4,6 +4,8 @@ import { memo, useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { ButtonBase, FilterChip, PillButton, PrimaryButton, TextButton } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
+import SaveWishlistPanel, { type WishlistFilterSelection } from '@/components/SaveWishlistPanel';
+import type { Wishlist } from '@/lib/hooks/useWishlists';
 
 export type SortField = 'price' | 'beds' | 'listDate';
 
@@ -109,6 +111,16 @@ interface FiltersProps {
   onLoginRequired?: () => void;
   showHidden?: boolean;
   onToggleShowHidden?: () => void;
+  /** Wishlists the user owns — shown in the "Created by you" section. */
+  myWishlists?: Wishlist[];
+  /** Wishlists shared with the user — shown in the "Shared with you" section. */
+  sharedWishlists?: Wishlist[];
+  /** Current wishlist filter selection. */
+  selectedWishlist?: WishlistFilterSelection;
+  onSelectWishlist?: (selection: WishlistFilterSelection) => void;
+  /** Resolves with the new wishlist's id (or null on failure) so the panel can auto-select it. */
+  onCreateWishlist?: (name: string) => Promise<string | null>;
+  onOpenWishlistManager?: () => void;
 }
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
@@ -1207,7 +1219,7 @@ function FilterToggleButton({
   );
 }
 
-const Filters = memo(function Filters({ filters, onChange, listingCount, viewToggle, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onLoginRequired, showHidden, onToggleShowHidden }: FiltersProps) {
+const Filters = memo(function Filters({ filters, onChange, listingCount, viewToggle, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onLoginRequired, showHidden, onToggleShowHidden, myWishlists = [], sharedWishlists = [], selectedWishlist = null, onSelectWishlist, onCreateWishlist, onOpenWishlistManager }: FiltersProps) {
   const [openChip, setOpenChip] = useState<ChipId | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
@@ -1232,6 +1244,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
 
   // Save search dropdown state
   const [saveOpen, setSaveOpen] = useState(false);
+  const [savePanelTab, setSavePanelTab] = useState<'save-search' | 'wishlist'>('save-search');
   const [saveName, setSaveName] = useState('');
   const [saveToastVisible, setSaveToastVisible] = useState(false);
   const saveToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1263,14 +1276,16 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
     setDraftExcludeNoSqft(filters.excludeNoSqft);
   }, [openChip, filters.minRent, filters.maxRent, filters.priceMode, filters.selectedBeds, filters.minBaths, filters.includeNaBaths, filters.maxListingAge, filters.selectedSources, filters.commuteRules, filters.minYearBuilt, filters.maxYearBuilt, filters.minSqft, filters.maxSqft, filters.excludeNoSqft]);
 
-  // Click-outside handler — discard drafts
+  // Click-outside handler — discard drafts. We don't close `saveOpen` here
+  // because the SaveWishlistPanel renders in a fixed-position element outside
+  // the containerRef and has its own outside-click handler that understands
+  // that geometry.
   const containerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpenChip(null);
         setSortOpen(false);
-        setSaveOpen(false);
         setEditingSearchId(null);
       }
     }
@@ -2104,131 +2119,194 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
             </div>
           )}
 
-          {/* Divider + Save / My Searches */}
+          {/* Divider + dual-purpose Save / Wishlist chip */}
           <>
             {/* Vertical divider */}
             <div className="h-4 w-px shrink-0" style={{ backgroundColor: '#2d333b' }} />
 
-            {/* Save chip — only when at least one filter is active */}
-            {activeCount > 0 && (
-              <div className="relative shrink-0" ref={saveDropdownRef}>
+            {/* Dual chip: left = Save search, right = Filter by wishlist */}
+            <div className="relative shrink-0" ref={saveDropdownRef}>
+              <div
+                className={cn(
+                  'inline-flex items-center rounded-[20px] overflow-hidden border h-[26px] font-medium whitespace-nowrap',
+                  saveOpen
+                    ? 'border-[#58a6ff]'
+                    : 'border-[#2d333b] hover:border-[#58a6ff]/40',
+                )}
+                style={{ background: 'transparent' }}
+              >
                 <ButtonBase
                   onClick={() => {
                     if (!userId) {
                       onLoginRequired?.();
                       return;
                     }
-                    setSaveOpen((prev) => {
-                      if (!prev) {
-                        setSaveName(suggestSearchName(filters));
-                        setOpenChip(null);
-                        // Focus input after render
-                        setTimeout(() => saveInputRef.current?.focus(), 50);
-                      }
-                      return !prev;
-                    });
+                    setOpenChip(null);
+                    setSaveName(suggestSearchName(filters));
+                    // If already open on this tab → close. Otherwise open this tab.
+                    if (saveOpen && savePanelTab === 'save-search') {
+                      setSaveOpen(false);
+                    } else {
+                      setSavePanelTab('save-search');
+                      setSaveOpen(true);
+                      setTimeout(() => saveInputRef.current?.focus(), 50);
+                    }
                   }}
-                    className={cn(
-                      'flex items-center gap-1 rounded-md font-medium whitespace-nowrap border px-2.5 py-0.5 text-[11px] h-[28px]',
-                      saveOpen
-                        ? 'bg-[#58a6ff]/[0.08] text-[#58a6ff] border-[#58a6ff]'
-                        : 'bg-transparent text-[#8b949e] border-[#2d333b] hover:bg-[#58a6ff]/20 hover:text-[#c0d6f5] hover:border-[#58a6ff]/40',
-                    )}
+                  className="flex items-center gap-1 px-2.5 h-full text-[11px]"
+                  style={{
+                    color: saveOpen && savePanelTab === 'save-search' ? '#58a6ff' : '#8b949e',
+                    borderRight: '1px solid #2d333b',
+                    background: 'transparent',
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                  </svg>
+                  Save
+                </ButtonBase>
+                <ButtonBase
+                  onClick={() => {
+                    if (!userId) {
+                      onLoginRequired?.();
+                      return;
+                    }
+                    setOpenChip(null);
+                    if (saveOpen && savePanelTab === 'wishlist') {
+                      setSaveOpen(false);
+                    } else {
+                      setSavePanelTab('wishlist');
+                      setSaveOpen(true);
+                    }
+                  }}
+                  aria-label="Filter by wishlist"
+                  className="flex items-center gap-1 px-2 h-full text-[11px]"
+                  style={{
+                    color: saveOpen && savePanelTab === 'wishlist' ? '#58a6ff' : '#e1e4e8',
+                    background: selectedWishlist ? 'rgba(126,231,135,0.1)' : 'transparent',
+                  }}
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill={selectedWishlist ? '#7ee787' : 'none'}
+                    stroke={selectedWishlist ? '#7ee787' : 'currentColor'}
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ opacity: selectedWishlist ? 1 : 0.6 }}
                   >
-                    {/* Bookmark icon */}
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M3 1.5h6a.5.5 0 0 1 .5.5v8.5L6 8l-3.5 2.5V2a.5.5 0 0 1 .5-.5z" />
-                    </svg>
-                    Save
-                  </ButtonBase>
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                  <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.6 }}>
+                    <path d="M2 3.5L5 6.5L8 3.5" />
+                  </svg>
+                </ButtonBase>
+              </div>
 
-                  {saveOpen && (
-                    <div
-                      className="fixed z-[9999] rounded-xl border border-[#2d333b] p-5 shadow-xl"
-                      style={{
-                        backgroundColor: '#1c2028',
-                        minWidth: '300px',
-                        maxWidth: 'calc(100vw - 16px)',
-                        top: saveDropdownRef.current ? saveDropdownRef.current.getBoundingClientRect().bottom + 8 : 0,
-                        right: saveDropdownRef.current ? window.innerWidth - saveDropdownRef.current.getBoundingClientRect().right : 0,
-                      }}
-                    >
+              {saveOpen && (
+                <SaveWishlistPanel
+                  anchorRef={saveDropdownRef}
+                  initialTab={savePanelTab}
+                  onClose={() => setSaveOpen(false)}
+                  myWishlists={myWishlists}
+                  sharedWishlists={sharedWishlists}
+                  selected={selectedWishlist}
+                  onSelect={(sel) => {
+                    onSelectWishlist?.(sel);
+                    setSaveOpen(false);
+                  }}
+                  onCreateWishlist={async (name) => {
+                    const id = await onCreateWishlist?.(name);
+                    return id ?? null;
+                  }}
+                  onOpenManager={() => {
+                    setSaveOpen(false);
+                    onOpenWishlistManager?.();
+                  }}
+                  saveSearchContent={(
+                    <>
                       <div className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: '#8b949e', letterSpacing: '0.05em' }}>
                         Save Search
                       </div>
+                      {activeCount === 0 ? (
+                        <div className="text-[12px]" style={{ color: '#8b949e' }}>
+                          Add at least one filter to save a search.
+                        </div>
+                      ) : (
+                        <>
+                          <input
+                            ref={saveInputRef}
+                            type="text"
+                            value={saveName}
+                            onChange={(e) => setSaveName(e.target.value)}
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter' && saveName.trim()) {
+                                const saved = await onSaveSearch?.(saveName.trim());
+                                if (saved) setActiveSearchId(saved.id);
+                                setSaveOpen(false);
+                                if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
+                                setSaveToastVisible(true);
+                                saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
+                              }
+                              if (e.key === 'Escape') setSaveOpen(false);
+                            }}
+                            placeholder="e.g. Brooklyn 5-bed hunt"
+                            className="w-full rounded-lg px-3 py-2 text-sm outline-none mb-3"
+                            style={{ backgroundColor: '#0f1117', border: '1px solid #2d333b', color: '#e1e4e8' }}
+                          />
 
-                      <input
-                        ref={saveInputRef}
-                        type="text"
-                        value={saveName}
-                        onChange={(e) => setSaveName(e.target.value)}
-                        onKeyDown={async (e) => {
-                          if (e.key === 'Enter' && saveName.trim()) {
-                            const saved = await onSaveSearch?.(saveName.trim());
-                            if (saved) setActiveSearchId(saved.id);
-                            setSaveOpen(false);
-                            // Show toast
-                            if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
-                            setSaveToastVisible(true);
-                            saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
-                          }
-                          if (e.key === 'Escape') setSaveOpen(false);
-                        }}
-                        placeholder="e.g. Brooklyn 5-bed hunt"
-                        className="w-full rounded-lg px-3 py-2 text-sm outline-none mb-3"
-                        style={{ backgroundColor: '#0f1117', border: '1px solid #2d333b', color: '#e1e4e8' }}
-                      />
+                          <div className="flex flex-wrap gap-1 mb-4">
+                            {filters.selectedBeds !== null && (
+                              <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
+                                {filters.selectedBeds.slice().sort((a, b) => a - b).map((b) => (b === 7 ? '7+' : String(b))).join(', ')} bed
+                              </span>
+                            )}
+                            {(filters.minRent !== null || filters.maxRent !== null) && (
+                              <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
+                                {priceLabel(filters.minRent, filters.maxRent)}
+                              </span>
+                            )}
+                            {filters.commuteRules && filters.commuteRules.length > 0 && (
+                              <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
+                                {commuteLabel(filters.commuteRules)}
+                              </span>
+                            )}
+                            {filters.selectedSources !== null && (
+                              <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
+                                {filters.selectedSources.length} source{filters.selectedSources.length !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
 
-                      {/* Active filter summary pills */}
-                      <div className="flex flex-wrap gap-1 mb-4">
-                        {filters.selectedBeds !== null && (
-                          <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
-                            {filters.selectedBeds.slice().sort((a, b) => a - b).map((b) => (b === 7 ? '7+' : String(b))).join(', ')} bed
-                          </span>
-                        )}
-                        {(filters.minRent !== null || filters.maxRent !== null) && (
-                          <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
-                            {priceLabel(filters.minRent, filters.maxRent)}
-                          </span>
-                        )}
-                        {filters.commuteRules && filters.commuteRules.length > 0 && (
-                          <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
-                            {commuteLabel(filters.commuteRules)}
-                          </span>
-                        )}
-                        {filters.selectedSources !== null && (
-                          <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
-                            {filters.selectedSources.length} source{filters.selectedSources.length !== 1 ? 's' : ''}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center justify-end gap-3">
-                        <TextButton variant="muted" onClick={() => setSaveOpen(false)}>
-                          Cancel
-                        </TextButton>
-                        <PrimaryButton
-                          onClick={async () => {
-                            if (saveName.trim()) {
-                              const saved = await onSaveSearch?.(saveName.trim());
-                              if (saved) setActiveSearchId(saved.id);
-                              setSaveOpen(false);
-                              if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
-                              setSaveToastVisible(true);
-                              saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
-                            }
-                          }}
-                          disabled={!saveName.trim()}
-                          className="h-8 px-5 text-xs font-bold"
-                        >
-                          Save
-                        </PrimaryButton>
-                      </div>
-                    </div>
+                          <div className="flex items-center justify-end gap-3">
+                            <TextButton variant="muted" onClick={() => setSaveOpen(false)}>
+                              Cancel
+                            </TextButton>
+                            <PrimaryButton
+                              onClick={async () => {
+                                if (saveName.trim()) {
+                                  const saved = await onSaveSearch?.(saveName.trim());
+                                  if (saved) setActiveSearchId(saved.id);
+                                  setSaveOpen(false);
+                                  if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
+                                  setSaveToastVisible(true);
+                                  saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
+                                }
+                              }}
+                              disabled={!saveName.trim()}
+                              className="h-8 px-5 text-xs font-bold"
+                            >
+                              Save
+                            </PrimaryButton>
+                          </div>
+                        </>
+                      )}
+                    </>
                   )}
-                </div>
+                />
               )}
-
+            </div>
           </>
         </div>
       )}

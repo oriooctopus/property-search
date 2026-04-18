@@ -52,6 +52,8 @@ interface SearchRequest {
   bounds?: Bounds | null;
   filters?: SearchFilters;
   commuteRules?: CommuteRule[] | null;
+  /** When provided, restrict results to listings that appear in ANY of these wishlists. */
+  wishlistIds?: string[] | null;
   limit?: number;
 }
 
@@ -187,8 +189,40 @@ export async function POST(request: NextRequest) {
     const bounds = body.bounds ?? null;
     const limit = Math.min(Math.max(body.limit ?? 2000, 1), 5000);
     const commuteRules = body.commuteRules ?? null;
+    const wishlistIds = body.wishlistIds ?? null;
 
     const supabase = getClient();
+
+    // ---- 0. Resolve wishlistIds to a Set of listing_ids (if provided). Empty
+    //        list → explicitly no results.
+    let wishlistListingIds: Set<number> | null = null;
+    if (wishlistIds !== null) {
+      if (wishlistIds.length === 0) {
+        return NextResponse.json({
+          listings: [],
+          commuteInfo: {},
+          total: 0,
+          commuteMessage: null,
+        });
+      }
+      const { data: items, error: itemsErr } = await supabase
+        .from('wishlist_items')
+        .select('listing_id')
+        .in('wishlist_id', wishlistIds);
+      if (itemsErr) {
+        console.error('[listings-search] wishlist_items query error:', itemsErr.message);
+        return NextResponse.json({ error: itemsErr.message }, { status: 500 });
+      }
+      wishlistListingIds = new Set(((items ?? []) as Array<{ listing_id: number }>).map((r) => r.listing_id));
+      if (wishlistListingIds.size === 0) {
+        return NextResponse.json({
+          listings: [],
+          commuteInfo: {},
+          total: 0,
+          commuteMessage: null,
+        });
+      }
+    }
 
     // ---- 1. Resolve commute rules first (if any) so we can push the ID
     //        intersection into the SQL query and avoid fetching rows the
@@ -206,7 +240,30 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const commuteIds = resolvedCommute.ids; // Set<number> | null
+    // Compute the effective ID filter set by intersecting commute + wishlist
+    // restrictions. `null` means "no restriction from this source".
+    let effectiveIds: Set<number> | null = resolvedCommute.ids;
+    if (wishlistListingIds !== null) {
+      if (effectiveIds === null) {
+        effectiveIds = wishlistListingIds;
+      } else {
+        const intersected = new Set<number>();
+        for (const id of effectiveIds) {
+          if (wishlistListingIds.has(id)) intersected.add(id);
+        }
+        effectiveIds = intersected;
+        if (effectiveIds.size === 0) {
+          return NextResponse.json({
+            listings: [],
+            commuteInfo: {},
+            total: 0,
+            commuteMessage: resolvedCommute.message,
+          });
+        }
+      }
+    }
+
+    const commuteIds = effectiveIds;
 
     // ---- 2. Build and run the listings query.
     let rows: Listing[] = [];
