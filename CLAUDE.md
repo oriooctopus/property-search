@@ -72,6 +72,12 @@ When agents complete and the user hasn't acknowledged or acted on the results (e
 
 The dev server runs on port **8000** (`http://localhost:8000`), not the Next.js default of 3000. Always use port 8000 when linking to local pages.
 
+## Deployment
+
+Production URL: **https://dwelligence.vercel.app**
+
+Vercel auto-deploys on push to `main`. Always use this URL when referencing the live site (not the auto-generated `web-seven-chi-63.vercel.app`).
+
 ## Test Credentials
 
 Test account credentials are in `web/.env.local` (not committed). Use these for Playwright-based verification of authenticated features like AI search, favorites, and would-live-there.
