@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { createPortal } from 'react-dom';
 import { PrimaryButton } from '@/components/ui';
-import SwipeCard, { type HoveredStation } from './SwipeCard';
+import SwipeCard, { type HoveredStation, getClosestStations } from './SwipeCard';
 import type { ViewportBounds } from './MapInner';
 import type { CommuteInfo } from './ListingCard';
 import type { Database } from '@/lib/types';
@@ -118,6 +118,7 @@ export default function SwipeView({
   const [hoveredStation, setHoveredStation] = useState<HoveredStation | null>(null);
   const [showMobileMap, setShowMobileMap] = useState(false);
   const [swipeOverlay, setSwipeOverlay] = useState<'left' | 'right' | 'down' | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const saveAnchorRef = useRef<HTMLDivElement>(null);
   const hideBtnRef = useRef<HTMLButtonElement>(null);
   const laterBtnRef = useRef<HTMLButtonElement>(null);
@@ -229,6 +230,23 @@ export default function SwipeView({
   useEffect(() => {
     currentListingIdRef.current = currentListing?.id ?? null;
   }, [currentListing?.id]);
+
+  // On mobile, auto-show the nearest subway station on the map (no hover needed)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.innerWidth >= 600) return; // desktop keeps hover behavior
+    if (!currentListing?.lat || !currentListing?.lon) {
+      setHoveredStation(null);
+      return;
+    }
+    const nearest = getClosestStations(currentListing.lat, currentListing.lon, 1);
+    if (nearest.length > 0) {
+      const { station } = nearest[0];
+      setHoveredStation({ lat: station.lat, lon: station.lon, name: station.name, lines: station.lines });
+    } else {
+      setHoveredStation(null);
+    }
+  }, [currentListing?.id, currentListing?.lat, currentListing?.lon]);
 
   // After undo-left/right, deck recomputes with the re-inserted item.
   // Find its new position and restore currentIndex to it.
@@ -522,17 +540,45 @@ export default function SwipeView({
                 <div style={{ height: 96 }} />
               </div>
 
-              {/* Stack visual: background card */}
+              {/* Next card underneath — visible while dragging */}
               {currentIndex + 1 < deck.length && (
                 <div
-                  className="absolute inset-0 rounded-xl border"
+                  className="absolute inset-0 rounded-xl overflow-hidden"
                   style={{
-                    backgroundColor: 'rgba(28, 32, 40, 0.93)',
-                    borderColor: '#2d333b',
-                    transform: 'scale(0.95) translateY(10px)',
                     zIndex: 1,
+                    transform: 'scale(0.97)',
+                    opacity: isDragging ? 1 : 0,
+                    transition: 'opacity 150ms ease-out',
+                    pointerEvents: 'none',
                   }}
-                />
+                >
+                  {/* Dark overlay to show depth */}
+                  <div
+                    className="absolute inset-0 rounded-xl"
+                    style={{
+                      zIndex: 3,
+                      backgroundColor: 'rgba(0, 0, 0, 0.25)',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      backgroundColor: 'rgba(28, 32, 40, 0.97)',
+                      border: '1px solid #2d333b',
+                      borderRadius: 12,
+                    }}
+                  >
+                    <div className="absolute top-0 left-0 right-0" style={{ bottom: 96 }}>
+                      <SwipeCard
+                        listing={deck[currentIndex + 1]}
+                        onSwipe={() => {}}
+                        onExpandDetail={() => {}}
+                        isTop={false}
+                      />
+                    </div>
+                  </div>
+                </div>
               )}
 
               {/* Top card + attached action bar — unified container */}
@@ -591,6 +637,7 @@ export default function SwipeView({
                     enterPhotoFocusRef={enterPhotoFocusRef}
                     exitPhotoFocusRef={exitPhotoFocusRef}
                     onSubwayHover={setHoveredStation}
+                    onDragStateChange={setIsDragging}
                   />
                 </div>
                 {/* Action bar attached to bottom of card */}
@@ -687,10 +734,6 @@ export default function SwipeView({
                 )}
               </div>
 
-              {/* Counter */}
-              <span className="text-xs tabular-nums whitespace-nowrap" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                {currentIndex + 1} of {deck.length}
-              </span>
                 </div>{/* action bar */}
               </div>{/* absolute card+bar */}
             </div>{/* relative w-full */}

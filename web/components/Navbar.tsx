@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
-import { PrimaryButton } from "@/components/ui";
+
 import { useProfile } from "@/lib/hooks/useProfile";
 import type { User } from "@supabase/supabase-js";
 
@@ -171,14 +171,26 @@ export default function Navbar() {
                   >
                     Profile
                   </Link>
-                  <Link
-                    href="/wishlists"
-                    onClick={() => setDropdownOpen(false)}
-                    className="block w-full px-4 py-2 text-left text-sm transition-colors hover:opacity-80"
-                    style={{ color: "#e1e4e8" }}
+                  <button
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      // Fire a custom event that the home page listens for to
+                      // open the manage-wishlists modal. If the user is not on
+                      // the home page, navigate there first and pass a query
+                      // param so home opens it after mount.
+                      if (typeof window !== "undefined") {
+                        if (window.location.pathname === "/") {
+                          window.dispatchEvent(new CustomEvent("open-wishlist-manager"));
+                        } else {
+                          router.push("/?manageWishlists=1");
+                        }
+                      }
+                    }}
+                    className="block w-full px-4 py-2 text-left text-sm transition-colors hover:opacity-80 cursor-pointer"
+                    style={{ color: "#e1e4e8", background: "transparent", border: "none" }}
                   >
-                    Wishlists
-                  </Link>
+                    Manage wishlists...
+                  </button>
                   <Link
                     href="/hidden"
                     onClick={() => setDropdownOpen(false)}
@@ -214,12 +226,25 @@ export default function Navbar() {
           </>
         ) : (
           <>
-            <PrimaryButton
+            <button
               onClick={() => router.push("/auth/login")}
-              className="rounded-md px-2 py-1 text-xs sm:px-4 sm:py-2 sm:text-sm"
+              className="rounded-md px-2 py-1 text-xs sm:px-4 sm:py-2 sm:text-sm cursor-pointer transition-colors"
+              style={{
+                border: "1px solid #30363d",
+                background: "transparent",
+                color: "#e1e4e8",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#58a6ff";
+                e.currentTarget.style.color = "#58a6ff";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "#30363d";
+                e.currentTarget.style.color = "#e1e4e8";
+              }}
             >
               Log in
-            </PrimaryButton>
+            </button>
             <Link
               href="/auth/signup"
               className="hidden sm:inline text-sm transition-colors hover:opacity-80"
