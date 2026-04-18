@@ -15,7 +15,6 @@ import WishlistPicker from './WishlistPicker';
 
 // Dynamically import MapComponent to avoid SSR issues (uses Leaflet)
 const MapComponent = dynamic(() => import('./Map'), { ssr: false });
-const MiniMap = dynamic(() => import('./MiniMapInner'), { ssr: false });
 
 export interface SwipeListing {
   id: number;
@@ -606,23 +605,26 @@ export default function SwipeView({
                 }}
               >
 
-                {/* Mini-map inset — mobile only, overlaid on photo area */}
+                {/* Map button — mobile only, overlaid on photo area */}
                 {currentListing.lat != null && currentListing.lon != null && (
-                  <div
+                  <button
                     onClick={() => setShowMobileMap(true)}
-                    className="absolute top-3 right-3 min-[600px]:hidden rounded-xl overflow-hidden cursor-pointer"
+                    className="absolute top-2.5 left-3 min-[600px]:hidden rounded-full flex items-center justify-center cursor-pointer"
                     style={{
                       zIndex: 6,
-                      width: 140,
-                      height: 110,
-                      border: '2px solid rgba(255,255,255,0.15)',
-                      boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+                      width: 36,
+                      height: 36,
+                      backgroundColor: 'rgba(0,0,0,0.5)',
+                      border: 'none',
+                      color: '#fff',
                     }}
+                    title="Show map"
                   >
-                    <div style={{ pointerEvents: 'none', width: '100%', height: '100%' }}>
-                      <MiniMap lat={currentListing.lat!} lon={currentListing.lon!} hoveredStation={hoveredStation} />
-                    </div>
-                  </div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                      <circle cx="12" cy="10" r="3" />
+                    </svg>
+                  </button>
                 )}
 
                 {/* Card portion */}

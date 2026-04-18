@@ -228,22 +228,23 @@ export default function Navbar() {
           <>
             <button
               onClick={() => router.push("/auth/login")}
-              className="rounded-md px-2 py-1 text-xs sm:px-4 sm:py-2 sm:text-sm cursor-pointer transition-colors"
+              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs sm:px-3 sm:py-1.5 sm:text-sm font-medium cursor-pointer transition-colors duration-150 group"
               style={{
-                border: "1px solid #30363d",
+                border: "none",
                 background: "transparent",
                 color: "#e1e4e8",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "#58a6ff";
                 e.currentTarget.style.color = "#58a6ff";
+                e.currentTarget.style.background = "rgba(88, 166, 255, 0.06)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "#30363d";
                 e.currentTarget.style.color = "#e1e4e8";
+                e.currentTarget.style.background = "transparent";
               }}
             >
               Log in
+              <span className="inline-block transition-transform duration-150 group-hover:translate-x-0.5">&rarr;</span>
             </button>
             <Link
               href="/auth/signup"
