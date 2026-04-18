@@ -214,19 +214,19 @@ export default function Navbar() {
           </>
         ) : (
           <>
+            <PrimaryButton
+              onClick={() => router.push("/auth/login")}
+              className="rounded-md px-2 py-1 text-xs sm:px-4 sm:py-2 sm:text-sm"
+            >
+              Log in
+            </PrimaryButton>
             <Link
-              href="/auth/login"
+              href="/auth/signup"
               className="hidden sm:inline text-sm transition-colors hover:opacity-80"
               style={{ color: "#8b949e" }}
             >
-              Log in
-            </Link>
-            <PrimaryButton
-              onClick={() => router.push("/auth/signup")}
-              className="rounded-md px-2 py-1 text-xs sm:px-4 sm:py-2 sm:text-sm"
-            >
               Sign up
-            </PrimaryButton>
+            </Link>
           </>
         )}
       </div>

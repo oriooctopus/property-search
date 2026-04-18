@@ -31,10 +31,10 @@ const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY ?? "";
 const NYC_PARAMS: SearchParams = { city: "New York", stateCode: "NY" };
 
 /** Runs a single adapter by name. Returns raw AdapterOutput[] with source tag. */
-async function runAdapter(source: ListingSource): Promise<AdapterOutput[]> {
+async function runAdapter(source: ListingSource, supabase?: SupabaseClient): Promise<AdapterOutput[]> {
   switch (source) {
     case "craigslist": {
-      const res = await fetchCraigslistListings(NYC_PARAMS);
+      const res = await fetchCraigslistListings(NYC_PARAMS, { supabase });
       return res.listings;
     }
     case "facebook-marketplace": {
@@ -121,7 +121,7 @@ export class StalenessGatedFetch implements FetchStrategy {
         return [];
       }
     }
-    return runAdapter(source as ListingSource);
+    return runAdapter(source as ListingSource, deps.supabase);
   }
 }
 
@@ -149,6 +149,6 @@ export class FullBisectionFetch implements FetchStrategy {
     // Craigslist and Facebook Marketplace don't have meaningful full-bisection
     // equivalents — they're already single-shot Apify actor runs. Fall back to
     // the normal adapter so full-bisection mode still works for them.
-    return runAdapter(source as ListingSource);
+    return runAdapter(source as ListingSource, deps.supabase);
   }
 }

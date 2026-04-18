@@ -10,18 +10,6 @@ Do NOT tell the user a change is done until ALL of these are true:
 If the verify agent fails, fix the issue and re-verify. Do NOT report as done with a failing verify.
 This is not optional. This is not skippable for "small" changes. TSC passing and build passing are NOT verification.
 
-## CRITICAL: Visual Regression Check
-
-Any agent modifying files in `web/components/` or `web/app/` that contain JSX:
-1. BEFORE changes: run `npm run test:visual` to capture baseline state
-2. AFTER changes: run `npm run test:visual` again
-3. If any screenshot diff is detected, the Playwright HTML report opens at `web/playwright-report/index.html`
-4. Agents MUST NOT deploy or report UI work as complete until the user has approved the visual diff
-5. If screenshots changed, run `npm run test:visual:review` to start the approval UI, then tell the user: "Visual changes detected — please review at http://localhost:9400"
-6. If the user approves, the approval UI updates baselines automatically
-7. If the user rejects, fix the regression before continuing
-8. A feature that works but looks broken is NOT done
-
 When adding a new Supabase table that is queried by UI components, add a corresponding
 mock entry to `web/tests/fixtures/`. The MockRegistry type enforces this at compile time
 for tables in the Database type, but API routes called via fetch() need manual mocking.

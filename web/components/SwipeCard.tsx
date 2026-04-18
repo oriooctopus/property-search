@@ -345,7 +345,7 @@ export default function SwipeCard({
     <div
       {...gestureBindings}
       className="absolute inset-0"
-      style={{ touchAction: 'none' }}
+      style={{ touchAction: 'pan-y' }}
     >
       <motion.div
         style={{
