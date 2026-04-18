@@ -288,7 +288,7 @@ export async function POST(request: NextRequest) {
     rows = applyJsFilters(rows, filters);
 
     // ---- 4. Build commute-info map restricted to the returned listings.
-    let commuteInfo: Record<number, ListingCommuteMeta> = {};
+    const commuteInfo: Record<number, ListingCommuteMeta> = {};
     if (commuteIds !== null) {
       for (const r of rows) {
         const m = resolvedCommute.meta[r.id];
