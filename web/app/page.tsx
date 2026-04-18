@@ -20,11 +20,13 @@ import { useConversation } from '@/lib/hooks/useConversation';
 import { useConversations } from '@/lib/hooks/useConversations';
 import { useSavedSearches } from '@/lib/hooks/useSavedSearches';
 import { useProfile, PROFILE_QUERY_KEY } from '@/lib/hooks/useProfile';
-import { useWishlists, useWishlistMutations, useWishlistedListingIds } from '@/lib/hooks/useWishlists';
+import { useWishlists, useWishlistsSplit, useWishlistMutations, useWishlistedListingIds } from '@/lib/hooks/useWishlists';
 import { useHiddenListings, useHiddenMutations } from '@/lib/hooks/useHiddenListings';
 import WishlistPicker from '@/components/WishlistPicker';
+import ManageWishlistsModal from '@/components/ManageWishlistsModal';
 import AuthModal from '@/components/AuthModal';
 import { setLastUsedWishlistId } from '@/lib/wishlist-storage';
+import type { WishlistFilterSelection } from '@/components/SaveWishlistPanel';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -92,11 +94,12 @@ interface MapPosition {
   zoom: number;
 }
 
-function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatMode?: boolean, listingId?: number | null, mapPos?: MapPosition | null): string {
+function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatMode?: boolean, listingId?: number | null, mapPos?: MapPosition | null, wishlistSel?: string | null): string {
   const p = new URLSearchParams();
   if (listingId != null) p.set('listing', String(listingId));
   if (chatMode) p.set('chat', '1');
   if (view !== 'list') p.set('view', view);
+  if (wishlistSel) p.set('wishlist', wishlistSel);
   if (f.sort !== 'price') p.set('sort', f.sort);
   if (f.selectedBeds != null) p.set('beds', f.selectedBeds.join(','));
   if (f.minBaths != null) p.set('minBaths', String(f.minBaths));
@@ -170,12 +173,52 @@ function HomeInner() {
     }
   }, [userId, supabase, queryClient]);
 
+  // User email — needed for shared-wishlist lookup
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
   // Wishlist system
   const { data: wishlists } = useWishlists(userId);
+  const { mine: myWishlists, shared: sharedWishlists, all: allWishlists } = useWishlistsSplit(userId, userEmail);
   const wishlistedIds = useWishlistedListingIds(userId);
-  const { addToWishlist, removeFromWishlist, createWishlist } = useWishlistMutations(userId);
+  const {
+    addToWishlist,
+    removeFromWishlist,
+    createWishlist,
+    deleteWishlist,
+    renameWishlist,
+    addShare,
+    removeShare,
+    updateSharePermission,
+    leaveSharedWishlist,
+  } = useWishlistMutations(userId);
   const [pickerListingId, setPickerListingId] = useState<number | null>(null);
   const [pickerAnchorRect, setPickerAnchorRect] = useState<DOMRect | null>(null);
+
+  // Wishlist filter selection — null (no filter), 'all-saved', or a wishlist id.
+  const initialWishlistSelection: WishlistFilterSelection = (() => {
+    const v = searchParams.get('wishlist');
+    if (!v) return null;
+    if (v === 'all-saved') return 'all-saved';
+    return v;
+  })();
+  const [selectedWishlist, setSelectedWishlist] = useState<WishlistFilterSelection>(initialWishlistSelection);
+  const [manageWishlistsOpen, setManageWishlistsOpen] = useState<boolean>(() => searchParams.get('manageWishlists') === '1');
+
+  // Listen for global "open-wishlist-manager" event (fired from the nav menu).
+  useEffect(() => {
+    function handleOpen() { setManageWishlistsOpen(true); }
+    window.addEventListener('open-wishlist-manager', handleOpen);
+    return () => window.removeEventListener('open-wishlist-manager', handleOpen);
+  }, []);
+
+  // Clear ?manageWishlists=1 query param once the modal is opened.
+  useEffect(() => {
+    if (manageWishlistsOpen && typeof window !== 'undefined' && new URL(window.location.href).searchParams.get('manageWishlists')) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('manageWishlists');
+      window.history.replaceState(null, '', url.toString());
+    }
+  }, [manageWishlistsOpen]);
 
   // Viewport loading state (map pan/zoom queries)
   const [viewportLoading, setViewportLoading] = useState(false);
@@ -217,6 +260,12 @@ function HomeInner() {
   // (kicked off from the initial boot useEffect) sees the URL-derived filters.
   // The matching useEffect below keeps this in sync on subsequent changes.
 
+  // Keep refs so loadForViewport stays stable yet always reads the latest values.
+  const selectedWishlistRef = useRef<WishlistFilterSelection>(selectedWishlist);
+  selectedWishlistRef.current = selectedWishlist;
+  const allWishlistsRef = useRef(allWishlists);
+  allWishlistsRef.current = allWishlists;
+
   const loadForViewport = useCallback(async (bounds: { latMin: number; latMax: number; lonMin: number; lonMax: number }) => {
     lastLoadedBounds.current = bounds;
     const requestId = ++viewportRequestRef.current;
@@ -224,12 +273,21 @@ function HomeInner() {
     const currentFilters = filtersRef.current;
     const commuteRules = currentFilters?.commuteRules ?? [];
     if (commuteRules.length > 0) setCommuteLoading(true);
+    // Resolve wishlist selection → array of ids (or null for "no restriction")
+    let wishlistIds: string[] | null = null;
+    const sel = selectedWishlistRef.current;
+    if (sel === 'all-saved') {
+      wishlistIds = allWishlistsRef.current.map((w) => w.id);
+    } else if (typeof sel === 'string') {
+      wishlistIds = [sel];
+    }
     try {
       const res = await fetch('/api/listings/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           bounds,
+          wishlistIds,
           filters: currentFilters ? {
             selectedBeds: currentFilters.selectedBeds,
             minBaths: currentFilters.minBaths,
@@ -457,8 +515,8 @@ function HomeInner() {
       isFirstRender.current = false;
       return;
     }
-    window.history.replaceState(null, '', buildQueryString(mobileView, filters, chatMode, detailListing?.id ?? null, mapPosition));
-  }, [mobileView, filters, chatMode, detailListing, mapPosition]);
+    window.history.replaceState(null, '', buildQueryString(mobileView, filters, chatMode, detailListing?.id ?? null, mapPosition, selectedWishlist));
+  }, [mobileView, filters, chatMode, detailListing, mapPosition, selectedWishlist]);
 
   // Show filter-loading overlay whenever filters change (skip initial mount)
   useEffect(() => {
@@ -483,6 +541,7 @@ function HomeInner() {
       } = await supabase.auth.getUser();
       const uid = user?.id ?? null;
       setUserId(uid);
+      setUserEmail(user?.email ?? null);
 
       // Load default NYC bounds immediately so listings appear even before
       // the map mounts (e.g. list view on mobile where the map is hidden).
@@ -522,7 +581,7 @@ function HomeInner() {
       loadForViewport(bounds);
     }, 250);
     return () => clearTimeout(t);
-  }, [filters, loadForViewport]);
+  }, [filters, selectedWishlist, loadForViewport]);
 
   // -----------------------------------------------------------------------
   // Deep-link: auto-open listing from ?listing=ID on page load
@@ -897,15 +956,17 @@ function HomeInner() {
         className={`${isSwipeView ? 'absolute top-0 left-0 right-0 z-20' : `w-full lg:w-[480px] shrink-0 ${mobileView === 'map' ? 'max-lg:shrink max-lg:flex-none' : ''}`} flex flex-col`}
         style={{ borderRight: isSwipeView ? 'none' : '1px solid #2d333b' }}
       >
-        {/* AI-applied filter pills */}
+        {/* AI-applied filter pills — hidden on mobile in swipe view */}
         {hasAIFilters && (
-          <FilterPills
-            filters={filters}
-            onRemoveFilter={chat.removeFilter}
-          />
+          <div className={isSwipeView ? 'hidden min-[600px]:block' : ''}>
+            <FilterPills
+              filters={filters}
+              onRemoveFilter={chat.removeFilter}
+            />
+          </div>
         )}
 
-        <div className="relative z-[1100]">
+        <div className={`relative z-[1100] ${isSwipeView ? 'hidden min-[600px]:block' : ''}`}>
           <Filters
             filters={filters}
             onChange={setFilters}
@@ -920,6 +981,19 @@ function HomeInner() {
             onLoginRequired={() => setAuthModal('login')}
             showHidden={showHidden}
             onToggleShowHidden={() => setShowHidden((v) => !v)}
+            myWishlists={myWishlists}
+            sharedWishlists={sharedWishlists}
+            selectedWishlist={selectedWishlist}
+            onSelectWishlist={setSelectedWishlist}
+            onCreateWishlist={async (name) => {
+              try {
+                const created = await createWishlist.mutateAsync(name);
+                return created?.id ?? null;
+              } catch {
+                return null;
+              }
+            }}
+            onOpenWishlistManager={() => setManageWishlistsOpen(true)}
           />
         </div>
 
@@ -1098,6 +1172,39 @@ function HomeInner() {
         <TourGuide
           onComplete={handleTourComplete}
           setMobileView={setMobileView}
+        />
+      )}
+
+      {/* Manage wishlists modal */}
+      {manageWishlistsOpen && (
+        <ManageWishlistsModal
+          myWishlists={myWishlists}
+          sharedWishlists={sharedWishlists}
+          currentUserEmail={userEmail}
+          onClose={() => setManageWishlistsOpen(false)}
+          onCreate={async (name) => {
+            await createWishlist.mutateAsync(name);
+          }}
+          onRename={async (id, name) => {
+            await renameWishlist.mutateAsync({ id, name });
+          }}
+          onDelete={async (id) => {
+            await deleteWishlist.mutateAsync(id);
+            if (selectedWishlist === id) setSelectedWishlist(null);
+          }}
+          onAddShare={async (wishlistId, email, permission) => {
+            await addShare.mutateAsync({ wishlistId, email, permission });
+          }}
+          onRemoveShare={async (shareId) => {
+            await removeShare.mutateAsync({ shareId });
+          }}
+          onUpdateSharePermission={async (shareId, permission) => {
+            await updateSharePermission.mutateAsync({ shareId, permission });
+          }}
+          onLeave={async (wishlistId, email) => {
+            await leaveSharedWishlist.mutateAsync({ wishlistId, email });
+            if (selectedWishlist === wishlistId) setSelectedWishlist(null);
+          }}
         />
       )}
 

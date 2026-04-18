@@ -156,7 +156,6 @@ export default function SwipeCard({
 
   const isDragging = useRef(false);
   const notifiedDragging = useRef(false);
-  const photoSwipeActive = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   // Photo-focus mode: arrow keys cycle photos instead of triggering swipe actions
@@ -231,9 +230,6 @@ export default function SwipeCard({
   const bind = useDrag(
     ({ movement: [mx, my], down, velocity: [vx, vy] }) => {
       if (!isTop) return;
-      // Don't process card swipe when touch originated in the photo area
-      if (photoSwipeActive.current) return;
-
       if (down) {
         // Only allow dragging down (positive y) for pass gesture
         // For left/right, track x movement
@@ -286,31 +282,28 @@ export default function SwipeCard({
     setPhotoIndex((i) => (i + 1) % totalPhotos);
   }, [totalPhotos]);
 
-  // Touch-based photo swiping for mobile
-  const photoSwipeBind = useDrag(
-    ({ movement: [mx], down, first, event }) => {
-      if (!isTop || totalPhotos <= 1) return;
-      if (first) {
-        // Prevent the card swipe from processing this gesture
-        event?.stopPropagation();
-      }
-      if (!down) {
-        // Swipe completed — check if threshold met
-        if (mx < -50) {
-          setPhotoIndex((i) => (i + 1) % totalPhotos);
-        } else if (mx > 50) {
-          setPhotoIndex((i) => (i - 1 + totalPhotos) % totalPhotos);
-        }
-      }
-    },
-    {
-      filterTaps: true,
-      pointer: { touch: true },
-      axis: 'x',
-    }
-  );
-
   const gestureBindings = isTop ? bind() : {};
+
+  // Tap-zone photo navigation for mobile: left third = prev, right third = next
+  const handlePhotoAreaClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    // Don't fire taps after a drag gesture
+    if (isDragging.current) return;
+    if (totalPhotos <= 1) return;
+
+    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const third = rect.width / 3;
+
+    if (clickX < third) {
+      setPhotoIndex((i) => (i - 1 + totalPhotos) % totalPhotos);
+    } else if (clickX > third * 2) {
+      setPhotoIndex((i) => (i + 1) % totalPhotos);
+    } else {
+      // Center third — enter photo focus if not already focused
+      if (!photoFocused) enterPhotoFocus();
+    }
+  }, [totalPhotos, photoFocused, enterPhotoFocus]);
 
   const nearbyStations = useMemo(() => {
     if (listing.lat == null || listing.lon == null) return [];
@@ -470,20 +463,16 @@ export default function SwipeCard({
           {/* Photo carousel */}
           <div
             ref={photoAreaRef}
-            {...(isTop && totalPhotos > 1 ? photoSwipeBind() : {})}
             className="relative w-full overflow-hidden flex-shrink-0"
             style={{
               height: 220,
               outline: photoFocused ? '2px solid rgba(88,166,255,0.7)' : 'none',
               outlineOffset: '-2px',
-              cursor: totalPhotos > 1 && !photoFocused ? 'zoom-in' : 'default',
+              cursor: totalPhotos > 1 ? 'pointer' : 'default',
               touchAction: 'pan-y',
             }}
-            onPointerDown={() => { photoSwipeActive.current = true; }}
-            onPointerUp={() => { photoSwipeActive.current = false; }}
-            onPointerCancel={() => { photoSwipeActive.current = false; }}
-            onClick={!photoFocused ? enterPhotoFocus : undefined}
-            title={totalPhotos > 1 && !photoFocused ? 'Click to browse photos with arrow keys' : undefined}
+            onClick={handlePhotoAreaClick}
+            title={totalPhotos > 1 && !photoFocused ? 'Tap sides to browse photos' : undefined}
           >
             {totalPhotos > 0 ? (
               <>
