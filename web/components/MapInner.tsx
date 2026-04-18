@@ -1,10 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useMemo } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Marker, Popup, Tooltip, useMap } from 'react-leaflet';
+import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
+import { MapContainer, TileLayer, CircleMarker, Marker, Popup, Tooltip, GeoJSON, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import type { Feature, FeatureCollection, GeoJsonProperties, Geometry } from 'geojson';
 import type { Database } from '@/lib/types';
+import { cn } from '@/lib/cn';
+import { ButtonBase } from './ui/ButtonBase';
 import type { CommuteInfo } from './ListingCard';
 import type { HoveredStation } from './SwipeCard';
 
@@ -25,6 +28,19 @@ const LINE_COLORS: Record<string, string> = {
 
 function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+/* ------------------------------------------------------------------ */
+/*  Subway overlay — translucent MTA-colored lines                     */
+/* ------------------------------------------------------------------ */
+
+const SUBWAY_OVERLAY_STORAGE_KEY = 'dwelligence.subwayOverlay';
+const SUBWAY_LINES_URL = '/data/subway-lines.geojson';
+
+function getSubwayFeatureColor(feature: Feature | undefined): string {
+  const sym = (feature?.properties as { rt_symbol?: string } | undefined)?.rt_symbol;
+  if (!sym) return '#8b949e';
+  return LINE_COLORS[sym] ?? '#8b949e';
 }
 
 
@@ -500,6 +516,183 @@ function buildPopupContent(listing: Listing, isFavorited: boolean, _isWouldLive:
   `;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Subway overlay toggle chip — bottom-left of the map                */
+/* ------------------------------------------------------------------ */
+interface SubwayOverlayChipProps {
+  enabled: boolean;
+  onToggle: () => void;
+}
+
+function SubwayOverlayChip({ enabled, onToggle }: SubwayOverlayChipProps) {
+  const iconColor = enabled ? '#7ee787' : '#ffffff';
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        // 16px on mobile, 12px on desktop — plus safe-area inset so it clears
+        // the home indicator / any bottom nav on iPhones.
+        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+        left: 16,
+        zIndex: 500,
+        display: 'flex',
+        alignItems: 'center',
+        pointerEvents: 'auto',
+      }}
+      // Prevent map drag/zoom when interacting with the chip
+      onMouseDown={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onWheel={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+    >
+      <ButtonBase
+        type="button"
+        aria-pressed={enabled}
+        aria-label={enabled ? 'Hide subway lines' : 'Show subway lines'}
+        onClick={onToggle}
+        className={cn(
+          // Circular icon-only button — 36px on mobile, 32px on md (laptop+).
+          'relative flex items-center justify-center rounded-full',
+          'w-9 h-9 md:w-8 md:h-8',
+          'border bg-[#1c2028]',
+          enabled
+            ? 'border-[#7ee787] hover:bg-[#2d333b]'
+            : 'border-[#2d333b] hover:bg-[#2d333b] hover:border-[#3d434b]',
+        )}
+        style={{
+          boxShadow: enabled
+            ? '0 0 0 2px rgba(126,231,135,0.20), 0 1px 4px rgba(0,0,0,0.4)'
+            : '0 1px 4px rgba(0,0,0,0.4)',
+          borderWidth: enabled ? 2 : 1.5,
+        }}
+      >
+        {/* Route-with-two-stops glyph: short line with filled dots at endpoints */}
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 18 18"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden
+          style={{ color: iconColor, display: 'block' }}
+        >
+          <line
+            x1="4"
+            y1="9"
+            x2="14"
+            y2="9"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+          />
+          <circle cx="4" cy="9" r="2.25" fill="currentColor" />
+          <circle cx="14" cy="9" r="2.25" fill="currentColor" />
+        </svg>
+        {enabled && (
+          <span
+            aria-hidden
+            style={{
+              position: 'absolute',
+              top: -1,
+              right: -1,
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              background: '#7ee787',
+              border: '1.5px solid #1c2028',
+            }}
+          />
+        )}
+      </ButtonBase>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Subway lines GeoJSON layer — lazy-loads on first enable            */
+/* ------------------------------------------------------------------ */
+interface SubwayLinesLayerProps {
+  enabled: boolean;
+}
+
+// Module-level cache so the geojson is only fetched once per page load,
+// even if the SubwayLinesLayer component re-mounts or re-renders.
+let subwayLinesCache: FeatureCollection<Geometry, GeoJsonProperties> | null = null;
+let subwayLinesPromise: Promise<FeatureCollection<Geometry, GeoJsonProperties>> | null = null;
+
+function loadSubwayLines(): Promise<FeatureCollection<Geometry, GeoJsonProperties>> {
+  if (subwayLinesCache) return Promise.resolve(subwayLinesCache);
+  if (subwayLinesPromise) return subwayLinesPromise;
+  subwayLinesPromise = fetch(SUBWAY_LINES_URL)
+    .then((res) => {
+      if (!res.ok) throw new Error(`Failed to load subway lines: ${res.status}`);
+      return res.json();
+    })
+    .then((json: FeatureCollection<Geometry, GeoJsonProperties>) => {
+      subwayLinesCache = json;
+      return json;
+    })
+    .catch((err) => {
+      // Reset so a later toggle can retry.
+      subwayLinesPromise = null;
+      throw err;
+    });
+  return subwayLinesPromise;
+}
+
+function SubwayLinesLayer({ enabled }: SubwayLinesLayerProps) {
+  const [data, setData] = useState<FeatureCollection<Geometry, GeoJsonProperties> | null>(
+    subwayLinesCache,
+  );
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
+    if (data) return;
+    if (subwayLinesCache) {
+      setData(subwayLinesCache);
+      return;
+    }
+    loadSubwayLines()
+      .then((json) => {
+        if (mountedRef.current) setData(json);
+      })
+      .catch((err) => {
+        console.warn('[subway-overlay] failed to load geojson', err);
+      });
+  }, [enabled, data]);
+
+  if (!enabled || !data) return null;
+
+  return (
+    <GeoJSON
+      key="subway-lines"
+      data={data}
+      // Non-interactive so clicks/hovers pass through to listings underneath
+      interactive={false}
+      style={(feature) => ({
+        color: getSubwayFeatureColor(feature),
+        weight: 2.5,
+        opacity: 0.65,
+        fillOpacity: 0,
+      })}
+      eventHandlers={{
+        add: (e) => {
+          // Keep the overlay below marker panes (under listing dots).
+          const layer = e.target as L.GeoJSON;
+          layer.bringToBack();
+        },
+      }}
+    />
+  );
+}
+
 export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, panOffset, hoveredStation }: MapProps) {
   // Fall back to a local ref if the caller doesn't provide one
   const localSuppressBoundsRef = useRef(false);
@@ -521,6 +714,32 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
   // Use URL-provided initial position if valid, otherwise fall back to listing average
   const center: [number, number] = initialCenter ?? computedCenter;
   const zoom: number = initialZoom ?? 13;
+
+  // Subway overlay toggle — persisted in localStorage (default on).
+  // Lazy-init so SSR doesn't touch window.
+  const [subwayOverlayEnabled, setSubwayOverlayEnabled] = useState<boolean>(true);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(SUBWAY_OVERLAY_STORAGE_KEY);
+      if (raw === '0' || raw === 'false') setSubwayOverlayEnabled(false);
+    } catch {
+      // localStorage may be unavailable (e.g. private mode) — fail silent.
+    }
+  }, []);
+  const toggleSubwayOverlay = useCallback(() => {
+    setSubwayOverlayEnabled((prev) => {
+      const next = !prev;
+      try {
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(SUBWAY_OVERLAY_STORAGE_KEY, next ? '1' : '0');
+        }
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
 
   // Track whether each popup was opened by click (persistent) vs hover (auto-close)
   const clickedRef = useRef<Set<number>>(new Set());
@@ -768,6 +987,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
           attribution='&copy; <a href="https://carto.com/">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
+        <SubwayLinesLayer enabled={subwayOverlayEnabled} />
         <InvalidateSize visible={visible} />
         <InjectPopupStyles />
         <FlyToSelected listing={selectedListing} suppressBoundsRef={suppressBoundsRef} panOffset={panOffset} />
@@ -918,6 +1138,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
           );
         })()}
       </MapContainer>
+      <SubwayOverlayChip enabled={subwayOverlayEnabled} onToggle={toggleSubwayOverlay} />
     </div>
   );
 }

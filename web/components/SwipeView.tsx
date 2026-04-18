@@ -53,6 +53,7 @@ export interface SwipeViewProps {
   onLoginRequired?: () => void;
   showHidden?: boolean;
   isLoading?: boolean;
+  wishlistedIds?: Set<number>;
 }
 
 interface UndoEntry {
@@ -105,6 +106,7 @@ export default function SwipeView({
   onLoginRequired,
   showHidden,
   isLoading,
+  wishlistedIds,
 }: SwipeViewProps) {
   // Don't persist swipedIds across refreshes — start fresh each session.
   // The localStorage was causing "You've seen all listings" on every refresh.
@@ -400,6 +402,18 @@ export default function SwipeView({
   // Render
   // ---------------------------------------------------------------------------
 
+  // Clicking a pin on the map should select that listing as the current swipe card.
+  // Find the clicked listing in the current deck and move currentIndex to it.
+  // If the listing isn't in the deck (already swiped/hidden), ignore silently.
+  const handleMarkerClick = useCallback((id: number) => {
+    const idx = deck.findIndex((l) => l.id === id);
+    if (idx >= 0) {
+      setCurrentIndex(idx);
+      // Update tracked ID immediately so the deck-change effect doesn't snap it back
+      currentListingIdRef.current = id;
+    }
+  }, [deck]);
+
   // Convert SwipeListing[] to Listing-compatible shape for Map.
   // Exclude hidden (left-swiped) listings but keep saved (right-swiped) ones.
   const hiddenIds = useMemo(() => {
@@ -425,6 +439,15 @@ export default function SwipeView({
       delisted_at: null,
     })), [listings, hiddenIds, savedIds]);
 
+  // Merge local in-session saves with the persisted wishlist so pins render
+  // green for listings saved in prior sessions, not just this one.
+  const mapFavoritedIds = useMemo(() => {
+    if (!wishlistedIds || wishlistedIds.size === 0) return savedIds;
+    const merged = new Set<number>(wishlistedIds);
+    for (const id of savedIds) merged.add(id);
+    return merged;
+  }, [savedIds, wishlistedIds]);
+
   return (
     <div className="relative flex-1 min-h-0 flex overflow-hidden" style={{ height: '100%' }}>
       {/* Full-screen map backdrop (desktop only — on mobile the mini-map handles it) */}
@@ -432,9 +455,9 @@ export default function SwipeView({
         <MapComponent
           listings={mapListings as unknown as Database['public']['Tables']['listings']['Row'][]}
           selectedId={currentListing?.id ?? null}
-          onMarkerClick={() => {}}
+          onMarkerClick={handleMarkerClick}
           onSelectDetail={() => {}}
-          favoritedIds={savedIds}
+          favoritedIds={mapFavoritedIds}
           onHideListing={() => {}}
           onBoundsChange={onBoundsChange}
           onMapMove={(center, zoom) => { mapCenterRef.current = center; onMapMove?.(center, zoom); }}
@@ -454,9 +477,9 @@ export default function SwipeView({
           <MapComponent
             listings={mapListings as unknown as Database['public']['Tables']['listings']['Row'][]}
             selectedId={currentListing?.id ?? null}
-            onMarkerClick={() => {}}
+            onMarkerClick={handleMarkerClick}
             onSelectDetail={() => {}}
-            favoritedIds={savedIds}
+            favoritedIds={mapFavoritedIds}
             onHideListing={() => {}}
             visible={true}
             commuteInfoMap={commuteInfoMap}
