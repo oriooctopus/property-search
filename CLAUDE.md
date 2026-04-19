@@ -78,6 +78,10 @@ Production URL: **https://dwelligence.vercel.app**
 
 Vercel auto-deploys on push to `main`. Always use this URL when referencing the live site (not the auto-generated `web-seven-chi-63.vercel.app`).
 
+## MANDATORY: Push and Deploy Frequently
+
+Commit and push after every batch of verified changes — don't accumulate a large backlog of uncommitted work. The user wants to see changes deployed to production quickly. After a few related fixes are verified, proactively suggest pushing. Smaller, more frequent deploys are always better than one big push at the end.
+
 ## Test Credentials
 
 Test account credentials are in `web/.env.local` (not committed). Use these for Playwright-based verification of authenticated features like AI search, favorites, and would-live-there.
