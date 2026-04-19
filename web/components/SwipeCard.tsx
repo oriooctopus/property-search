@@ -158,6 +158,8 @@ export default function SwipeCard({
   const notifiedDragging = useRef(false);
   const touchInPhoto = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const gestureAxis = useRef<null | 'x' | 'y'>(null);
+  const scrollingContent = useRef(false);
 
   // Photo-focus mode: arrow keys cycle photos instead of triggering swipe actions
   const enterPhotoFocus = useCallback(() => {
@@ -228,11 +230,16 @@ export default function SwipeCard({
     });
   }, [onSwipe, x, y]);
 
+  const AXIS_LOCK_THRESHOLD = 15;
+
   const bind = useDrag(
     ({ movement: [mx, my], down, first, event }) => {
       if (!isTop) return;
 
       if (first) {
+        gestureAxis.current = null;
+        scrollingContent.current = false;
+
         const target = event?.target as HTMLElement | null;
         touchInPhoto.current = !!(
           totalPhotos > 1 &&
@@ -240,7 +247,16 @@ export default function SwipeCard({
           target &&
           photoAreaRef.current.contains(target)
         );
+
+        // Check if touch started inside scrollable content that has been scrolled down
+        const inScrollable = !!(panelRef.current && target && panelRef.current.contains(target));
+        if (inScrollable && (panelRef.current?.scrollTop ?? 0) > 0) {
+          scrollingContent.current = true;
+        }
       }
+
+      // Let browser handle scroll when user is inside already-scrolled content
+      if (scrollingContent.current) return;
 
       if (touchInPhoto.current) {
         if (!down && Math.abs(mx) > 30) {
@@ -253,22 +269,38 @@ export default function SwipeCard({
         return;
       }
 
+      // Lock gesture axis after initial movement exceeds threshold
+      if (gestureAxis.current === null) {
+        const absX = Math.abs(mx);
+        const absY = Math.abs(my);
+        if (absX > AXIS_LOCK_THRESHOLD || absY > AXIS_LOCK_THRESHOLD) {
+          gestureAxis.current = absX > absY ? 'x' : 'y';
+        }
+      }
+
+      // If axis locked to vertical AND moving upward, let browser handle native scroll
+      if (gestureAxis.current === 'y' && my < 0) return;
+
       if (down) {
-        const allowedY = my > 0 ? my : 0;
-        isDragging.current = Math.abs(mx) > 5 || allowedY > 5;
+        // Apply axis lock: zero out the non-locked axis
+        const effectiveMx = gestureAxis.current === 'y' ? 0 : mx;
+        const effectiveMy = gestureAxis.current === 'x' ? 0 : my;
+        const allowedY = effectiveMy > 0 ? effectiveMy : 0;
+
+        isDragging.current = Math.abs(effectiveMx) > 5 || allowedY > 5;
         if (isDragging.current && !notifiedDragging.current) {
           notifiedDragging.current = true;
           onDragStateChange?.(true);
         }
-        x.set(mx);
+        x.set(effectiveMx);
         y.set(allowedY);
       } else {
         const absX = Math.abs(mx);
         const curY = y.get();
 
-        if (absX > SWIPE_X_THRESHOLD && absX > curY) {
+        if (gestureAxis.current === 'x' && absX > SWIPE_X_THRESHOLD) {
           commitSwipe(mx < 0 ? 'left' : 'right');
-        } else if (curY > SWIPE_Y_THRESHOLD && curY > absX) {
+        } else if (gestureAxis.current === 'y' && curY > SWIPE_Y_THRESHOLD) {
           commitSwipe('down');
         } else {
           const springBack = { type: 'spring' as const, stiffness: 500, damping: 30 };
@@ -383,8 +415,7 @@ export default function SwipeCard({
           {totalPhotos > 0 && (
             <div className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{totalPhotos} photo{totalPhotos !== 1 ? 's' : ''}</div>
           )}
-          <div className="flex items-center justify-between pt-1 pb-2">
-            <span className="inline-block rounded-full px-2.5 py-0.5 text-xs" style={{ backgroundColor: '#21262d', color: '#8b949e', border: '1px solid #30363d' }}>via {listing.source}</span>
+          <div className="flex items-center justify-end pt-1 pb-2">
             <span className="text-sm font-medium" style={{ color: '#58a6ff' }}>View details &rarr;</span>
           </div>
         </div>
@@ -404,12 +435,13 @@ export default function SwipeCard({
           y: isTop ? y : 0,
           rotate: isTop ? rotate : 0,
           transformOrigin: 'bottom center',
+          border: '1px solid #2d333b',
         }}
-        className="w-full h-full shadow-2xl overflow-hidden flex flex-col select-none"
+        className="w-full h-full shadow-2xl overflow-hidden flex flex-col select-none rounded-xl"
         initial={false}
       >
-        {/* Panel background — transparent; outer container owns bg/border */}
-        <div className="absolute inset-0" />
+        {/* Panel background — moves with the card during drag */}
+        <div className="absolute inset-0" style={{ backgroundColor: 'rgba(28, 32, 40, 0.97)' }} />
 
         {/* Background tints */}
         <motion.div
@@ -716,18 +748,8 @@ export default function SwipeCard({
               </div>
             )}
 
-            {/* Source + external link */}
-            <div className="flex items-center justify-between pt-1 pb-2">
-              <span
-                className="inline-block rounded-full px-2.5 py-0.5 text-xs"
-                style={{
-                  backgroundColor: '#21262d',
-                  color: '#8b949e',
-                  border: '1px solid #30363d',
-                }}
-              >
-                via {SOURCE_LABELS[listing.source] ?? listing.source}
-              </span>
+            {/* External link */}
+            <div className="flex items-center justify-end pt-1 pb-2">
               <a
                 href={listing.url}
                 target="_blank"

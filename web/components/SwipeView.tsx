@@ -247,6 +247,17 @@ export default function SwipeView({
     }
   }, [currentListing?.id, currentListing?.lat, currentListing?.lon]);
 
+  // Re-set nearest subway station when mobile map overlay opens
+  useEffect(() => {
+    if (!showMobileMap || typeof window === 'undefined' || window.innerWidth >= 600) return;
+    if (!currentListing?.lat || !currentListing?.lon) return;
+    const nearest = getClosestStations(currentListing.lat, currentListing.lon, 1);
+    if (nearest.length > 0) {
+      const { station } = nearest[0];
+      setHoveredStation({ lat: station.lat, lon: station.lon, name: station.name, lines: station.lines });
+    }
+  }, [showMobileMap, currentListing?.id, currentListing?.lat, currentListing?.lon]);
+
   // After undo-left/right, deck recomputes with the re-inserted item.
   // Find its new position and restore currentIndex to it.
   useEffect(() => {
@@ -502,6 +513,7 @@ export default function SwipeView({
             commuteInfoMap={commuteInfoMap}
             initialCenter={currentListing?.lat && currentListing?.lon ? [currentListing.lat, currentListing.lon] : initialCenter}
             initialZoom={15}
+            hoveredStation={hoveredStation}
           />
           <button
             onClick={() => setShowMobileMap(false)}
@@ -524,7 +536,7 @@ export default function SwipeView({
         {currentListing ? (
           <>
             {/* Card + action bar — fills available space, content scrolls if needed */}
-            <div className="flex-1 min-h-0 overflow-hidden min-[600px]:pr-3 flex flex-col">
+            <div className="flex-1 min-h-0 overflow-hidden p-2 min-[600px]:p-0 min-[600px]:pr-3 flex flex-col">
             <div className="relative w-full my-0 min-[600px]:my-auto max-h-full min-[600px]:max-h-[calc(100%-40px)]">
               {/* Invisible layout card to establish natural height (card + action bar) */}
               <div className="invisible">
@@ -555,7 +567,7 @@ export default function SwipeView({
                     className="absolute inset-0 rounded-xl"
                     style={{
                       zIndex: 3,
-                      backgroundColor: 'rgba(0, 0, 0, 0.25)',
+                      backgroundColor: 'rgba(0, 0, 0, 0.12)',
                       pointerEvents: 'none',
                     }}
                   />
@@ -582,17 +594,18 @@ export default function SwipeView({
               {/* Top card + attached action bar — unified container */}
               <div
                 data-tour="swipe-card"
-                className="absolute inset-0 rounded-xl overflow-hidden"
+                className="absolute inset-0 rounded-xl"
                 style={{
                   zIndex: 2,
-                  backgroundColor: 'rgba(28, 32, 40, 0.97)',
+                  overflow: isDragging ? 'visible' : 'hidden',
+                  backgroundColor: isDragging ? 'transparent' : 'rgba(28, 32, 40, 0.97)',
                   border: swipeOverlay === 'left'
                     ? '2px solid rgba(220, 38, 38, 0.8)'
                     : swipeOverlay === 'right'
                       ? '2px solid rgba(34, 197, 94, 0.8)'
                       : swipeOverlay === 'down'
                         ? '2px solid rgba(107, 114, 128, 0.7)'
-                        : '1px solid #2d333b',
+                        : isDragging ? '1px solid transparent' : '1px solid #2d333b',
                   boxShadow: swipeOverlay === 'left'
                     ? '0 0 20px rgba(220, 38, 38, 0.4), inset 0 0 20px rgba(220, 38, 38, 0.1)'
                     : swipeOverlay === 'right'
@@ -643,10 +656,11 @@ export default function SwipeView({
                 </div>
                 {/* Action bar attached to bottom of card */}
                 <div
-                  className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-5"
+                  className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-5 rounded-b-xl"
                   style={{
                     height: 96,
                     borderTop: '1px solid #2d333b',
+                    backgroundColor: 'rgba(28, 32, 40, 0.97)',
                   }}
                 >
               {/* Undo · Z */}
