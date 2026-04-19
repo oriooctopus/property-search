@@ -14,8 +14,6 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const dynamic = "force-dynamic";
-
 const BUILD_TIME = new Date().toISOString();
 
 export const viewport: Viewport = {

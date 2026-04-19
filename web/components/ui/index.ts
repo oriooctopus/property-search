@@ -1,6 +1,7 @@
 export { ButtonBase } from './ButtonBase';
 export type { ButtonBaseProps } from './ButtonBase';
 export { IconButton } from './IconButton';
+export { DockActionButton } from './DockActionButton';
 export { ActionButton } from './ActionButton';
 export { FilterChip } from './FilterChip';
 export { PillButton } from './PillButton';

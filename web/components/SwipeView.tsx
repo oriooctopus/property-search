@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { createPortal } from 'react-dom';
-import { PrimaryButton } from '@/components/ui';
+import { PrimaryButton, DockActionButton } from '@/components/ui';
+import { X, RotateCcw, Heart } from 'lucide-react';
 import SwipeCard, { type HoveredStation, getClosestStations } from './SwipeCard';
 import type { ViewportBounds } from './MapInner';
 import type { CommuteInfo } from './ListingCard';
@@ -116,9 +117,17 @@ export default function SwipeView({
   const [wishlistDropdownOpen, setWishlistDropdownOpen] = useState(false);
   const [hoveredStation, setHoveredStation] = useState<HoveredStation | null>(null);
   const [showMobileMap, setShowMobileMap] = useState(false);
+  // Defer mounting the Map component until the user actually needs it.
+  // On desktop (viewport >= 600px) the map is the full-screen backdrop, so
+  // we set this true once we detect a desktop viewport. On mobile, it only
+  // flips to true when the user opens the expanded map overlay, saving
+  // ~4MB of Leaflet+react-leaflet JS and subway GeoJSON on initial load.
+  // Once true it stays true so toggling back doesn't re-init the map.
+  const [hasOpenedMap, setHasOpenedMap] = useState(false);
   const [swipeOverlay, setSwipeOverlay] = useState<'left' | 'right' | 'down' | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const saveAnchorRef = useRef<HTMLDivElement>(null);
+  const mobileSaveAnchorRef = useRef<HTMLButtonElement>(null);
   const hideBtnRef = useRef<HTMLButtonElement>(null);
   const laterBtnRef = useRef<HTMLButtonElement>(null);
   const saveBtnRef = useRef<HTMLButtonElement>(null);
@@ -230,6 +239,38 @@ export default function SwipeView({
   useEffect(() => {
     currentListingIdRef.current = currentListing?.id ?? null;
   }, [currentListing?.id]);
+
+  // Mark map as "opened" on desktop viewports (where the map is the backdrop)
+  // and once the user triggers the mobile map overlay. We keep it mounted
+  // after that so toggling views doesn't re-init Leaflet.
+  useEffect(() => {
+    if (hasOpenedMap) return;
+    if (typeof window !== 'undefined' && window.innerWidth >= 600) {
+      setHasOpenedMap(true);
+      return;
+    }
+    if (showMobileMap) setHasOpenedMap(true);
+  }, [hasOpenedMap, showMobileMap]);
+
+  // Also watch for viewport resize crossing the 600px threshold (e.g. device rotation)
+  // Debounced + passive so drag-resize doesn't storm React with state updates.
+  useEffect(() => {
+    if (hasOpenedMap) return;
+    if (typeof window === 'undefined') return;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const onResize = () => {
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        timeoutId = null;
+        if (window.innerWidth >= 600) setHasOpenedMap(true);
+      }, 150);
+    };
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => {
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [hasOpenedMap]);
 
   // On mobile, auto-show the nearest subway station on the map (no hover needed)
   useEffect(() => {
@@ -481,30 +522,12 @@ export default function SwipeView({
 
   return (
     <div className="relative flex-1 min-h-0 flex overflow-hidden" style={{ height: '100%' }}>
-      {/* Full-screen map backdrop (desktop only — on mobile the mini-map handles it) */}
-      <div className="absolute inset-0 z-0 hidden min-[600px]:block">
-        <MapComponent
-          listings={mapListings as unknown as Database['public']['Tables']['listings']['Row'][]}
-          selectedId={currentListing?.id ?? null}
-          onMarkerClick={handleMarkerClick}
-          onSelectDetail={() => {}}
-          favoritedIds={mapFavoritedIds}
-          onHideListing={() => {}}
-          onBoundsChange={onBoundsChange}
-          onMapMove={(center, zoom) => { mapCenterRef.current = center; onMapMove?.(center, zoom); }}
-          suppressBoundsRef={suppressBoundsRef}
-          initialCenter={initialCenter}
-          initialZoom={initialZoom}
-          visible={true}
-          commuteInfoMap={commuteInfoMap}
-          panOffset={{ x: 210, y: 0 }}
-          hoveredStation={hoveredStation}
-        />
-      </div>
-
-      {/* Expanded mobile map overlay — portal to escape parent stacking context */}
-      {showMobileMap && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 min-[600px]:hidden" style={{ zIndex: 1400 }}>
+      {/* Full-screen map backdrop (desktop only — on mobile the mini-map handles it).
+          Only mounted once hasOpenedMap flips true. On desktop that happens
+          immediately via the viewport effect; on mobile it waits until the user
+          taps the map tab (which opens the mobile map overlay below). */}
+      {hasOpenedMap && (
+        <div className="absolute inset-0 z-0 hidden min-[600px]:block">
           <MapComponent
             listings={mapListings as unknown as Database['public']['Tables']['listings']['Row'][]}
             selectedId={currentListing?.id ?? null}
@@ -512,7 +535,36 @@ export default function SwipeView({
             onSelectDetail={() => {}}
             favoritedIds={mapFavoritedIds}
             onHideListing={() => {}}
+            onBoundsChange={onBoundsChange}
+            onMapMove={(center, zoom) => { mapCenterRef.current = center; onMapMove?.(center, zoom); }}
+            suppressBoundsRef={suppressBoundsRef}
+            initialCenter={initialCenter}
+            initialZoom={initialZoom}
             visible={true}
+            commuteInfoMap={commuteInfoMap}
+            panOffset={{ x: 210, y: 0 }}
+            hoveredStation={hoveredStation}
+          />
+        </div>
+      )}
+
+      {/* Expanded mobile map overlay — portal to escape parent stacking context.
+          Mounted on first open (hasOpenedMap) and kept mounted afterward; we
+          toggle visibility via display:none so re-opening doesn't re-init
+          Leaflet / re-fetch subway GeoJSON. */}
+      {hasOpenedMap && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 min-[600px]:hidden"
+          style={{ zIndex: 1400, display: showMobileMap ? 'block' : 'none' }}
+        >
+          <MapComponent
+            listings={mapListings as unknown as Database['public']['Tables']['listings']['Row'][]}
+            selectedId={currentListing?.id ?? null}
+            onMarkerClick={handleMarkerClick}
+            onSelectDetail={() => {}}
+            favoritedIds={mapFavoritedIds}
+            onHideListing={() => {}}
+            visible={showMobileMap}
             commuteInfoMap={commuteInfoMap}
             initialCenter={currentListing?.lat && currentListing?.lon ? [currentListing.lat, currentListing.lon] : initialCenter}
             initialZoom={15}
@@ -538,10 +590,13 @@ export default function SwipeView({
       >
         {currentListing ? (
           <>
-            {/* Card + action bar — fills available space, content scrolls if needed */}
-            <div className="flex-1 min-h-0 overflow-hidden p-2 min-[600px]:p-0 min-[600px]:pr-3 flex flex-col">
-            <div className="relative w-full my-0 min-[600px]:my-auto max-h-full min-[600px]:max-h-[calc(100%-40px)]">
-              {/* Invisible layout card to establish natural height (card + action bar) */}
+            {/* Card + action bar — fills available space, content scrolls if needed.
+                On mobile the card is vertically centered in the area between the top
+                navbar and the floating glassmorphic dock (rendered below). On desktop
+                the card + attached 96px action bar keeps its original behavior. */}
+            <div className="flex-1 min-h-0 overflow-hidden p-2 min-[600px]:p-0 min-[600px]:pr-3 flex flex-col min-[600px]:block items-center justify-center min-[600px]:items-stretch min-[600px]:justify-start pb-[calc(env(safe-area-inset-bottom)+168px)] min-[600px]:pb-0">
+            <div className="relative w-full my-auto min-[600px]:my-auto max-h-full min-[600px]:max-h-[calc(100%-40px)]">
+              {/* Invisible layout card to establish natural height (card + action bar on desktop) */}
               <div className="invisible">
                 <SwipeCard
                   listing={currentListing}
@@ -550,7 +605,8 @@ export default function SwipeView({
                   isTop={false}
                   layoutOnly
                 />
-                <div style={{ height: 96 }} />
+                {/* Reserve action-bar height on desktop only — mobile dock floats outside the card */}
+                <div className="h-0 min-[600px]:h-24" />
               </div>
 
               {/* Next card underneath — visible while dragging */}
@@ -582,7 +638,7 @@ export default function SwipeView({
                       borderRadius: 12,
                     }}
                   >
-                    <div className="absolute top-0 left-0 right-0" style={{ bottom: 96 }}>
+                    <div className="absolute top-0 left-0 right-0 bottom-0 min-[600px]:bottom-24">
                       <SwipeCard
                         listing={deck[currentIndex + 1]}
                         onSwipe={() => {}}
@@ -642,8 +698,8 @@ export default function SwipeView({
                   </button>
                 )}
 
-                {/* Card portion */}
-                <div className="absolute top-0 left-0 right-0" style={{ bottom: 96 }}>
+                {/* Card portion — full height on mobile (no attached bar), leaves 96px for action bar on desktop */}
+                <div className="absolute top-0 left-0 right-0 bottom-0 min-[600px]:bottom-24">
                   <SwipeCard
                     key={currentListing.id}
                     listing={currentListing}
@@ -658,9 +714,10 @@ export default function SwipeView({
                     resetRef={resetCardRef}
                   />
                 </div>
-                {/* Action bar attached to bottom of card */}
+                {/* Action bar attached to bottom of card — desktop only. Mobile uses
+                    the floating glassmorphic dock rendered below the card area. */}
                 <div
-                  className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-5 rounded-b-xl"
+                  className="absolute bottom-0 left-0 right-0 hidden min-[600px]:flex items-center justify-between px-5 rounded-b-xl"
                   style={{
                     height: 96,
                     borderTop: '1px solid #2d333b',
@@ -736,27 +793,104 @@ export default function SwipeView({
                   </span>
                   <span style={{ flexShrink: 0 }}>▾</span>
                 </button>
-                {wishlistDropdownOpen && userId && currentListing && (
-                  <WishlistPicker
-                    listingId={currentListing.id}
-                    wishlists={wishlists}
-                    onToggle={(wishlistId, checked) => {
-                      if (checked) {
-                        handleSelectWishlist(wishlistId);
-                      }
-                      setWishlistDropdownOpen(false);
-                    }}
-                    onCreateNew={handleCreateWishlist}
-                    onClose={() => setWishlistDropdownOpen(false)}
-                    anchorRect={saveAnchorRef.current?.getBoundingClientRect() ?? null}
-                  />
-                )}
               </div>
 
                 </div>{/* action bar */}
               </div>{/* absolute card+bar */}
             </div>{/* relative w-full */}
             </div>{/* flex-1 centering */}
+
+            {/* Mobile-only floating glassmorphic action dock.
+                Sits above the bottom nav pill. Contains 3 equal-size 56px circular
+                buttons: Reject (X / swipe-left), Undo (same as Z), Heart (save / swipe-right).
+                The "Save to: <wishlist>" label sits just above the dock. */}
+            <div
+              className="min-[600px]:hidden absolute left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 pointer-events-none"
+              style={{ bottom: 'calc(env(safe-area-inset-bottom) + 80px)' }}
+            >
+              {/* Save to: <wishlist> label — mobile version, above the dock */}
+              <button
+                ref={mobileSaveAnchorRef}
+                onClick={() => setWishlistDropdownOpen((prev) => !prev)}
+                className="pointer-events-auto text-[12px] flex items-center gap-1 cursor-pointer transition-colors px-3 py-1 rounded-full"
+                style={{
+                  color: '#c9d1d9',
+                  background: 'rgba(0, 0, 0, 0.55)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  maxWidth: 220,
+                  lineHeight: 1.4,
+                }}
+                title="Choose wishlist"
+              >
+                <span style={{ whiteSpace: 'nowrap', color: '#8b949e' }}>Save to:</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>
+                  {selectedWishlist ? selectedWishlist.name : 'Wishlist'}
+                </span>
+                <span style={{ flexShrink: 0, color: '#8b949e' }}>▾</span>
+              </button>
+
+              {/* Glassmorphic pill dock — 3 equal 56px circular buttons */}
+              <div
+                className="pointer-events-auto flex items-center justify-center gap-3 rounded-full px-4 py-2"
+                style={{
+                  background: 'rgba(0, 0, 0, 0.6)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+                }}
+              >
+                <DockActionButton
+                  tone="reject"
+                  aria-label="Reject"
+                  onClick={() => handleSwipe('left')}
+                >
+                  <X size={24} strokeWidth={2.5} color="#ef4444" />
+                </DockActionButton>
+                <DockActionButton
+                  tone="neutral"
+                  aria-label="Undo"
+                  onClick={handleUndo}
+                  disabled={undoStack.length === 0}
+                >
+                  <RotateCcw size={22} strokeWidth={2} color="#8b949e" />
+                </DockActionButton>
+                <DockActionButton
+                  tone="heart"
+                  aria-label="Save"
+                  onClick={() => handleSwipe('right')}
+                >
+                  <Heart size={22} strokeWidth={2} color="#ec4899" />
+                </DockActionButton>
+              </div>
+            </div>
+
+            {/* Wishlist picker — anchors to whichever save-to button is visible
+                (mobile dock label on mobile, in-card action bar on desktop). */}
+            {wishlistDropdownOpen && userId && currentListing && (
+              <WishlistPicker
+                listingId={currentListing.id}
+                wishlists={wishlists}
+                onToggle={(wishlistId, checked) => {
+                  if (checked) {
+                    handleSelectWishlist(wishlistId);
+                  }
+                  setWishlistDropdownOpen(false);
+                }}
+                onCreateNew={handleCreateWishlist}
+                onClose={() => setWishlistDropdownOpen(false)}
+                anchorRect={(() => {
+                  // Prefer the visible anchor. Measure offsetParent to check visibility.
+                  const mobileEl = mobileSaveAnchorRef.current;
+                  const desktopEl = saveAnchorRef.current;
+                  if (mobileEl && mobileEl.offsetParent !== null) return mobileEl.getBoundingClientRect();
+                  if (desktopEl && desktopEl.offsetParent !== null) return desktopEl.getBoundingClientRect();
+                  return null;
+                })()}
+              />
+            )}
           </>
         ) : listings.length === 0 && isLoading ? (
           /* Loading state — listings haven't loaded yet */
