@@ -870,7 +870,7 @@ function HomeInner() {
       <div
         className="fixed inset-y-0 right-0 z-[1400] flex flex-col"
         style={{
-          width: 'min(420px, 100vw)',
+          width: 'min(420px, 100%)',
           backgroundColor: '#0f1117',
           borderLeft: '1px solid #2d333b',
           boxShadow: '-8px 0 24px rgba(0,0,0,0.4)',

@@ -1476,12 +1476,6 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
 
         {/* Right-side controls */}
         <div className="flex items-center gap-1.5 shrink-0 pl-2">
-          {listingCount !== undefined && (
-            <span data-testid="listing-count" className="text-[11px] whitespace-nowrap" style={{ color: '#8b949e' }}>
-              {listingCount}
-            </span>
-          )}
-
           {/* Sort dropdown */}
           <div className="relative shrink-0">
             <button
@@ -1535,10 +1529,9 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
             />
           </div>
 
+          {/* View toggle (list/map/swipe) */}
+          {viewToggle && <div className="shrink-0">{viewToggle}</div>}
         </div>
-
-        {/* View toggle (list/map/swipe) — outside the scrollable area */}
-        {viewToggle && <div className="shrink-0">{viewToggle}</div>}
       </div>
 
       {/* Row 2 (expandable): Filter chips — conditional render so dropdowns aren't clipped */}

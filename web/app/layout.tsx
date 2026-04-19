@@ -42,7 +42,7 @@ export default function RootLayout({
       >
         <Providers>
           <Navbar />
-          <main className="pt-0 lg:pt-[60px]">{children}</main>
+          <main className="pt-0 lg:pt-[60px] overflow-x-hidden">{children}</main>
           <footer className="hidden" aria-hidden="true">Built {BUILD_TIME}</footer>
         </Providers>
       </body>
