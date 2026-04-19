@@ -383,17 +383,18 @@ export default function SwipeCard({
   // Layout-only mode: render content in normal flow to establish natural height
   if (layoutOnly) {
     return (
-      <div className="rounded-xl overflow-hidden flex flex-col" style={{ backgroundColor: 'rgba(28, 32, 40, 0.97)', border: '1px solid #2d333b' }}>
+      <div className="rounded-2xl overflow-hidden flex flex-col" style={{ backgroundColor: 'rgba(28, 32, 40, 0.97)', border: '1px solid #2d333b', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
         <div className="w-full flex-shrink-0" style={{ height: 220, backgroundColor: '#0d1117' }} />
         <div className="px-5 py-4 flex flex-col gap-3">
           <div>
-            <div className="text-base font-bold leading-snug" style={{ color: '#e1e4e8' }}>{listing.address}</div>
+            <div className="text-base font-semibold leading-snug" style={{ color: '#c9d1d9' }}>{listing.address}</div>
             <div className="text-sm mt-0.5" style={{ color: '#8b949e' }}>{listing.area}</div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold" style={{ color: '#7ee787' }}>${listing.price.toLocaleString()}/mo</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: '#7ee787' }}>${listing.price.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 400, color: '#8b949e' }}>/mo</span></span>
           </div>
           {listDateFormatted && <div className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Listed {listDateFormatted}</div>}
+          <div style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }} />
           <div className="grid grid-cols-3 gap-px rounded-lg overflow-hidden" style={{ border: '1px solid #2d333b' }}>
             {[{ label: 'Beds', value: listing.beds === 0 ? 'Studio' : `${listing.beds}` }, { label: 'Baths', value: listing.baths != null ? `${listing.baths}` : 'N/A' }, { label: 'Sqft', value: listing.sqft ? listing.sqft.toLocaleString() : 'N/A' }].map(({ label, value }) => (
               <div key={label} className="flex flex-col items-center py-3 gap-0.5" style={{ backgroundColor: '#161b22' }}>
@@ -404,6 +405,9 @@ export default function SwipeCard({
           </div>
           {listing.year_built != null && (
             <div className="text-sm" style={{ color: '#8b949e' }}>Built {listing.year_built}</div>
+          )}
+          {(listing.transit_summary || (listing.lat != null && listing.lon != null && getClosestStations(listing.lat as number, listing.lon as number, 2).length > 0)) && (
+            <div style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }} />
           )}
           {listing.transit_summary && (
             <div className="flex items-start gap-2 text-sm rounded-lg px-3 py-2.5" style={{ backgroundColor: '#161b22', border: '1px solid #2d333b', color: '#8b949e' }}>
@@ -449,8 +453,9 @@ export default function SwipeCard({
           rotate: isTop ? rotate : 0,
           transformOrigin: 'bottom center',
           border: '1px solid #2d333b',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
         }}
-        className="w-full h-full shadow-2xl overflow-hidden flex flex-col select-none rounded-xl"
+        className="w-full h-full overflow-hidden flex flex-col select-none rounded-2xl"
         initial={false}
       >
         {/* Panel background — moves with the card during drag */}
@@ -588,12 +593,40 @@ export default function SwipeCard({
                   </>
                 )}
 
-                {/* Photo counter badge */}
-                <div
-                  className="absolute bottom-2.5 right-3 text-xs font-medium px-2 py-0.5 rounded-full"
-                  style={{ backgroundColor: 'rgba(0,0,0,0.6)', color: '#fff' }}
-                >
-                  {photoIndex + 1} / {totalPhotos}
+                {/* Photo dots indicator */}
+                <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center justify-center">
+                  <div
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.4)',
+                      backdropFilter: 'blur(8px)',
+                      WebkitBackdropFilter: 'blur(8px)',
+                      borderRadius: 12,
+                      padding: '4px 8px',
+                      display: 'inline-flex',
+                      gap: 4,
+                      alignItems: 'center',
+                    }}
+                  >
+                    {totalPhotos <= 7 ? (
+                      photos.map((_, idx) => (
+                        <span
+                          key={idx}
+                          style={{
+                            width: idx === photoIndex ? 8 : 6,
+                            height: idx === photoIndex ? 8 : 6,
+                            borderRadius: '50%',
+                            backgroundColor: idx === photoIndex ? '#fff' : 'rgba(255,255,255,0.4)',
+                            transition: 'all 200ms ease',
+                            flexShrink: 0,
+                          }}
+                        />
+                      ))
+                    ) : (
+                      <span style={{ color: '#fff', fontSize: 11, fontWeight: 500, lineHeight: 1 }}>
+                        {photoIndex + 1} / {totalPhotos}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Photo-focus mode indicator */}
@@ -641,7 +674,7 @@ export default function SwipeCard({
           <div className="px-5 py-4 flex flex-col gap-3">
             {/* Address + area */}
             <div>
-              <div className="text-base font-bold leading-snug" style={{ color: '#e1e4e8' }}>
+              <div className="text-base font-semibold leading-snug" style={{ color: '#c9d1d9' }}>
                 {listing.address}
               </div>
               <div className="text-sm mt-0.5" style={{ color: '#8b949e' }}>
@@ -651,8 +684,9 @@ export default function SwipeCard({
 
             {/* Price */}
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold" style={{ color: '#7ee787' }}>
-                ${listing.price.toLocaleString()}/mo
+              <span style={{ fontSize: 22, fontWeight: 700, color: '#7ee787' }}>
+                ${listing.price.toLocaleString()}
+                <span style={{ fontSize: 14, fontWeight: 400, color: '#8b949e' }}>/mo</span>
               </span>
             </div>
 
@@ -662,6 +696,9 @@ export default function SwipeCard({
                 Listed {listDateFormatted}
               </div>
             )}
+
+            {/* Divider: price/address section → stats */}
+            <div style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }} />
 
             {/* Stats grid */}
             <div
@@ -702,6 +739,11 @@ export default function SwipeCard({
               <div className="text-sm" style={{ color: '#8b949e' }}>
                 Built {listing.year_built}
               </div>
+            )}
+
+            {/* Divider: stats section → transit/subway */}
+            {(listing.transit_summary || nearbyStations.length > 0) && (
+              <div style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }} />
             )}
 
             {/* Transit summary */}
