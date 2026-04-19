@@ -519,14 +519,13 @@ export default function SwipeView({
 
       {/* Floating detail panel on the right */}
       <div
-        className="absolute right-0 bottom-0 z-10 flex flex-col w-full min-[600px]:w-[440px]"
-        style={{ top: 76 }}
+        className="absolute right-0 bottom-0 z-10 flex flex-col w-full min-[600px]:w-[440px] top-0 min-[600px]:top-[76px]"
       >
         {currentListing ? (
           <>
             {/* Card + action bar — fills available space, content scrolls if needed */}
             <div className="flex-1 min-h-0 overflow-hidden min-[600px]:pr-3 flex flex-col">
-            <div className="relative w-full my-auto" style={{ maxHeight: 'calc(100% - 40px)' }}>
+            <div className="relative w-full my-0 min-[600px]:my-auto max-h-full min-[600px]:max-h-[calc(100%-40px)]">
               {/* Invisible layout card to establish natural height (card + action bar) */}
               <div className="invisible">
                 <SwipeCard

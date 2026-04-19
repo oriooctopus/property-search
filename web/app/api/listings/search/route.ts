@@ -79,6 +79,15 @@ function getClient() {
   return createClient<Database>(url, key);
 }
 
+// Only fetch the columns the UI actually needs. Dropping photos (legacy),
+// availability_date, external_id, last_seen_at, delisted_at etc. saves ~1MB+.
+const LISTING_SELECT = [
+  "id", "address", "area", "price", "beds", "baths", "sqft",
+  "lat", "lon", "transit_summary", "photo_urls", "url",
+  "list_date", "last_update_date", "source", "year_built",
+  "photos", "created_at",
+].join(", ");
+
 // Supabase query builder type is complex; use any locally to avoid
 // fighting the chain-style return types from the SDK.
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -283,7 +292,7 @@ export async function POST(request: NextRequest) {
         if (from > to) break;
         let pageQ: any = supabase
           .from("listings")
-          .select("*")
+          .select(LISTING_SELECT)
           .order("last_update_date", { ascending: false, nullsFirst: false })
           .order("created_at", { ascending: false })
           .order("id", { ascending: true })
@@ -314,7 +323,7 @@ export async function POST(request: NextRequest) {
         const chunk = ids.slice(i, i + CHUNK);
         let chunkQ: any = supabase
           .from("listings")
-          .select("*")
+          .select(LISTING_SELECT)
           .order("last_update_date", { ascending: false, nullsFirst: false })
           .order("created_at", { ascending: false })
           .in("id", chunk)
@@ -344,21 +353,35 @@ export async function POST(request: NextRequest) {
     // ---- 3. Apply the JS-side filters (perRoom pricing, scam filter).
     rows = applyJsFilters(rows, filters);
 
-    // ---- 4. Build commute-info map restricted to the returned listings.
+    // ---- 4. Trim photo_urls to max 3 per listing to reduce payload size.
+    //         Full photo set is only needed in ListingDetail (fetched separately).
+    const trimmedRows = rows.map((r) => ({
+      ...r,
+      photo_urls: (r.photo_urls ?? []).slice(0, 3),
+    }));
+
+    // ---- 5. Build commute-info map restricted to the returned listings.
     const commuteInfo: Record<number, ListingCommuteMeta> = {};
     if (commuteIds !== null) {
-      for (const r of rows) {
+      for (const r of trimmedRows) {
         const m = resolvedCommute.meta[r.id];
         if (m) commuteInfo[r.id] = m;
       }
     }
 
-    return NextResponse.json({
-      listings: rows,
-      commuteInfo,
-      total: rows.length,
-      commuteMessage: resolvedCommute.message,
-    });
+    return NextResponse.json(
+      {
+        listings: trimmedRows,
+        commuteInfo,
+        total: trimmedRows.length,
+        commuteMessage: resolvedCommute.message,
+      },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+        },
+      },
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[listings-search] error:", msg);
