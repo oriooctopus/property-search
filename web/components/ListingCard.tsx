@@ -21,16 +21,6 @@ const SOURCE_LABELS: Record<string, string> = {
   zillow: 'Zillow',
 };
 
-const SOURCE_DOT_COLORS: Record<string, string> = {
-  craigslist: '#a855f7',
-  streeteasy: '#22c55e',
-  'facebook-marketplace': '#1877f2',
-  facebook: '#1877f2',
-  realtor: '#3b82f6',
-  zillow: '#006aff',
-  renthop: '#f59e0b',
-  apartments: '#ef4444',
-};
 
 interface Person {
   id: string;
@@ -285,34 +275,8 @@ export default function ListingCard({
         {formatListedDate(listing.list_date ?? listing.created_at)}
       </div>
 
-      {/* Tag pill + source badges + actions */}
-      <div className="flex items-center justify-between mt-2">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Source badges */}
-          {((listing as Record<string, unknown>).sources as string[] | undefined ?? (listing.source ? [listing.source] : [])).map((src) => (
-            <span
-              key={src}
-              className="inline-flex items-center gap-1 rounded-full px-2.5 h-[22px] text-[10px] font-semibold cursor-default"
-              style={{
-                color: '#8b949e',
-                border: '1px solid #2d333b',
-              }}
-            >
-              <span
-                className="inline-block rounded-full shrink-0"
-                style={{
-                  width: 6,
-                  height: 6,
-                  backgroundColor: SOURCE_DOT_COLORS[src] ?? '#8b949e',
-                }}
-              />
-              {SOURCE_LABELS[src] ?? src}
-            </span>
-          ))}
-          {/* Commute time badge removed — inaccurate for OTP polygon filters.
-             Users see actual commute details in the listing detail panel. */}
-        </div>
-
+      {/* Actions */}
+      <div className="flex items-center justify-end mt-2">
         <div className="flex items-center gap-1">
           {/* Hide */}
           <ActionButton
