@@ -1242,6 +1242,9 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
   const [draftMaxSqft, setDraftMaxSqft] = useState<number | null>(filters.maxSqft);
   const [draftExcludeNoSqft, setDraftExcludeNoSqft] = useState<boolean>(filters.excludeNoSqft);
 
+  // Mobile filter bottom sheet state
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+
   // Save search dropdown state
   const [saveOpen, setSaveOpen] = useState(false);
   const [savePanelTab, setSavePanelTab] = useState<'save-search' | 'wishlist'>('save-search');
@@ -1476,8 +1479,28 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
 
         {/* Right-side controls */}
         <div className="flex items-center gap-1.5 shrink-0 pl-2">
-          {/* Sort dropdown */}
-          <div className="relative shrink-0">
+          {/* Mobile: compact filter pill that opens bottom sheet */}
+          <button
+            onClick={() => setMobileSheetOpen(true)}
+            className="flex min-[600px]:hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap transition-colors duration-150 cursor-pointer"
+            style={{
+              background: activeCount > 0 ? 'rgba(88, 166, 255, 0.1)' : '#2d333b',
+              color: activeCount > 0 ? '#58a6ff' : '#8b949e',
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1 2h10M3 6h6M5 10h2" />
+            </svg>
+            Filters
+            {activeCount > 0 && (
+              <span className="bg-[#58a6ff] text-[#0f1117] text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                {activeCount}
+              </span>
+            )}
+          </button>
+
+          {/* Desktop: Sort dropdown (hidden on mobile) */}
+          <div className="relative shrink-0 hidden min-[600px]:block">
             <button
               onClick={() => {
                 setSortOpen((prev) => !prev);
@@ -1515,8 +1538,8 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
             )}
           </div>
 
-          {/* Filters toggle button */}
-          <div data-tour="filters" className="shrink-0">
+          {/* Desktop: Filters toggle button (hidden on mobile) */}
+          <div data-tour="filters" className="shrink-0 hidden min-[600px]:block">
             <FilterToggleButton
               activeCount={activeCount}
               expanded={filtersExpanded}
@@ -1529,8 +1552,8 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
             />
           </div>
 
-          {/* View toggle (list/map/swipe) */}
-          {viewToggle && <div className="shrink-0">{viewToggle}</div>}
+          {/* View toggle (list/map/swipe) — desktop only; mobile uses MobileBottomNav */}
+          {viewToggle && <div className="shrink-0 hidden min-[600px]:block">{viewToggle}</div>}
         </div>
       </div>
 
@@ -2302,6 +2325,92 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
             </div>
           </>
         </div>
+      )}
+
+      {/* Mobile filter bottom sheet */}
+      {mobileSheetOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-[1400] min-[600px]:hidden"
+            style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+            onClick={() => setMobileSheetOpen(false)}
+          />
+          {/* Sheet */}
+          <div
+            className="fixed bottom-0 left-0 right-0 z-[1401] min-[600px]:hidden rounded-t-2xl"
+            style={{
+              backgroundColor: '#1c2028',
+              paddingBottom: 'env(safe-area-inset-bottom)',
+              boxShadow: '0 -8px 32px rgba(0,0,0,0.5)',
+              animation: 'mobileSheetSlideUp 200ms ease-out',
+            }}
+          >
+            {/* Drag handle */}
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-10 h-1 rounded-full" style={{ backgroundColor: '#484f58' }} />
+            </div>
+
+            {/* Close button */}
+            <div className="flex items-center justify-between px-4 pb-2">
+              <span className="text-sm font-semibold" style={{ color: '#e1e4e8' }}>Sort &amp; Filter</span>
+              <button
+                onClick={() => setMobileSheetOpen(false)}
+                className="rounded p-1.5 transition-colors hover:bg-white/5 cursor-pointer"
+                style={{ color: '#8b949e' }}
+                aria-label="Close"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M3 3L13 13M13 3L3 13" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Sort section */}
+            <div className="px-4 pb-4" style={{ borderBottom: '1px solid #2d333b' }}>
+              <div className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: '#8b949e' }}>Sort by</div>
+              <div className="flex flex-wrap gap-2">
+                {SORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => {
+                      onChange({ ...filters, sort: opt.value });
+                    }}
+                    className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer"
+                    style={{
+                      backgroundColor: filters.sort === opt.value ? 'rgba(88, 166, 255, 0.15)' : '#2d333b',
+                      color: filters.sort === opt.value ? '#58a6ff' : '#8b949e',
+                      border: filters.sort === opt.value ? '1px solid rgba(88, 166, 255, 0.3)' : '1px solid transparent',
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Filters section */}
+            <div className="px-4 py-4">
+              <FilterToggleButton
+                activeCount={activeCount}
+                expanded={filtersExpanded}
+                onClick={() => {
+                  setFiltersExpanded((prev) => !prev);
+                  if (filtersExpanded) {
+                    setOpenChip(null);
+                  }
+                  setMobileSheetOpen(false);
+                }}
+              />
+            </div>
+          </div>
+          <style dangerouslySetInnerHTML={{ __html: `
+            @keyframes mobileSheetSlideUp {
+              from { transform: translateY(100%); }
+              to { transform: translateY(0); }
+            }
+          ` }} />
+        </>
       )}
 
       {/* Save success toast — positioned at bottom center */}
