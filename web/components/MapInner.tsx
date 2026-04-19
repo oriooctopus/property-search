@@ -228,10 +228,22 @@ function InvalidateSize({ visible }: { visible: boolean }) {
   }, [map, visible]);
 
   // Handle container resize (e.g. window resize, browser zoom)
+  // Coalesce invalidateSize() calls to one per animation frame to avoid
+  // stalling the main thread during rapid window drag-resize.
   useEffect(() => {
-    const observer = new ResizeObserver(() => map.invalidateSize());
+    let rafId: number | null = null;
+    const observer = new ResizeObserver(() => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        map.invalidateSize();
+      });
+    });
     observer.observe(map.getContainer());
-    return () => observer.disconnect();
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
   }, [map]);
 
   return null;

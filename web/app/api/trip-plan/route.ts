@@ -182,7 +182,11 @@ export async function GET(request: NextRequest) {
 
     const itinerary = transformItinerary(best);
 
-    return NextResponse.json(itinerary);
+    return NextResponse.json(itinerary, {
+      headers: {
+        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+      },
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("aborted") || msg.includes("AbortError")) {

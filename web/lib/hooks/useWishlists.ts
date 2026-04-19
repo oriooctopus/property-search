@@ -30,7 +30,7 @@ export function useWishlists(userId: string | null) {
       if (!userId) return [];
       const { data, error } = await supabase
         .from('wishlists')
-        .select('*, wishlist_items(listing_id), wishlist_shares(id, shared_with_email, permission)')
+        .select('id, name, user_id, created_at, updated_at, wishlist_items(listing_id), wishlist_shares(id, shared_with_email, permission)')
         .order('created_at', { ascending: true });
       if (error) throw error;
       return (data ?? []) as unknown as Wishlist[];
@@ -63,7 +63,7 @@ export function useSharedWishlists(userEmail: string | null) {
 
       const { data: wls, error: wlErr } = await supabase
         .from('wishlists')
-        .select('*, wishlist_items(listing_id), wishlist_shares(id, shared_with_email, permission)')
+        .select('id, name, user_id, created_at, updated_at, wishlist_items(listing_id), wishlist_shares(id, shared_with_email, permission)')
         .in('id', wishlistIds);
       if (wlErr) throw wlErr;
       const rows = (wls ?? []) as unknown as Wishlist[];
