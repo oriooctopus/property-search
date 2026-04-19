@@ -140,6 +140,7 @@ export default function SwipeView({
   const photoFocusedRef = useRef(false);
   const enterPhotoFocusRef = useRef<(() => void) | null>(null);
   const exitPhotoFocusRef = useRef<(() => void) | null>(null);
+  const resetCardRef = useRef<(() => void) | null>(null);
   const mapCenterRef = useRef<{ lat: number; lng: number } | null>(
     initialCenter ? { lat: initialCenter[0], lng: initialCenter[1] } : null
   );
@@ -279,6 +280,8 @@ export default function SwipeView({
       // Auth check — all swipe actions require login (before overlay flash)
       if (!userId) {
         onLoginRequired?.();
+        // Card animated off-screen by commitSwipe — spring it back
+        setTimeout(() => resetCardRef.current?.(), 100);
         return;
       }
 
@@ -652,6 +655,7 @@ export default function SwipeView({
                     exitPhotoFocusRef={exitPhotoFocusRef}
                     onSubwayHover={setHoveredStation}
                     onDragStateChange={setIsDragging}
+                    resetRef={resetCardRef}
                   />
                 </div>
                 {/* Action bar attached to bottom of card */}

@@ -112,6 +112,8 @@ interface SwipeCardProps {
   onSubwayHover?: (station: HoveredStation | null) => void;
   /** Called when drag state changes (true = actively dragging, false = released) */
   onDragStateChange?: (dragging: boolean) => void;
+  /** Ref callback so parent can imperatively reset card position (spring back to 0,0) */
+  resetRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 const SWIPE_X_THRESHOLD = 100;
@@ -129,6 +131,7 @@ export default function SwipeCard({
   exitPhotoFocusRef,
   onSubwayHover,
   onDragStateChange,
+  resetRef,
 }: SwipeCardProps) {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [photoFocused, setPhotoFocused] = useState(false);
@@ -177,6 +180,11 @@ export default function SwipeCard({
   // available immediately (useEffect runs after paint, causing timing issues)
   if (enterPhotoFocusRef) enterPhotoFocusRef.current = enterPhotoFocus;
   if (exitPhotoFocusRef) exitPhotoFocusRef.current = exitPhotoFocus;
+  if (resetRef) resetRef.current = () => {
+    const springBack = { type: 'spring' as const, stiffness: 500, damping: 30 };
+    animate(x, 0, springBack);
+    animate(y, 0, springBack);
+  };
 
   // Keyboard handler for photo-focus mode
   useEffect(() => {
@@ -211,6 +219,14 @@ export default function SwipeCard({
     document.addEventListener('mousedown', handleMouseDown);
     return () => document.removeEventListener('mousedown', handleMouseDown);
   }, [photoFocused, exitPhotoFocus]);
+
+  // Reset scroll position and photo index when listing changes
+  useEffect(() => {
+    if (panelRef.current) {
+      panelRef.current.scrollTop = 0;
+    }
+    setPhotoIndex(0);
+  }, [listing.id]);
 
   const commitSwipe = useCallback((direction: 'left' | 'right' | 'down') => {
     const targets = {
@@ -412,9 +428,6 @@ export default function SwipeCard({
               </div>
             );
           })()}
-          {totalPhotos > 0 && (
-            <div className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>{totalPhotos} photo{totalPhotos !== 1 ? 's' : ''}</div>
-          )}
           <div className="flex items-center justify-end pt-1 pb-2">
             <span className="text-sm font-medium" style={{ color: '#58a6ff' }}>View details &rarr;</span>
           </div>
@@ -738,13 +751,6 @@ export default function SwipeCard({
                     </span>
                   </div>
                 ))}
-              </div>
-            )}
-
-            {/* Photo count */}
-            {totalPhotos > 0 && (
-              <div className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                {totalPhotos} photo{totalPhotos !== 1 ? 's' : ''}
               </div>
             )}
 
