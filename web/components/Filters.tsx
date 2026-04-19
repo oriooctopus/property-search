@@ -1332,6 +1332,776 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
 
   const expandedRowRef = useRef<HTMLDivElement>(null);
 
+
+  const filterChipsContent = (
+    <>
+        {/* Price chip */}
+        <FilterChip
+          compact
+          label={priceLabel(filters.minRent, filters.maxRent, filters.priceMode)}
+          active={filters.minRent !== null || filters.maxRent !== null}
+          open={openChip === 'price'}
+          onToggle={() => toggleChip('price')}
+        >
+          <SectionTitle>Price</SectionTitle>
+          <div className="flex rounded-lg p-0.5 mb-3" style={{ backgroundColor: '#0d1117' }}>
+            <button
+              className="flex-1 text-xs font-medium py-1.5 rounded-md transition-colors"
+              style={{
+                backgroundColor: draftPriceMode === 'total' ? '#58a6ff' : 'transparent',
+                color: draftPriceMode === 'total' ? '#ffffff' : '#8b949e',
+              }}
+              onClick={() => {
+                setDraftPriceMode('total');
+                setDraftMinRent(null);
+                setDraftMaxRent(null);
+              }}
+            >
+              Total
+            </button>
+            <button
+              className="flex-1 text-xs font-medium py-1.5 rounded-md transition-colors"
+              style={{
+                backgroundColor: draftPriceMode === 'perRoom' ? '#58a6ff' : 'transparent',
+                color: draftPriceMode === 'perRoom' ? '#ffffff' : '#8b949e',
+              }}
+              onClick={() => {
+                setDraftPriceMode('perRoom');
+                setDraftMinRent(null);
+                setDraftMaxRent(null);
+              }}
+            >
+              Per Room
+            </button>
+          </div>
+          <RangeSlider
+            label={draftPriceMode === 'total' ? 'Min Price' : 'Min / Room'}
+            min={draftPriceMode === 'total' ? PRICE_SLIDER_MIN : PRICE_PER_ROOM_MIN}
+            max={draftPriceMode === 'total' ? PRICE_SLIDER_MAX : PRICE_PER_ROOM_MAX}
+            step={draftPriceMode === 'total' ? PRICE_SLIDER_STEP : PRICE_PER_ROOM_STEP}
+            value={draftMinRent ?? (draftPriceMode === 'total' ? PRICE_SLIDER_MIN : PRICE_PER_ROOM_MIN)}
+            onChange={(v) => setDraftMinRent(v === (draftPriceMode === 'total' ? PRICE_SLIDER_MIN : PRICE_PER_ROOM_MIN) ? null : v)}
+          />
+          <RangeSlider
+            label={draftPriceMode === 'total' ? 'Max Price' : 'Max / Room'}
+            min={draftPriceMode === 'total' ? PRICE_SLIDER_MIN : PRICE_PER_ROOM_MIN}
+            max={draftPriceMode === 'total' ? PRICE_SLIDER_MAX : PRICE_PER_ROOM_MAX}
+            step={draftPriceMode === 'total' ? PRICE_SLIDER_STEP : PRICE_PER_ROOM_STEP}
+            value={draftMaxRent ?? (draftPriceMode === 'total' ? PRICE_SLIDER_MAX : PRICE_PER_ROOM_MAX)}
+            onChange={(v) => setDraftMaxRent(v === (draftPriceMode === 'total' ? PRICE_SLIDER_MAX : PRICE_PER_ROOM_MAX) ? null : v)}
+          />
+          <DropdownFooter
+            onReset={() => {
+              onChange({ ...filters, minRent: null, maxRent: null, priceMode: 'total' });
+              setOpenChip(null);
+            }}
+            onDone={() => {
+              onChange({ ...filters, minRent: draftMinRent, maxRent: draftMaxRent, priceMode: draftPriceMode });
+              setOpenChip(null);
+            }}
+          />
+        </FilterChip>
+    
+        {/* Beds / Baths chip */}
+        <FilterChip
+          compact
+          label={bedsBathsLabel(filters.selectedBeds, filters.minBaths)}
+          active={filters.selectedBeds !== null || filters.minBaths !== null}
+          open={openChip === 'bedsBaths'}
+          onToggle={() => toggleChip('bedsBaths')}
+        >
+          <SectionTitle>Bedrooms</SectionTitle>
+          <MultiPillGroup
+            options={BEDROOM_OPTIONS}
+            selected={draftSelectedBeds}
+            onToggle={(v) => {
+              if (v === null) {
+                // "Any" clears all selections
+                setDraftSelectedBeds([]);
+              } else {
+                setDraftSelectedBeds((prev) =>
+                  prev.includes(v) ? prev.filter((b) => b !== v) : [...prev, v],
+                );
+              }
+            }}
+          />
+    
+          <div className="mt-5">
+            <SectionTitle>Bathrooms</SectionTitle>
+            <PillGroup
+              options={BATHROOM_OPTIONS}
+              value={draftMinBaths}
+              onSelect={setDraftMinBaths}
+            />
+            {draftMinBaths !== null && (
+              <>
+                <label className="flex items-center gap-2 cursor-pointer mt-2">
+                  <input
+                    type="checkbox"
+                    checked={draftIncludeNaBaths}
+                    onChange={(e) => setDraftIncludeNaBaths(e.target.checked)}
+                    className="accent-[#58a6ff] w-4 h-4 rounded cursor-pointer"
+                  />
+                  <span className="text-sm" style={{ color: '#8b949e' }}>Include N/A</span>
+                </label>
+                <p className="text-xs mt-1 ml-6" style={{ color: '#6e7681', fontStyle: 'italic' }}>
+                  Some listings on Craigslist or Marketplace may not have bathroom data
+                </p>
+              </>
+            )}
+          </div>
+    
+          <DropdownFooter
+            onReset={() => {
+              onChange({ ...filters, selectedBeds: null, minBaths: null, includeNaBaths: false });
+              setOpenChip(null);
+            }}
+            onDone={() => {
+              onChange({
+                ...filters,
+                selectedBeds: draftSelectedBeds.length > 0 ? draftSelectedBeds : null,
+                minBaths: draftMinBaths,
+                includeNaBaths: draftIncludeNaBaths,
+              });
+              setOpenChip(null);
+            }}
+          />
+        </FilterChip>
+    
+        <FilterChip
+          compact
+          label={listingAgeLabel(filters.maxListingAge)}
+          active={filters.maxListingAge !== null}
+          open={openChip === 'listingAge'}
+          onToggle={() => toggleChip('listingAge')}
+        >
+          <ListingAgeSlider
+            value={draftMaxListingAge}
+            onChange={setDraftMaxListingAge}
+          />
+          <DropdownFooter
+            onReset={() => {
+              onChange({ ...filters, maxListingAge: null });
+              setOpenChip(null);
+            }}
+            onDone={() => {
+              onChange({ ...filters, maxListingAge: draftMaxListingAge });
+              setOpenChip(null);
+            }}
+          />
+        </FilterChip>
+    
+        {/* Source chip */}
+        <FilterChip
+          compact
+          label={filters.selectedSources !== null ? `Sources (${filters.selectedSources.length})` : 'Source'}
+          active={filters.selectedSources !== null}
+          open={openChip === 'source'}
+          onToggle={() => toggleChip('source')}
+        >
+          <SectionTitle>Sources</SectionTitle>
+          <div className="flex flex-col gap-2">
+            {ALL_SOURCES.map((src) => {
+              const checked = draftSources === null || draftSources.includes(src);
+              return (
+                <label key={src} className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: '#e1e4e8' }}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      if (draftSources === null) {
+                        // All selected -> uncheck this one
+                        setDraftSources(ALL_SOURCES.filter((s) => s !== src) as string[]);
+                      } else if (checked) {
+                        const next = draftSources.filter((s) => s !== src);
+                        setDraftSources(next.length === 0 ? null : next);
+                      } else {
+                        const next = [...draftSources, src];
+                        setDraftSources(next.length === ALL_SOURCES.length ? null : next);
+                      }
+                    }}
+                    className="accent-[#58a6ff] w-4 h-4"
+                  />
+                  {SOURCE_LABELS[src]}
+                </label>
+              );
+            })}
+          </div>
+          <DropdownFooter
+            onReset={() => {
+              onChange({ ...filters, selectedSources: null });
+              setOpenChip(null);
+            }}
+            onDone={() => {
+              onChange({ ...filters, selectedSources: draftSources });
+              setOpenChip(null);
+            }}
+          />
+        </FilterChip>
+    
+        {/* Year Built chip */}
+        <FilterChip
+          compact
+          label={yearBuiltLabel(filters.minYearBuilt, filters.maxYearBuilt)}
+          active={filters.minYearBuilt !== null || filters.maxYearBuilt !== null}
+          open={openChip === 'yearBuilt'}
+          onToggle={() => toggleChip('yearBuilt')}
+        >
+          <SectionTitle>Year Built Presets</SectionTitle>
+          <div className="flex flex-col gap-2 mb-4">
+            {YEAR_BUILT_PRESETS.map((preset) => (
+              <button
+                key={preset.label}
+                onClick={() => {
+                  setDraftMinYearBuilt(preset.minYear);
+                  setDraftMaxYearBuilt(preset.maxYear);
+                }}
+                className={cn(
+                  'px-3 py-2 rounded-md text-sm text-left transition-colors cursor-pointer border',
+                  draftMinYearBuilt === preset.minYear && draftMaxYearBuilt === preset.maxYear
+                    ? 'bg-[#58a6ff]/10 border-[#58a6ff] text-[#58a6ff]'
+                    : 'bg-transparent border-[#2d333b] text-[#8b949e] hover:bg-[#58a6ff]/5 hover:border-[#58a6ff]/30',
+                )}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+    
+          <SectionTitle>Custom Range</SectionTitle>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: '#8b949e' }}>
+                Min Year
+              </label>
+              <input
+                type="number"
+                value={draftMinYearBuilt ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                  setDraftMinYearBuilt(val && val >= YEAR_BUILT_MIN ? val : null);
+                }}
+                placeholder="1800"
+                min={YEAR_BUILT_MIN}
+                max={YEAR_BUILT_MAX}
+                className="w-full h-8 rounded px-2 text-sm border"
+                style={{
+                  backgroundColor: '#0d1117',
+                  color: '#e1e4e8',
+                  borderColor: '#2d333b',
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: '#8b949e' }}>
+                Max Year
+              </label>
+              <input
+                type="number"
+                value={draftMaxYearBuilt ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                  setDraftMaxYearBuilt(val && val <= YEAR_BUILT_MAX ? val : null);
+                }}
+                placeholder={String(YEAR_BUILT_MAX)}
+                min={YEAR_BUILT_MIN}
+                max={YEAR_BUILT_MAX}
+                className="w-full h-8 rounded px-2 text-sm border"
+                style={{
+                  backgroundColor: '#0d1117',
+                  color: '#e1e4e8',
+                  borderColor: '#2d333b',
+                }}
+              />
+            </div>
+          </div>
+    
+          <DropdownFooter
+            onReset={() => {
+              onChange({ ...filters, minYearBuilt: null, maxYearBuilt: null });
+              setOpenChip(null);
+            }}
+            onDone={() => {
+              onChange({ ...filters, minYearBuilt: draftMinYearBuilt, maxYearBuilt: draftMaxYearBuilt });
+              setOpenChip(null);
+            }}
+          />
+        </FilterChip>
+    
+        {/* Sqft chip */}
+        <FilterChip
+          compact
+          label={sqftLabel(filters.minSqft, filters.maxSqft, filters.excludeNoSqft)}
+          active={filters.minSqft !== null || filters.maxSqft !== null || filters.excludeNoSqft}
+          open={openChip === 'sqft'}
+          onToggle={() => toggleChip('sqft')}
+        >
+          <SectionTitle>Size Presets</SectionTitle>
+          <div className="flex flex-col gap-2 mb-4">
+            {SQFT_PRESETS.map((preset) => (
+              <button
+                key={preset.label}
+                onClick={() => {
+                  setDraftMinSqft(preset.minSqft);
+                  setDraftMaxSqft(preset.maxSqft);
+                }}
+                className={cn(
+                  'px-3 py-2 rounded-md text-sm text-left transition-colors cursor-pointer border',
+                  draftMinSqft === preset.minSqft && draftMaxSqft === preset.maxSqft
+                    ? 'bg-[#58a6ff]/10 border-[#58a6ff] text-[#58a6ff]'
+                    : 'bg-transparent border-[#2d333b] text-[#8b949e] hover:bg-[#58a6ff]/5 hover:border-[#58a6ff]/30',
+                )}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+    
+          <SectionTitle>Custom Range</SectionTitle>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: '#8b949e' }}>
+                Min Sqft
+              </label>
+              <input
+                type="number"
+                value={draftMinSqft ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                  setDraftMinSqft(val && val > 0 ? val : null);
+                }}
+                placeholder="0"
+                min={0}
+                className="w-full h-8 rounded px-2 text-sm border"
+                style={{
+                  backgroundColor: '#0d1117',
+                  color: '#e1e4e8',
+                  borderColor: '#2d333b',
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: '#8b949e' }}>
+                Max Sqft
+              </label>
+              <input
+                type="number"
+                value={draftMaxSqft ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                  setDraftMaxSqft(val && val > 0 ? val : null);
+                }}
+                placeholder="No max"
+                min={0}
+                className="w-full h-8 rounded px-2 text-sm border"
+                style={{
+                  backgroundColor: '#0d1117',
+                  color: '#e1e4e8',
+                  borderColor: '#2d333b',
+                }}
+              />
+            </div>
+          </div>
+    
+          <label className="flex items-center gap-2 cursor-pointer mb-2">
+            <input
+              type="checkbox"
+              checked={draftExcludeNoSqft}
+              onChange={(e) => setDraftExcludeNoSqft(e.target.checked)}
+              className="accent-[#58a6ff] w-4 h-4 rounded cursor-pointer"
+            />
+            <span className="text-sm" style={{ color: '#8b949e' }}>Exclude listings without sqft</span>
+          </label>
+    
+          <DropdownFooter
+            onReset={() => {
+              onChange({ ...filters, minSqft: null, maxSqft: null, excludeNoSqft: false });
+              setOpenChip(null);
+            }}
+            onDone={() => {
+              onChange({ ...filters, minSqft: draftMinSqft, maxSqft: draftMaxSqft, excludeNoSqft: draftExcludeNoSqft });
+              setOpenChip(null);
+            }}
+          />
+        </FilterChip>
+    
+        {/* Commute chip */}
+        <FilterChip
+          compact
+          label={commuteLabel(filters.commuteRules ?? [])}
+          active={(filters.commuteRules ?? []).length > 0}
+          open={openChip === 'commute'}
+          onToggle={() => toggleChip('commute')}
+          dropdownAlign="right"
+          data-testid="commute-chip"
+        >
+          <div style={{ minWidth: 'min(380px, calc(100vw - 16px))', maxWidth: '440px' }}>
+            <div className="flex items-center justify-between mb-3">
+              <SectionTitle>Commute Rules</SectionTitle>
+            </div>
+            {draftCommuteRules.length === 0 ? (
+              /* Animated subway train empty state */
+              <div className="flex flex-col items-center py-6 gap-4">
+                <style>{`
+                  @keyframes commuteTrainSlide {
+                    from { left: -90px; }
+                    to   { left: 50%; transform: translateX(-50%); }
+                  }
+                  @keyframes commuteTrainBob {
+                    0%, 100% { transform: translateX(-50%) translateY(0px); }
+                    50%       { transform: translateX(-50%) translateY(-3px); }
+                  }
+                `}</style>
+                <div style={{ position: 'relative', width: 220, height: 80, overflow: 'hidden' }}>
+                  {/* Track ties */}
+                  <div style={{ position: 'absolute', bottom: 14, left: 0, right: 0, display: 'flex', gap: 14, padding: '0 4px' }}>
+                    {Array.from({ length: 14 }).map((_, i) => (
+                      <div key={i} style={{ width: 4, height: 8, background: '#2d333b', borderRadius: 1, flexShrink: 0 }} />
+                    ))}
+                  </div>
+                  {/* Track line */}
+                  <div style={{ position: 'absolute', bottom: 18, left: 0, right: 0, height: 2, background: '#2d333b', borderRadius: 1 }} />
+                  {/* Station dots */}
+                  <div style={{ position: 'absolute', bottom: 15, left: 20, width: 6, height: 6, borderRadius: '50%', background: '#2d333b', border: '1.5px solid #3d4450' }} />
+                  <div style={{ position: 'absolute', bottom: 15, right: 20, width: 6, height: 6, borderRadius: '50%', background: '#2d333b', border: '1.5px solid #3d4450' }} />
+                  {/* Train */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 20,
+                    animation: 'commuteTrainSlide 1.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both, commuteTrainBob 2.4s ease-in-out 2.2s infinite',
+                  }}>
+                    <svg width="72" height="38" viewBox="0 0 72 38" fill="none">
+                      <rect x="2" y="8" width="68" height="26" rx="5" fill="#252d38" stroke="#3d4450" strokeWidth="1.5"/>
+                      <path d="M60 8 Q70 8 70 20 Q70 34 60 34" fill="#2d3748" stroke="#3d4450" strokeWidth="1.5"/>
+                      <rect x="2" y="8" width="68" height="5" rx="3" fill="#58a6ff" opacity="0.7"/>
+                      <rect x="8" y="16" width="10" height="9" rx="2" fill="#1a2535" stroke="#58a6ff" strokeWidth="1" opacity="0.9"/>
+                      <rect x="24" y="16" width="10" height="9" rx="2" fill="#1a2535" stroke="#58a6ff" strokeWidth="1" opacity="0.9"/>
+                      <rect x="40" y="16" width="10" height="9" rx="2" fill="#1a2535" stroke="#58a6ff" strokeWidth="1" opacity="0.9"/>
+                      <rect x="10" y="18" width="2" height="2" rx="1" fill="#58a6ff" opacity="0.5"/>
+                      <rect x="26" y="18" width="2" height="2" rx="1" fill="#58a6ff" opacity="0.5"/>
+                      <rect x="42" y="18" width="2" height="2" rx="1" fill="#58a6ff" opacity="0.5"/>
+                      <circle cx="65" cy="20" r="3" fill="#7ee787" opacity="0.85"/>
+                      <circle cx="65" cy="20" r="1.5" fill="#fff" opacity="0.7"/>
+                      <circle cx="14" cy="36" r="4" fill="#1c2028" stroke="#3d4450" strokeWidth="1.5"/>
+                      <circle cx="14" cy="36" r="1.5" fill="#3d4450"/>
+                      <circle cx="36" cy="36" r="4" fill="#1c2028" stroke="#3d4450" strokeWidth="1.5"/>
+                      <circle cx="36" cy="36" r="1.5" fill="#3d4450"/>
+                      <circle cx="58" cy="36" r="4" fill="#1c2028" stroke="#3d4450" strokeWidth="1.5"/>
+                      <circle cx="58" cy="36" r="1.5" fill="#3d4450"/>
+                    </svg>
+                  </div>
+                </div>
+                <div style={{ fontSize: 13, color: '#8b949e', textAlign: 'center', lineHeight: 1.5 }}>Where do you commute?</div>
+                <button
+                  onClick={() => setDraftCommuteRules((prev) => [...prev, createDefaultRule()])}
+                  className="inline-flex items-center gap-1.5 cursor-pointer transition-colors duration-150"
+                  style={{ padding: '9px 18px', background: 'rgba(88,166,255,0.12)', border: '1px solid rgba(88,166,255,0.3)', borderRadius: 8, color: '#58a6ff', fontSize: 13, fontWeight: 600 }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                    <path d="M6.5 1v11M1 6.5h11" stroke="#58a6ff" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                  Add commute filter
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-y-auto dark-scrollbar" style={{ maxHeight: 'min(400px, calc(100vh - 280px))', scrollbarWidth: 'thin', scrollbarColor: '#2d333b #1c2028' }}>
+                  {draftCommuteRules.map((rule, idx) => (
+                    <CommuteRuleEditor
+                      key={rule.id}
+                      rule={rule}
+                      onChange={(updated) => {
+                        setDraftCommuteRules((prev) => prev.map((r) => (r.id === rule.id ? updated : r)));
+                      }}
+                      onDelete={() => {
+                        setDraftCommuteRules((prev) => prev.filter((r) => r.id !== rule.id));
+                      }}
+                    />
+                  ))}
+                </div>
+                {draftCommuteRules.length < 10 && (
+                  <button
+                    onClick={() => setDraftCommuteRules((prev) => [...prev, createDefaultRule()])}
+                    className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg text-[11px] font-medium cursor-pointer transition-all mt-1 mb-1 text-[#58a6ff] bg-transparent border border-dashed border-[#2d333b] hover:border-[#58a6ff] hover:bg-[#58a6ff]/[0.04]"
+                  >
+                    + Add rule
+                  </button>
+                )}
+              </>
+            )}
+            <DropdownFooter
+              onReset={() => {
+                onChange({ ...filters, commuteRules: [] });
+                setOpenChip(null);
+              }}
+              onDone={() => {
+                onChange({ ...filters, commuteRules: draftCommuteRules });
+                setOpenChip(null);
+              }}
+            />
+          </div>
+        </FilterChip>
+    
+        {/* Photos first toggle chip */}
+        <div className="relative group shrink-0">
+          <FilterChip
+            compact
+            label="Photos first"
+            active={filters.photosFirst}
+            open={false}
+            onToggle={() => onChange({ ...filters, photosFirst: !filters.photosFirst })}
+          />
+          <div
+            className="pointer-events-none absolute left-0 top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-75 z-50"
+          >
+            <div
+              className="absolute -top-1 w-2 h-2 rotate-45"
+              style={{ left: 12, backgroundColor: '#1c2028', border: '1px solid #2d333b', borderRight: 'none', borderBottom: 'none' }}
+            />
+            <div
+              className="rounded-md px-2.5 py-1.5 text-xs"
+              style={{
+                backgroundColor: '#1c2028',
+                color: '#e1e4e8',
+                border: '1px solid #2d333b',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                maxWidth: 'min(260px, calc(100vw - 32px))',
+                width: 'max-content',
+                wordWrap: 'break-word',
+              }}
+            >
+              Prioritize listings with photos at the top of results
+            </div>
+          </div>
+        </div>
+    
+        {/* Show hidden toggle chip */}
+        {onToggleShowHidden !== undefined && (
+          <div className="relative group shrink-0">
+            <FilterChip
+              compact
+              label="Show hidden"
+              active={showHidden ?? false}
+              open={false}
+              onToggle={onToggleShowHidden}
+            />
+            <div
+              className="pointer-events-none absolute left-0 top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-75 z-50"
+            >
+              <div
+                className="absolute -top-1 w-2 h-2 rotate-45"
+                style={{ left: 12, backgroundColor: '#1c2028', border: '1px solid #2d333b', borderRight: 'none', borderBottom: 'none' }}
+              />
+              <div
+                className="rounded-md px-2.5 py-1.5 text-xs"
+                style={{
+                  backgroundColor: '#1c2028',
+                  color: '#e1e4e8',
+                  border: '1px solid #2d333b',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                  maxWidth: 'min(260px, calc(100vw - 32px))',
+                  width: 'max-content',
+                  wordWrap: 'break-word',
+                }}
+              >
+                Include listings you&apos;ve hidden
+              </div>
+            </div>
+          </div>
+        )}
+    
+        {/* Divider + dual-purpose Save / Wishlist chip */}
+        <>
+          {/* Vertical divider */}
+          <div className="h-4 w-px shrink-0" style={{ backgroundColor: '#2d333b' }} />
+    
+          {/* Dual chip: left = Save search, right = Filter by wishlist */}
+          <div className="relative shrink-0" ref={saveDropdownRef}>
+            <div
+              className={cn(
+                'inline-flex items-center rounded-[20px] overflow-hidden border h-[26px] font-medium whitespace-nowrap',
+                saveOpen
+                  ? 'border-[#58a6ff]'
+                  : 'border-[#2d333b] hover:border-[#58a6ff]/40',
+              )}
+              style={{ background: 'transparent' }}
+            >
+              <ButtonBase
+                onClick={() => {
+                  if (!userId) {
+                    onLoginRequired?.();
+                    return;
+                  }
+                  setOpenChip(null);
+                  setSaveName(suggestSearchName(filters));
+                  // If already open on this tab → close. Otherwise open this tab.
+                  if (saveOpen && savePanelTab === 'save-search') {
+                    setSaveOpen(false);
+                  } else {
+                    setSavePanelTab('save-search');
+                    setSaveOpen(true);
+                    setTimeout(() => saveInputRef.current?.focus(), 50);
+                  }
+                }}
+                className="flex items-center gap-1 px-2.5 h-full text-[11px]"
+                style={{
+                  color: saveOpen && savePanelTab === 'save-search' ? '#58a6ff' : '#8b949e',
+                  borderRight: '1px solid #2d333b',
+                  background: 'transparent',
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+                </svg>
+                Save
+              </ButtonBase>
+              <ButtonBase
+                onClick={() => {
+                  if (!userId) {
+                    onLoginRequired?.();
+                    return;
+                  }
+                  setOpenChip(null);
+                  if (saveOpen && savePanelTab === 'wishlist') {
+                    setSaveOpen(false);
+                  } else {
+                    setSavePanelTab('wishlist');
+                    setSaveOpen(true);
+                  }
+                }}
+                aria-label="Filter by wishlist"
+                className="flex items-center gap-1 px-2 h-full text-[11px]"
+                style={{
+                  color: saveOpen && savePanelTab === 'wishlist' ? '#58a6ff' : '#e1e4e8',
+                  background: selectedWishlist ? 'rgba(126,231,135,0.1)' : 'transparent',
+                }}
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill={selectedWishlist ? '#7ee787' : 'none'}
+                  stroke={selectedWishlist ? '#7ee787' : 'currentColor'}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ opacity: selectedWishlist ? 1 : 0.6 }}
+                >
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+                <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.6 }}>
+                  <path d="M2 3.5L5 6.5L8 3.5" />
+                </svg>
+              </ButtonBase>
+            </div>
+    
+            {saveOpen && (
+              <SaveWishlistPanel
+                anchorRef={saveDropdownRef}
+                initialTab={savePanelTab}
+                onClose={() => setSaveOpen(false)}
+                myWishlists={myWishlists}
+                sharedWishlists={sharedWishlists}
+                selected={selectedWishlist}
+                onSelect={(sel) => {
+                  onSelectWishlist?.(sel);
+                  setSaveOpen(false);
+                }}
+                onCreateWishlist={async (name) => {
+                  const id = await onCreateWishlist?.(name);
+                  return id ?? null;
+                }}
+                onOpenManager={() => {
+                  setSaveOpen(false);
+                  onOpenWishlistManager?.();
+                }}
+                saveSearchContent={(
+                  <>
+                    <div className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: '#8b949e', letterSpacing: '0.05em' }}>
+                      Save Search
+                    </div>
+                    {activeCount === 0 ? (
+                      <div className="text-[12px]" style={{ color: '#8b949e' }}>
+                        Add at least one filter to save a search.
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          ref={saveInputRef}
+                          type="text"
+                          value={saveName}
+                          onChange={(e) => setSaveName(e.target.value)}
+                          onKeyDown={async (e) => {
+                            if (e.key === 'Enter' && saveName.trim()) {
+                              const saved = await onSaveSearch?.(saveName.trim());
+                              if (saved) setActiveSearchId(saved.id);
+                              setSaveOpen(false);
+                              if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
+                              setSaveToastVisible(true);
+                              saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
+                            }
+                            if (e.key === 'Escape') setSaveOpen(false);
+                          }}
+                          placeholder="e.g. Brooklyn 5-bed hunt"
+                          className="w-full rounded-lg px-3 py-2 text-sm outline-none mb-3"
+                          style={{ backgroundColor: '#0f1117', border: '1px solid #2d333b', color: '#e1e4e8' }}
+                        />
+    
+                        <div className="flex flex-wrap gap-1 mb-4">
+                          {filters.selectedBeds !== null && (
+                            <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
+                              {filters.selectedBeds.slice().sort((a, b) => a - b).map((b) => (b === 7 ? '7+' : String(b))).join(', ')} bed
+                            </span>
+                          )}
+                          {(filters.minRent !== null || filters.maxRent !== null) && (
+                            <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
+                              {priceLabel(filters.minRent, filters.maxRent)}
+                            </span>
+                          )}
+                          {filters.commuteRules && filters.commuteRules.length > 0 && (
+                            <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
+                              {commuteLabel(filters.commuteRules)}
+                            </span>
+                          )}
+                          {filters.selectedSources !== null && (
+                            <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
+                              {filters.selectedSources.length} source{filters.selectedSources.length !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
+    
+                        <div className="flex items-center justify-end gap-3">
+                          <TextButton variant="muted" onClick={() => setSaveOpen(false)}>
+                            Cancel
+                          </TextButton>
+                          <PrimaryButton
+                            onClick={async () => {
+                              if (saveName.trim()) {
+                                const saved = await onSaveSearch?.(saveName.trim());
+                                if (saved) setActiveSearchId(saved.id);
+                                setSaveOpen(false);
+                                if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
+                                setSaveToastVisible(true);
+                                saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
+                              }
+                            }}
+                            disabled={!saveName.trim()}
+                            className="h-8 px-5 text-xs font-bold"
+                          >
+                            Save
+                          </PrimaryButton>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              />
+            )}
+          </div>
+        </>
+    </>
+  );
+
   return (
     <div
       ref={containerRef}
@@ -1557,776 +2327,13 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
         </div>
       </div>
 
-      {/* Row 2 (expandable): Filter chips — conditional render so dropdowns aren't clipped */}
+
+      {/* Row 2 (expandable): Filter chips — desktop only; mobile shows these in bottom sheet */}
       {filtersExpanded && (
-        <div ref={expandedRowRef} className="flex items-center gap-1.5 flex-wrap pt-1.5 pb-1" style={{ borderTop: '1px solid #2d333b' }}>
-          {/* Price chip */}
-          <FilterChip
-            compact
-            label={priceLabel(filters.minRent, filters.maxRent, filters.priceMode)}
-            active={filters.minRent !== null || filters.maxRent !== null}
-            open={openChip === 'price'}
-            onToggle={() => toggleChip('price')}
-          >
-            <SectionTitle>Price</SectionTitle>
-            <div className="flex rounded-lg p-0.5 mb-3" style={{ backgroundColor: '#0d1117' }}>
-              <button
-                className="flex-1 text-xs font-medium py-1.5 rounded-md transition-colors"
-                style={{
-                  backgroundColor: draftPriceMode === 'total' ? '#58a6ff' : 'transparent',
-                  color: draftPriceMode === 'total' ? '#ffffff' : '#8b949e',
-                }}
-                onClick={() => {
-                  setDraftPriceMode('total');
-                  setDraftMinRent(null);
-                  setDraftMaxRent(null);
-                }}
-              >
-                Total
-              </button>
-              <button
-                className="flex-1 text-xs font-medium py-1.5 rounded-md transition-colors"
-                style={{
-                  backgroundColor: draftPriceMode === 'perRoom' ? '#58a6ff' : 'transparent',
-                  color: draftPriceMode === 'perRoom' ? '#ffffff' : '#8b949e',
-                }}
-                onClick={() => {
-                  setDraftPriceMode('perRoom');
-                  setDraftMinRent(null);
-                  setDraftMaxRent(null);
-                }}
-              >
-                Per Room
-              </button>
-            </div>
-            <RangeSlider
-              label={draftPriceMode === 'total' ? 'Min Price' : 'Min / Room'}
-              min={draftPriceMode === 'total' ? PRICE_SLIDER_MIN : PRICE_PER_ROOM_MIN}
-              max={draftPriceMode === 'total' ? PRICE_SLIDER_MAX : PRICE_PER_ROOM_MAX}
-              step={draftPriceMode === 'total' ? PRICE_SLIDER_STEP : PRICE_PER_ROOM_STEP}
-              value={draftMinRent ?? (draftPriceMode === 'total' ? PRICE_SLIDER_MIN : PRICE_PER_ROOM_MIN)}
-              onChange={(v) => setDraftMinRent(v === (draftPriceMode === 'total' ? PRICE_SLIDER_MIN : PRICE_PER_ROOM_MIN) ? null : v)}
-            />
-            <RangeSlider
-              label={draftPriceMode === 'total' ? 'Max Price' : 'Max / Room'}
-              min={draftPriceMode === 'total' ? PRICE_SLIDER_MIN : PRICE_PER_ROOM_MIN}
-              max={draftPriceMode === 'total' ? PRICE_SLIDER_MAX : PRICE_PER_ROOM_MAX}
-              step={draftPriceMode === 'total' ? PRICE_SLIDER_STEP : PRICE_PER_ROOM_STEP}
-              value={draftMaxRent ?? (draftPriceMode === 'total' ? PRICE_SLIDER_MAX : PRICE_PER_ROOM_MAX)}
-              onChange={(v) => setDraftMaxRent(v === (draftPriceMode === 'total' ? PRICE_SLIDER_MAX : PRICE_PER_ROOM_MAX) ? null : v)}
-            />
-            <DropdownFooter
-              onReset={() => {
-                onChange({ ...filters, minRent: null, maxRent: null, priceMode: 'total' });
-                setOpenChip(null);
-              }}
-              onDone={() => {
-                onChange({ ...filters, minRent: draftMinRent, maxRent: draftMaxRent, priceMode: draftPriceMode });
-                setOpenChip(null);
-              }}
-            />
-          </FilterChip>
-
-          {/* Beds / Baths chip */}
-          <FilterChip
-            compact
-            label={bedsBathsLabel(filters.selectedBeds, filters.minBaths)}
-            active={filters.selectedBeds !== null || filters.minBaths !== null}
-            open={openChip === 'bedsBaths'}
-            onToggle={() => toggleChip('bedsBaths')}
-          >
-            <SectionTitle>Bedrooms</SectionTitle>
-            <MultiPillGroup
-              options={BEDROOM_OPTIONS}
-              selected={draftSelectedBeds}
-              onToggle={(v) => {
-                if (v === null) {
-                  // "Any" clears all selections
-                  setDraftSelectedBeds([]);
-                } else {
-                  setDraftSelectedBeds((prev) =>
-                    prev.includes(v) ? prev.filter((b) => b !== v) : [...prev, v],
-                  );
-                }
-              }}
-            />
-
-            <div className="mt-5">
-              <SectionTitle>Bathrooms</SectionTitle>
-              <PillGroup
-                options={BATHROOM_OPTIONS}
-                value={draftMinBaths}
-                onSelect={setDraftMinBaths}
-              />
-              {draftMinBaths !== null && (
-                <>
-                  <label className="flex items-center gap-2 cursor-pointer mt-2">
-                    <input
-                      type="checkbox"
-                      checked={draftIncludeNaBaths}
-                      onChange={(e) => setDraftIncludeNaBaths(e.target.checked)}
-                      className="accent-[#58a6ff] w-4 h-4 rounded cursor-pointer"
-                    />
-                    <span className="text-sm" style={{ color: '#8b949e' }}>Include N/A</span>
-                  </label>
-                  <p className="text-xs mt-1 ml-6" style={{ color: '#6e7681', fontStyle: 'italic' }}>
-                    Some listings on Craigslist or Marketplace may not have bathroom data
-                  </p>
-                </>
-              )}
-            </div>
-
-            <DropdownFooter
-              onReset={() => {
-                onChange({ ...filters, selectedBeds: null, minBaths: null, includeNaBaths: false });
-                setOpenChip(null);
-              }}
-              onDone={() => {
-                onChange({
-                  ...filters,
-                  selectedBeds: draftSelectedBeds.length > 0 ? draftSelectedBeds : null,
-                  minBaths: draftMinBaths,
-                  includeNaBaths: draftIncludeNaBaths,
-                });
-                setOpenChip(null);
-              }}
-            />
-          </FilterChip>
-
-          <FilterChip
-            compact
-            label={listingAgeLabel(filters.maxListingAge)}
-            active={filters.maxListingAge !== null}
-            open={openChip === 'listingAge'}
-            onToggle={() => toggleChip('listingAge')}
-          >
-            <ListingAgeSlider
-              value={draftMaxListingAge}
-              onChange={setDraftMaxListingAge}
-            />
-            <DropdownFooter
-              onReset={() => {
-                onChange({ ...filters, maxListingAge: null });
-                setOpenChip(null);
-              }}
-              onDone={() => {
-                onChange({ ...filters, maxListingAge: draftMaxListingAge });
-                setOpenChip(null);
-              }}
-            />
-          </FilterChip>
-
-          {/* Source chip */}
-          <FilterChip
-            compact
-            label={filters.selectedSources !== null ? `Sources (${filters.selectedSources.length})` : 'Source'}
-            active={filters.selectedSources !== null}
-            open={openChip === 'source'}
-            onToggle={() => toggleChip('source')}
-          >
-            <SectionTitle>Sources</SectionTitle>
-            <div className="flex flex-col gap-2">
-              {ALL_SOURCES.map((src) => {
-                const checked = draftSources === null || draftSources.includes(src);
-                return (
-                  <label key={src} className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: '#e1e4e8' }}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => {
-                        if (draftSources === null) {
-                          // All selected -> uncheck this one
-                          setDraftSources(ALL_SOURCES.filter((s) => s !== src) as string[]);
-                        } else if (checked) {
-                          const next = draftSources.filter((s) => s !== src);
-                          setDraftSources(next.length === 0 ? null : next);
-                        } else {
-                          const next = [...draftSources, src];
-                          setDraftSources(next.length === ALL_SOURCES.length ? null : next);
-                        }
-                      }}
-                      className="accent-[#58a6ff] w-4 h-4"
-                    />
-                    {SOURCE_LABELS[src]}
-                  </label>
-                );
-              })}
-            </div>
-            <DropdownFooter
-              onReset={() => {
-                onChange({ ...filters, selectedSources: null });
-                setOpenChip(null);
-              }}
-              onDone={() => {
-                onChange({ ...filters, selectedSources: draftSources });
-                setOpenChip(null);
-              }}
-            />
-          </FilterChip>
-
-          {/* Year Built chip */}
-          <FilterChip
-            compact
-            label={yearBuiltLabel(filters.minYearBuilt, filters.maxYearBuilt)}
-            active={filters.minYearBuilt !== null || filters.maxYearBuilt !== null}
-            open={openChip === 'yearBuilt'}
-            onToggle={() => toggleChip('yearBuilt')}
-          >
-            <SectionTitle>Year Built Presets</SectionTitle>
-            <div className="flex flex-col gap-2 mb-4">
-              {YEAR_BUILT_PRESETS.map((preset) => (
-                <button
-                  key={preset.label}
-                  onClick={() => {
-                    setDraftMinYearBuilt(preset.minYear);
-                    setDraftMaxYearBuilt(preset.maxYear);
-                  }}
-                  className={cn(
-                    'px-3 py-2 rounded-md text-sm text-left transition-colors cursor-pointer border',
-                    draftMinYearBuilt === preset.minYear && draftMaxYearBuilt === preset.maxYear
-                      ? 'bg-[#58a6ff]/10 border-[#58a6ff] text-[#58a6ff]'
-                      : 'bg-transparent border-[#2d333b] text-[#8b949e] hover:bg-[#58a6ff]/5 hover:border-[#58a6ff]/30',
-                  )}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-
-            <SectionTitle>Custom Range</SectionTitle>
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: '#8b949e' }}>
-                  Min Year
-                </label>
-                <input
-                  type="number"
-                  value={draftMinYearBuilt ?? ''}
-                  onChange={(e) => {
-                    const val = e.target.value ? parseInt(e.target.value, 10) : null;
-                    setDraftMinYearBuilt(val && val >= YEAR_BUILT_MIN ? val : null);
-                  }}
-                  placeholder="1800"
-                  min={YEAR_BUILT_MIN}
-                  max={YEAR_BUILT_MAX}
-                  className="w-full h-8 rounded px-2 text-sm border"
-                  style={{
-                    backgroundColor: '#0d1117',
-                    color: '#e1e4e8',
-                    borderColor: '#2d333b',
-                  }}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: '#8b949e' }}>
-                  Max Year
-                </label>
-                <input
-                  type="number"
-                  value={draftMaxYearBuilt ?? ''}
-                  onChange={(e) => {
-                    const val = e.target.value ? parseInt(e.target.value, 10) : null;
-                    setDraftMaxYearBuilt(val && val <= YEAR_BUILT_MAX ? val : null);
-                  }}
-                  placeholder={String(YEAR_BUILT_MAX)}
-                  min={YEAR_BUILT_MIN}
-                  max={YEAR_BUILT_MAX}
-                  className="w-full h-8 rounded px-2 text-sm border"
-                  style={{
-                    backgroundColor: '#0d1117',
-                    color: '#e1e4e8',
-                    borderColor: '#2d333b',
-                  }}
-                />
-              </div>
-            </div>
-
-            <DropdownFooter
-              onReset={() => {
-                onChange({ ...filters, minYearBuilt: null, maxYearBuilt: null });
-                setOpenChip(null);
-              }}
-              onDone={() => {
-                onChange({ ...filters, minYearBuilt: draftMinYearBuilt, maxYearBuilt: draftMaxYearBuilt });
-                setOpenChip(null);
-              }}
-            />
-          </FilterChip>
-
-          {/* Sqft chip */}
-          <FilterChip
-            compact
-            label={sqftLabel(filters.minSqft, filters.maxSqft, filters.excludeNoSqft)}
-            active={filters.minSqft !== null || filters.maxSqft !== null || filters.excludeNoSqft}
-            open={openChip === 'sqft'}
-            onToggle={() => toggleChip('sqft')}
-          >
-            <SectionTitle>Size Presets</SectionTitle>
-            <div className="flex flex-col gap-2 mb-4">
-              {SQFT_PRESETS.map((preset) => (
-                <button
-                  key={preset.label}
-                  onClick={() => {
-                    setDraftMinSqft(preset.minSqft);
-                    setDraftMaxSqft(preset.maxSqft);
-                  }}
-                  className={cn(
-                    'px-3 py-2 rounded-md text-sm text-left transition-colors cursor-pointer border',
-                    draftMinSqft === preset.minSqft && draftMaxSqft === preset.maxSqft
-                      ? 'bg-[#58a6ff]/10 border-[#58a6ff] text-[#58a6ff]'
-                      : 'bg-transparent border-[#2d333b] text-[#8b949e] hover:bg-[#58a6ff]/5 hover:border-[#58a6ff]/30',
-                  )}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-
-            <SectionTitle>Custom Range</SectionTitle>
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: '#8b949e' }}>
-                  Min Sqft
-                </label>
-                <input
-                  type="number"
-                  value={draftMinSqft ?? ''}
-                  onChange={(e) => {
-                    const val = e.target.value ? parseInt(e.target.value, 10) : null;
-                    setDraftMinSqft(val && val > 0 ? val : null);
-                  }}
-                  placeholder="0"
-                  min={0}
-                  className="w-full h-8 rounded px-2 text-sm border"
-                  style={{
-                    backgroundColor: '#0d1117',
-                    color: '#e1e4e8',
-                    borderColor: '#2d333b',
-                  }}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1" style={{ color: '#8b949e' }}>
-                  Max Sqft
-                </label>
-                <input
-                  type="number"
-                  value={draftMaxSqft ?? ''}
-                  onChange={(e) => {
-                    const val = e.target.value ? parseInt(e.target.value, 10) : null;
-                    setDraftMaxSqft(val && val > 0 ? val : null);
-                  }}
-                  placeholder="No max"
-                  min={0}
-                  className="w-full h-8 rounded px-2 text-sm border"
-                  style={{
-                    backgroundColor: '#0d1117',
-                    color: '#e1e4e8',
-                    borderColor: '#2d333b',
-                  }}
-                />
-              </div>
-            </div>
-
-            <label className="flex items-center gap-2 cursor-pointer mb-2">
-              <input
-                type="checkbox"
-                checked={draftExcludeNoSqft}
-                onChange={(e) => setDraftExcludeNoSqft(e.target.checked)}
-                className="accent-[#58a6ff] w-4 h-4 rounded cursor-pointer"
-              />
-              <span className="text-sm" style={{ color: '#8b949e' }}>Exclude listings without sqft</span>
-            </label>
-
-            <DropdownFooter
-              onReset={() => {
-                onChange({ ...filters, minSqft: null, maxSqft: null, excludeNoSqft: false });
-                setOpenChip(null);
-              }}
-              onDone={() => {
-                onChange({ ...filters, minSqft: draftMinSqft, maxSqft: draftMaxSqft, excludeNoSqft: draftExcludeNoSqft });
-                setOpenChip(null);
-              }}
-            />
-          </FilterChip>
-
-          {/* Commute chip */}
-          <FilterChip
-            compact
-            label={commuteLabel(filters.commuteRules ?? [])}
-            active={(filters.commuteRules ?? []).length > 0}
-            open={openChip === 'commute'}
-            onToggle={() => toggleChip('commute')}
-            dropdownAlign="right"
-            data-testid="commute-chip"
-          >
-            <div style={{ minWidth: 'min(380px, calc(100vw - 16px))', maxWidth: '440px' }}>
-              <div className="flex items-center justify-between mb-3">
-                <SectionTitle>Commute Rules</SectionTitle>
-              </div>
-              {draftCommuteRules.length === 0 ? (
-                /* Animated subway train empty state */
-                <div className="flex flex-col items-center py-6 gap-4">
-                  <style>{`
-                    @keyframes commuteTrainSlide {
-                      from { left: -90px; }
-                      to   { left: 50%; transform: translateX(-50%); }
-                    }
-                    @keyframes commuteTrainBob {
-                      0%, 100% { transform: translateX(-50%) translateY(0px); }
-                      50%       { transform: translateX(-50%) translateY(-3px); }
-                    }
-                  `}</style>
-                  <div style={{ position: 'relative', width: 220, height: 80, overflow: 'hidden' }}>
-                    {/* Track ties */}
-                    <div style={{ position: 'absolute', bottom: 14, left: 0, right: 0, display: 'flex', gap: 14, padding: '0 4px' }}>
-                      {Array.from({ length: 14 }).map((_, i) => (
-                        <div key={i} style={{ width: 4, height: 8, background: '#2d333b', borderRadius: 1, flexShrink: 0 }} />
-                      ))}
-                    </div>
-                    {/* Track line */}
-                    <div style={{ position: 'absolute', bottom: 18, left: 0, right: 0, height: 2, background: '#2d333b', borderRadius: 1 }} />
-                    {/* Station dots */}
-                    <div style={{ position: 'absolute', bottom: 15, left: 20, width: 6, height: 6, borderRadius: '50%', background: '#2d333b', border: '1.5px solid #3d4450' }} />
-                    <div style={{ position: 'absolute', bottom: 15, right: 20, width: 6, height: 6, borderRadius: '50%', background: '#2d333b', border: '1.5px solid #3d4450' }} />
-                    {/* Train */}
-                    <div style={{
-                      position: 'absolute',
-                      bottom: 20,
-                      animation: 'commuteTrainSlide 1.6s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both, commuteTrainBob 2.4s ease-in-out 2.2s infinite',
-                    }}>
-                      <svg width="72" height="38" viewBox="0 0 72 38" fill="none">
-                        <rect x="2" y="8" width="68" height="26" rx="5" fill="#252d38" stroke="#3d4450" strokeWidth="1.5"/>
-                        <path d="M60 8 Q70 8 70 20 Q70 34 60 34" fill="#2d3748" stroke="#3d4450" strokeWidth="1.5"/>
-                        <rect x="2" y="8" width="68" height="5" rx="3" fill="#58a6ff" opacity="0.7"/>
-                        <rect x="8" y="16" width="10" height="9" rx="2" fill="#1a2535" stroke="#58a6ff" strokeWidth="1" opacity="0.9"/>
-                        <rect x="24" y="16" width="10" height="9" rx="2" fill="#1a2535" stroke="#58a6ff" strokeWidth="1" opacity="0.9"/>
-                        <rect x="40" y="16" width="10" height="9" rx="2" fill="#1a2535" stroke="#58a6ff" strokeWidth="1" opacity="0.9"/>
-                        <rect x="10" y="18" width="2" height="2" rx="1" fill="#58a6ff" opacity="0.5"/>
-                        <rect x="26" y="18" width="2" height="2" rx="1" fill="#58a6ff" opacity="0.5"/>
-                        <rect x="42" y="18" width="2" height="2" rx="1" fill="#58a6ff" opacity="0.5"/>
-                        <circle cx="65" cy="20" r="3" fill="#7ee787" opacity="0.85"/>
-                        <circle cx="65" cy="20" r="1.5" fill="#fff" opacity="0.7"/>
-                        <circle cx="14" cy="36" r="4" fill="#1c2028" stroke="#3d4450" strokeWidth="1.5"/>
-                        <circle cx="14" cy="36" r="1.5" fill="#3d4450"/>
-                        <circle cx="36" cy="36" r="4" fill="#1c2028" stroke="#3d4450" strokeWidth="1.5"/>
-                        <circle cx="36" cy="36" r="1.5" fill="#3d4450"/>
-                        <circle cx="58" cy="36" r="4" fill="#1c2028" stroke="#3d4450" strokeWidth="1.5"/>
-                        <circle cx="58" cy="36" r="1.5" fill="#3d4450"/>
-                      </svg>
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 13, color: '#8b949e', textAlign: 'center', lineHeight: 1.5 }}>Where do you commute?</div>
-                  <button
-                    onClick={() => setDraftCommuteRules((prev) => [...prev, createDefaultRule()])}
-                    className="inline-flex items-center gap-1.5 cursor-pointer transition-colors duration-150"
-                    style={{ padding: '9px 18px', background: 'rgba(88,166,255,0.12)', border: '1px solid rgba(88,166,255,0.3)', borderRadius: 8, color: '#58a6ff', fontSize: 13, fontWeight: 600 }}
-                  >
-                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                      <path d="M6.5 1v11M1 6.5h11" stroke="#58a6ff" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
-                    Add commute filter
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="overflow-y-auto dark-scrollbar" style={{ maxHeight: 'min(400px, calc(100vh - 280px))', scrollbarWidth: 'thin', scrollbarColor: '#2d333b #1c2028' }}>
-                    {draftCommuteRules.map((rule, idx) => (
-                      <CommuteRuleEditor
-                        key={rule.id}
-                        rule={rule}
-                        onChange={(updated) => {
-                          setDraftCommuteRules((prev) => prev.map((r) => (r.id === rule.id ? updated : r)));
-                        }}
-                        onDelete={() => {
-                          setDraftCommuteRules((prev) => prev.filter((r) => r.id !== rule.id));
-                        }}
-                      />
-                    ))}
-                  </div>
-                  {draftCommuteRules.length < 10 && (
-                    <button
-                      onClick={() => setDraftCommuteRules((prev) => [...prev, createDefaultRule()])}
-                      className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg text-[11px] font-medium cursor-pointer transition-all mt-1 mb-1 text-[#58a6ff] bg-transparent border border-dashed border-[#2d333b] hover:border-[#58a6ff] hover:bg-[#58a6ff]/[0.04]"
-                    >
-                      + Add rule
-                    </button>
-                  )}
-                </>
-              )}
-              <DropdownFooter
-                onReset={() => {
-                  onChange({ ...filters, commuteRules: [] });
-                  setOpenChip(null);
-                }}
-                onDone={() => {
-                  onChange({ ...filters, commuteRules: draftCommuteRules });
-                  setOpenChip(null);
-                }}
-              />
-            </div>
-          </FilterChip>
-
-          {/* Photos first toggle chip */}
-          <div className="relative group shrink-0">
-            <FilterChip
-              compact
-              label="Photos first"
-              active={filters.photosFirst}
-              open={false}
-              onToggle={() => onChange({ ...filters, photosFirst: !filters.photosFirst })}
-            />
-            <div
-              className="pointer-events-none absolute left-0 top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-75 z-50"
-            >
-              <div
-                className="absolute -top-1 w-2 h-2 rotate-45"
-                style={{ left: 12, backgroundColor: '#1c2028', border: '1px solid #2d333b', borderRight: 'none', borderBottom: 'none' }}
-              />
-              <div
-                className="rounded-md px-2.5 py-1.5 text-xs"
-                style={{
-                  backgroundColor: '#1c2028',
-                  color: '#e1e4e8',
-                  border: '1px solid #2d333b',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-                  maxWidth: 'min(260px, calc(100vw - 32px))',
-                  width: 'max-content',
-                  wordWrap: 'break-word',
-                }}
-              >
-                Prioritize listings with photos at the top of results
-              </div>
-            </div>
-          </div>
-
-          {/* Show hidden toggle chip */}
-          {onToggleShowHidden !== undefined && (
-            <div className="relative group shrink-0">
-              <FilterChip
-                compact
-                label="Show hidden"
-                active={showHidden ?? false}
-                open={false}
-                onToggle={onToggleShowHidden}
-              />
-              <div
-                className="pointer-events-none absolute left-0 top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-75 z-50"
-              >
-                <div
-                  className="absolute -top-1 w-2 h-2 rotate-45"
-                  style={{ left: 12, backgroundColor: '#1c2028', border: '1px solid #2d333b', borderRight: 'none', borderBottom: 'none' }}
-                />
-                <div
-                  className="rounded-md px-2.5 py-1.5 text-xs"
-                  style={{
-                    backgroundColor: '#1c2028',
-                    color: '#e1e4e8',
-                    border: '1px solid #2d333b',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-                    maxWidth: 'min(260px, calc(100vw - 32px))',
-                    width: 'max-content',
-                    wordWrap: 'break-word',
-                  }}
-                >
-                  Include listings you&apos;ve hidden
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Divider + dual-purpose Save / Wishlist chip */}
-          <>
-            {/* Vertical divider */}
-            <div className="h-4 w-px shrink-0" style={{ backgroundColor: '#2d333b' }} />
-
-            {/* Dual chip: left = Save search, right = Filter by wishlist */}
-            <div className="relative shrink-0" ref={saveDropdownRef}>
-              <div
-                className={cn(
-                  'inline-flex items-center rounded-[20px] overflow-hidden border h-[26px] font-medium whitespace-nowrap',
-                  saveOpen
-                    ? 'border-[#58a6ff]'
-                    : 'border-[#2d333b] hover:border-[#58a6ff]/40',
-                )}
-                style={{ background: 'transparent' }}
-              >
-                <ButtonBase
-                  onClick={() => {
-                    if (!userId) {
-                      onLoginRequired?.();
-                      return;
-                    }
-                    setOpenChip(null);
-                    setSaveName(suggestSearchName(filters));
-                    // If already open on this tab → close. Otherwise open this tab.
-                    if (saveOpen && savePanelTab === 'save-search') {
-                      setSaveOpen(false);
-                    } else {
-                      setSavePanelTab('save-search');
-                      setSaveOpen(true);
-                      setTimeout(() => saveInputRef.current?.focus(), 50);
-                    }
-                  }}
-                  className="flex items-center gap-1 px-2.5 h-full text-[11px]"
-                  style={{
-                    color: saveOpen && savePanelTab === 'save-search' ? '#58a6ff' : '#8b949e',
-                    borderRight: '1px solid #2d333b',
-                    background: 'transparent',
-                  }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-                  </svg>
-                  Save
-                </ButtonBase>
-                <ButtonBase
-                  onClick={() => {
-                    if (!userId) {
-                      onLoginRequired?.();
-                      return;
-                    }
-                    setOpenChip(null);
-                    if (saveOpen && savePanelTab === 'wishlist') {
-                      setSaveOpen(false);
-                    } else {
-                      setSavePanelTab('wishlist');
-                      setSaveOpen(true);
-                    }
-                  }}
-                  aria-label="Filter by wishlist"
-                  className="flex items-center gap-1 px-2 h-full text-[11px]"
-                  style={{
-                    color: saveOpen && savePanelTab === 'wishlist' ? '#58a6ff' : '#e1e4e8',
-                    background: selectedWishlist ? 'rgba(126,231,135,0.1)' : 'transparent',
-                  }}
-                >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill={selectedWishlist ? '#7ee787' : 'none'}
-                    stroke={selectedWishlist ? '#7ee787' : 'currentColor'}
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    style={{ opacity: selectedWishlist ? 1 : 0.6 }}
-                  >
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                  </svg>
-                  <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.6 }}>
-                    <path d="M2 3.5L5 6.5L8 3.5" />
-                  </svg>
-                </ButtonBase>
-              </div>
-
-              {saveOpen && (
-                <SaveWishlistPanel
-                  anchorRef={saveDropdownRef}
-                  initialTab={savePanelTab}
-                  onClose={() => setSaveOpen(false)}
-                  myWishlists={myWishlists}
-                  sharedWishlists={sharedWishlists}
-                  selected={selectedWishlist}
-                  onSelect={(sel) => {
-                    onSelectWishlist?.(sel);
-                    setSaveOpen(false);
-                  }}
-                  onCreateWishlist={async (name) => {
-                    const id = await onCreateWishlist?.(name);
-                    return id ?? null;
-                  }}
-                  onOpenManager={() => {
-                    setSaveOpen(false);
-                    onOpenWishlistManager?.();
-                  }}
-                  saveSearchContent={(
-                    <>
-                      <div className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: '#8b949e', letterSpacing: '0.05em' }}>
-                        Save Search
-                      </div>
-                      {activeCount === 0 ? (
-                        <div className="text-[12px]" style={{ color: '#8b949e' }}>
-                          Add at least one filter to save a search.
-                        </div>
-                      ) : (
-                        <>
-                          <input
-                            ref={saveInputRef}
-                            type="text"
-                            value={saveName}
-                            onChange={(e) => setSaveName(e.target.value)}
-                            onKeyDown={async (e) => {
-                              if (e.key === 'Enter' && saveName.trim()) {
-                                const saved = await onSaveSearch?.(saveName.trim());
-                                if (saved) setActiveSearchId(saved.id);
-                                setSaveOpen(false);
-                                if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
-                                setSaveToastVisible(true);
-                                saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
-                              }
-                              if (e.key === 'Escape') setSaveOpen(false);
-                            }}
-                            placeholder="e.g. Brooklyn 5-bed hunt"
-                            className="w-full rounded-lg px-3 py-2 text-sm outline-none mb-3"
-                            style={{ backgroundColor: '#0f1117', border: '1px solid #2d333b', color: '#e1e4e8' }}
-                          />
-
-                          <div className="flex flex-wrap gap-1 mb-4">
-                            {filters.selectedBeds !== null && (
-                              <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
-                                {filters.selectedBeds.slice().sort((a, b) => a - b).map((b) => (b === 7 ? '7+' : String(b))).join(', ')} bed
-                              </span>
-                            )}
-                            {(filters.minRent !== null || filters.maxRent !== null) && (
-                              <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
-                                {priceLabel(filters.minRent, filters.maxRent)}
-                              </span>
-                            )}
-                            {filters.commuteRules && filters.commuteRules.length > 0 && (
-                              <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
-                                {commuteLabel(filters.commuteRules)}
-                              </span>
-                            )}
-                            {filters.selectedSources !== null && (
-                              <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
-                                {filters.selectedSources.length} source{filters.selectedSources.length !== 1 ? 's' : ''}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="flex items-center justify-end gap-3">
-                            <TextButton variant="muted" onClick={() => setSaveOpen(false)}>
-                              Cancel
-                            </TextButton>
-                            <PrimaryButton
-                              onClick={async () => {
-                                if (saveName.trim()) {
-                                  const saved = await onSaveSearch?.(saveName.trim());
-                                  if (saved) setActiveSearchId(saved.id);
-                                  setSaveOpen(false);
-                                  if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
-                                  setSaveToastVisible(true);
-                                  saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
-                                }
-                              }}
-                              disabled={!saveName.trim()}
-                              className="h-8 px-5 text-xs font-bold"
-                            >
-                              Save
-                            </PrimaryButton>
-                          </div>
-                        </>
-                      )}
-                    </>
-                  )}
-                />
-              )}
-            </div>
-          </>
+        <div ref={expandedRowRef} className="hidden min-[600px]:flex items-center gap-1.5 flex-wrap pt-1.5 pb-1" style={{ borderTop: '1px solid #2d333b' }}>
+          {filterChipsContent}
         </div>
       )}
-
       {/* Mobile filter bottom sheet */}
       {mobileSheetOpen && (
         <>
@@ -2389,19 +2396,10 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
               </div>
             </div>
 
-            {/* Filters section */}
-            <div className="px-4 py-4">
-              <FilterToggleButton
-                activeCount={activeCount}
-                expanded={filtersExpanded}
-                onClick={() => {
-                  setFiltersExpanded((prev) => !prev);
-                  if (filtersExpanded) {
-                    setOpenChip(null);
-                  }
-                  setMobileSheetOpen(false);
-                }}
-              />
+
+            {/* Filter chips */}
+            <div className="px-4 pt-3 pb-16 overflow-y-auto flex flex-wrap gap-1.5" style={{ maxHeight: '60vh' }}>
+              {filterChipsContent}
             </div>
           </div>
           <style dangerouslySetInnerHTML={{ __html: `

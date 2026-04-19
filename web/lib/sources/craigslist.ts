@@ -625,7 +625,7 @@ export async function fetchCraigslistListings(
       sqft: null,
       lat: lat && !isNaN(lat) ? lat : null,
       lon: lon && !isNaN(lon) ? lon : null,
-      photo_urls: (item.pics ?? []).slice(0, 8),
+      photo_urls: (item.pics ?? []).slice(0, 8).map((url: string) => url.replace(/_\d+x\d+\./, '_600x450.')),
       url: item.url,
       list_date: item.datetime ?? null,
       last_update_date: null,
