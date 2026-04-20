@@ -10,3 +10,4 @@ export { PrimaryButton } from './PrimaryButton';
 export { TextButton } from './TextButton';
 export { SegmentedControl } from './SegmentedControl';
 export type { SegmentedControlProps } from './SegmentedControl';
+export { CompactStats } from './CompactStats';

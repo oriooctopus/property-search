@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect, useMemo, type ReactNode } fro
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { useDrag } from '@use-gesture/react';
 import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
+import { CompactStats } from '@/components/ui';
 
 // NYC lat/lon degree-to-miles conversion factors
 const MI_PER_DEG_LAT = 69;
@@ -399,7 +400,13 @@ export default function SwipeCard({
           </div>
           {listDateFormatted && <div className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Listed {listDateFormatted}</div>}
           <div style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }} />
-          <div className="grid grid-cols-3 gap-px rounded-lg overflow-hidden" style={{ border: '1px solid #2d333b' }}>
+          <CompactStats
+            beds={listing.beds}
+            baths={listing.baths}
+            sqft={listing.sqft}
+            className="min-[600px]:hidden"
+          />
+          <div className="hidden min-[600px]:grid grid-cols-3 gap-px rounded-lg overflow-hidden" style={{ border: '1px solid #2d333b' }}>
             {[{ label: 'Beds', value: listing.beds === 0 ? 'Studio' : `${listing.beds}` }, { label: 'Baths', value: listing.baths != null ? `${listing.baths}` : 'N/A' }, { label: 'Sqft', value: listing.sqft ? listing.sqft.toLocaleString() : 'N/A' }].map(({ label, value }) => (
               <div key={label} className="flex flex-col items-center py-3 gap-0.5" style={{ backgroundColor: '#161b22' }}>
                 <span className="text-sm font-semibold" style={{ color: '#e1e4e8' }}>{value}</span>
@@ -704,9 +711,15 @@ export default function SwipeCard({
             {/* Divider: price/address section → stats */}
             <div style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }} />
 
-            {/* Stats grid */}
+            {/* Stats — compact inline on mobile, verbose 3-col grid on >=600px */}
+            <CompactStats
+              beds={listing.beds}
+              baths={listing.baths}
+              sqft={listing.sqft}
+              className="min-[600px]:hidden"
+            />
             <div
-              className="grid grid-cols-3 gap-px rounded-lg overflow-hidden"
+              className="hidden min-[600px]:grid grid-cols-3 gap-px rounded-lg overflow-hidden"
               style={{ border: '1px solid #2d333b' }}
             >
               {[
