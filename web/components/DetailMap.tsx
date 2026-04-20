@@ -21,12 +21,20 @@ const DetailMapInner = dynamic(() => import('./DetailMapInner'), {
   ),
 });
 
+export interface SubwayMarker {
+  lat: number;
+  lon: number;
+  name: string;
+  lines: string[];
+}
+
 interface DetailMapProps {
   lat: number;
   lon: number;
+  subway?: SubwayMarker | null;
 }
 
-export default function DetailMap({ lat, lon }: DetailMapProps) {
+export default function DetailMap({ lat, lon, subway }: DetailMapProps) {
   const numLat = Number(lat);
   const numLon = Number(lon);
 
@@ -34,5 +42,5 @@ export default function DetailMap({ lat, lon }: DetailMapProps) {
     return null;
   }
 
-  return <DetailMapInner lat={numLat} lon={numLon} />;
+  return <DetailMapInner lat={numLat} lon={numLon} subway={subway ?? null} />;
 }

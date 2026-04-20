@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { memo, useState, useRef, useCallback, useMemo } from 'react';
 import type { Database } from '@/lib/types';
 import { formatListedDate, formatAvailabilityDate } from '@/lib/format-date';
 import { ActionButton, IconButton } from '@/components/ui';
@@ -41,13 +41,13 @@ interface ListingCardProps {
   isFavorited: boolean;
   isHiding?: boolean;
   commuteInfo?: CommuteInfo;
-  onClick: () => void;
+  onClick: (id: number) => void;
   onStarClick: (listingId: number, anchorRect: DOMRect) => void;
-  onExpand: () => void;
-  onHide: () => void;
+  onExpand: (listing: Listing) => void;
+  onHide: (id: number) => void;
 }
 
-export default function ListingCard({
+function ListingCard({
   listing,
   isSelected,
   isFavorited,
@@ -104,12 +104,32 @@ export default function ListingCard({
     // If the click originated from (or inside) an anchor tag, don't open the detail modal
     const target = e.target as HTMLElement;
     if (target.closest('a')) return;
-    onClick();
-    onExpand();
-  }, [onClick, onExpand]);
+    onClick(listing.id);
+    onExpand(listing);
+  }, [onClick, onExpand, listing]);
+
+  const handleHideClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onHide(listing.id);
+  }, [onHide, listing.id]);
+
+  const handleStarBtnClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (starButtonRef.current) {
+      onStarClick(listing.id, starButtonRef.current.getBoundingClientRect());
+    }
+  }, [onStarClick, listing.id]);
+
+  // Cache listed-date formatting — avoids rebuilding the Date/locale string
+  // on every parent re-render. Recomputes only when list_date changes.
+  const listedDateLabel = useMemo(
+    () => formatListedDate(listing.list_date ?? listing.created_at),
+    [listing.list_date, listing.created_at],
+  );
 
   return (
     <div
+      data-listing-id={listing.id}
       className={`rounded-xl cursor-pointer transition-all group ${isHiding ? 'pointer-events-none' : ''}`}
       style={{
         backgroundColor: '#1c2028',
@@ -144,6 +164,10 @@ export default function ListingCard({
                 key={idx}
                 src={url}
                 alt={`${listing.address} photo ${idx + 1}`}
+                width={400}
+                height={300}
+                loading={idx === 0 ? 'eager' : 'lazy'}
+                decoding="async"
                 style={{
                   width: `${100 / totalPhotos}%`,
                   height: '100%',
@@ -289,7 +313,7 @@ export default function ListingCard({
 
       {/* Date info */}
       <div className="text-[11px] mb-2" style={{ color: '#8b949e' }}>
-        {formatListedDate(listing.list_date ?? listing.created_at)}
+        {listedDateLabel}
       </div>
 
       {/* Actions */}
@@ -300,10 +324,7 @@ export default function ListingCard({
             variant="hide"
             active={false}
             compact
-            onClick={(e) => {
-              e.stopPropagation();
-              onHide();
-            }}
+            onClick={handleHideClick}
           />
 
           {/* Save / star toggle */}
@@ -312,12 +333,7 @@ export default function ListingCard({
             variant="save"
             active={isFavorited}
             compact
-            onClick={(e) => {
-              e.stopPropagation();
-              if (starButtonRef.current) {
-                onStarClick(listing.id, starButtonRef.current.getBoundingClientRect());
-              }
-            }}
+            onClick={handleStarBtnClick}
           />
         </div>
       </div>
@@ -341,3 +357,5 @@ export default function ListingCard({
     </div>
   );
 }
+
+export default memo(ListingCard);

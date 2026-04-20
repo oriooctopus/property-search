@@ -2105,7 +2105,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
   return (
     <div
       ref={containerRef}
-      className="px-2 relative z-[1200]"
+      className="pl-3 pr-2 sm:px-2 relative z-[1200]"
       style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}
     >
       {/* Row 1 (always visible): Area tabs + listing count + Filters button + Sort + View toggle */}
@@ -2147,14 +2147,14 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
                   if (el.dataset.lptFired === '1') e.preventDefault();
                 }}
                 className={cn(
-                  'relative flex items-center h-8 px-2.5 text-[11px] whitespace-nowrap cursor-pointer transition-colors duration-150',
+                  'relative flex items-center h-8 pl-0 pr-2.5 sm:px-2.5 text-[11px] whitespace-nowrap cursor-pointer transition-colors duration-150',
                   activeSearchId === null ? 'text-[#e1e4e8]' : 'text-[#8b949e] hover:text-[#c0d6f5]',
                 )}
               >
                 All
                 {activeSearchId === null && (
                   <span
-                    className="absolute bottom-0 left-2.5 right-2.5 h-0.5 rounded-sm"
+                    className="absolute bottom-0 left-0 right-2.5 sm:left-2.5 h-0.5 rounded-sm"
                     style={{ backgroundColor: '#58a6ff' }}
                   />
                 )}
@@ -2270,7 +2270,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
           </button>
 
           {/* Desktop: Sort dropdown (hidden on mobile) */}
-          <div className="relative shrink-0 hidden min-[600px]:block">
+          <div className="relative shrink-0 hidden min-[600px]:flex items-center">
             <button
               onClick={() => {
                 setSortOpen((prev) => !prev);
@@ -2309,7 +2309,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
           </div>
 
           {/* Desktop: Filters toggle button (hidden on mobile) */}
-          <div data-tour="filters" className="shrink-0 hidden min-[600px]:block">
+          <div data-tour="filters" className="shrink-0 hidden min-[600px]:flex items-center">
             <FilterToggleButton
               activeCount={activeCount}
               expanded={filtersExpanded}
@@ -2323,7 +2323,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
           </div>
 
           {/* View toggle (list/map/swipe) — desktop only; mobile uses MobileBottomNav */}
-          {viewToggle && <div className="shrink-0 hidden min-[600px]:block">{viewToggle}</div>}
+          {viewToggle && <div className="shrink-0 hidden min-[600px]:flex items-center">{viewToggle}</div>}
         </div>
       </div>
 
