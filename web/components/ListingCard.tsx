@@ -13,13 +13,25 @@ type Listing = Database['public']['Tables']['listings']['Row'];
 const SOURCE_LABELS: Record<string, string> = {
   craigslist: 'Craigslist',
   streeteasy: 'StreetEasy',
-  'facebook-marketplace': 'Facebook',
+  'facebook-marketplace': 'Facebook Marketplace',
   facebook: 'Facebook',
   realtor: 'Realtor.com',
   renthop: 'RentHop',
   apartments: 'Apartments.com',
   zillow: 'Zillow',
 };
+
+// Outlined chip styling per source (from mockup-card-footer-c.html, Treatment B).
+// `label` is the short badge text; `color` is the border + text color.
+const SOURCE_STYLE: Record<string, { label: string; color: string }> = {
+  streeteasy: { label: 'SE', color: '#818cf8' }, // indigo
+  craigslist: { label: 'CL', color: '#2dd4bf' }, // teal
+  'facebook-marketplace': { label: 'FB', color: '#60a5fa' }, // blue
+  realtor: { label: 'R', color: '#fb7185' }, // coral
+};
+
+const SOURCE_CHIP_FONT_STACK =
+  "'SF Mono', Menlo, Monaco, Consolas, monospace";
 
 
 interface Person {
@@ -311,13 +323,11 @@ function ListingCard({
         </div>
       )}
 
-      {/* Date info */}
-      <div className="text-[11px] mb-2" style={{ color: '#8b949e' }}>
-        {listedDateLabel}
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center justify-end mt-2">
+      {/* Footer: listed date + actions + source chip, all on one row */}
+      <div className="flex items-center justify-between mt-2">
+        <span className="text-[11px]" style={{ color: '#8b949e' }}>
+          {listedDateLabel}
+        </span>
         <div className="flex items-center gap-1">
           {/* Hide */}
           <ActionButton
@@ -335,23 +345,47 @@ function ListingCard({
             compact
             onClick={handleStarBtnClick}
           />
-        </div>
-      </div>
 
-      {/* View listing link */}
-      <div className="mt-2 flex items-center justify-end">
-        <a
-          href={listing.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => {
-            e.stopPropagation();
-          }}
-          className="text-xs font-medium hover:underline shrink-0 cursor-pointer"
-          style={{ color: '#58a6ff' }}
-        >
-          View on {SOURCE_LABELS[listing.source] ?? 'listing'} &rarr;
-        </a>
+          {/* Outlined source chip (links to listing.url) */}
+          {(() => {
+            const style = SOURCE_STYLE[listing.source] ?? {
+              label: listing.source.slice(0, 2).toUpperCase(),
+              color: '#8b949e',
+            };
+            const sourceName = SOURCE_LABELS[listing.source] ?? 'listing';
+            return (
+              <a
+                href={listing.url}
+                target="_blank"
+                rel="noreferrer noopener"
+                onClick={(e) => e.stopPropagation()}
+                aria-label={`View on ${sourceName}`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: 20,
+                  minWidth: 20,
+                  padding: '0 5px',
+                  borderRadius: 4,
+                  background: 'transparent',
+                  border: `1px solid ${style.color}`,
+                  color: style.color,
+                  fontFamily: SOURCE_CHIP_FONT_STACK,
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: '0.5px',
+                  textTransform: 'uppercase',
+                  textDecoration: 'none',
+                  flexShrink: 0,
+                  lineHeight: 1,
+                }}
+              >
+                {style.label}
+              </a>
+            );
+          })()}
+        </div>
       </div>
       </div>
     </div>

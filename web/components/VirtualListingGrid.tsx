@@ -47,10 +47,27 @@ const BREAKPOINT_ONE_COL_LG = 1024; // Tailwind `lg:` — back to single column
 const ESTIMATED_ROW_HEIGHT = 580;
 const OVERSCAN = 6;
 
-function getColumnCount(width: number): number {
-  // Matches Tailwind classes: grid-cols-1 sm:grid-cols-2 lg:grid-cols-1
-  if (width >= BREAKPOINT_ONE_COL_LG) return 1;
-  if (width >= BREAKPOINT_TWO_COL) return 2;
+// Hysteresis (dead zone) around breakpoints to prevent scrollbar-toggle
+// feedback loops. The container width can oscillate by ~15px as a vertical
+// scrollbar appears/disappears; if the breakpoint sits inside that oscillation
+// range, the column count flips every frame and the grid flickers at ~20Hz.
+// Dead zones: 620..660 around the 640 breakpoint, 1004..1044 around 1024.
+const HYSTERESIS = 20;
+
+function getColumnCount(width: number, prevCols: number): number {
+  // Matches Tailwind classes: grid-cols-1 sm:grid-cols-2 lg:grid-cols-1.
+  // We use different thresholds depending on the current column count so
+  // a narrow oscillation near a breakpoint doesn't flip us back and forth.
+  if (prevCols === 1) {
+    // To switch UP to 2-col we need to be comfortably past BREAKPOINT_TWO_COL.
+    // To switch UP to 1-col (at lg) we need to be past BREAKPOINT_ONE_COL_LG.
+    if (width >= BREAKPOINT_ONE_COL_LG + HYSTERESIS) return 1;
+    if (width >= BREAKPOINT_TWO_COL + HYSTERESIS) return 2;
+    return 1;
+  }
+  // prevCols === 2: to switch DOWN we need to be comfortably below the breakpoint.
+  if (width >= BREAKPOINT_ONE_COL_LG - HYSTERESIS) return 1;
+  if (width >= BREAKPOINT_TWO_COL - HYSTERESIS) return 2;
   return 1;
 }
 
@@ -76,21 +93,38 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
   ) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [cols, setCols] = useState<number>(1);
+    const colsRef = useRef(1);
+    useEffect(() => {
+      colsRef.current = cols;
+    }, [cols]);
 
     // Track container width → column count (preserves the sm: 2-col breakpoint).
+    // rAF-coalesced + hysteresis to prevent scrollbar-toggle feedback loops.
     useLayoutEffect(() => {
       const el = scrollRef.current;
       if (!el) return;
+      let rafId: number | null = null;
       const measure = () => {
+        rafId = null;
         const width = el.getBoundingClientRect().width;
-        const next = getColumnCount(width);
+        const next = getColumnCount(width, colsRef.current);
         setCols((prev) => (prev === next ? prev : next));
       };
-      measure();
+      const schedule = () => {
+        if (rafId !== null) return;
+        rafId = requestAnimationFrame(measure);
+      };
+      // Initial measure is synchronous so the first paint uses the right cols.
+      const width = el.getBoundingClientRect().width;
+      const initial = getColumnCount(width, colsRef.current);
+      if (initial !== colsRef.current) setCols(initial);
       if (typeof ResizeObserver === 'undefined') return;
-      const ro = new ResizeObserver(measure);
+      const ro = new ResizeObserver(schedule);
       ro.observe(el);
-      return () => ro.disconnect();
+      return () => {
+        if (rafId !== null) cancelAnimationFrame(rafId);
+        ro.disconnect();
+      };
     }, []);
 
     // Split listings into virtual "rows" of `cols` cards each.
@@ -151,6 +185,12 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
         style={{
           opacity: isDimmed ? 0.35 : 1,
           transition: 'opacity 150ms',
+          // Reserve the scrollbar gutter so the container width doesn't
+          // oscillate when the scrollbar appears/disappears. Without this,
+          // the ResizeObserver above can feedback-loop at ~20Hz near
+          // breakpoints (scrollbar on → narrower → 1 col → shorter content →
+          // scrollbar off → wider → 2 col → taller content → scrollbar on …).
+          scrollbarGutter: 'stable',
         }}
       >
         {/* Horizontal padding wrapper — matches the previous px-3 py-3 */}
