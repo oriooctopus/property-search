@@ -527,12 +527,29 @@ function HomeInner() {
       setSidebarHeight(0);
       return;
     }
-    const update = () => setSidebarHeight(el.getBoundingClientRect().height);
-    update();
+    let rafId: number | null = null;
+    let lastHeight = -1;
+    const measure = () => {
+      rafId = null;
+      const h = el.getBoundingClientRect().height;
+      // Only update when the height changes by more than 1px to avoid
+      // sub-pixel ping-pong triggering React state updates every frame.
+      if (Math.abs(h - lastHeight) < 1) return;
+      lastHeight = h;
+      setSidebarHeight(h);
+    };
+    const schedule = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(measure);
+    };
+    measure();
     if (typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(update);
+    const ro = new ResizeObserver(schedule);
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      ro.disconnect();
+    };
   }, [mobileView]);
 
   // Sync state changes to URL via history.replaceState (avoids Next.js
