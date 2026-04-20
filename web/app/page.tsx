@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase-browser';
@@ -451,6 +451,12 @@ function HomeInner() {
     if (v && VALID_VIEWS.has(v)) return v as 'list' | 'map' | 'swipe';
     return 'list';
   });
+  // Measured height of the sidebar filter bar. Used in swipe view on mobile to
+  // push the swipe card down so it doesn't sit underneath the absolute filter
+  // bar. Kept as state so SwipeView re-renders when the filter bar resizes
+  // (e.g. AI filter pills appearing).
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const [sidebarHeight, setSidebarHeight] = useState(0);
   const [filters, setFilters] = useState<FiltersState>(() =>
     readFiltersFromParams(searchParams),
   );
@@ -506,6 +512,27 @@ function HomeInner() {
   const handleMapMove = useCallback((center: { lat: number; lng: number }, zoom: number) => {
     setMapPosition({ lat: center.lat, lng: center.lng, zoom });
   }, []);
+
+  // Measure the sidebar (filter bar) height so SwipeView can push the card
+  // down on mobile when the sidebar overlays the swipe view. Only measured
+  // in swipe mode (in other modes the sidebar contains the listing grid and
+  // takes up the full viewport, which isn't a useful inset for SwipeView).
+  // Uses useLayoutEffect so the first paint of the swipe view already has
+  // the correct topInset, avoiding a frame where the card snaps down.
+  // ResizeObserver picks up dynamic changes (e.g. AI filter pills mounting).
+  useLayoutEffect(() => {
+    const el = sidebarRef.current;
+    if (!el || mobileView !== 'swipe') {
+      setSidebarHeight(0);
+      return;
+    }
+    const update = () => setSidebarHeight(el.getBoundingClientRect().height);
+    update();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [mobileView]);
 
   // Sync state changes to URL via history.replaceState (avoids Next.js
   // navigation overhead and unnecessary re-renders).
@@ -691,6 +718,10 @@ function HomeInner() {
     }
   }, [pickerListingId, addToWishlist, removeFromWishlist]);
 
+  const switchMobileView = useCallback((v: 'list' | 'map' | 'swipe') => {
+    startTransition(() => setMobileView(v));
+  }, []);
+
   // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
@@ -740,7 +771,7 @@ function HomeInner() {
     <div data-tour="view-modes">
     <SegmentedControl
       value={mobileView}
-      onChange={(v) => setMobileView(v as 'list' | 'map' | 'swipe')}
+      onChange={(v) => switchMobileView(v as 'list' | 'map' | 'swipe')}
       options={[
         { value: 'list', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> },
         { value: 'swipe', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="14" height="18" rx="2"/><rect x="8" y="2" width="14" height="18" rx="2"/></svg> },
@@ -953,12 +984,13 @@ function HomeInner() {
     <div className="relative flex flex-col lg:flex-row" style={{ height: 'calc(100dvh - 60px - env(safe-area-inset-top))' }}>
       {/* Sidebar: AI search bar + filters + listing cards */}
       <div
+        ref={sidebarRef}
         className={`${isSwipeView ? 'absolute top-0 left-0 right-0 z-20' : `w-full lg:w-[480px] shrink-0 ${mobileView === 'map' ? 'max-lg:shrink max-lg:flex-none' : ''}`} flex flex-col`}
         style={{ borderRight: isSwipeView ? 'none' : '1px solid #2d333b' }}
       >
-        {/* AI-applied filter pills — hidden on mobile in swipe view */}
+        {/* AI-applied filter pills */}
         {hasAIFilters && (
-          <div className={isSwipeView ? 'hidden min-[600px]:block' : ''}>
+          <div>
             <FilterPills
               filters={filters}
               onRemoveFilter={chat.removeFilter}
@@ -966,7 +998,7 @@ function HomeInner() {
           </div>
         )}
 
-        <div className={`relative z-[1100] ${isSwipeView ? 'hidden min-[600px]:block' : ''}`}>
+        <div className="relative z-[1100]">
           <Filters
             filters={filters}
             onChange={setFilters}
@@ -1096,8 +1128,9 @@ function HomeInner() {
             onHideListing={handleHideListing}
             onUnhideListing={(id) => unhideMutation.mutate(id)}
             onExpandDetail={(listing) => { setSelectedId(listing.id); setDetailListing(filteredListings.find(l => l.id === listing.id) ?? null); }}
-            onSwitchView={() => setMobileView('list')}
-            onSwitchToMap={() => setMobileView('map')}
+            onSwitchView={() => switchMobileView('list')}
+            onSwitchToMap={() => switchMobileView('map')}
+            topInset={sidebarHeight}
             onBoundsChange={handleBoundsChange}
             onMapMove={handleMapMove}
             suppressBoundsRef={suppressBoundsRef}
@@ -1189,7 +1222,7 @@ function HomeInner() {
           ].map((opt) => (
             <button
               key={opt.value}
-              onClick={() => setMobileView(opt.value)}
+              onClick={() => switchMobileView(opt.value)}
               className="relative flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all duration-200 cursor-pointer"
               style={{
                 background: mobileView === opt.value ? 'rgba(88, 166, 255, 0.15)' : 'transparent',

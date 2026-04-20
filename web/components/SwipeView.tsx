@@ -56,6 +56,10 @@ export interface SwipeViewProps {
   showHidden?: boolean;
   isLoading?: boolean;
   wishlistedIds?: Set<number>;
+  /** Reserved space at the top (in px) for the filter bar that sits above
+      the SwipeView on mobile. Used to shift the card downward so it doesn't
+      render underneath the absolute filter bar. */
+  topInset?: number;
 }
 
 interface UndoEntry {
@@ -110,6 +114,7 @@ export default function SwipeView({
   showHidden,
   isLoading,
   wishlistedIds,
+  topInset = 0,
 }: SwipeViewProps) {
   // Don't persist swipedIds across refreshes — start fresh each session.
   // The localStorage was causing "You've seen all listings" on every refresh.
@@ -587,9 +592,13 @@ export default function SwipeView({
         document.body,
       )}
 
-      {/* Floating detail panel on the right */}
+      {/* Floating detail panel on the right.
+          On mobile the card is pushed down by `topInset` (the height of the
+          overlaying filter bar in page.tsx). On desktop the 76px offset is
+          the existing reserved space for the top chrome. */}
       <div
-        className="absolute right-0 bottom-0 z-10 flex flex-col w-full min-[600px]:w-[440px] top-0 min-[600px]:top-[76px]"
+        className="swipe-detail-panel absolute right-0 bottom-0 z-10 flex flex-col w-full min-[600px]:w-[440px]"
+        style={{ ['--swipe-top-inset' as string]: `${topInset}px` }}
       >
         {currentListing ? (
           <>

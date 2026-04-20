@@ -138,3 +138,16 @@ body {
     transform: translate(-50%, 0);
   }
 }
+
+/* Swipe detail panel — reserve top space for the filter bar on mobile.
+   The `--swipe-top-inset` CSS variable is set inline from SwipeView based
+   on the measured sidebar height. On desktop (≥600px) we fall back to the
+   fixed 76px offset that the previous layout used. */
+.swipe-detail-panel {
+  top: var(--swipe-top-inset, 0px);
+}
+@media (min-width: 600px) {
+  .swipe-detail-panel {
+    top: 76px;
+  }
+}
