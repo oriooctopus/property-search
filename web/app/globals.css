@@ -139,6 +139,15 @@ body {
   }
 }
 
+/* ListingCard source chip — outlined by default, fills on hover.
+   The accent color is supplied per-source via the `--src-color` CSS variable
+   set inline on the element (one of streeteasy/craigslist/facebook/realtor). */
+.source-chip:hover {
+  background-color: var(--src-color) !important;
+  color: #0f1117 !important;
+  border-color: var(--src-color) !important;
+}
+
 /* Swipe detail panel — reserve top space for the filter bar on mobile.
    The `--swipe-top-inset` CSS variable is set inline from SwipeView based
    on the measured sidebar height. On desktop (≥600px) we fall back to the

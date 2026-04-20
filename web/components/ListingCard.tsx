@@ -346,7 +346,9 @@ function ListingCard({
             onClick={handleStarBtnClick}
           />
 
-          {/* Outlined source chip (links to listing.url) */}
+          {/* Outlined source chip (links to listing.url) — wrapped in a 44x44
+              shell so its outer footprint matches the sibling ActionButtons,
+              giving even horizontal spacing between all three footer icons. */}
           {(() => {
             const style = SOURCE_STYLE[listing.source] ?? {
               label: listing.source.slice(0, 2).toUpperCase(),
@@ -354,35 +356,44 @@ function ListingCard({
             };
             const sourceName = SOURCE_LABELS[listing.source] ?? 'listing';
             return (
-              <a
-                href={listing.url}
-                target="_blank"
-                rel="noreferrer noopener"
-                onClick={(e) => e.stopPropagation()}
-                aria-label={`View on ${sourceName}`}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: 20,
-                  minWidth: 20,
-                  padding: '0 5px',
-                  borderRadius: 4,
-                  background: 'transparent',
-                  border: `1px solid ${style.color}`,
-                  color: style.color,
-                  fontFamily: SOURCE_CHIP_FONT_STACK,
-                  fontSize: 9,
-                  fontWeight: 700,
-                  letterSpacing: '0.5px',
-                  textTransform: 'uppercase',
-                  textDecoration: 'none',
-                  flexShrink: 0,
-                  lineHeight: 1,
-                }}
-              >
-                {style.label}
-              </a>
+              <span className="p-1.5 rounded-md min-w-[44px] min-h-[44px] flex items-center justify-center">
+                <a
+                  href={listing.url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  onClick={(e) => e.stopPropagation()}
+                  aria-label={`View on ${sourceName}`}
+                  className="source-chip"
+                  style={{
+                    ['--src-color' as string]: style.color,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: 20,
+                    minWidth: 20,
+                    padding: '0 5px',
+                    borderRadius: 4,
+                    backgroundColor: 'transparent',
+                    borderWidth: 1,
+                    borderStyle: 'solid',
+                    borderColor: style.color,
+                    color: style.color,
+                    fontFamily: SOURCE_CHIP_FONT_STACK,
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: '0.5px',
+                    textTransform: 'uppercase',
+                    textDecoration: 'none',
+                    flexShrink: 0,
+                    lineHeight: 1,
+                    transition:
+                      'background-color 150ms ease, color 150ms ease, border-color 150ms ease',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {style.label}
+                </a>
+              </span>
             );
           })()}
         </div>
