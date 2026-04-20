@@ -1097,6 +1097,7 @@ function HomeInner() {
             onUnhideListing={(id) => unhideMutation.mutate(id)}
             onExpandDetail={(listing) => { setSelectedId(listing.id); setDetailListing(filteredListings.find(l => l.id === listing.id) ?? null); }}
             onSwitchView={() => setMobileView('list')}
+            onSwitchToMap={() => setMobileView('map')}
             onBoundsChange={handleBoundsChange}
             onMapMove={handleMapMove}
             suppressBoundsRef={suppressBoundsRef}
@@ -1139,9 +1140,11 @@ function HomeInner() {
       {/* Toast */}
       {toastEl}
 
-      {/* Mobile bottom nav — view mode toggle (list/swipe/map) */}
+      {/* Mobile bottom nav — view mode toggle (list/swipe/map).
+          Hidden in swipe view: SwipeView renders its own unified pill that
+          combines the view-mode toggle with the X/undo/heart swipe actions. */}
       <div
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 z-[1300] min-[600px]:hidden"
+        className={`fixed bottom-0 left-1/2 -translate-x-1/2 z-[1300] min-[600px]:hidden ${isSwipeView ? 'hidden' : ''}`}
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
         <div

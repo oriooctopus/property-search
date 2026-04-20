@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo, type ReactNode } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { useDrag } from '@use-gesture/react';
 import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
@@ -114,6 +114,9 @@ interface SwipeCardProps {
   onDragStateChange?: (dragging: boolean) => void;
   /** Ref callback so parent can imperatively reset card position (spring back to 0,0) */
   resetRef?: React.MutableRefObject<(() => void) | null>;
+  /** Optional leading slot in the card footer (left of "View on <source>"). Used on
+   *  mobile to render the "Save to: <wishlist> ▾" control inline in the card. */
+  footerLeadingSlot?: ReactNode;
 }
 
 const SWIPE_X_THRESHOLD = 100;
@@ -132,6 +135,7 @@ export default function SwipeCard({
   onSubwayHover,
   onDragStateChange,
   resetRef,
+  footerLeadingSlot,
 }: SwipeCardProps) {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [photoFocused, setPhotoFocused] = useState(false);
@@ -796,14 +800,21 @@ export default function SwipeCard({
               </div>
             )}
 
-            {/* External link */}
-            <div className="flex items-center justify-end pt-1 pb-2">
+            {/* External link + optional leading slot (e.g. mobile "Save to" control) */}
+            <div
+              className={`flex items-center ${footerLeadingSlot ? 'justify-between gap-3' : 'justify-end'} pt-1 pb-2`}
+            >
+              {footerLeadingSlot ? (
+                <div className="min-w-0 flex-shrink" onClick={(e) => e.stopPropagation()}>
+                  {footerLeadingSlot}
+                </div>
+              ) : null}
               <a
                 href={listing.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="text-sm font-medium hover:underline cursor-pointer"
+                className="text-sm font-medium hover:underline cursor-pointer flex-shrink-0"
                 style={{ color: '#58a6ff' }}
               >
                 View on {SOURCE_LABELS[listing.source] ?? listing.source} →
