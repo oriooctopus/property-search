@@ -759,29 +759,40 @@ export default function SwipeView({
                 {/* Action bar attached to bottom of card — desktop only. Mobile uses
                     the floating glassmorphic dock rendered below the card area. */}
                 <div
-                  className="absolute bottom-0 left-0 right-0 hidden min-[600px]:flex items-center justify-between px-5 rounded-b-xl"
+                  className="absolute bottom-0 left-0 right-0 hidden min-[600px]:flex items-center justify-center px-5 rounded-b-xl"
                   style={{
                     height: 96,
                     borderTop: '1px solid #2d333b',
                     backgroundColor: 'rgba(28, 32, 40, 0.97)',
                   }}
                 >
-              {/* Undo · Z */}
-              <div className="flex flex-col items-center gap-0.5">
-                <button
-                  onClick={handleUndo}
-                  disabled={undoStack.length === 0}
-                  className="flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed"
-                  style={{ color: '#8b949e', background: 'none', border: 'none', padding: 0 }}
-                  title="Undo (Z)"
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 7v6h6" />
-                    <path d="M3 13a9 9 0 0 1 15.36-6.36L21 9" />
-                  </svg>
-                </button>
+              {/* Undo · Z — absolutely positioned on the left, vertically
+                  aligned with the center of the 4-arrow button row (not the
+                  whole right cluster, which also includes the "Save to" row
+                  below). The button row is ~38px tall and sits at the top of
+                  the center cluster, so we offset upward from the bar's
+                  vertical center by half the "Save to" row height + gap (~10px)
+                  so Undo's center Y matches the arrow-button row's center Y. */}
+              <button
+                onClick={handleUndo}
+                disabled={undoStack.length === 0}
+                className="absolute left-5 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed"
+                style={{
+                  color: '#8b949e',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  top: 'calc(50% - 10px)',
+                  transform: 'translateY(-50%)',
+                }}
+                title="Undo (Z)"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 7v6h6" />
+                  <path d="M3 13a9 9 0 0 1 15.36-6.36L21 9" />
+                </svg>
                 <span className="text-[12px]" style={{ color: '#6e7681' }}>Undo · <span style={{ color: '#8b949e' }}>Z</span></span>
-              </div>
+              </button>
 
               {/* Center: 4-circle arrow cluster with tooltips */}
               <div ref={saveAnchorRef} className="flex flex-col items-center gap-1.5">
