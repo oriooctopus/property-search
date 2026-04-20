@@ -722,6 +722,15 @@ function HomeInner() {
     startTransition(() => setMobileView(v));
   }, []);
 
+  // Stable handlers for ListingCard so React.memo can skip re-renders when
+  // the parent re-renders for unrelated reasons.
+  const handleCardSelect = useCallback((id: number) => {
+    setSelectedId(id);
+  }, []);
+  const handleCardExpand = useCallback((l: Listing) => {
+    setDetailListing(l);
+  }, []);
+
   // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
@@ -742,10 +751,10 @@ function HomeInner() {
           isFavorited={wishlistedIds.has(listing.id)}
           isHiding={hidingId === listing.id}
           commuteInfo={commuteInfoMap?.get(listing.id)}
-          onClick={() => setSelectedId(listing.id)}
+          onClick={handleCardSelect}
           onStarClick={handleStarClick}
-          onExpand={() => setDetailListing(listing)}
-          onHide={() => handleHideListing(listing.id)}
+          onExpand={handleCardExpand}
+          onHide={handleHideListing}
         />
       ))}
 
@@ -768,7 +777,7 @@ function HomeInner() {
   );
 
   const viewToggle = (
-    <div data-tour="view-modes">
+    <div data-tour="view-modes" className="flex items-center">
     <SegmentedControl
       value={mobileView}
       onChange={(v) => switchMobileView(v as 'list' | 'map' | 'swipe')}

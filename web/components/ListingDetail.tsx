@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import type { Database } from '@/lib/types';
 import { ActionButton, IconButton } from '@/components/ui';
 import { formatShortDate } from '@/lib/format-date';
@@ -126,6 +126,33 @@ export default function ListingDetail({
   const photos = listing.photo_urls ?? [];
   const pricePerBed = listing.beds > 0 ? Math.round(listing.price / listing.beds) : null;
   const commuteDest = getCommuteDestination(commuteRules, listing.lat, listing.lon);
+
+  // Nearest subway station (same data source used for "Nearest Subway" card below).
+  // Memoized so we don't iterate all ~467 stations on every render.
+  const nearestStations = useMemo(() => {
+    const MI_PER_DEG_LAT = 69;
+    const MI_PER_DEG_LON = 52;
+    if (listing.lat == null || listing.lon == null) return [];
+    const lat = listing.lat as number;
+    const lon = listing.lon as number;
+    return SUBWAY_STATIONS
+      .map((s) => {
+        const dLat = (s.lat - lat) * MI_PER_DEG_LAT;
+        const dLon = (s.lon - lon) * MI_PER_DEG_LON;
+        return { station: s, distMi: Math.sqrt(dLat * dLat + dLon * dLon) };
+      })
+      .sort((a, b) => a.distMi - b.distMi)
+      .slice(0, 2);
+  }, [listing.lat, listing.lon]);
+  const nearestSubwayForMap = useMemo(() => {
+    if (nearestStations.length === 0) return null;
+    return {
+      lat: nearestStations[0].station.lat,
+      lon: nearestStations[0].station.lon,
+      name: nearestStations[0].station.name,
+      lines: nearestStations[0].station.lines,
+    };
+  }, [nearestStations]);
 
   const handleStarClick = useCallback(() => {
     if (starButtonRef.current) {
@@ -379,9 +406,7 @@ export default function ListingDetail({
           )}
 
           {/* Nearest subway stations */}
-          {listing.lat != null && listing.lon != null && (() => {
-            const MI_PER_DEG_LAT = 69;
-            const MI_PER_DEG_LON = 52;
+          {nearestStations.length > 0 && (() => {
             const LINE_COLORS: Record<string, string> = {
               '1': '#EE352E', '2': '#EE352E', '3': '#EE352E',
               '4': '#00933C', '5': '#00933C', '6': '#00933C',
@@ -394,22 +419,11 @@ export default function ListingDetail({
               'N': '#FCCC0A', 'Q': '#FCCC0A', 'R': '#FCCC0A', 'W': '#FCCC0A',
               'S': '#808183',
             };
-            const lat = listing.lat as number;
-            const lon = listing.lon as number;
-            const stations = SUBWAY_STATIONS
-              .map((s) => {
-                const dLat = (s.lat - lat) * MI_PER_DEG_LAT;
-                const dLon = (s.lon - lon) * MI_PER_DEG_LON;
-                return { station: s, distMi: Math.sqrt(dLat * dLat + dLon * dLon) };
-              })
-              .sort((a, b) => a.distMi - b.distMi)
-              .slice(0, 2);
-            if (stations.length === 0) return null;
             return (
               <div className="mb-4">
                 <div className="text-xs font-medium mb-2" style={{ color: '#8b949e' }}>Nearest Subway</div>
                 <div className="flex flex-col gap-2">
-                  {stations.map(({ station, distMi }) => {
+                  {nearestStations.map(({ station, distMi }) => {
                     const displayDist = distMi < 0.1 ? '<0.1' : distMi.toFixed(1);
                     return (
                       <div key={station.stopId} className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ backgroundColor: '#0f1117', border: '1px solid #2d333b' }}>
@@ -456,7 +470,7 @@ export default function ListingDetail({
             </span>
           </div>
 
-          {/* Action buttons */}
+          {/* Action row — hide, save, and external link all on one row */}
           <div className="flex items-center gap-1.5 sm:gap-2 mb-6">
             <ActionButton
               variant="hide"
@@ -476,25 +490,30 @@ export default function ListingDetail({
               className="px-2 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm"
               label={isFavorited ? 'Saved' : 'Save'}
             />
+            {listing.url && (
+              <IconButton
+                variant="overlay"
+                size="md"
+                onClick={() => window.open(listing.url, '_blank', 'noopener,noreferrer')}
+                className="ml-auto rounded-md p-2"
+                aria-label={`View on ${SOURCE_LABELS[listing.source] ?? 'source'}`}
+                title={`View on ${SOURCE_LABELS[listing.source] ?? 'source'}`}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+              </IconButton>
+            )}
           </div>
 
-          {/* Source + View link + Hide button */}
+          {/* Source attribution */}
           {listing.source && (
-            <div className="text-xs mb-2" style={{ color: '#6e7681' }}>
+            <div className="text-xs mb-6" style={{ color: '#6e7681' }}>
               via {SOURCE_LABELS[listing.source] ?? listing.source}
             </div>
           )}
-          <div className="mb-6">
-            <a
-              href={listing.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-sm font-medium hover:underline"
-              style={{ color: '#58a6ff' }}
-            >
-              View on {SOURCE_LABELS[listing.source] ?? 'listing site'} &rarr;
-            </a>
-          </div>
 
           {/* Location map */}
           {listing.lat != null && listing.lon != null && !isNaN(Number(listing.lat)) && !isNaN(Number(listing.lon)) && (
@@ -502,7 +521,7 @@ export default function ListingDetail({
               <div className="text-xs font-medium mb-2" style={{ color: '#8b949e' }}>
                 Location
               </div>
-              <DetailMap lat={listing.lat} lon={listing.lon} />
+              <DetailMap lat={listing.lat} lon={listing.lon} subway={nearestSubwayForMap} />
             </div>
           )}
 
