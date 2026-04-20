@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { createPortal } from 'react-dom';
-import { PrimaryButton, DockActionButton } from '@/components/ui';
+import { PrimaryButton } from '@/components/ui';
 import { X, RotateCcw, Heart } from 'lucide-react';
 import SwipeCard, { type HoveredStation, getClosestStations } from './SwipeCard';
 import type { ViewportBounds } from './MapInner';
@@ -43,6 +43,8 @@ export interface SwipeViewProps {
   onUnhideListing?: (id: number) => void;
   onExpandDetail?: (listing: SwipeListing) => void;
   onSwitchView?: () => void;
+  /** Called when the user taps the map icon in the mobile unified bottom pill */
+  onSwitchToMap?: () => void;
   // Map props passthrough
   onBoundsChange?: (bounds: ViewportBounds) => void;
   onMapMove?: (center: { lat: number; lng: number }, zoom: number) => void;
@@ -97,6 +99,7 @@ export default function SwipeView({
   onUnhideListing,
   onExpandDetail,
   onSwitchView,
+  onSwitchToMap,
   onBoundsChange,
   onMapMove,
   suppressBoundsRef,
@@ -592,10 +595,12 @@ export default function SwipeView({
           <>
             {/* Card + action bar — fills available space, content scrolls if needed.
                 On mobile the card is vertically centered in the area between the top
-                navbar and the floating glassmorphic dock (rendered below). On desktop
-                the card + attached 96px action bar keeps its original behavior. */}
-            <div className="flex-1 min-h-0 overflow-hidden p-2 min-[600px]:p-0 min-[600px]:pr-3 flex flex-col min-[600px]:block items-center justify-center min-[600px]:items-stretch min-[600px]:justify-start pb-[calc(env(safe-area-inset-bottom)+168px)] min-[600px]:pb-0">
-            <div className="relative w-full my-auto min-[600px]:my-auto max-h-full min-[600px]:max-h-[calc(100%-40px)]">
+                navbar and the unified bottom pill (rendered via portal below). The
+                ~80px bottom padding reserves space for the pill (52px) + safe area +
+                a bit of breathing room. On desktop the card + attached 96px action
+                bar keeps its original behavior. */}
+            <div className="flex-1 min-h-0 overflow-hidden p-2 min-[600px]:p-0 min-[600px]:pr-3 flex flex-col items-center justify-center min-[600px]:items-stretch pb-[calc(env(safe-area-inset-bottom)+80px)] min-[600px]:pb-0">
+            <div className="relative w-full my-auto max-h-full min-[600px]:max-h-[calc(100%-40px)]">
               {/* Invisible layout card to establish natural height (card + action bar on desktop) */}
               <div className="invisible">
                 <SwipeCard
@@ -712,6 +717,34 @@ export default function SwipeView({
                     onSubwayHover={setHoveredStation}
                     onDragStateChange={setIsDragging}
                     resetRef={resetCardRef}
+                    footerLeadingSlot={(
+                      // Mobile-only "Save to: <wishlist> ▾" inline in card footer.
+                      // Hidden on desktop (≥600px) where the same control lives
+                      // in the attached action bar.
+                      <button
+                        ref={mobileSaveAnchorRef}
+                        onClick={(e) => { e.stopPropagation(); setWishlistDropdownOpen((prev) => !prev); }}
+                        className="min-[600px]:hidden text-[12px] flex items-center gap-1 cursor-pointer transition-colors"
+                        style={{
+                          color: '#8b949e',
+                          background: 'none',
+                          border: 'none',
+                          padding: '2px 0',
+                          lineHeight: 1.4,
+                          maxWidth: '100%',
+                        }}
+                        title="Choose wishlist"
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
+                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                        </svg>
+                        <span style={{ whiteSpace: 'nowrap' }}>Save to:</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120, color: '#c9d1d9' }}>
+                          {selectedWishlist ? selectedWishlist.name : 'Wishlist'}
+                        </span>
+                        <span style={{ flexShrink: 0 }}>▾</span>
+                      </button>
+                    )}
                   />
                 </div>
                 {/* Action bar attached to bottom of card — desktop only. Mobile uses
@@ -800,72 +833,131 @@ export default function SwipeView({
             </div>{/* relative w-full */}
             </div>{/* flex-1 centering */}
 
-            {/* Mobile-only floating glassmorphic action dock.
-                Sits above the bottom nav pill. Contains 3 equal-size 56px circular
-                buttons: Reject (X / swipe-left), Undo (same as Z), Heart (save / swipe-right).
-                The "Save to: <wishlist>" label sits just above the dock. */}
-            <div
-              className="min-[600px]:hidden absolute left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-2 pointer-events-none"
-              style={{ bottom: 'calc(env(safe-area-inset-bottom) + 80px)' }}
-            >
-              {/* Save to: <wishlist> label — mobile version, above the dock */}
-              <button
-                ref={mobileSaveAnchorRef}
-                onClick={() => setWishlistDropdownOpen((prev) => !prev)}
-                className="pointer-events-auto text-[12px] flex items-center gap-1 cursor-pointer transition-colors px-3 py-1 rounded-full"
-                style={{
-                  color: '#c9d1d9',
-                  background: 'rgba(0, 0, 0, 0.55)',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  maxWidth: 220,
-                  lineHeight: 1.4,
-                }}
-                title="Choose wishlist"
-              >
-                <span style={{ whiteSpace: 'nowrap', color: '#8b949e' }}>Save to:</span>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>
-                  {selectedWishlist ? selectedWishlist.name : 'Wishlist'}
-                </span>
-                <span style={{ flexShrink: 0, color: '#8b949e' }}>▾</span>
-              </button>
-
-              {/* Glassmorphic pill dock — 3 equal 56px circular buttons */}
+            {/* Mobile-only unified bottom pill — replaces the old floating dock
+                AND the standalone nav pill from page.tsx. Contains:
+                [list-edge] | [X] | [undo] | [heart] | [map-edge]
+                The list/map icons switch view mode; the 3 center buttons perform
+                swipe actions. Rendered as a portal so it sits above the rest of
+                the app chrome regardless of parent stacking context. */}
+            {typeof document !== 'undefined' && createPortal(
               <div
-                className="pointer-events-auto flex items-center justify-center gap-3 rounded-full px-4 py-2"
+                className="fixed left-1/2 -translate-x-1/2 min-[600px]:hidden"
                 style={{
-                  background: 'rgba(0, 0, 0, 0.6)',
-                  backdropFilter: 'blur(12px)',
-                  WebkitBackdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+                  bottom: 'calc(env(safe-area-inset-bottom) + 12px)',
+                  zIndex: 1300,
                 }}
               >
-                <DockActionButton
-                  tone="reject"
-                  aria-label="Reject"
-                  onClick={() => handleSwipe('left')}
+                <div
+                  className="flex items-center rounded-full overflow-hidden"
+                  style={{
+                    height: 52,
+                    background: 'rgba(28, 32, 40, 0.85)',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+                  }}
                 >
-                  <X size={24} strokeWidth={2.5} color="#ef4444" />
-                </DockActionButton>
-                <DockActionButton
-                  tone="neutral"
-                  aria-label="Undo"
-                  onClick={handleUndo}
-                  disabled={undoStack.length === 0}
-                >
-                  <RotateCcw size={22} strokeWidth={2} color="#8b949e" />
-                </DockActionButton>
-                <DockActionButton
-                  tone="heart"
-                  aria-label="Save"
-                  onClick={() => handleSwipe('right')}
-                >
-                  <Heart size={22} strokeWidth={2} color="#ec4899" />
-                </DockActionButton>
-              </div>
-            </div>
+                  {/* List icon (edge, left) — switch to list view */}
+                  <button
+                    onClick={() => onSwitchView?.()}
+                    aria-label="List view"
+                    className="flex items-center justify-center cursor-pointer transition-colors"
+                    style={{
+                      width: 60,
+                      height: 52,
+                      background: 'none',
+                      border: 'none',
+                      color: '#8b949e',
+                    }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="8" y1="6" x2="21" y2="6" />
+                      <line x1="8" y1="12" x2="21" y2="12" />
+                      <line x1="8" y1="18" x2="21" y2="18" />
+                      <line x1="3" y1="6" x2="3.01" y2="6" />
+                      <line x1="3" y1="12" x2="3.01" y2="12" />
+                      <line x1="3" y1="18" x2="3.01" y2="18" />
+                    </svg>
+                  </button>
+
+                  <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
+
+                  {/* Reject (X) */}
+                  <button
+                    onClick={() => handleSwipe('left')}
+                    aria-label="Reject"
+                    className="flex items-center justify-center cursor-pointer transition-colors active:scale-95"
+                    style={{
+                      width: 62,
+                      height: 52,
+                      background: 'none',
+                      border: 'none',
+                    }}
+                  >
+                    <X size={22} strokeWidth={2.5} color="#ef4444" />
+                  </button>
+
+                  <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} />
+
+                  {/* Undo */}
+                  <button
+                    onClick={handleUndo}
+                    disabled={undoStack.length === 0}
+                    aria-label="Undo"
+                    className="flex items-center justify-center cursor-pointer transition-colors active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+                    style={{
+                      width: 62,
+                      height: 52,
+                      background: 'none',
+                      border: 'none',
+                    }}
+                  >
+                    <RotateCcw size={20} strokeWidth={2} color="#8b949e" />
+                  </button>
+
+                  <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} />
+
+                  {/* Heart (save) */}
+                  <button
+                    onClick={() => handleSwipe('right')}
+                    aria-label="Save"
+                    className="flex items-center justify-center cursor-pointer transition-colors active:scale-95"
+                    style={{
+                      width: 62,
+                      height: 52,
+                      background: 'none',
+                      border: 'none',
+                    }}
+                  >
+                    <Heart size={21} strokeWidth={2.2} color="#ec4899" />
+                  </button>
+
+                  <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
+
+                  {/* Map icon (edge, right) — switch to map view */}
+                  <button
+                    onClick={() => onSwitchToMap?.()}
+                    aria-label="Map view"
+                    className="flex items-center justify-center cursor-pointer transition-colors"
+                    style={{
+                      width: 60,
+                      height: 52,
+                      background: 'none',
+                      border: 'none',
+                      color: '#8b949e',
+                    }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
+                      <line x1="8" y1="2" x2="8" y2="18" />
+                      <line x1="16" y1="6" x2="16" y2="22" />
+                    </svg>
+                  </button>
+                </div>
+              </div>,
+              document.body,
+            )}
 
             {/* Wishlist picker — anchors to whichever save-to button is visible
                 (mobile dock label on mobile, in-card action bar on desktop). */}
