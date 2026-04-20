@@ -7,7 +7,8 @@ import { createClient } from '@/lib/supabase-browser';
 import type { Database } from '@/lib/types';
 import Map from '@/components/Map';
 import Filters, { type FiltersState, type SortField, type MaxListingAge } from '@/components/Filters';
-import ListingCard, { type CommuteInfo } from '@/components/ListingCard';
+import { type CommuteInfo } from '@/components/ListingCard';
+import VirtualListingGrid, { type VirtualListingGridHandle } from '@/components/VirtualListingGrid';
 import ListingDetail from '@/components/ListingDetail';
 import RadarLoader from '@/components/RadarLoader';
 import { SegmentedControl } from '@/components/ui';
@@ -731,6 +732,10 @@ function HomeInner() {
     setDetailListing(l);
   }, []);
 
+  // Ref to the virtualized listing grid — used to scroll to a listing when
+  // a map marker is clicked (since the target card may not be in the DOM).
+  const virtualGridRef = useRef<VirtualListingGridHandle>(null);
+
   // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
@@ -739,42 +744,10 @@ function HomeInner() {
   }
 
   // -----------------------------------------------------------------------
-  // Shared listing cards renderer
+  // Shared listing cards renderer — virtualized via VirtualListingGrid.
+  // Renders only visible rows (+ overscan) instead of all ~2000 cards.
   // -----------------------------------------------------------------------
-  const listingCards = (
-    <>
-      {filteredListings.map((listing) => (
-        <ListingCard
-          key={listing.id}
-          listing={listing}
-          isSelected={listing.id === selectedId}
-          isFavorited={wishlistedIds.has(listing.id)}
-          isHiding={hidingId === listing.id}
-          commuteInfo={commuteInfoMap?.get(listing.id)}
-          onClick={handleCardSelect}
-          onStarClick={handleStarClick}
-          onExpand={handleCardExpand}
-          onHide={handleHideListing}
-        />
-      ))}
-
-{commuteMessage && !commuteLoading && (
-        <div className="text-center py-4 text-xs" style={{ color: '#f0883e' }}>
-          {commuteMessage}
-        </div>
-      )}
-      {filteredListings.length === 0 && (loading || viewportLoading || commuteLoading) && (
-        <div className="col-span-full flex items-center justify-center min-h-[200px]">
-          <RadarLoader />
-        </div>
-      )}
-      {filteredListings.length === 0 && !commuteLoading && !loading && !viewportLoading && (
-        <div className="col-span-full flex items-center justify-center min-h-[200px] text-center text-sm" style={{ color: '#8b949e' }}>
-          No listings match your filters.
-        </div>
-      )}
-    </>
-  );
+  const listingGridLoading = filteredListings.length === 0 && (loading || viewportLoading || commuteLoading);
 
   const viewToggle = (
     <div data-tour="view-modes" className="flex items-center">
@@ -818,8 +791,7 @@ function HomeInner() {
           setSelectedId(id);
           if (window.innerWidth >= 1024) {
             setTimeout(() => {
-              const el = document.getElementById(`listing-${id}`);
-              el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              virtualGridRef.current?.scrollToListing(id);
             }, 100);
           }
         }}
@@ -1040,12 +1012,33 @@ function HomeInner() {
 
         <div className="relative flex-1 min-h-0 flex flex-col">
           {!isSwipeView && (
-            <div
-              className={`flex-1 overflow-y-auto dark-scrollbar min-h-0 px-3 py-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 relative z-0 ${mobileView === 'map' ? 'hidden lg:grid' : ''}`}
-              style={{ opacity: (filterChanging || commuteLoading) ? 0.35 : 1, transition: 'opacity 150ms' }}
-            >
-              {listingCards}
-            </div>
+            <>
+              <VirtualListingGrid
+                ref={virtualGridRef}
+                listings={filteredListings}
+                selectedId={selectedId}
+                wishlistedIds={wishlistedIds}
+                hidingId={hidingId}
+                commuteInfoMap={commuteInfoMap}
+                onCardSelect={handleCardSelect}
+                onStarClick={handleStarClick}
+                onExpand={handleCardExpand}
+                onHide={handleHideListing}
+                commuteMessage={commuteMessage}
+                commuteLoading={commuteLoading}
+                isDimmed={filterChanging || commuteLoading}
+                hiddenOnMobile={mobileView === 'map'}
+                suppressEmptyState={listingGridLoading}
+              />
+              {listingGridLoading && (
+                <div
+                  className={`absolute inset-0 flex items-center justify-center min-h-[200px] ${mobileView === 'map' ? 'hidden lg:flex' : 'flex'}`}
+                  style={{ pointerEvents: 'none' }}
+                >
+                  <RadarLoader />
+                </div>
+              )}
+            </>
           )}
 
           {/* Filter-changing overlay — uses pointer-events-none + fixed centering scoped to sidebar */}
