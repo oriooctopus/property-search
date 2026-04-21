@@ -61,6 +61,11 @@ export interface SwipeViewProps {
       the SwipeView on mobile. Used to shift the card downward so it doesn't
       render underneath the absolute filter bar. */
   topInset?: number;
+  /** Called when the user taps the mobile floating Filters pill. The host
+      (page.tsx) owns the filter state and renders the drawer so the same
+      <Filters> props pipeline can be reused without threading every prop
+      through SwipeView. */
+  onOpenFilters?: () => void;
 }
 
 interface UndoEntry {
@@ -116,6 +121,7 @@ export default function SwipeView({
   isLoading,
   wishlistedIds,
   topInset = 0,
+  onOpenFilters,
 }: SwipeViewProps) {
   // Don't persist swipedIds across refreshes — start fresh each session.
   // The localStorage was causing "You've seen all listings" on every refresh.
@@ -632,14 +638,14 @@ export default function SwipeView({
         </div>
       )}
 
-      {/* Mobile floating Filters pill (top-right) — placeholder visual
-          matching the Option D mockup. Clicking currently does nothing
-          wired to the filter UI yet; that's a follow-up. Exists so the
-          layout matches the mockup when the global Navbar + sidebar filter
-          bar are hidden. */}
+      {/* Mobile floating Filters pill (top-right). Opens the mobile filters
+          drawer rendered by page.tsx (host owns the filter state). Exists so
+          the layout matches the Option D mockup when the global Navbar +
+          sidebar filter bar are hidden on mobile swipe. */}
       {isMobileViewport === true && (
         <button
           type="button"
+          onClick={onOpenFilters}
           className="absolute min-[600px]:hidden cursor-pointer"
           style={{
             top: 'calc(env(safe-area-inset-top) + 12px)',
@@ -660,8 +666,9 @@ export default function SwipeView({
             fontSize: 12,
             fontWeight: 500,
           }}
-          aria-label="Filters"
+          aria-label="Open filters"
           title="Filters"
+          data-testid="swipe-filters-pill"
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b949e" strokeWidth="2.5" strokeLinecap="round">
             <line x1="4" y1="6" x2="20" y2="6" />
