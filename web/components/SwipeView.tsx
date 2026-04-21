@@ -567,26 +567,24 @@ export default function SwipeView({
         </div>
       )}
 
-      {/* Mobile mini-map — Option B2 persistent 45vh map above the swipe card.
-          Shows the current listing's pin and nearby subway markers. Tapping the
-          map opens the full-screen expanded overlay below. Only mounts on
-          mobile viewports to avoid running two Leaflet instances side-by-side
-          on desktop. */}
+      {/* Mobile full-bleed map backdrop — Option D layout.
+          Fills the entire mobile viewport; the swipe card floats over it
+          in the middle-lower area with rounded corners on all sides, and
+          the action pill sits at the very bottom. Map shows above the card
+          (top area with floating nav/filter pills) and below the card
+          (between card bottom and the action pill). Only mounts on mobile
+          viewports to avoid running two Leaflet instances side-by-side on
+          desktop. */}
       {isMobileViewport === true && (
         <div
-          className="absolute left-0 right-0 z-0 min-[600px]:hidden"
-          style={{
-            top: `var(--swipe-top-inset, 0px)`,
-            height: '45vh',
-            borderBottom: '1px solid #2d333b',
-            overflow: 'hidden',
-          }}
+          className="absolute inset-0 z-0 min-[600px]:hidden"
+          style={{ overflow: 'hidden' }}
         >
           {hasOpenedMap && (
             <MapComponent
-              // Mini-map renders only the active listing + subway stations —
-              // no saved/other pins (those remain on the desktop backdrop and
-              // the full-screen expanded mobile overlay below).
+              // Full-bleed map renders only the active listing + subway
+              // stations — no saved/other pins (those remain on the desktop
+              // backdrop and the full-screen expanded mobile overlay below).
               listings={mobileMapListings as unknown as Database['public']['Tables']['listings']['Row'][]}
               selectedId={currentListing?.id ?? null}
               onMarkerClick={handleMarkerClick}
@@ -594,9 +592,10 @@ export default function SwipeView({
               favoritedIds={EMPTY_FAVORITES}
               onHideListing={() => {}}
               // Wire bounds/move callbacks so user-initiated pan/zoom on the
-              // mini-map re-queries listings for the new viewport. Swiping to
-              // a new card does NOT move the map (auto-recenter removed), so
-              // bounds-watcher events are always from real user gestures.
+              // full-bleed map re-queries listings for the new viewport.
+              // Swiping to a new card does NOT move the map (auto-recenter
+              // removed), so bounds-watcher events are always from real user
+              // gestures.
               onBoundsChange={onBoundsChange}
               onMapMove={(center, zoom) => { mapCenterRef.current = center; onMapMove?.(center, zoom); }}
               suppressBoundsRef={suppressBoundsRef}
@@ -612,30 +611,105 @@ export default function SwipeView({
               hoveredStation={hoveredStation}
             />
           )}
-          <button
-            onClick={() => setShowMobileMap(true)}
-            aria-label="Expand map"
-            className="absolute top-2 right-2 rounded-full flex items-center justify-center cursor-pointer"
-            style={{
-              width: 36,
-              height: 36,
-              backgroundColor: 'rgba(28,32,40,0.9)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              color: '#e1e4e8',
-              zIndex: 5,
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-            }}
-            title="Expand map"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 3 21 3 21 9" />
-              <polyline points="9 21 3 21 3 15" />
-              <line x1="21" y1="3" x2="14" y2="10" />
-              <line x1="3" y1="21" x2="10" y2="14" />
-            </svg>
-          </button>
         </div>
+      )}
+
+      {/* Mobile floating nav pill (top-left) — compact logo + hamburger.
+          Replaces the global Navbar which is hidden when mobile swipe view
+          is active (see globals.css data-swipe-mobile rule). Logo links to
+          the home route, matching the global Navbar. */}
+      {isMobileViewport === true && (
+        <div
+          className="absolute min-[600px]:hidden"
+          style={{
+            top: 'calc(env(safe-area-inset-top) + 12px)',
+            left: 14,
+            zIndex: 20,
+            display: 'flex',
+            gap: 8,
+            alignItems: 'center',
+          }}
+        >
+          <a
+            href="/"
+            aria-label="Home"
+            className="cursor-pointer"
+            style={{
+              height: 36,
+              padding: '0 12px',
+              background: 'rgba(28,32,40,0.88)',
+              backdropFilter: 'blur(14px)',
+              WebkitBackdropFilter: 'blur(14px)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 9999,
+              boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              textDecoration: 'none',
+            }}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 48 48"
+              fill="none"
+              width={18}
+              height={18}
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="42" height="42" rx="8" stroke="#ffffff" strokeWidth="2" fill="none" />
+              <rect x="9" y="9" width="30" height="30" rx="5" stroke="#ffffff" strokeWidth="1.2" fill="none" opacity="0.55" />
+              <path d="M24 18 L19 23 L29 23 Z" fill="#ffffff" />
+              <rect x="20" y="23" width="8" height="6" fill="#ffffff" />
+            </svg>
+            <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.12)' }} />
+            <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <span style={{ display: 'block', width: 14, height: 1.5, background: '#8b949e', borderRadius: 1 }} />
+              <span style={{ display: 'block', width: 14, height: 1.5, background: '#8b949e', borderRadius: 1 }} />
+              <span style={{ display: 'block', width: 14, height: 1.5, background: '#8b949e', borderRadius: 1 }} />
+            </span>
+          </a>
+        </div>
+      )}
+
+      {/* Mobile floating Filters pill (top-right) — placeholder visual
+          matching the Option D mockup. Clicking currently does nothing
+          wired to the filter UI yet; that's a follow-up. Exists so the
+          layout matches the mockup when the global Navbar + sidebar filter
+          bar are hidden. */}
+      {isMobileViewport === true && (
+        <button
+          type="button"
+          className="absolute min-[600px]:hidden cursor-pointer"
+          style={{
+            top: 'calc(env(safe-area-inset-top) + 12px)',
+            right: 14,
+            zIndex: 20,
+            height: 36,
+            padding: '0 12px',
+            background: 'rgba(28,32,40,0.88)',
+            backdropFilter: 'blur(14px)',
+            WebkitBackdropFilter: 'blur(14px)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: 9999,
+            boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            color: '#c9d1d9',
+            fontSize: 12,
+            fontWeight: 500,
+          }}
+          aria-label="Filters"
+          title="Filters"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b949e" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="4" y1="6" x2="20" y2="6" />
+            <line x1="8" y1="12" x2="16" y2="12" />
+            <line x1="11" y1="18" x2="13" y2="18" />
+          </svg>
+          Filters
+        </button>
       )}
 
       {/* Expanded mobile map overlay — portal to escape parent stacking context.
@@ -681,12 +755,19 @@ export default function SwipeView({
         document.body,
       )}
 
-      {/* Floating detail panel on the right.
-          On mobile the card is pushed down by `topInset` (the height of the
-          overlaying filter bar in page.tsx). On desktop the 76px offset is
-          the existing reserved space for the top chrome. */}
+      {/* Floating detail panel.
+          Desktop (≥600px): right-anchored 440px wide column, top:76px, bottom:0
+            (original behavior — unchanged).
+          Mobile (<600px): floating card — horizontal gutters of 12px, top
+            starts at 42vh so the map is full-bleed above, bottom stops ~88px
+            above the screen edge so the action pill (bottom: 12px + safe-area,
+            height: 52px) has ~24px of map visible between it and the card.
+          `topInset` was the height of an overlaying filter bar — on mobile
+          swipe the filter bar is now hidden (body[data-swipe-mobile]) so we
+          no longer need to reserve space for it. Keep the CSS var for any
+          future use but it stays 0 in practice. */}
       <div
-        className="swipe-detail-panel absolute right-0 bottom-0 z-10 flex flex-col w-full min-[600px]:w-[440px]"
+        className="swipe-detail-panel absolute z-10 flex flex-col"
         style={{ ['--swipe-top-inset' as string]: `${topInset}px` }}
       >
         {currentListing ? (
@@ -697,7 +778,7 @@ export default function SwipeView({
                 ~80px bottom padding reserves space for the pill (52px) + safe area +
                 a bit of breathing room. On desktop the card + attached 96px action
                 bar keeps its original behavior. */}
-            <div className="flex-1 min-h-0 overflow-hidden p-2 min-[600px]:p-0 min-[600px]:pr-3 flex flex-col items-center justify-center min-[600px]:items-stretch pb-[calc(env(safe-area-inset-bottom)+80px)] min-[600px]:pb-0">
+            <div className="flex-1 min-h-0 overflow-hidden min-[600px]:p-0 min-[600px]:pr-3 flex flex-col items-stretch justify-center">
             <div className="relative w-full my-auto max-h-full min-[600px]:max-h-[calc(100%-40px)]">
               {/* Invisible layout card to establish natural height (card + action bar on desktop) */}
               <div className="invisible">
@@ -713,10 +794,12 @@ export default function SwipeView({
                 <div className="h-0 min-[600px]:h-24" />
               </div>
 
-              {/* Next card underneath — visible while dragging */}
+              {/* Next card underneath — visible while dragging.
+                  Mobile uses 24px radius (Option D floating card look);
+                  desktop keeps 12px to match the original attached-card layout. */}
               {currentIndex + 1 < deck.length && (
                 <div
-                  className="absolute inset-0 rounded-xl overflow-hidden"
+                  className="absolute inset-0 rounded-3xl min-[600px]:rounded-xl overflow-hidden"
                   style={{
                     zIndex: 1,
                     transform: 'scale(0.97)',
@@ -727,7 +810,7 @@ export default function SwipeView({
                 >
                   {/* Dark overlay to show depth */}
                   <div
-                    className="absolute inset-0 rounded-xl"
+                    className="absolute inset-0 rounded-3xl min-[600px]:rounded-xl"
                     style={{
                       zIndex: 3,
                       backgroundColor: 'rgba(0, 0, 0, 0.12)',
@@ -735,11 +818,10 @@ export default function SwipeView({
                     }}
                   />
                   <div
-                    className="absolute inset-0"
+                    className="absolute inset-0 rounded-3xl min-[600px]:rounded-xl"
                     style={{
                       backgroundColor: 'rgba(28, 32, 40, 0.97)',
                       border: '1px solid #2d333b',
-                      borderRadius: 12,
                     }}
                   >
                     <div className="absolute top-0 left-0 right-0 bottom-0 min-[600px]:bottom-24">
@@ -755,10 +837,12 @@ export default function SwipeView({
                 </div>
               )}
 
-              {/* Top card + attached action bar — unified container */}
+              {/* Top card + attached action bar — unified container.
+                  Mobile: 24px radius (Option D floating card).
+                  Desktop: 12px radius (original attached-bar look). */}
               <div
                 data-tour="swipe-card"
-                className="absolute inset-0 rounded-xl"
+                className="absolute inset-0 rounded-3xl min-[600px]:rounded-xl"
                 style={{
                   zIndex: 2,
                   overflow: isDragging ? 'visible' : 'hidden',
