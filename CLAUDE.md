@@ -78,18 +78,26 @@ Production URL: **https://dwelligence.vercel.app**
 
 Vercel auto-deploys on push to `main`. Always use this URL when referencing the live site (not the auto-generated `web-seven-chi-63.vercel.app`).
 
-## MANDATORY: Typecheck Frequently
+## MANDATORY: Typecheck AND Lint Frequently
 
-Run `cd web && npx tsc --noEmit` at these checkpoints — not just before push:
+`next build` runs BOTH `tsc` AND ESLint. Passing tsc alone is NOT sufficient — lint errors (e.g. `@next/next/no-html-link-for-pages`) fail the production deploy even when tsc is clean.
 
-1. **After every implementation agent completes** — before reporting "done" to the user, before spawning verify.
+Run BOTH of these at every checkpoint below:
+
+```
+cd web && npx tsc --noEmit
+cd web && npx next lint
+```
+
+Checkpoints:
+1. **After every implementation agent completes** — before reporting "done" to the user.
 2. **Before every `git commit`** — especially when committing changes that span multiple files or touch shared types.
-3. **Before every `git push`** — always. Production deploy failures from tsc errors are unacceptable because they were catchable locally.
-4. **When the user says "deploy"** — before pushing, run tsc even if you think nothing changed; the working tree may have drifted.
+3. **Before every `git push`** — always. Production deploy failures from either tsc OR lint are unacceptable because they were catchable locally.
+4. **When the user says "deploy"** — run both even if you think nothing changed; the working tree may have drifted.
 
-If tsc reports errors, stop and fix them before proceeding. Never push with failing tsc. Never assume "the agent said it was clean" — re-run it yourself. The cost of running tsc is ~5 seconds; the cost of a broken production deploy is much higher.
+Treat lint **errors** as blockers. Lint warnings (unused vars, missing deps) are OK to push. If unsure whether an issue is error vs warning, read the output carefully — `Error:` and `error` lines block `next build`; `Warning:` lines do not.
 
-If tsc errors appear in files you did not touch, investigate — they may be pre-existing but also may block your push. Surface them to the user loudly before deciding how to unblock.
+If either tool reports problems in files you did not touch, investigate — they may be pre-existing but also may block your push. Surface them loudly before deciding how to unblock.
 
 ## MANDATORY: Always Follow Up on Deployments with a Background Agent
 
