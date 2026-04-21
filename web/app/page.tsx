@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase-browser';
 import type { Database } from '@/lib/types';
 import Map from '@/components/Map';
-import Filters, { type FiltersState, type SortField, type MaxListingAge } from '@/components/Filters';
+import Filters, { type FiltersState, type FiltersHandle, type SortField, type MaxListingAge } from '@/components/Filters';
 import { type CommuteInfo } from '@/components/ListingCard';
 import VirtualListingGrid, { type VirtualListingGridHandle } from '@/components/VirtualListingGrid';
 import ListingDetail from '@/components/ListingDetail';
@@ -16,7 +16,6 @@ import ChatPanel from '@/components/ChatPanel';
 import SaveSearchModal from '@/components/SaveSearchModal';
 import FilterPills from '@/components/FilterPills';
 import SwipeView from '@/components/SwipeView';
-import MobileFiltersDrawer from '@/components/MobileFiltersDrawer';
 import TourGuide from '@/components/TourGuide';
 import { useConversation } from '@/lib/hooks/useConversation';
 import { useConversations } from '@/lib/hooks/useConversations';
@@ -684,7 +683,11 @@ function HomeInner() {
 
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(chatMode);
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  // Ref to the sidebar-mounted <Filters> — lets the floating Filters pill
+  // in SwipeView open Filters' internal mobile bottom sheet directly, so
+  // there's only ONE sheet (no nested drawer) and one source of truth for
+  // filter state.
+  const filtersHandleRef = useRef<FiltersHandle | null>(null);
 
   // Open chat drawer when ?chat=1 is in URL
   useEffect(() => {
@@ -1235,6 +1238,7 @@ function HomeInner() {
 
         <div className="relative z-[1100]">
           <Filters
+            ref={filtersHandleRef}
             filters={filters}
             onChange={setFilters}
             listingCount={filteredListings.length}
@@ -1404,7 +1408,7 @@ function HomeInner() {
             onExpandDetail={(listing) => { setSelectedId(listing.id); setDetailListing(filteredListings.find(l => l.id === listing.id) ?? null); }}
             onSwitchView={() => switchMobileView('list')}
             onSwitchToMap={() => switchMobileView('map')}
-            onOpenFilters={() => setMobileFiltersOpen(true)}
+            onOpenFilters={() => filtersHandleRef.current?.openMobileSheet()}
             topInset={sidebarHeight}
             onBoundsChange={handleBoundsChange}
             onMapMove={handleMapMove}
@@ -1444,45 +1448,6 @@ function HomeInner() {
 
       {/* Chat drawer (slide-out) */}
       {chatDrawer}
-
-      {/* Mobile filters drawer — only meaningful in swipe view on mobile,
-          where the sidebar (and its <Filters>) is hidden by CSS. A second
-          <Filters> is mounted inside the drawer and reads/writes the same
-          `filters` state, so both instances stay in sync via setFilters. */}
-      {isSwipeView && (
-        <MobileFiltersDrawer
-          open={mobileFiltersOpen}
-          onClose={() => setMobileFiltersOpen(false)}
-        >
-          <Filters
-            filters={filters}
-            onChange={setFilters}
-            listingCount={filteredListings.length}
-            userId={userId}
-            savedSearches={savedSearches}
-            onSaveSearch={async (name) => saveSavedSearch(name, filters)}
-            onDeleteSearch={deleteSavedSearch}
-            onLoadSearch={setFilters}
-            onUpdateSearch={updateSavedSearch}
-            onLoginRequired={() => setAuthModal('login')}
-            showHidden={showHidden}
-            onToggleShowHidden={() => setShowHidden((v) => !v)}
-            myWishlists={myWishlists}
-            sharedWishlists={sharedWishlists}
-            selectedWishlist={selectedWishlist}
-            onSelectWishlist={setSelectedWishlist}
-            onCreateWishlist={async (name) => {
-              try {
-                const created = await createWishlist.mutateAsync(name);
-                return created?.id ?? null;
-              } catch {
-                return null;
-              }
-            }}
-            onOpenWishlistManager={() => setManageWishlistsOpen(true)}
-          />
-        </MobileFiltersDrawer>
-      )}
 
       {/* Toast */}
       {toastEl}
