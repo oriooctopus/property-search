@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
 import { createPortal } from 'react-dom';
 import { PrimaryButton } from '@/components/ui';
 import { X, RotateCcw, Heart } from 'lucide-react';
@@ -630,64 +629,6 @@ export default function SwipeView({
               hoveredStation={hoveredStation}
             />
           )}
-        </div>
-      )}
-
-      {/* Mobile floating nav pill (top-left) — compact logo + hamburger.
-          Replaces the global Navbar which is hidden when mobile swipe view
-          is active (see globals.css data-swipe-mobile rule). Logo links to
-          the home route, matching the global Navbar. */}
-      {isMobileViewport === true && (
-        <div
-          className="absolute min-[600px]:hidden"
-          style={{
-            top: 'calc(env(safe-area-inset-top) + 12px)',
-            left: 14,
-            zIndex: 20,
-            display: 'flex',
-            gap: 8,
-            alignItems: 'center',
-          }}
-        >
-          <Link
-            href="/"
-            aria-label="Home"
-            className="cursor-pointer"
-            style={{
-              height: 36,
-              padding: '0 12px',
-              background: 'rgba(28,32,40,0.88)',
-              backdropFilter: 'blur(14px)',
-              WebkitBackdropFilter: 'blur(14px)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 9999,
-              boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              textDecoration: 'none',
-            }}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 48 48"
-              fill="none"
-              width={18}
-              height={18}
-              aria-hidden="true"
-            >
-              <rect x="3" y="3" width="42" height="42" rx="8" stroke="#ffffff" strokeWidth="2" fill="none" />
-              <rect x="9" y="9" width="30" height="30" rx="5" stroke="#ffffff" strokeWidth="1.2" fill="none" opacity="0.55" />
-              <path d="M24 18 L19 23 L29 23 Z" fill="#ffffff" />
-              <rect x="20" y="23" width="8" height="6" fill="#ffffff" />
-            </svg>
-            <span style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.12)' }} />
-            <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              <span style={{ display: 'block', width: 14, height: 1.5, background: '#8b949e', borderRadius: 1 }} />
-              <span style={{ display: 'block', width: 14, height: 1.5, background: '#8b949e', borderRadius: 1 }} />
-              <span style={{ display: 'block', width: 14, height: 1.5, background: '#8b949e', borderRadius: 1 }} />
-            </span>
-          </Link>
         </div>
       )}
 
