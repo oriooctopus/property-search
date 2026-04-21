@@ -394,13 +394,13 @@ export default function SwipeCard({
   // Layout-only mode: render content in normal flow to establish natural height
   if (layoutOnly) {
     return (
-      <div className="rounded-2xl overflow-hidden flex flex-col" style={{ backgroundColor: 'rgba(28, 32, 40, 0.97)', border: '1px solid #2d333b', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+      <div className={`overflow-hidden flex flex-col ${compactMobile ? 'rounded-3xl min-[600px]:rounded-2xl' : 'rounded-2xl'}`} style={{ backgroundColor: 'rgba(28, 32, 40, 0.97)', border: '1px solid #2d333b', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
         <div
           className={`w-full flex-shrink-0 ${compactMobile ? 'h-[165px] min-[600px]:h-[220px]' : 'h-[220px]'}`}
           style={{ backgroundColor: '#0d1117' }}
         />
         <div className="px-5 py-4 flex flex-col gap-3">
-          <div className={compactMobile ? 'hidden min-[600px]:block' : ''}>
+          <div>
             <div className="text-base font-semibold leading-snug" style={{ color: '#c9d1d9' }}>{listing.address}</div>
             <div className="text-sm mt-0.5" style={{ color: '#8b949e' }}>{listing.area}</div>
           </div>
@@ -722,8 +722,8 @@ export default function SwipeCard({
 
           {/* Detail content */}
           <div className="px-5 py-4 flex flex-col gap-3">
-            {/* Address + area — hidden on mobile in compactMobile mode */}
-            <div className={compactMobile ? 'hidden min-[600px]:block' : ''}>
+            {/* Address + area — shown on both mobile and desktop */}
+            <div>
               <div className="text-base font-semibold leading-snug" style={{ color: '#c9d1d9' }}>
                 {listing.address}
               </div>

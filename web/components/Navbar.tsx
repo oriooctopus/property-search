@@ -59,6 +59,7 @@ export default function Navbar() {
 
   return (
     <nav
+      data-global-nav="1"
       className="relative lg:fixed top-0 left-0 right-0 z-[1200] flex items-center justify-between px-3 sm:px-6"
       style={{
         backgroundColor: "#0f1117",

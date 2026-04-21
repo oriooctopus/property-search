@@ -734,6 +734,23 @@ function HomeInner() {
     };
   }, [mobileView]);
 
+  // Set body[data-swipe-mobile] when swipe view is active so global CSS can
+  // hide the Navbar + sidebar filter bar on mobile (<600px). Prefer CSS-level
+  // hiding over unmounting to keep view-switch fast (no Leaflet/grid re-init).
+  // Must run before any conditional early-return (e.g. `if (loading)`) to
+  // keep hook order stable.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (mobileView === 'swipe') {
+      document.body.setAttribute('data-swipe-mobile', '1');
+    } else {
+      document.body.removeAttribute('data-swipe-mobile');
+    }
+    return () => {
+      document.body.removeAttribute('data-swipe-mobile');
+    };
+  }, [mobileView]);
+
   // Sync state changes to URL via history.replaceState (avoids Next.js
   // navigation overhead and unnecessary re-renders).
   const isFirstRender = useRef(true);
@@ -1187,7 +1204,9 @@ function HomeInner() {
   // Chat drawer slides over from right when opened
   // -----------------------------------------------------------------------
   return (
-    <div className="relative flex flex-col lg:flex-row" style={{ height: 'calc(100dvh - 60px - env(safe-area-inset-top))' }}>
+    <div
+      className={`relative flex flex-col lg:flex-row ${isSwipeView ? 'swipe-root-height' : 'normal-root-height'}`}
+    >
       {/* Sidebar: AI search bar + filters + listing cards.
           On mobile the sidebar fills the full viewport regardless of which
           view is active — the map panel overlays it via `absolute inset-0`
@@ -1198,6 +1217,7 @@ function HomeInner() {
           components whose getImgProps is ~15ms each in dev mode). */}
       <div
         ref={sidebarRef}
+        data-swipe-sidebar={isSwipeView ? '1' : undefined}
         className={`${isSwipeView ? 'absolute top-0 left-0 right-0 z-20' : `w-full lg:w-[480px] shrink-0 max-lg:flex-1 max-lg:min-h-0`} flex flex-col`}
         style={{ borderRight: isSwipeView ? 'none' : '1px solid #2d333b' }}
       >
