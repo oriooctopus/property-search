@@ -168,6 +168,84 @@ const STATION_PULSE_STYLES = `
   }
 `;
 
+/* ------------------------------------------------------------------ */
+/*  Active-pin hero styles — dominant, multi-layer, gentle breathing   */
+/* ------------------------------------------------------------------ */
+// Design goals (see CLAUDE.md layout checks + feedback commit):
+//   - Active pin must be the unmistakable hero of the map, dominating
+//     numbered cluster bubbles (~30–44px) which otherwise outweigh it.
+//   - Three visual layers: outer soft halo, middle colored ring, inner
+//     solid dot — reads as a "target lock" rather than a radius.
+//   - Hot saturated color (#00ff88 neon green) chosen for maximum
+//     contrast against dark CARTO tiles AND the cluster bubbles (which
+//     are dark-fill / gray-border). Green also aligns with brand accent.
+//   - Gentle "breathing" pulse on OUTER halo ONLY — opacity 0.35 → 0.6
+//     and scale 1 → 1.15, 2.4s cycle. Explicitly non-blinking. User
+//     feedback said they dislike blinking; breathe must be subtle.
+//   - Rendered in markerPane (via divIcon Marker) with zIndexOffset
+//     so it always beats cluster bubbles in z-order.
+const ACTIVE_PIN_STYLES = `
+  @keyframes dw-active-pin-breathe {
+    0%, 100% {
+      opacity: 0.40;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.65;
+      transform: scale(1.12);
+    }
+  }
+  .dw-active-hero {
+    pointer-events: none;
+  }
+  .dw-active-hero__halo {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 64px;
+    height: 64px;
+    margin: -32px 0 0 -32px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,255,136,0.55) 0%, rgba(0,255,136,0.25) 45%, rgba(0,255,136,0) 75%);
+    animation: dw-active-pin-breathe 2.4s ease-in-out infinite;
+    will-change: opacity, transform;
+  }
+  .dw-active-hero__ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 28px;
+    height: 28px;
+    margin: -14px 0 0 -14px;
+    border-radius: 50%;
+    background: rgba(0, 255, 136, 0.18);
+    border: 3px solid #00ff88;
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.45),
+      0 0 12px 2px rgba(0, 255, 136, 0.65);
+  }
+  .dw-active-hero__core {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 14px;
+    height: 14px;
+    margin: -7px 0 0 -7px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  }
+  .dw-active-hero__core--saved {
+    background: #00ff88;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dw-active-hero__halo {
+      animation: none;
+      opacity: 0.55;
+    }
+  }
+`;
+
 // Static "lit" subway station marker: a steady outer glow ring and a filled
 // inner dot in the line's color. Intentionally non-animated (previously used
 // a keyframe-pulse ring which was distracting on the mini-map).
@@ -219,6 +297,33 @@ function makeStationPulseIcon(color: string): L.DivIcon {
  * Lazy init so Leaflet's L isn't touched until first render on the client
  * (MapInner is already dynamic({ ssr: false }) but defensive).
  */
+/**
+ * Hero icon for the active listing pin. Three-layer divIcon rendered in
+ * Leaflet's markerPane (above overlayPane where CircleMarkers live) with
+ * a large zIndexOffset so it always beats cluster bubbles (also in
+ * markerPane) in z-order.
+ *
+ * Two variants — one for "active & saved" where the core flips to the
+ * brand green to preserve saved-ness identity even while active.
+ * Non-interactive: the underlying CircleMarker below still handles
+ * click/hover/popup for the active listing. This icon is purely visual.
+ */
+function makeActivePinHeroIcon(saved: boolean): L.DivIcon {
+  const size = 64; // matches .dw-active-hero__halo dimensions
+  return L.divIcon({
+    className: '',
+    html: `
+      <div class="dw-active-hero" style="position:relative;width:${size}px;height:${size}px;">
+        <div class="dw-active-hero__halo"></div>
+        <div class="dw-active-hero__ring"></div>
+        <div class="dw-active-hero__core${saved ? ' dw-active-hero__core--saved' : ''}"></div>
+      </div>
+    `,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
 let heartGlyphIconCache: L.DivIcon | null = null;
 function getHeartGlyphIcon(): L.DivIcon {
   if (heartGlyphIconCache) return heartGlyphIconCache;
@@ -242,7 +347,7 @@ function InjectPopupStyles() {
     if (document.getElementById(id)) return;
     const style = document.createElement('style');
     style.id = id;
-    style.textContent = POPUP_STYLES + STATION_PULSE_STYLES;
+    style.textContent = POPUP_STYLES + STATION_PULSE_STYLES + ACTIVE_PIN_STYLES;
     document.head.appendChild(style);
     return () => {
       style.remove();
@@ -1233,7 +1338,8 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
             );
           }
 
-          // Single listing — render with Option 3 color scheme.
+          // Single listing — render with Option 3 color scheme for saved
+          // and regular pins; a new DOMINANT HERO treatment for the active pin.
           //
           // Regular pin (neither active nor saved):
           //   muted dark `#4a5568`, smaller radius, low opacity so it recedes
@@ -1244,50 +1350,55 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
           //   saved-ness is legible at tiny zoom levels and for colorblind
           //   users.
           // Active pin (isSelected):
-          //   white `#ffffff` core with a soft white outer glow. If ALSO
-          //   saved, the core is green (`#7ee787`) while the white glow is
-          //   preserved — spotlight + saved hue simultaneously.
+          //   Three-layer divIcon Marker (outer breathing halo, colored ring,
+          //   solid core) in markerPane with a high zIndexOffset so it always
+          //   renders ABOVE cluster bubbles. Neon green `#00ff88` chosen for
+          //   max contrast against both the dark map tiles and the gray-
+          //   bordered cluster bubbles. See `makeActivePinHeroIcon` and the
+          //   `ACTIVE_PIN_STYLES` keyframes. The underlying CircleMarker is
+          //   kept (hidden, tiny) so the existing `.dw-active-pin` SVG path
+          //   selector used by verify tests still resolves and so click/hover
+          //   popup handlers continue to work uniformly with the other pins.
           const listing = groupListings[0];
           const isSaved = favoritedIds.has(listing.id);
           const isSelected = listing.id === selectedId;
 
-          // Radius tuning (Option 3): regular pins shrink to 7; saved bump
-          // to 10 so they're slightly more prominent than regular; active
-          // is ~20% larger than regular (9) — the glow does most of the
-          // visual work for "this is the focused one".
+          // Radius tuning: regular pins shrink to 7; saved bump to 10 so
+          // they're slightly more prominent than regular. Active pin's
+          // visible heroics come from the divIcon overlay below; its
+          // underlying CircleMarker is kept small + fully transparent so it
+          // acts purely as a hit-target while the hero divIcon does the
+          // visual work.
           const regularRadius = 7;
           const savedRadius = 10;
-          const activeRadius = Math.round(regularRadius * 1.2); // 8–9
-          const radius = isSelected ? activeRadius : isSaved ? savedRadius : regularRadius;
+          const radius = isSelected ? regularRadius : isSaved ? savedRadius : regularRadius;
 
-          const mainFill = isSelected
-            ? (isSaved ? '#7ee787' : '#ffffff')
-            : (isSaved ? '#7ee787' : '#4a5568');
-          const mainStroke = isSelected
-            ? (isSaved ? 'rgba(126,231,135,0.5)' : '#ffffff')
-            : (isSaved ? '#7ee787' : '#4a5568');
-          const mainWeight = isSelected ? 1.5 : 1;
-          const mainOpacity = isSelected ? 1 : isSaved ? 1 : 0.75;
+          const mainFill = isSaved ? '#7ee787' : '#4a5568';
+          const mainStroke = isSaved ? '#7ee787' : '#4a5568';
+          const mainWeight = 1;
+          const mainOpacity = isSaved ? 1 : 0.75;
+          // When selected, hide the CircleMarker visuals entirely — the
+          // divIcon hero takes over. We keep the SVG path in the DOM (with
+          // `dw-active-pin` class) so tests that query it by className still
+          // find it, and so click/hover events still fire on the same layer
+          // the saved/regular pins use.
+          const pathOpacity = isSelected ? 0 : mainOpacity;
+          const pathFillOpacity = isSelected ? 0 : mainOpacity;
 
           return (
             <Fragment key={key}>
-              {/* Active-pin outer glow — a larger white circle behind the
-                  main dot, low-opacity, non-interactive. Provides the
-                  "spotlight" effect without extra DOM/CSS (pure Leaflet). */}
+              {/* Active-pin HERO — three-layer divIcon Marker above the
+                  overlayPane. High zIndexOffset guarantees it renders above
+                  cluster bubbles (also divIcon Markers in markerPane). Not
+                  interactive so clicks pass through to the CircleMarker
+                  below, keeping event wiring uniform with saved/regular. */}
               {isSelected && (
-                <CircleMarker
-                  key={`${key}__glow`}
-                  center={[listing.lat, listing.lon]}
-                  radius={activeRadius + 10}
+                <Marker
+                  key={`${key}__hero`}
+                  position={[listing.lat, listing.lon]}
+                  icon={makeActivePinHeroIcon(isSaved)}
                   interactive={false}
-                  pathOptions={{
-                    color: '#ffffff',
-                    fillColor: '#ffffff',
-                    fillOpacity: 0.25,
-                    weight: 0,
-                    opacity: 0,
-                    className: 'dw-active-glow',
-                  }}
+                  zIndexOffset={10000}
                 />
               )}
               <CircleMarker
@@ -1296,9 +1407,9 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
                 pathOptions={{
                   color: mainStroke,
                   fillColor: mainFill,
-                  fillOpacity: mainOpacity,
-                  weight: mainWeight,
-                  opacity: mainOpacity,
+                  fillOpacity: pathFillOpacity,
+                  weight: isSelected ? 0 : mainWeight,
+                  opacity: pathOpacity,
                   className: isSelected
                     ? 'dw-active-pin'
                     : isSaved
@@ -1321,8 +1432,11 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
                   of the green circle so saved-ness is visible at tiny zoom
                   levels and for colorblind users. Rendered as a
                   non-interactive divIcon Marker so it doesn't intercept
-                  clicks (the underlying CircleMarker handles those). */}
-              {isSaved && (
+                  clicks (the underlying CircleMarker handles those).
+                  Suppressed when the pin is ALSO active: the hero core
+                  flips green in that case to preserve saved-ness identity,
+                  and a 14px heart on top of a 14px core is visually muddy. */}
+              {isSaved && !isSelected && (
                 <Marker
                   key={`${key}__heart`}
                   position={[listing.lat, listing.lon]}
