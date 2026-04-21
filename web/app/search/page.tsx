@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase-browser";
 import Link from "next/link";
 
@@ -352,12 +353,17 @@ export default function SearchPage() {
               }}
             >
               {listing.photo_urls && listing.photo_urls.length > 0 && (
-                <img
-                  src={listing.photo_urls[0]}
-                  alt={listing.address}
-                  className="w-full object-cover"
-                  style={{ height: 140 }}
-                />
+                <div className="relative w-full" style={{ height: 140 }}>
+                  <Image
+                    src={listing.photo_urls[0]}
+                    alt={listing.address}
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    quality={70}
+                    loading={i < 3 ? undefined : 'lazy'}
+                    className="object-cover"
+                  />
+                </div>
               )}
 
               <div className="p-4">

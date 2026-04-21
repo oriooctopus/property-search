@@ -40,6 +40,16 @@ interface VirtualListingGridProps {
   hiddenOnMobile?: boolean;
   // Suppress the "No listings" empty-state (when an outer loader is showing)
   suppressEmptyState?: boolean;
+  // ---- Infinite scroll ----
+  // Whether more pages are available from the server.
+  hasMore?: boolean;
+  // Whether a "load more" request is currently in flight (drives the
+  // bottom-of-list spinner and suppresses duplicate triggers).
+  isLoadingMore?: boolean;
+  // Called when the user scrolls near the end of the currently-loaded list.
+  // Parent handles debounce/guards; the grid may still invoke this more than
+  // once per page so the parent must be re-entrant-safe.
+  onLoadMore?: () => void;
 }
 
 const BREAKPOINT_TWO_COL = 640; // Tailwind `sm:`
@@ -88,6 +98,9 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
       isDimmed,
       hiddenOnMobile,
       suppressEmptyState,
+      hasMore,
+      isLoadingMore,
+      onLoadMore,
     },
     ref,
   ) {
@@ -167,6 +180,43 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
     const virtualItems = virtualizer.getVirtualItems();
     const totalSize = virtualizer.getTotalSize();
 
+    // ---- Infinite scroll trigger -------------------------------------------
+    //
+    // Fire onLoadMore when the user scrolls within LOAD_MORE_ROW_THRESHOLD
+    // rows of the end of the currently-loaded data. The virtualizer re-renders
+    // on every scroll tick so this effect fires often; the parent is expected
+    // to guard against overlapping requests (via an in-flight ref).
+    //
+    // We deliberately key off the last *virtual* row index rather than a
+    // sentinel element at the bottom — the latter is always mounted in
+    // react-virtual's DOM but would add an extra measured row to the
+    // virtualizer's row-height cache.
+    //
+    // The 1.5-row threshold keeps the next page in flight before the user
+    // can reach the end of the current page at typical scroll speeds.
+    // -------------------------------------------------------------------------
+    const LOAD_MORE_ROW_THRESHOLD = 4;
+    const onLoadMoreRef = useRef(onLoadMore);
+    onLoadMoreRef.current = onLoadMore;
+    useEffect(() => {
+      if (!hasMore || isLoadingMore || !onLoadMoreRef.current) return;
+      // If client-side filters (e.g. "hide listing") removed *every* row from
+      // the current page, the virtualizer has nothing to key off — pull the
+      // next page so the grid doesn't look empty when the server still has
+      // matches upstream.
+      if (rowCount === 0) {
+        onLoadMoreRef.current();
+        return;
+      }
+      const lastItem = virtualItems[virtualItems.length - 1];
+      if (!lastItem) return;
+      if (lastItem.index >= rowCount - 1 - LOAD_MORE_ROW_THRESHOLD) {
+        onLoadMoreRef.current();
+      }
+      // virtualItems array identity changes on every scroll tick, which is
+      // what drives this effect. rowCount/hasMore/isLoadingMore gate it.
+    }, [virtualItems, rowCount, hasMore, isLoadingMore]);
+
     // Grid layout inside each virtual row
     const rowGridStyle = useMemo<React.CSSProperties>(
       () => ({
@@ -229,6 +279,7 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
                         isFavorited={wishlistedIds.has(listing.id)}
                         isHiding={hidingId === listing.id}
                         commuteInfo={commuteInfoMap?.get(listing.id)}
+                        priority={rowIndex === 0}
                         onClick={onCardSelect}
                         onStarClick={onStarClick}
                         onExpand={onExpand}
@@ -242,6 +293,18 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
           )}
 
           {/* Footers / empty states — match previous behavior */}
+          {/* Infinite-scroll bottom indicator. Sits below the virtualized
+              list so it doesn't pollute the virtualizer's row height cache. */}
+          {listings.length > 0 && (hasMore || isLoadingMore) && (
+            <div
+              className="text-center py-4 text-xs"
+              style={{ color: '#6b7280' }}
+              aria-live="polite"
+              data-testid="infinite-scroll-sentinel"
+            >
+              {isLoadingMore ? 'Loading more listings…' : ''}
+            </div>
+          )}
           {commuteMessage && !commuteLoading && (
             <div className="text-center py-4 text-xs" style={{ color: '#f0883e' }}>
               {commuteMessage}

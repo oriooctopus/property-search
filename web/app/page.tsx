@@ -80,6 +80,8 @@ function readFiltersFromParams(params: URLSearchParams): FiltersState {
     minSqft: parseNumOrNull(params.get('minSqft')),
     maxSqft: parseNumOrNull(params.get('maxSqft')),
     excludeNoSqft: params.get('excludeNoSqft') === '1',
+    minAvailableDate: params.get('minAvailableDate') || null,
+    maxAvailableDate: params.get('maxAvailableDate') || null,
     commuteRules: (() => {
       try {
         const raw = params.get('commute');
@@ -116,6 +118,8 @@ function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatM
   if (f.minSqft != null) p.set('minSqft', String(f.minSqft));
   if (f.maxSqft != null) p.set('maxSqft', String(f.maxSqft));
   if (f.excludeNoSqft) p.set('excludeNoSqft', '1');
+  if (f.minAvailableDate) p.set('minAvailableDate', f.minAvailableDate);
+  if (f.maxAvailableDate) p.set('maxAvailableDate', f.maxAvailableDate);
   if (f.commuteRules && f.commuteRules.length > 0) p.set('commute', JSON.stringify(f.commuteRules));
   if (mapPos != null) {
     p.set('lat', mapPos.lat.toFixed(4));
@@ -230,6 +234,33 @@ function HomeInner() {
   // Shared ref: BoundsWatcher skips one callback when FlyToSelected sets this
   const suppressBoundsRef = useRef(false);
 
+  // -----------------------------------------------------------------------
+  // Infinite-scroll pagination state
+  //
+  // The /api/listings/search endpoint now returns pages of up to 100 rows
+  // (instead of 2000 up-front). `listings` starts with page 1 on every
+  // filter/bounds change; subsequent pages are appended as the grid's
+  // virtualizer scrolls near the end.
+  //
+  // The map consumes the same `listings` array — so map pins grow as more
+  // pages load. We chose this over a separate full-pins endpoint because
+  // map popups expect full Listing objects (address, photos, url), and
+  // splitting the data source would double the network cost of every
+  // filter change.
+  // -----------------------------------------------------------------------
+  const PAGE_SIZE = 100;
+  const [hasMoreListings, setHasMoreListings] = useState(false);
+  const [loadingMoreListings, setLoadingMoreListings] = useState(false);
+  // Next offset to request. null = no more to load.
+  const nextOffsetRef = useRef<number | null>(null);
+  // Tracks the in-flight "load more" request so late responses can be
+  // discarded after a filter/bounds change invalidates them.
+  const loadMoreRequestRef = useRef(0);
+  // Mirror of loadingMoreListings for synchronous reads inside the callback
+  // (setState is batched / async, so checking the state value would miss
+  // rapid re-entry from the virtualizer).
+  const loadingMoreListingsRef = useRef(false);
+
   // Viewport version counter — triggers commute filter re-run after viewport loads
   const [viewportVersion, setViewportVersion] = useState(0);
 
@@ -282,6 +313,8 @@ function HomeInner() {
     } else if (typeof sel === 'string') {
       wishlistIds = [sel];
     }
+    // A new viewport/filter fetch invalidates any in-flight "load more".
+    loadMoreRequestRef.current++;
     try {
       const res = await fetch('/api/listings/search', {
         method: 'POST',
@@ -303,9 +336,12 @@ function HomeInner() {
             minSqft: currentFilters.minSqft,
             maxSqft: currentFilters.maxSqft,
             excludeNoSqft: currentFilters.excludeNoSqft,
+            minAvailableDate: currentFilters.minAvailableDate,
+            maxAvailableDate: currentFilters.maxAvailableDate,
           } : {},
           commuteRules,
-          limit: 2000,
+          limit: PAGE_SIZE,
+          offset: 0,
         }),
       });
       // Discard stale responses from superseded requests
@@ -319,6 +355,8 @@ function HomeInner() {
         commuteInfo: Record<number, { minutes: number; station: string; mode: string }>;
         total: number;
         commuteMessage: string | null;
+        hasMore?: boolean;
+        nextOffset?: number | null;
       };
       if (requestId !== viewportRequestRef.current) return;
 
@@ -386,14 +424,21 @@ function HomeInner() {
         // Null out viewport count so the badge falls back to the accurate
         // filtered count.
         setViewportCount(null);
+        // Page 1 populated — remember pagination cursor for load-more.
+        nextOffsetRef.current = data.nextOffset ?? null;
+        setHasMoreListings(Boolean(data.hasMore));
       } else if (commuteRules.length > 0) {
         // Commute filter active and nothing matched — clear listings so the
         // "no match" state is honest.
         setListings([]);
         setViewportVersion(v => v + 1);
         setViewportCount(0);
+        nextOffsetRef.current = null;
+        setHasMoreListings(false);
       } else {
-        // Empty area (no commute) — keep existing listings, update badge
+        // Empty area (no commute) — keep existing listings, update badge.
+        // Leave pagination state alone; it still reflects the last populated
+        // viewport's cursor.
         setViewportCount(0);
       }
     } catch (err) {
@@ -403,6 +448,138 @@ function HomeInner() {
         setViewportLoading(false);
         setCommuteLoading(false);
       }
+    }
+  }, []);
+
+  // ---------------------------------------------------------------------
+  // Load the next page for infinite scroll.
+  //
+  // Uses the bounds + filters + wishlist currently on screen (not a snapshot
+  // — refs are live). Appends to `listings` rather than replacing. If a
+  // filter/viewport change fires while this is in-flight, the response is
+  // discarded via `loadMoreRequestRef`.
+  // ---------------------------------------------------------------------
+  const loadMoreListings = useCallback(async () => {
+    const offset = nextOffsetRef.current;
+    if (offset == null) return;
+    const bounds = lastLoadedBounds.current;
+    if (!bounds) return;
+    // Prevent overlapping load-more requests
+    if (loadingMoreListingsRef.current) return;
+    loadingMoreListingsRef.current = true;
+    setLoadingMoreListings(true);
+    const requestId = ++loadMoreRequestRef.current;
+    const currentFilters = filtersRef.current;
+    const commuteRules = currentFilters?.commuteRules ?? [];
+    let wishlistIds: string[] | null = null;
+    const sel = selectedWishlistRef.current;
+    if (sel === 'all-saved') {
+      wishlistIds = allWishlistsRef.current.map((w) => w.id);
+    } else if (typeof sel === 'string') {
+      wishlistIds = [sel];
+    }
+    try {
+      const res = await fetch('/api/listings/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bounds,
+          wishlistIds,
+          filters: currentFilters ? {
+            selectedBeds: currentFilters.selectedBeds,
+            minBaths: currentFilters.minBaths,
+            includeNaBaths: currentFilters.includeNaBaths,
+            minRent: currentFilters.minRent,
+            maxRent: currentFilters.maxRent,
+            priceMode: currentFilters.priceMode,
+            maxListingAge: currentFilters.maxListingAge,
+            selectedSources: currentFilters.selectedSources,
+            minYearBuilt: currentFilters.minYearBuilt,
+            maxYearBuilt: currentFilters.maxYearBuilt,
+            minSqft: currentFilters.minSqft,
+            maxSqft: currentFilters.maxSqft,
+            excludeNoSqft: currentFilters.excludeNoSqft,
+            minAvailableDate: currentFilters.minAvailableDate,
+            maxAvailableDate: currentFilters.maxAvailableDate,
+          } : {},
+          commuteRules,
+          limit: PAGE_SIZE,
+          offset,
+        }),
+      });
+      if (requestId !== loadMoreRequestRef.current) return;
+      if (!res.ok) {
+        console.error('[loadMore] query error:', res.status, await res.text().catch(() => ''));
+        return;
+      }
+      const data = await res.json() as {
+        listings: Listing[];
+        commuteInfo: Record<number, { minutes: number; station: string; mode: string }>;
+        total: number;
+        commuteMessage: string | null;
+        hasMore?: boolean;
+        nextOffset?: number | null;
+      };
+      if (requestId !== loadMoreRequestRef.current) return;
+
+      const newListings = (data.listings ?? []).map((l) => ({
+        ...l,
+        lat: l.lat != null ? Number(l.lat) : null,
+        lon: l.lon != null ? Number(l.lon) : null,
+        baths: l.baths != null ? Number(l.baths) : null,
+        sqft: l.sqft != null ? Number(l.sqft) : null,
+        price: Number(l.price),
+        beds: Number(l.beds),
+        photos: Number(l.photos),
+        photo_urls: l.photo_urls ?? [],
+      }));
+
+      // Merge into the existing list, de-duping by id (defensive — the
+      // endpoint uses a stable sort with an `id` tiebreaker, but if filter
+      // state drifted between pages a duplicate is still possible).
+      if (newListings.length > 0) {
+        setListings((prev) => {
+          const seen = new Set(prev.map((l) => l.id));
+          const additions = newListings.filter((l) => !seen.has(l.id));
+          return additions.length > 0 ? [...prev, ...additions] : prev;
+        });
+
+        // Merge commute info entries for the newly appended rows.
+        if (commuteRules.length > 0 && data.commuteInfo) {
+          setCommuteInfoMap((prev) => {
+            const next = new globalThis.Map<number, CommuteInfo>(prev ?? []);
+            // Preserve route styling from the existing map
+            let routeLetter: string | undefined;
+            let routeColor: string | undefined;
+            if (prev) {
+              const firstEntry = prev.values().next().value;
+              if (firstEntry) {
+                routeLetter = firstEntry.route;
+                routeColor = firstEntry.routeColor;
+              }
+            }
+            for (const [idStr, meta] of Object.entries(data.commuteInfo)) {
+              next.set(Number(idStr), {
+                minutes: meta.minutes,
+                route: routeLetter,
+                routeColor,
+                destination: meta.station,
+              });
+            }
+            return next;
+          });
+        }
+      }
+
+      nextOffsetRef.current = data.nextOffset ?? null;
+      setHasMoreListings(Boolean(data.hasMore));
+    } catch (err) {
+      console.error('[loadMore] fetch failed:', err);
+    } finally {
+      if (requestId === loadMoreRequestRef.current) {
+        setLoadingMoreListings(false);
+      }
+      loadingMoreListingsRef.current = false;
     }
   }, []);
 
@@ -1046,6 +1223,9 @@ function HomeInner() {
                 isDimmed={filterChanging || commuteLoading}
                 hiddenOnMobile={mobileView === 'map'}
                 suppressEmptyState={listingGridLoading}
+                hasMore={hasMoreListings}
+                isLoadingMore={loadingMoreListings}
+                onLoadMore={loadMoreListings}
               />
               {listingGridLoading && (
                 <div

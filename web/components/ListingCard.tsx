@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useState, useRef, useCallback, useMemo } from 'react';
+import Image from 'next/image';
 import type { Database } from '@/lib/types';
 import { formatListedDate, formatAvailabilityDate } from '@/lib/format-date';
 import { ActionButton, IconButton, CompactStats } from '@/components/ui';
@@ -53,6 +54,9 @@ interface ListingCardProps {
   isFavorited: boolean;
   isHiding?: boolean;
   commuteInfo?: CommuteInfo;
+  /** True for cards in the first visible grid row — hints the browser to
+   *  prioritize their hero photos (LCP candidates). */
+  priority?: boolean;
   onClick: (id: number) => void;
   onStarClick: (listingId: number, anchorRect: DOMRect) => void;
   onExpand: (listing: Listing) => void;
@@ -65,6 +69,7 @@ function ListingCard({
   isFavorited,
   isHiding,
   commuteInfo,
+  priority = false,
   onClick,
   onStarClick,
   onExpand,
@@ -171,24 +176,40 @@ function ListingCard({
               transition: 'transform 300ms ease',
             }}
           >
-            {photos.map((url, idx) => (
-              <img
-                key={idx}
-                src={url}
-                alt={`${listing.address} photo ${idx + 1}`}
-                width={400}
-                height={300}
-                loading={idx === 0 ? 'eager' : 'lazy'}
-                decoding="async"
-                style={{
-                  width: `${100 / totalPhotos}%`,
-                  height: '100%',
-                  objectFit: 'cover',
-                  flexShrink: 0,
-                }}
-                draggable={false}
-              />
-            ))}
+            {photos.map((url, idx) => {
+              // Only the visible slide + its neighbor are worth fetching.
+              // Everything else stays lazy/low so off-screen slides don't
+              // steal bandwidth from the LCP.
+              const isVisible = idx === photoIndex;
+              const isNeighbor = Math.abs(idx - photoIndex) === 1;
+              const isHero = priority && idx === 0;
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    position: 'relative',
+                    width: `${100 / totalPhotos}%`,
+                    height: '100%',
+                    flexShrink: 0,
+                  }}
+                >
+                  <Image
+                    src={url}
+                    alt={`${listing.address} photo ${idx + 1}`}
+                    fill
+                    // Card is ~1 col on mobile, 2 on tablet, 3 on desktop.
+                    // Tell the optimizer the largest rendered width per breakpoint.
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    quality={70}
+                    priority={isHero}
+                    loading={isHero ? undefined : 'lazy'}
+                    fetchPriority={isHero ? 'high' : isVisible || isNeighbor ? 'auto' : 'low'}
+                    style={{ objectFit: 'cover' }}
+                    draggable={false}
+                  />
+                </div>
+              );
+            })}
             {hasMorePhotosSlide && (
               <a
                 href={listing.url}

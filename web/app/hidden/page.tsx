@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase-browser";
 import type { Database } from "@/lib/types";
 import { TextButton } from "@/components/ui";
@@ -112,12 +113,16 @@ export default function HiddenPage() {
               {/* Photo thumbnail */}
               {photo && (
                 <div
-                  className="sm:w-36 sm:h-24 w-full h-40 shrink-0"
+                  className="sm:w-36 sm:h-24 w-full h-40 shrink-0 relative"
                 >
-                  <img
+                  <Image
                     src={photo}
                     alt={listing.address}
-                    className="w-full h-full object-cover"
+                    fill
+                    sizes="(max-width: 640px) 100vw, 144px"
+                    quality={65}
+                    loading="lazy"
+                    className="object-cover"
                   />
                 </div>
               )}

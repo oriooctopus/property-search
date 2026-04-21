@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase-browser";
@@ -179,9 +180,13 @@ function ProfileInner() {
             className="group relative h-32 w-32 overflow-hidden rounded-full border-2 border-[#2d333b] transition hover:border-[#58a6ff] cursor-pointer"
           >
             {shownAvatar ? (
-              <img
+              <Image
                 src={shownAvatar}
                 alt="Avatar"
+                width={128}
+                height={128}
+                sizes="128px"
+                quality={85}
                 className="h-full w-full object-cover"
               />
             ) : (
