@@ -78,6 +78,31 @@ Production URL: **https://dwelligence.vercel.app**
 
 Vercel auto-deploys on push to `main`. Always use this URL when referencing the live site (not the auto-generated `web-seven-chi-63.vercel.app`).
 
+## MANDATORY: Typecheck Frequently
+
+Run `cd web && npx tsc --noEmit` at these checkpoints — not just before push:
+
+1. **After every implementation agent completes** — before reporting "done" to the user, before spawning verify.
+2. **Before every `git commit`** — especially when committing changes that span multiple files or touch shared types.
+3. **Before every `git push`** — always. Production deploy failures from tsc errors are unacceptable because they were catchable locally.
+4. **When the user says "deploy"** — before pushing, run tsc even if you think nothing changed; the working tree may have drifted.
+
+If tsc reports errors, stop and fix them before proceeding. Never push with failing tsc. Never assume "the agent said it was clean" — re-run it yourself. The cost of running tsc is ~5 seconds; the cost of a broken production deploy is much higher.
+
+If tsc errors appear in files you did not touch, investigate — they may be pre-existing but also may block your push. Surface them to the user loudly before deciding how to unblock.
+
+## MANDATORY: Always Follow Up on Deployments with a Background Agent
+
+After every `git push` to `main` (or any push that triggers a Vercel deploy), immediately spawn a background agent to monitor the deployment. Never consider a "deploy" done just because the push succeeded — the deploy itself must succeed.
+
+The follow-up agent must:
+1. Poll Vercel (via the Vercel MCP: `mcp__vercel__getDeployments` / `mcp__vercel__getDeploymentEvents`) until the deployment reaches a terminal state (`READY`, `ERROR`, or `CANCELED`) — with a timeout of ~5 minutes.
+2. If `READY`: hit the production URL with a curl or Playwright check to confirm it actually responds 200 and the new change is visible.
+3. If `ERROR` or `CANCELED`: pull the build events log, extract the root cause (tsc error, lint error, runtime crash, etc.), and report back with the exact file/line and error message. Never just say "deploy failed" — always surface the specific error.
+4. Report back to the main conversation with: deploy status, deploy URL, commit SHA built, verification result, and (if failed) the exact error + suggested fix.
+
+This is not optional. Production-broken-and-we-didn't-notice is worse than any other class of bug. Launch this agent via `run_in_background: true` immediately after every push, in the same response where you confirm the push.
+
 ## MANDATORY: Push and Deploy Frequently
 
 Commit and push after every batch of verified changes — don't accumulate a large backlog of uncommitted work. The user wants to see changes deployed to production quickly. After a few related fixes are verified, proactively suggest pushing. Smaller, more frequent deploys are always better than one big push at the end.

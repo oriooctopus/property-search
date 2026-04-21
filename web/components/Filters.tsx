@@ -87,6 +87,8 @@ export interface FiltersState {
   minSqft: number | null;
   maxSqft: number | null;
   excludeNoSqft: boolean;
+  minAvailableDate: string | null;
+  maxAvailableDate: string | null;
   commuteRules: CommuteRule[];
 }
 
