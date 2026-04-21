@@ -2,6 +2,7 @@
 
 import {
   forwardRef,
+  memo,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -36,8 +37,14 @@ interface VirtualListingGridProps {
   commuteLoading?: boolean;
   // Visual loading state for the grid (opacity dim during filter changes)
   isDimmed?: boolean;
-  // Hide grid (e.g. map view on mobile) — still needs to render for ref availability
-  hiddenOnMobile?: boolean;
+  /**
+   * Extra classes to apply to the grid's root scroll container. Primarily used
+   * by the parent to toggle visibility (e.g. `max-lg:hidden` when the mobile
+   * view is showing the map). Kept as a free-form className rather than a
+   * boolean prop so the grid's heavy inner markup stays behind React.memo —
+   * a boolean prop that flips on every view switch would defeat the memo.
+   */
+  containerClassName?: string;
   // Suppress the "No listings" empty-state (when an outer loader is showing)
   suppressEmptyState?: boolean;
   // ---- Infinite scroll ----
@@ -96,7 +103,7 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
       commuteMessage,
       commuteLoading,
       isDimmed,
-      hiddenOnMobile,
+      containerClassName,
       suppressEmptyState,
       hasMore,
       isLoadingMore,
@@ -231,7 +238,7 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
     return (
       <div
         ref={scrollRef}
-        className={`flex-1 overflow-y-auto dark-scrollbar min-h-0 relative z-0 ${hiddenOnMobile ? 'hidden lg:block' : 'block'}`}
+        className={`flex-1 overflow-y-auto dark-scrollbar min-h-0 relative z-0 block ${containerClassName ?? ''}`}
         style={{
           opacity: isDimmed ? 0.35 : 1,
           transition: 'opacity 150ms',
@@ -324,4 +331,9 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
   },
 );
 
-export default VirtualListingGrid;
+// Wrap in React.memo so that unrelated parent re-renders (e.g. toggling
+// between list/map views on mobile, opening a modal, etc.) don't force the
+// virtualized grid to re-evaluate its heavy JSX tree. Default memo's shallow
+// prop equality is sufficient here — every prop is a primitive, a stable
+// useCallback, or an identity-stable state reference on the parent.
+export default memo(VirtualListingGrid);

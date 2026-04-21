@@ -930,6 +930,30 @@ function HomeInner() {
   // a map marker is clicked (since the target card may not be in the DOM).
   const virtualGridRef = useRef<VirtualListingGridHandle>(null);
 
+  // Stable callbacks for <Map> — inline arrows used to force Map (and its
+  // heavy Leaflet tree) to re-render on every parent state change, including
+  // view-switches on mobile. Extracted so the Map's memo can skip re-renders
+  // when only unrelated state (filters, mobileView) changes.
+  const handleMapToggleFavorite = useCallback((id: number) => {
+    const btn = document.querySelector(`[data-action="save"][data-listing-id="${id}"]`);
+    const rect = btn?.getBoundingClientRect() ?? new DOMRect(window.innerWidth / 2, window.innerHeight / 2, 0, 0);
+    handleStarClick(id, rect);
+  }, [handleStarClick]);
+
+  const handleMapSelectDetail = useCallback((listing: Listing) => {
+    console.log(`[page] onSelectDetail called for listing #${listing.id} "${listing.address}"`);
+    setDetailListing(listing);
+  }, []);
+
+  const handleMapMarkerClick = useCallback((id: number) => {
+    setSelectedId(id);
+    if (window.innerWidth >= 1024) {
+      setTimeout(() => {
+        virtualGridRef.current?.scrollToListing(id);
+      }, 100);
+    }
+  }, []);
+
   // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
@@ -961,19 +985,28 @@ function HomeInner() {
 
   const isSwipeView = mobileView === 'swipe';
 
+  // Mobile: render the map as an absolute overlay on top of the sidebar
+  // when in map view (keeps sidebar dimensions constant → no grid resize).
+  // Desktop (≥lg): fall back to the standard side-by-side flex layout.
+  // `max-lg:hidden` hides the map on mobile list view; in map view, the
+  // absolute positioning covers the sidebar including its filter bar (the
+  // previous behavior already hid the grid content when in map view, so this
+  // is functionally equivalent from the user's perspective).
+  const mapPanelMobileClass = mobileView === 'map'
+    ? 'max-lg:absolute max-lg:inset-0 max-lg:z-10'
+    : 'max-lg:hidden';
   const mapPanel = (
-    <div className={`flex-1 relative ${mobileView === 'list' ? 'hidden lg:block' : mobileView === 'map' ? 'block' : 'hidden'}`} style={{ minHeight: 'calc(100vh - 60px - 42px)' }}>
+    <div
+      className={`flex-1 relative lg:block ${mapPanelMobileClass}`}
+      style={{ minHeight: 'calc(100vh - 60px - 42px)' }}
+    >
       <Map
         listings={filteredListings}
         selectedId={selectedId}
         favoritedIds={wishlistedIds}
         onHideListing={handleHideListing}
-        onToggleFavorite={(id) => {
-          const btn = document.querySelector(`[data-action="save"][data-listing-id="${id}"]`);
-          const rect = btn?.getBoundingClientRect() ?? new DOMRect(window.innerWidth / 2, window.innerHeight / 2, 0, 0);
-          handleStarClick(id, rect);
-        }}
-        onSelectDetail={(listing) => { console.log(`[page] onSelectDetail called for listing #${listing.id} "${listing.address}"`); setDetailListing(listing); }}
+        onToggleFavorite={handleMapToggleFavorite}
+        onSelectDetail={handleMapSelectDetail}
         commuteInfoMap={commuteInfoMap ?? undefined}
         onBoundsChange={handleBoundsChange}
         onMapMove={handleMapMove}
@@ -981,14 +1014,7 @@ function HomeInner() {
         initialCenter={initialCenter}
         initialZoom={initialZoom}
         visible={isMapView}
-        onMarkerClick={(id) => {
-          setSelectedId(id);
-          if (window.innerWidth >= 1024) {
-            setTimeout(() => {
-              virtualGridRef.current?.scrollToListing(id);
-            }, 100);
-          }
-        }}
+        onMarkerClick={handleMapMarkerClick}
       />
 
       {/* Map overlay: loading spinner */}
@@ -1157,10 +1183,17 @@ function HomeInner() {
   // -----------------------------------------------------------------------
   return (
     <div className="relative flex flex-col lg:flex-row" style={{ height: 'calc(100dvh - 60px - env(safe-area-inset-top))' }}>
-      {/* Sidebar: AI search bar + filters + listing cards */}
+      {/* Sidebar: AI search bar + filters + listing cards.
+          On mobile the sidebar fills the full viewport regardless of which
+          view is active — the map panel overlays it via `absolute inset-0`
+          when in map view, instead of being a flex sibling that takes space.
+          This keeps the VirtualListingGrid's container height constant across
+          view switches, avoiding the ResizeObserver cascade that used to
+          re-mount every visible <ListingCard> (each with ~10 Next.js <Image>
+          components whose getImgProps is ~15ms each in dev mode). */}
       <div
         ref={sidebarRef}
-        className={`${isSwipeView ? 'absolute top-0 left-0 right-0 z-20' : `w-full lg:w-[480px] shrink-0 ${mobileView === 'map' ? 'max-lg:shrink max-lg:flex-none' : ''}`} flex flex-col`}
+        className={`${isSwipeView ? 'absolute top-0 left-0 right-0 z-20' : `w-full lg:w-[480px] shrink-0 max-lg:flex-1 max-lg:min-h-0`} flex flex-col`}
         style={{ borderRight: isSwipeView ? 'none' : '1px solid #2d333b' }}
       >
         {/* AI-applied filter pills */}
@@ -1207,6 +1240,21 @@ function HomeInner() {
         <div className="relative flex-1 min-h-0 flex flex-col">
           {!isSwipeView && (
             <>
+              {/*
+                Performance note: on mobile, view switching (list↔map) used to
+                trigger a full re-render of the virtualized listing grid
+                because VirtualListingGrid took a `hiddenOnMobile` prop that
+                flipped on every switch. Each re-render re-materialized every
+                visible <ListingCard>, which ran Next.js <Image>'s getImgProps
+                per photo (dev-mode picomatch regex compile + URL parse is
+                ~15ms per image). With ~5 cards × 10 images per card that's
+                ~750ms of wasted work per switch on throttled mobile CPU.
+
+                Now the hidden class lives on an outer wrapper, so the grid's
+                props stay stable across view switches and React.memo can
+                short-circuit the re-render. See VirtualListingGrid's memo
+                equality fn and the `max-lg:hidden` class below.
+              */}
               <VirtualListingGrid
                 ref={virtualGridRef}
                 listings={filteredListings}
@@ -1221,11 +1269,11 @@ function HomeInner() {
                 commuteMessage={commuteMessage}
                 commuteLoading={commuteLoading}
                 isDimmed={filterChanging || commuteLoading}
-                hiddenOnMobile={mobileView === 'map'}
                 suppressEmptyState={listingGridLoading}
                 hasMore={hasMoreListings}
                 isLoadingMore={loadingMoreListings}
                 onLoadMore={loadMoreListings}
+                containerClassName={mobileView === 'map' ? 'max-lg:hidden' : ''}
               />
               {listingGridLoading && (
                 <div
