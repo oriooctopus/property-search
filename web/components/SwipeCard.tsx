@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect, useMemo, type ReactNode } from 'react';
+import Image from 'next/image';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { useDrag } from '@use-gesture/react';
 import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
@@ -564,20 +565,42 @@ export default function SwipeCard({
                     transition: 'transform 300ms ease',
                   }}
                 >
-                  {photos.map((url, idx) => (
-                    <img
-                      key={idx}
-                      src={url}
-                      alt={`${listing.address} photo ${idx + 1}`}
-                      style={{
-                        width: `${100 / totalPhotos}%`,
-                        height: '100%',
-                        objectFit: 'cover',
-                        flexShrink: 0,
-                      }}
-                      draggable={false}
-                    />
-                  ))}
+                  {photos.map((url, idx) => {
+                    const isVisible = idx === photoIndex;
+                    const isNeighbor = Math.abs(idx - photoIndex) === 1;
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          position: 'relative',
+                          width: `${100 / totalPhotos}%`,
+                          height: '100%',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Image
+                          src={url}
+                          alt={`${listing.address} photo ${idx + 1}`}
+                          fill
+                          // Swipe card is ~100vw on mobile, capped at ~600px desktop.
+                          sizes="(max-width: 640px) 100vw, 600px"
+                          quality={75}
+                          // First photo of the top card is the LCP candidate.
+                          priority={isTop && idx === 0}
+                          loading={isTop && idx === 0 ? undefined : 'lazy'}
+                          fetchPriority={
+                            isTop && idx === 0
+                              ? 'high'
+                              : isVisible || isNeighbor
+                              ? 'auto'
+                              : 'low'
+                          }
+                          style={{ objectFit: 'cover' }}
+                          draggable={false}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Arrow buttons */}

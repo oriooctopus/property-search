@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import Image from 'next/image';
 import type { Database } from '@/lib/types';
 import { ActionButton, IconButton } from '@/components/ui';
 import { formatShortDate } from '@/lib/format-date';
@@ -125,7 +126,14 @@ export default function ListingDetail({
   const [linkCopied, setLinkCopied] = useState(false);
   const photos = listing.photo_urls ?? [];
   const pricePerBed = listing.beds > 0 ? Math.round(listing.price / listing.beds) : null;
-  const commuteDest = getCommuteDestination(commuteRules, listing.lat, listing.lon);
+  // Resolving a commute destination for a subway-line rule walks ~467 subway
+  // stations. Memoize on the exact inputs so unrelated re-renders (scrolling,
+  // hover state on the parent) don't redo the work. Also gives
+  // CommuteItinerary a stable object to diff against.
+  const commuteDest = useMemo(
+    () => getCommuteDestination(commuteRules, listing.lat, listing.lon),
+    [commuteRules, listing.lat, listing.lon],
+  );
 
   // Nearest subway station (same data source used for "Nearest Subway" card below).
   // Memoized so we don't iterate all ~467 stations on every render.
@@ -213,13 +221,24 @@ export default function ListingDetail({
               }}
             >
               {photos.map((url, i) => (
-                <img
+                <div
                   key={i}
-                  src={url}
-                  alt={`Photo ${i + 1}`}
-                  className="snap-start shrink-0 w-full object-cover rounded-t-xl"
+                  className="snap-start shrink-0 w-full relative rounded-t-xl overflow-hidden"
                   style={{ height: 300 }}
-                />
+                >
+                  <Image
+                    src={url}
+                    alt={`Photo ${i + 1}`}
+                    fill
+                    // Modal caps at max-w-lg (512px) plus mobile up to 100vw.
+                    sizes="(max-width: 640px) 100vw, 512px"
+                    quality={80}
+                    priority={i === 0}
+                    loading={i === 0 ? undefined : 'lazy'}
+                    fetchPriority={i === 0 ? 'high' : i <= photoIndex + 1 ? 'auto' : 'low'}
+                    style={{ objectFit: 'cover' }}
+                  />
+                </div>
               ))}
             </div>
             {/* Left arrow */}
@@ -345,6 +364,9 @@ export default function ListingDetail({
           {/* Dates info */}
           <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4 text-xs" style={{ color: '#8b949e' }}>
             <span>Listed: {formatShortDate(listing.list_date ?? listing.created_at)}</span>
+            {listing.availability_date && (
+              <span>Move-in: {formatShortDate(listing.availability_date)}</span>
+            )}
           </div>
 
           {/* Details grid */}

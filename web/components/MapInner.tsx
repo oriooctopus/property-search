@@ -26,6 +26,19 @@ const LINE_COLORS: Record<string, string> = {
   'S': '#808183',
 };
 
+/**
+ * Route an external photo URL through Vercel's Image Optimization endpoint
+ * (`/_next/image?url=<src>&w=<width>&q=<quality>`) so we benefit from AVIF/WebP
+ * negotiation and width-appropriate variants even inside Leaflet popups where
+ * next/image's React component can't be used (popup content is `innerHTML`).
+ *
+ * Falls back to the raw URL if rewriting would fail (e.g. non-http URL).
+ */
+function optimizedPhotoUrl(src: string, width: number, quality = 70): string {
+  if (!src || !/^https?:\/\//.test(src)) return src;
+  return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=${quality}`;
+}
+
 function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
@@ -413,8 +426,10 @@ function buildPopupContent(listing: Listing, isFavorited: boolean, _isWouldLive:
       ">
         <img
           data-photo-img
-          src="${escapeHtml(photos[0])}"
+          src="${escapeHtml(optimizedPhotoUrl(photos[0], 320, 65))}"
           alt=""
+          loading="lazy"
+          decoding="async"
           data-photo-index="0"
           data-photo-urls="${escapeHtml(JSON.stringify(photos))}"
           style="
@@ -709,19 +724,32 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
   // Fall back to a local ref if the caller doesn't provide one
   const localSuppressBoundsRef = useRef(false);
   const suppressBoundsRef = suppressBoundsRefProp ?? localSuppressBoundsRef;
-  // Supabase returns numeric columns as strings — coerce to numbers
-  const validListings = listings
-    .map((l) => ({ ...l, lat: Number(l.lat), lon: Number(l.lon) }))
-    .filter((l) => !isNaN(l.lat) && !isNaN(l.lon) && l.lat !== 0 && l.lon !== 0);
+  // Supabase returns numeric columns as strings — coerce to numbers.
+  // Memoized so unrelated parent re-renders don't invalidate downstream
+  // cluster memos (coordGroups / renderGroups depend on this).
+  const validListings = useMemo(
+    () =>
+      listings
+        .map((l) => ({ ...l, lat: Number(l.lat), lon: Number(l.lon) }))
+        .filter((l) => !isNaN(l.lat) && !isNaN(l.lon) && l.lat !== 0 && l.lon !== 0),
+    [listings],
+  );
 
-  const selectedListing = validListings.find((l) => l.id === selectedId);
+  const selectedListing = useMemo(
+    () => validListings.find((l) => l.id === selectedId),
+    [validListings, selectedId],
+  );
 
-  const computedCenter: [number, number] = validListings.length > 0
-    ? [
-        validListings.reduce((s, l) => s + l.lat, 0) / validListings.length,
-        validListings.reduce((s, l) => s + l.lon, 0) / validListings.length,
-      ]
-    : [40.7128, -74.006];
+  const computedCenter = useMemo<[number, number]>(
+    () =>
+      validListings.length > 0
+        ? [
+            validListings.reduce((s, l) => s + l.lat, 0) / validListings.length,
+            validListings.reduce((s, l) => s + l.lon, 0) / validListings.length,
+          ]
+        : [40.7128, -74.006],
+    [validListings],
+  );
 
   // Use URL-provided initial position if valid, otherwise fall back to listing average
   const center: [number, number] = initialCenter ?? computedCenter;
@@ -853,7 +881,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
                 const total = urls.length;
                 if (total > 0) {
                   idx = action === 'photo-prev' ? (idx - 1 + total) % total : (idx + 1) % total;
-                  img.src = urls[idx];
+                  img.src = optimizedPhotoUrl(urls[idx], 320, 65);
                   img.setAttribute('data-photo-index', String(idx));
                   if (counter) counter.textContent = `${idx + 1}/${total}`;
                 }

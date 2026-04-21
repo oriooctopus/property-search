@@ -46,6 +46,8 @@ interface SearchFilters {
   minSqft?: number | null;
   maxSqft?: number | null;
   excludeNoSqft?: boolean;
+  minAvailableDate?: string | null;
+  maxAvailableDate?: string | null;
 }
 
 interface SearchRequest {
@@ -54,8 +56,22 @@ interface SearchRequest {
   commuteRules?: CommuteRule[] | null;
   /** When provided, restrict results to listings that appear in ANY of these wishlists. */
   wishlistIds?: string[] | null;
+  /**
+   * Page size for offset-based pagination. Defaults to DEFAULT_PAGE_LIMIT (100).
+   * Capped at MAX_PAGE_LIMIT (200) to keep payloads small. Legacy callers that
+   * passed `limit: 2000` to get "everything" now receive only the first page —
+   * use `offset` to paginate.
+   */
   limit?: number;
+  /** Offset for pagination. Defaults to 0. */
+  offset?: number;
 }
+
+// Pagination bounds — initial payload is ~100 rows so the grid renders
+// quickly; subsequent pages are loaded as the user scrolls. Cap each page
+// at 200 to keep client-side network I/O predictable.
+const DEFAULT_PAGE_LIMIT = 100;
+const MAX_PAGE_LIMIT = 200;
 
 const MAX_AGE_MS: Record<string, number> = {
   "1h": 3_600_000,
@@ -85,7 +101,7 @@ const LISTING_SELECT = [
   "id", "address", "area", "price", "beds", "baths", "sqft",
   "lat", "lon", "transit_summary", "photo_urls", "url",
   "list_date", "last_update_date", "source", "year_built",
-  "photos", "created_at",
+  "photos", "created_at", "availability_date",
 ].join(", ");
 
 // Supabase query builder type is complex; use any locally to avoid
@@ -164,6 +180,15 @@ function applyBoundsAndFilters(
   if (filters.minSqft != null) q = q.gte("sqft", filters.minSqft);
   if (filters.maxSqft != null) q = q.lte("sqft", filters.maxSqft);
 
+  // Move-in / availability date. When either bound is set, exclude listings
+  // with NULL availability_date (otherwise the filter would silently let
+  // unknown-availability rows through).
+  if (filters.minAvailableDate || filters.maxAvailableDate) {
+    q = q.not("availability_date", "is", null);
+    if (filters.minAvailableDate) q = q.gte("availability_date", filters.minAvailableDate);
+    if (filters.maxAvailableDate) q = q.lte("availability_date", filters.maxAvailableDate);
+  }
+
   // Scam filter (matches client): per-room < $800 is spam. Keep beds=0.
   // Expressed as: beds = 0 OR price >= beds * 800. The latter is hard in
   // PostgREST so we filter in JS after fetch (it's cheap on 2000 rows).
@@ -196,7 +221,11 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as SearchRequest;
     const filters: SearchFilters = body.filters ?? {};
     const bounds = body.bounds ?? null;
-    const limit = Math.min(Math.max(body.limit ?? 2000, 1), 5000);
+    const limit = Math.min(
+      Math.max(body.limit ?? DEFAULT_PAGE_LIMIT, 1),
+      MAX_PAGE_LIMIT,
+    );
+    const offset = Math.max(body.offset ?? 0, 0);
     const commuteRules = body.commuteRules ?? null;
     const wishlistIds = body.wishlistIds ?? null;
 
@@ -212,6 +241,8 @@ export async function POST(request: NextRequest) {
           commuteInfo: {},
           total: 0,
           commuteMessage: null,
+          hasMore: false,
+          nextOffset: null,
         });
       }
       const { data: items, error: itemsErr } = await supabase
@@ -229,6 +260,8 @@ export async function POST(request: NextRequest) {
           commuteInfo: {},
           total: 0,
           commuteMessage: null,
+          hasMore: false,
+          nextOffset: null,
         });
       }
     }
@@ -246,6 +279,8 @@ export async function POST(request: NextRequest) {
         commuteInfo: {},
         total: 0,
         commuteMessage: resolvedCommute.message,
+        hasMore: false,
+        nextOffset: null,
       });
     }
 
@@ -267,6 +302,8 @@ export async function POST(request: NextRequest) {
             commuteInfo: {},
             total: 0,
             commuteMessage: resolvedCommute.message,
+            hasMore: false,
+            nextOffset: null,
           });
         }
       }
@@ -274,60 +311,55 @@ export async function POST(request: NextRequest) {
 
     const commuteIds = effectiveIds;
 
-    // ---- 2. Build and run the listings query.
+    // ---- 2. Build and run the listings query (offset + limit pagination).
+    //
+    // The `last_update_date` + `created_at` sort can produce ties (e.g. many
+    // rows with NULL last_update_date), so we include a stable tiebreaker on
+    // `id` to make offset pagination deterministic — the same (filters, sort)
+    // combo applied with different offsets will never double-count or skip
+    // rows.
     let rows: Listing[] = [];
+    // Raw row count before JS-side scam / per-room filtering. We use this to
+    // compute `hasMore`: if we got a full page back from Supabase there's
+    // almost certainly more upstream, regardless of how many rows survived
+    // JS filtering.
+    let rawRowCount = 0;
 
     if (commuteIds === null) {
-      // Page through results — PostgREST caps each response at ~1000 rows
-      // regardless of .limit(), so use .range() to fetch up to `limit`.
-      // The `last_update_date` + `created_at` sort can produce ties (e.g. many
-      // rows with NULL last_update_date), so we add a stable tiebreaker on
-      // `id` to avoid the same row appearing on consecutive pages — which
-      // would produce duplicate React keys in the list.
-      const PAGE_SIZE = 1000;
-      const seen = new Set<number>();
-      for (let page = 0; rows.length < limit; page++) {
-        const from = page * PAGE_SIZE;
-        const to = Math.min(from + PAGE_SIZE - 1, limit - 1);
-        if (from > to) break;
-        let pageQ: any = supabase
-          .from("listings")
-          .select(LISTING_SELECT)
-          .order("last_update_date", { ascending: false, nullsFirst: false })
-          .order("created_at", { ascending: false })
-          .order("id", { ascending: true })
-          .range(from, to);
-        pageQ = applyBoundsAndFilters(pageQ, bounds, filters);
-        const { data, error } = await pageQ;
-        if (error) {
-          console.error("[listings-search] query error:", error.message);
-          return NextResponse.json({ error: error.message }, { status: 500 });
-        }
-        const pageRows = (data ?? []) as Listing[];
-        for (const r of pageRows) {
-          if (!seen.has(r.id)) {
-            seen.add(r.id);
-            rows.push(r);
-          }
-        }
-        if (pageRows.length < PAGE_SIZE) break;
+      let pageQ: any = supabase
+        .from("listings")
+        .select(LISTING_SELECT)
+        .order("last_update_date", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(offset, offset + limit - 1);
+      pageQ = applyBoundsAndFilters(pageQ, bounds, filters);
+      const { data, error } = await pageQ;
+      if (error) {
+        console.error("[listings-search] query error:", error.message);
+        return NextResponse.json({ error: error.message }, { status: 500 });
       }
+      rows = (data ?? []) as Listing[];
+      rawRowCount = rows.length;
     } else {
-      // Commute rules resolved — intersect via .in('id', …). Supabase caps
-      // the length of an IN clause well above what we'll hit (tens of
-      // thousands), but we'll still batch to be safe and merge.
+      // Commute rules resolved — intersect via .in('id', …). We fetch all
+      // matching rows across chunks, sort client-side (since .in() shuffles
+      // order), then apply offset/limit to the sorted set. Commute-filtered
+      // result sets are typically small (hundreds, not thousands) so this
+      // is cheap.
       const ids = [...commuteIds];
       const CHUNK = 500;
       const seen = new Set<number>();
-      for (let i = 0; i < ids.length && rows.length < limit; i += CHUNK) {
+      const allRows: Listing[] = [];
+      for (let i = 0; i < ids.length; i += CHUNK) {
         const chunk = ids.slice(i, i + CHUNK);
         let chunkQ: any = supabase
           .from("listings")
           .select(LISTING_SELECT)
           .order("last_update_date", { ascending: false, nullsFirst: false })
           .order("created_at", { ascending: false })
-          .in("id", chunk)
-          .limit(limit);
+          .order("id", { ascending: true })
+          .in("id", chunk);
         chunkQ = applyBoundsAndFilters(chunkQ, bounds, filters);
         const { data, error } = await chunkQ;
         if (error) {
@@ -337,18 +369,25 @@ export async function POST(request: NextRequest) {
         for (const r of (data ?? []) as Listing[]) {
           if (!seen.has(r.id)) {
             seen.add(r.id);
-            rows.push(r);
+            allRows.push(r);
           }
         }
       }
       // Re-sort after merging chunks (same order clause as the single-shot path).
-      rows.sort((a, b) => {
+      allRows.sort((a, b) => {
         const ad = a.last_update_date ?? a.created_at ?? "";
         const bd = b.last_update_date ?? b.created_at ?? "";
-        return bd.localeCompare(ad);
+        const cmp = bd.localeCompare(ad);
+        if (cmp !== 0) return cmp;
+        return a.id - b.id;
       });
-      if (rows.length > limit) rows = rows.slice(0, limit);
+      rawRowCount = Math.max(0, Math.min(limit, allRows.length - offset));
+      rows = allRows.slice(offset, offset + limit);
     }
+
+    // Did Supabase give us a full page? If so, assume there's more.
+    const hasMore = rawRowCount >= limit;
+    const nextOffset = hasMore ? offset + rawRowCount : null;
 
     // ---- 3. Apply the JS-side filters (perRoom pricing, scam filter).
     rows = applyJsFilters(rows, filters);
@@ -373,8 +412,14 @@ export async function POST(request: NextRequest) {
       {
         listings: trimmedRows,
         commuteInfo,
+        // `total` is the size of *this page* after JS filtering — not the
+        // full result-set size. Kept for backwards compatibility with
+        // existing callers; paginated UIs should rely on `hasMore` /
+        // `nextOffset` rather than accumulating `total`.
         total: trimmedRows.length,
         commuteMessage: resolvedCommute.message,
+        hasMore,
+        nextOffset,
       },
       {
         headers: {

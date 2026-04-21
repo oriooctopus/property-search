@@ -32,8 +32,33 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Preconnect to the image CDNs that serve listing photos. These three hosts
+  // cover ~100% of photo traffic (Zillow ~90%, Craigslist ~8%, Supabase ~2%).
+  // crossOrigin is set to "anonymous" since browsers treat <img> loads as
+  // anonymous CORS by default — mismatched crossorigin attrs on preconnect
+  // get ignored, so this must match the eventual fetch mode.
   return (
     <html lang="en">
+      <head>
+        <link
+          rel="preconnect"
+          href="https://photos.zillowstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link rel="dns-prefetch" href="https://photos.zillowstatic.com" />
+        <link
+          rel="preconnect"
+          href="https://images.craigslist.org"
+          crossOrigin="anonymous"
+        />
+        <link rel="dns-prefetch" href="https://images.craigslist.org" />
+        <link
+          rel="preconnect"
+          href="https://vlzqdeisrngovqpbtsgi.supabase.co"
+          crossOrigin="anonymous"
+        />
+        <link rel="dns-prefetch" href="https://vlzqdeisrngovqpbtsgi.supabase.co" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen`}
         style={{ backgroundColor: "#0f1117", color: "#e1e4e8" }}

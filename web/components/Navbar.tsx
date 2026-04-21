@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase-browser";
@@ -145,9 +146,13 @@ export default function Navbar() {
                 title={user.email ?? ""}
               >
                 {avatarUrl ? (
-                  <img
+                  <Image
                     src={avatarUrl}
                     alt="Avatar"
+                    width={32}
+                    height={32}
+                    sizes="32px"
+                    quality={80}
                     className="h-full w-full object-cover"
                   />
                 ) : (
