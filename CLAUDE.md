@@ -103,9 +103,22 @@ The follow-up agent must:
 
 This is not optional. Production-broken-and-we-didn't-notice is worse than any other class of bug. Launch this agent via `run_in_background: true` immediately after every push, in the same response where you confirm the push.
 
-## MANDATORY: Push and Deploy Frequently
+## MANDATORY: Auto-Deploy After Verified Changes
 
-Commit and push after every batch of verified changes — don't accumulate a large backlog of uncommitted work. The user wants to see changes deployed to production quickly. After a few related fixes are verified, proactively suggest pushing. Smaller, more frequent deploys are always better than one big push at the end.
+Do NOT wait for the user to say "deploy" or "push". As soon as a change is verified (verify agent PASS + tsc clean), automatically:
+
+1. Commit the change with a descriptive message.
+2. Push to `main`.
+3. Spawn the deploy-monitor background agent (see below).
+
+Multiple related fixes can be bundled into one commit if they were verified together, but do not let verified work sit uncommitted waiting for user approval. The user has pre-authorized shipping verified changes — treat auto-deploy as the default workflow, not an opt-in action.
+
+Exceptions (ask first):
+- The change is on a non-`main` branch the user asked you to preserve.
+- Another agent is actively working in the same files (merge conflict risk) — wait for it to finish.
+- The work is an explicit plan or draft the user said they want to review before shipping.
+
+Smaller, more frequent deploys are always better than one big push at the end. If multiple fixes are in flight across parallel agents, deploy them as each one lands — don't batch them unless they are genuinely interdependent.
 
 ## Test Credentials
 
