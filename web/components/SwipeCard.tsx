@@ -119,6 +119,10 @@ interface SwipeCardProps {
   /** Optional leading slot in the card footer (left of "View on <source>"). Used on
    *  mobile to render the "Save to: <wishlist> ▾" control inline in the card. */
   footerLeadingSlot?: ReactNode;
+  /** When true, render the mobile B2 compact layout: shorter photo (165px),
+   *  no address/area header, no subway section. Only affects viewports <600px
+   *  via responsive classes; desktop still shows the full card. */
+  compactMobile?: boolean;
 }
 
 const SWIPE_X_THRESHOLD = 100;
@@ -138,6 +142,7 @@ export default function SwipeCard({
   onDragStateChange,
   resetRef,
   footerLeadingSlot,
+  compactMobile = false,
 }: SwipeCardProps) {
   const [photoIndex, setPhotoIndex] = useState(0);
   const [photoFocused, setPhotoFocused] = useState(false);
@@ -390,9 +395,12 @@ export default function SwipeCard({
   if (layoutOnly) {
     return (
       <div className="rounded-2xl overflow-hidden flex flex-col" style={{ backgroundColor: 'rgba(28, 32, 40, 0.97)', border: '1px solid #2d333b', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
-        <div className="w-full flex-shrink-0" style={{ height: 220, backgroundColor: '#0d1117' }} />
+        <div
+          className={`w-full flex-shrink-0 ${compactMobile ? 'h-[165px] min-[600px]:h-[220px]' : 'h-[220px]'}`}
+          style={{ backgroundColor: '#0d1117' }}
+        />
         <div className="px-5 py-4 flex flex-col gap-3">
-          <div>
+          <div className={compactMobile ? 'hidden min-[600px]:block' : ''}>
             <div className="text-base font-semibold leading-snug" style={{ color: '#c9d1d9' }}>{listing.address}</div>
             <div className="text-sm mt-0.5" style={{ color: '#8b949e' }}>{listing.area}</div>
           </div>
@@ -419,10 +427,16 @@ export default function SwipeCard({
             <div className="text-sm" style={{ color: '#8b949e' }}>Built {listing.year_built}</div>
           )}
           {(listing.transit_summary || (listing.lat != null && listing.lon != null && getClosestStations(listing.lat as number, listing.lon as number, 2).length > 0)) && (
-            <div style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }} />
+            <div
+              className={compactMobile ? 'hidden min-[600px]:block' : ''}
+              style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }}
+            />
           )}
           {listing.transit_summary && (
-            <div className="flex items-start gap-2 text-sm rounded-lg px-3 py-2.5" style={{ backgroundColor: '#161b22', border: '1px solid #2d333b', color: '#8b949e' }}>
+            <div
+              className={`flex items-start gap-2 text-sm rounded-lg px-3 py-2.5 ${compactMobile ? 'hidden min-[600px]:flex' : ''}`}
+              style={{ backgroundColor: '#161b22', border: '1px solid #2d333b', color: '#8b949e' }}
+            >
               <span>{listing.transit_summary}</span>
             </div>
           )}
@@ -430,7 +444,10 @@ export default function SwipeCard({
             const stations = getClosestStations(listing.lat as number, listing.lon as number, 2);
             if (stations.length === 0) return null;
             return (
-              <div className="rounded-lg px-3 py-2.5 flex flex-col gap-2" style={{ backgroundColor: '#161b22', border: '1px solid #2d333b' }}>
+              <div
+                className={`rounded-lg px-3 py-2.5 flex flex-col gap-2 ${compactMobile ? 'hidden min-[600px]:flex' : ''}`}
+                style={{ backgroundColor: '#161b22', border: '1px solid #2d333b' }}
+              >
                 <div className="text-[10px] uppercase tracking-wider font-medium" style={{ color: '#8b949e' }}>Nearest Subway</div>
                 {stations.map(({ station, distMi }) => (
                   <div key={station.stopId} className="flex items-center gap-2">
@@ -543,9 +560,8 @@ export default function SwipeCard({
           {/* Photo carousel */}
           <div
             ref={photoAreaRef}
-            className="relative w-full overflow-hidden flex-shrink-0"
+            className={`relative w-full overflow-hidden flex-shrink-0 ${compactMobile ? 'h-[165px] min-[600px]:h-[220px]' : 'h-[220px]'}`}
             style={{
-              height: 220,
               outline: photoFocused ? '2px solid rgba(88,166,255,0.7)' : 'none',
               outlineOffset: '-2px',
               cursor: totalPhotos > 1 ? 'pointer' : 'default',
@@ -706,8 +722,8 @@ export default function SwipeCard({
 
           {/* Detail content */}
           <div className="px-5 py-4 flex flex-col gap-3">
-            {/* Address + area */}
-            <div>
+            {/* Address + area — hidden on mobile in compactMobile mode */}
+            <div className={compactMobile ? 'hidden min-[600px]:block' : ''}>
               <div className="text-base font-semibold leading-snug" style={{ color: '#c9d1d9' }}>
                 {listing.address}
               </div>
@@ -781,15 +797,18 @@ export default function SwipeCard({
               </div>
             )}
 
-            {/* Divider: stats section → transit/subway */}
+            {/* Divider: stats section → transit/subway — hidden on mobile in compactMobile */}
             {(listing.transit_summary || nearbyStations.length > 0) && (
-              <div style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }} />
+              <div
+                className={compactMobile ? 'hidden min-[600px]:block' : ''}
+                style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }}
+              />
             )}
 
-            {/* Transit summary */}
+            {/* Transit summary — hidden on mobile in compactMobile */}
             {listing.transit_summary && (
               <div
-                className="flex items-start gap-2 text-sm rounded-lg px-3 py-2.5"
+                className={`flex items-start gap-2 text-sm rounded-lg px-3 py-2.5 ${compactMobile ? 'hidden min-[600px]:flex' : ''}`}
                 style={{ backgroundColor: '#161b22', border: '1px solid #2d333b', color: '#8b949e' }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 2 }}>
@@ -800,10 +819,10 @@ export default function SwipeCard({
               </div>
             )}
 
-            {/* Nearest subway stations */}
+            {/* Nearest subway stations — hidden on mobile in compactMobile */}
             {nearbyStations.length > 0 && (
               <div
-                className="rounded-lg px-3 py-2.5 flex flex-col gap-2"
+                className={`rounded-lg px-3 py-2.5 flex flex-col gap-2 ${compactMobile ? 'hidden min-[600px]:flex' : ''}`}
                 style={{ backgroundColor: '#161b22', border: '1px solid #2d333b' }}
                 onMouseLeave={() => onSubwayHover?.(null)}
               >
