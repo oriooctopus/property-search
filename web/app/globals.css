@@ -174,7 +174,7 @@ body {
      top:76px, bottom:0, full width of the 440px column — original behavior
      (unchanged from pre-Option-D). */
 .swipe-detail-panel {
-  top: 42vh;
+  top: 38vh;
   left: 12px;
   right: 12px;
   bottom: calc(env(safe-area-inset-bottom) + 88px);
