@@ -1,0 +1,24 @@
+# Node
+node_modules/
+
+# iOS / Xcode / CocoaPods
+ios/App/Pods/
+ios/App/Podfile.lock
+ios/DerivedData/
+ios/App/build/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/App.xcodeproj/xcuserdata/
+ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/
+ios/App/output/
+ios/capacitor-cordova-ios-plugins/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Misc
+.env
+.env.local
