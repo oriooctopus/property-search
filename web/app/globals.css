@@ -148,16 +148,63 @@ body {
   border-color: var(--src-color) !important;
 }
 
-/* Swipe detail panel — reserve top space for the filter bar on mobile,
-   plus the 45vh mobile mini-map above the swipe card (Option B2 layout).
-   The `--swipe-top-inset` CSS variable is set inline from SwipeView based
-   on the measured sidebar height. On desktop (≥600px) we fall back to the
-   fixed 76px offset that the previous layout used. */
+/* Root container heights for the unified page layout. On mobile swipe view
+   we hide the global Navbar (see data-swipe-mobile rule below), so the
+   swipe-root-height class uses the full viewport. Desktop (≥600px) keeps
+   the 60px reservation because the Navbar stays visible there. */
+.normal-root-height {
+  height: calc(100dvh - 60px - env(safe-area-inset-top));
+}
+.swipe-root-height {
+  height: calc(100dvh - env(safe-area-inset-top));
+}
+@media (min-width: 600px) {
+  .swipe-root-height {
+    height: calc(100dvh - 60px - env(safe-area-inset-top));
+  }
+}
+
+/* Swipe detail panel.
+   Mobile (<600px, Option D floating card): floats in the middle-lower
+     portion of the viewport with 12px horizontal gutters. Top starts at
+     42vh so the map shows full-bleed above. Bottom stops 88px above the
+     screen edge so the action pill (bottom: 12px + safe-area, height: 52px)
+     has ~24px of map visible between card bottom and pill.
+   Desktop (≥600px): right-anchored 440px column under the 60px top nav,
+     top:76px, bottom:0, full width of the 440px column — original behavior
+     (unchanged from pre-Option-D). */
 .swipe-detail-panel {
-  top: calc(var(--swipe-top-inset, 0px) + 45vh);
+  top: 42vh;
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom) + 88px);
+  width: auto;
 }
 @media (min-width: 600px) {
   .swipe-detail-panel {
     top: 76px;
+    left: auto;
+    right: 0;
+    bottom: 0;
+    width: 440px;
+  }
+}
+
+/* Mobile swipe view — hide the global Navbar and the sidebar filter bar.
+   The floating nav pill + Filters pill inside SwipeView replaces them.
+   Desktop (≥600px) keeps its normal layout. Using CSS (not unmount) so
+   toggling views stays fast (no ListingGrid remount / Leaflet re-init). */
+body[data-swipe-mobile="1"] nav[data-global-nav="1"] {
+  display: none;
+}
+body[data-swipe-mobile="1"] [data-swipe-sidebar="1"] {
+  display: none !important;
+}
+@media (min-width: 600px) {
+  body[data-swipe-mobile="1"] nav[data-global-nav="1"] {
+    display: flex;
+  }
+  body[data-swipe-mobile="1"] [data-swipe-sidebar="1"] {
+    display: flex !important;
   }
 }
