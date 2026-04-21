@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     .from("listings")
     .select("*")
     .is("delisted_at", null)
+    .neq("source", "facebook-marketplace")
     .gte("created_at", since);
 
   if (listingsError) {

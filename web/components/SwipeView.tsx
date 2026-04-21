@@ -562,7 +562,6 @@ export default function SwipeView({
             initialZoom={initialZoom}
             visible={true}
             commuteInfoMap={commuteInfoMap}
-            panOffset={{ x: 210, y: 0 }}
             hoveredStation={hoveredStation}
           />
         </div>
@@ -595,16 +594,17 @@ export default function SwipeView({
               favoritedIds={EMPTY_FAVORITES}
               onHideListing={() => {}}
               // Wire bounds/move callbacks so user-initiated pan/zoom on the
-              // mini-map re-queries listings for the new viewport. Programmatic
-              // recenters triggered by swiping to a new card are suppressed by
-              // `suppressBoundsRef` inside MapInner's FlyToSelected.
+              // mini-map re-queries listings for the new viewport. Swiping to
+              // a new card does NOT move the map (auto-recenter removed), so
+              // bounds-watcher events are always from real user gestures.
               onBoundsChange={onBoundsChange}
               onMapMove={(center, zoom) => { mapCenterRef.current = center; onMapMove?.(center, zoom); }}
               suppressBoundsRef={suppressBoundsRef}
-              // Instant (no flyTo animation) re-center when the active listing
-              // changes — prevents the pin from briefly appearing far from the
-              // map's visible area during the ~800ms flyTo animation.
-              instantRecenter
+              // NOTE: No programmatic re-centering when the active listing
+              // changes. The map viewport is controlled ONLY by user gestures
+              // (drag / scroll-wheel / pinch) or explicit reset actions.
+              // Swiping to a new card highlights the matching pin but does
+              // NOT pan the map.
               visible={true}
               commuteInfoMap={commuteInfoMap}
               initialCenter={currentListing?.lat && currentListing?.lon ? [currentListing.lat, currentListing.lon] : initialCenter}

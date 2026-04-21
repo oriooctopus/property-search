@@ -63,6 +63,25 @@ function getActiveFilters(filters: FiltersState): FilterPillData[] {
   if (filters.excludeNoSqft) {
     pills.push({ key: 'excludeNoSqft', label: 'Has sqft' });
   }
+  if (filters.minAvailableDate !== null || filters.maxAvailableDate !== null) {
+    const fmt = (iso: string) => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+      if (!m) return iso;
+      const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      return Number.isNaN(d.getTime())
+        ? iso
+        : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
+    let label: string;
+    if (filters.minAvailableDate && filters.maxAvailableDate) {
+      label = `Move-in: ${fmt(filters.minAvailableDate)}–${fmt(filters.maxAvailableDate)}`;
+    } else if (filters.maxAvailableDate) {
+      label = `Move-in by ${fmt(filters.maxAvailableDate)}`;
+    } else {
+      label = `Move-in after ${fmt(filters.minAvailableDate!)}`;
+    }
+    pills.push({ key: 'minAvailableDate', label });
+  }
 
   return pills;
 }
@@ -85,6 +104,8 @@ function getDefaultValue(key: keyof FiltersState): FiltersState[keyof FiltersSta
     case 'maxYearBuilt':
     case 'minSqft':
     case 'maxSqft':
+    case 'minAvailableDate':
+    case 'maxAvailableDate':
       return null;
     default:
       return null;

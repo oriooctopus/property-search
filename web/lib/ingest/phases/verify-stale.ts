@@ -151,12 +151,19 @@ export async function runVerifyStalePhase(
       }
     });
 
+    let sourceUnknown = 0;
     for (const applied of results) {
       const outcome = await applyResult(deps.supabase, applied, deps.dryRun);
       if (outcome === "active") summary.activeConfirmed++;
       else if (outcome === "delisted") summary.delistedConfirmed++;
-      else if (outcome === "unknown") summary.unknown++;
+      else if (outcome === "unknown") { summary.unknown++; sourceUnknown++; }
       else summary.errors++;
+    }
+
+    if (sourceUnknown === rows.length && rows.length > 0) {
+      log.warn(
+        `WARNING: all ${rows.length} candidates for ${src} returned unknown — verifier may be a stub`,
+      );
     }
   }
 

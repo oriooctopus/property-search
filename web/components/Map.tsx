@@ -39,15 +39,13 @@ interface MapProps {
   initialZoom?: number;
   visible?: boolean;
   commuteInfoMap?: Map<number, CommuteInfo>;
-  panOffset?: { x: number; y: number };
   hoveredStation?: HoveredStation | null;
-  instantRecenter?: boolean;
 }
 
 // Memoized so parent re-renders (e.g. view-switches on mobile) don't force
 // the Leaflet tree to re-run its own render cycle. Stable callback references
 // from the parent are required for the memo to be effective.
-function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, initialCenter, initialZoom, visible, commuteInfoMap, panOffset, hoveredStation, instantRecenter }: MapProps) {
+function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, initialCenter, initialZoom, visible, commuteInfoMap, hoveredStation }: MapProps) {
   return (
     <MapInner
       listings={listings}
@@ -66,9 +64,7 @@ function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds
       initialZoom={initialZoom}
       visible={visible}
       commuteInfoMap={commuteInfoMap}
-      panOffset={panOffset}
       hoveredStation={hoveredStation ?? null}
-      instantRecenter={instantRecenter}
     />
   );
 }

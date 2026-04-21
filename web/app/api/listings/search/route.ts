@@ -114,6 +114,7 @@ function applyBoundsAndFilters(
   filters: SearchFilters,
 ): any {
   q = q.is("delisted_at", null);
+  q = q.neq("source", "facebook-marketplace");
 
   if (bounds) {
     q = q

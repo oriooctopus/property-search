@@ -88,11 +88,11 @@ export interface ValidatedListing extends RawListing {
 export const ALL_SOURCES: readonly ListingSource[] = [
   "streeteasy",
   "craigslist",
-  "facebook-marketplace",
+  // "facebook-marketplace", // disabled to save Apify costs — re-enable when needed
 ] as const;
 
 /** Sources that extract data from text rather than structured API fields. */
 export const SCRAPER_SOURCES: ReadonlySet<ListingSource> = new Set([
   "craigslist",
-  "facebook-marketplace",
+  // "facebook-marketplace", // disabled to save Apify costs — re-enable when needed
 ]);
