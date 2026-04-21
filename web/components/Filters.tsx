@@ -1,6 +1,7 @@
 'use client';
 
-import { memo, useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { memo, useEffect, useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
+import { createPortal } from 'react-dom';
 import { ButtonBase, FilterChip, PillButton, PrimaryButton, TextButton } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
@@ -122,6 +123,17 @@ interface FiltersProps {
   /** Resolves with the new wishlist's id (or null on failure) so the panel can auto-select it. */
   onCreateWishlist?: (name: string) => Promise<string | null>;
   onOpenWishlistManager?: () => void;
+}
+
+/**
+ * Imperative handle exposed by <Filters>. Lets an ancestor (e.g. the page
+ * container) open the mobile Sort & Filter bottom sheet directly — used by
+ * the floating Filters pill in SwipeView so there's only ONE mobile sheet
+ * (no nested drawer). This keeps filter state consistent because the same
+ * <Filters> instance mounted in the sidebar owns the sheet.
+ */
+export interface FiltersHandle {
+  openMobileSheet: () => void;
 }
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
@@ -1243,7 +1255,7 @@ function FilterToggleButton({
   );
 }
 
-const Filters = memo(function Filters({ filters, onChange, listingCount, viewToggle, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onLoginRequired, showHidden, onToggleShowHidden, myWishlists = [], sharedWishlists = [], selectedWishlist = null, onSelectWishlist, onCreateWishlist, onOpenWishlistManager }: FiltersProps) {
+const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ filters, onChange, listingCount, viewToggle, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onLoginRequired, showHidden, onToggleShowHidden, myWishlists = [], sharedWishlists = [], selectedWishlist = null, onSelectWishlist, onCreateWishlist, onOpenWishlistManager }, ref) {
   const [openChip, setOpenChip] = useState<ChipId | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
@@ -1270,6 +1282,13 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
 
   // Mobile filter bottom sheet state
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+
+  // Expose imperative openMobileSheet() so ancestors (e.g. the SwipeView
+  // floating Filters pill via page.tsx) can open this single source-of-truth
+  // bottom sheet directly — no nested drawer.
+  useImperativeHandle(ref, () => ({
+    openMobileSheet: () => setMobileSheetOpen(true),
+  }), []);
 
   // Save search dropdown state
   const [saveOpen, setSaveOpen] = useState(false);
@@ -2435,8 +2454,11 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
           {filterChipsContent}
         </div>
       )}
-      {/* Mobile filter bottom sheet */}
-      {mobileSheetOpen && (
+      {/* Mobile filter bottom sheet — portaled to document.body so it escapes
+          any ancestor with `display: none` (e.g. the sidebar is hidden via
+          body[data-swipe-mobile] in swipe view but still mounts this
+          component as the single source of truth for filter state). */}
+      {mobileSheetOpen && typeof document !== 'undefined' && createPortal(
         <>
           {/* Backdrop */}
           <div
@@ -2447,6 +2469,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
           {/* Sheet */}
           <div
             className="fixed bottom-0 left-0 right-0 z-[1401] min-[600px]:hidden rounded-t-2xl"
+            data-testid="mobile-filters-sheet"
             style={{
               backgroundColor: '#1c2028',
               paddingBottom: 'env(safe-area-inset-bottom)',
@@ -2499,7 +2522,7 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
 
 
             {/* Filter chips */}
-            <div className="px-4 pt-3 pb-16 overflow-y-auto flex flex-wrap gap-1.5" style={{ maxHeight: '60vh' }}>
+            <div className="px-4 pt-3 pb-6 overflow-y-auto flex flex-wrap gap-1.5" style={{ maxHeight: '60vh' }}>
               {filterChipsContent}
             </div>
           </div>
@@ -2509,7 +2532,8 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
               to { transform: translateY(0); }
             }
           ` }} />
-        </>
+        </>,
+        document.body,
       )}
 
       {/* Save success toast — positioned at bottom center */}
@@ -2531,6 +2555,6 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
       )}
     </div>
   );
-});
+}));
 
 export default Filters;
