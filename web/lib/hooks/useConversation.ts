@@ -27,6 +27,8 @@ const DEFAULT_FILTERS: FiltersState = {
   minSqft: null,
   maxSqft: null,
   excludeNoSqft: false,
+  minAvailableDate: null,
+  maxAvailableDate: null,
   commuteRules: [],
 };
 
@@ -189,6 +191,8 @@ export function useConversation({
         minSqft: 'minimum sqft',
         maxSqft: 'maximum sqft',
         excludeNoSqft: 'exclude no sqft',
+        minAvailableDate: 'earliest move-in',
+        maxAvailableDate: 'latest move-in',
         commuteRules: 'commute rules',
       };
 
@@ -227,6 +231,8 @@ export function useConversation({
         minSqft: 'minimum sqft',
         maxSqft: 'maximum sqft',
         excludeNoSqft: 'exclude no sqft',
+        minAvailableDate: 'earliest move-in',
+        maxAvailableDate: 'latest move-in',
         commuteRules: 'commute rules',
       };
 
