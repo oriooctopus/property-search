@@ -265,7 +265,7 @@ function InvalidateSize({ visible }: { visible: boolean }) {
   return null;
 }
 
-function FlyToSelected({ listing, suppressBoundsRef, panOffset }: { listing: Listing | undefined; suppressBoundsRef: React.MutableRefObject<boolean>; panOffset?: { x: number; y: number } }) {
+function FlyToSelected({ listing, suppressBoundsRef, panOffset, instantRecenter }: { listing: Listing | undefined; suppressBoundsRef: React.MutableRefObject<boolean>; panOffset?: { x: number; y: number }; instantRecenter?: boolean }) {
   const map = useMap();
   const prevId = useRef<number | null>(null);
 
@@ -276,7 +276,24 @@ function FlyToSelected({ listing, suppressBoundsRef, panOffset }: { listing: Lis
       const lon = Number(listing.lon);
       const size = map.getSize();
       if (!isNaN(lat) && !isNaN(lon) && size.x > 0 && size.y > 0) {
-        // Only fly if the listing is outside the current visible bounds
+        // Mobile mini-map mode: the pin is always the active listing and the
+        // map must always be centered on it. Use setView (instant, no animation)
+        // so the pin and the map-center move in the same frame — otherwise we
+        // get a flicker where the new pin renders at the new coords while the
+        // map is still animating from the old center (the pin appears far from
+        // the visible area for ~800ms).
+        if (instantRecenter) {
+          suppressBoundsRef.current = true;
+          map.setView([lat, lon], map.getZoom() || 15, { animate: false });
+          // Clear suppress on the next tick so any legitimate moveend that
+          // Leaflet fires synchronously is ignored, but a subsequent real user
+          // pan/zoom fires through.
+          requestAnimationFrame(() => {
+            suppressBoundsRef.current = false;
+          });
+          return;
+        }
+        // Desktop: only fly if the listing is outside the current visible bounds
         const bounds = map.getBounds();
         if (bounds.contains([lat, lon])) {
           // Listing is already visible — don't move the map
@@ -299,7 +316,7 @@ function FlyToSelected({ listing, suppressBoundsRef, panOffset }: { listing: Lis
         setTimeout(() => { suppressBoundsRef.current = false; }, 1200);
       }
     }
-  }, [listing, map, suppressBoundsRef, panOffset]);
+  }, [listing, map, suppressBoundsRef, panOffset, instantRecenter]);
 
   return null;
 }
@@ -334,6 +351,12 @@ export interface MapProps {
   panOffset?: { x: number; y: number };
   /** Hovered subway station from SwipeCard — renders a pulsing marker */
   hoveredStation?: HoveredStation | null;
+  /** Mobile mini-map mode: re-center instantly on selected-listing change
+   *  (no flyTo animation) so the pin and map-center move in one frame,
+   *  eliminating the "pin appears far from center" flicker while the map
+   *  animates. Also causes bounds-change events from the programmatic
+   *  re-center to be suppressed. */
+  instantRecenter?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -723,7 +746,7 @@ function SubwayLinesLayer({ enabled }: SubwayLinesLayerProps) {
   );
 }
 
-export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, panOffset, hoveredStation }: MapProps) {
+export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, panOffset, hoveredStation, instantRecenter }: MapProps) {
   // Fall back to a local ref if the caller doesn't provide one
   const localSuppressBoundsRef = useRef(false);
   const suppressBoundsRef = suppressBoundsRefProp ?? localSuppressBoundsRef;
@@ -1033,7 +1056,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
         <SubwayLinesLayer enabled={subwayOverlayEnabled} />
         <InvalidateSize visible={visible} />
         <InjectPopupStyles />
-        <FlyToSelected listing={selectedListing} suppressBoundsRef={suppressBoundsRef} panOffset={panOffset} />
+        <FlyToSelected listing={selectedListing} suppressBoundsRef={suppressBoundsRef} panOffset={panOffset} instantRecenter={instantRecenter} />
         {onBoundsChange && <BoundsWatcher onBoundsChange={onBoundsChange} onMapMove={onMapMove} suppressBoundsRef={suppressBoundsRef} />}
 
         {renderGroups.map(({ key, listings: groupListings, isCluster }) => {

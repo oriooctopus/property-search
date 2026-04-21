@@ -594,6 +594,17 @@ export default function SwipeView({
               onSelectDetail={() => {}}
               favoritedIds={EMPTY_FAVORITES}
               onHideListing={() => {}}
+              // Wire bounds/move callbacks so user-initiated pan/zoom on the
+              // mini-map re-queries listings for the new viewport. Programmatic
+              // recenters triggered by swiping to a new card are suppressed by
+              // `suppressBoundsRef` inside MapInner's FlyToSelected.
+              onBoundsChange={onBoundsChange}
+              onMapMove={(center, zoom) => { mapCenterRef.current = center; onMapMove?.(center, zoom); }}
+              suppressBoundsRef={suppressBoundsRef}
+              // Instant (no flyTo animation) re-center when the active listing
+              // changes — prevents the pin from briefly appearing far from the
+              // map's visible area during the ~800ms flyTo animation.
+              instantRecenter
               visible={true}
               commuteInfoMap={commuteInfoMap}
               initialCenter={currentListing?.lat && currentListing?.lon ? [currentListing.lat, currentListing.lon] : initialCenter}
@@ -643,6 +654,13 @@ export default function SwipeView({
             onSelectDetail={() => {}}
             favoritedIds={mapFavoritedIds}
             onHideListing={() => {}}
+            // Wire bounds/move callbacks so user-initiated pan/zoom on the
+            // expanded mobile map also re-queries listings for the new
+            // viewport (matching desktop behavior). Programmatic recenters
+            // from swipes are suppressed by `suppressBoundsRef`.
+            onBoundsChange={onBoundsChange}
+            onMapMove={(center, zoom) => { mapCenterRef.current = center; onMapMove?.(center, zoom); }}
+            suppressBoundsRef={suppressBoundsRef}
             visible={showMobileMap}
             commuteInfoMap={commuteInfoMap}
             initialCenter={currentListing?.lat && currentListing?.lon ? [currentListing.lat, currentListing.lon] : initialCenter}

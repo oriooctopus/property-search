@@ -40,9 +40,10 @@ interface MapProps {
   commuteInfoMap?: Map<number, CommuteInfo>;
   panOffset?: { x: number; y: number };
   hoveredStation?: HoveredStation | null;
+  instantRecenter?: boolean;
 }
 
-export default function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, initialCenter, initialZoom, visible, commuteInfoMap, panOffset, hoveredStation }: MapProps) {
+export default function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, initialCenter, initialZoom, visible, commuteInfoMap, panOffset, hoveredStation, instantRecenter }: MapProps) {
   return (
     <MapInner
       listings={listings}
@@ -63,6 +64,7 @@ export default function Map({ listings, selectedId, onMarkerClick, onSelectDetai
       commuteInfoMap={commuteInfoMap}
       panOffset={panOffset}
       hoveredStation={hoveredStation ?? null}
+      instantRecenter={instantRecenter}
     />
   );
 }
