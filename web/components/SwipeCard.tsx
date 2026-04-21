@@ -408,7 +408,10 @@ export default function SwipeCard({
             <span style={{ fontSize: 22, fontWeight: 700, color: '#7ee787' }}>${listing.price.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 400, color: '#8b949e' }}>/mo</span></span>
           </div>
           {listDateFormatted && <div className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Listed {listDateFormatted}</div>}
-          <div style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }} />
+          <div
+            className={compactMobile ? 'hidden min-[600px]:block' : ''}
+            style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }}
+          />
           <CompactStats
             beds={listing.beds}
             baths={listing.baths}
@@ -747,8 +750,13 @@ export default function SwipeCard({
               </div>
             )}
 
-            {/* Divider: price/address section → stats */}
-            <div style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }} />
+            {/* Divider: price/address section → stats. Hidden on mobile
+                (compactMobile) to save vertical space so the stats row fits
+                the floating card without truncation. */}
+            <div
+              className={compactMobile ? 'hidden min-[600px]:block' : ''}
+              style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }}
+            />
 
             {/* Stats — compact inline on mobile, verbose 3-col grid on >=600px */}
             <CompactStats

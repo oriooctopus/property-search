@@ -74,7 +74,7 @@ function coordKey(lat: number, lon: number): string {
 /** Returns the cluster DivIcon for a given group size and whether any are saved. */
 function makeClusterIcon(count: number, hasSaved: boolean): L.DivIcon {
   const size = count <= 3 ? 30 : count <= 9 ? 36 : 44;
-  const borderColor = hasSaved ? '#7ee787' : '#8b949e';
+  const borderColor = hasSaved ? '#58a6ff' : '#8b949e';
   return L.divIcon({
     className: '',
     html: `<div style="
@@ -236,7 +236,7 @@ const ACTIVE_PIN_STYLES = `
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
   }
   .dw-active-hero__core--saved {
-    background: #00ff88;
+    background: #58a6ff;
   }
   @media (prefers-reduced-motion: reduce) {
     .dw-active-hero__halo {
@@ -1293,7 +1293,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
                       font-size:12px;
                     "
                   >
-                    ${isSaved ? `<span style="color:#7ee787;flex-shrink:0;">&#9733;</span>` : `<span style="color:#8b949e;flex-shrink:0;font-size:10px;">&#9675;</span>`}
+                    ${isSaved ? `<span style="color:#58a6ff;flex-shrink:0;">&#9733;</span>` : `<span style="color:#8b949e;flex-shrink:0;font-size:10px;">&#9675;</span>`}
                     <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(l.address)}</span>
                     <span style="color:#3fb950;font-weight:700;flex-shrink:0;">$${l.price.toLocaleString()}</span>
                   </div>`;
@@ -1373,8 +1373,8 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
           const savedRadius = 10;
           const radius = isSelected ? regularRadius : isSaved ? savedRadius : regularRadius;
 
-          const mainFill = isSaved ? '#7ee787' : '#4a5568';
-          const mainStroke = isSaved ? '#7ee787' : '#4a5568';
+          const mainFill = isSaved ? '#58a6ff' : '#4a5568';
+          const mainStroke = isSaved ? '#58a6ff' : '#4a5568';
           const mainWeight = 1;
           const mainOpacity = isSaved ? 1 : 0.75;
           // When selected, hide the CircleMarker visuals entirely — the
