@@ -5,6 +5,7 @@ import Image from 'next/image';
 import type { Database } from '@/lib/types';
 import { ActionButton, IconButton } from '@/components/ui';
 import { formatShortDate } from '@/lib/format-date';
+import { shareListing } from '@/lib/native';
 import DetailMap from './DetailMap';
 import CommuteItinerary from './CommuteItinerary';
 import type { CommuteRule } from '@/components/Filters';
@@ -177,13 +178,22 @@ export default function ListingDetail({
     }
   };
 
-  const handleShareLink = () => {
+  const handleShareLink = async () => {
     const url = new URL(window.location.href);
     url.searchParams.set('listing', String(listing.id));
-    navigator.clipboard.writeText(url.toString()).then(() => {
+    const address = (listing as { address?: string | null }).address ?? 'this place';
+    const result = await shareListing({
+      title: address,
+      text: 'Check out this place on Dwelligence',
+      url: url.toString(),
+    });
+    // Only show the "Link copied" toast when we actually copied — the native
+    // share sheet and navigator.share don't need a toast (the OS UI handles
+    // feedback already).
+    if (result === 'clipboard') {
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
-    });
+    }
   };
 
   useEffect(() => {

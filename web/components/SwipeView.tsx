@@ -12,6 +12,7 @@ import type { Database } from '@/lib/types';
 import { useWishlists, useWishlistMutations } from '@/lib/hooks/useWishlists';
 import { getLastUsedWishlistId, setLastUsedWishlistId } from '@/lib/wishlist-storage';
 import { geoSort } from '@/lib/geo-sort';
+import { triggerHaptic } from '@/lib/native';
 import WishlistPicker from './WishlistPicker';
 
 // Dynamically import MapComponent to avoid SSR issues (uses Leaflet)
@@ -338,6 +339,10 @@ export default function SwipeView({
       // Flash the swipe overlay
       setSwipeOverlay(direction);
       setTimeout(() => setSwipeOverlay(null), 200);
+
+      // Haptic feedback on swipe commit — medium for the actionable
+      // left/right, lighter for the "later" pass. No-op on web.
+      void triggerHaptic(direction === 'down' ? 'light' : 'medium');
 
       // Execute the action
       // For left swipes: persist hide immediately. The currentListingIdRef
