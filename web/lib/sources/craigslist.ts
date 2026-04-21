@@ -384,7 +384,9 @@ export async function fetchCraigslistListings(
     throw new Error("APIFY_TOKEN not set — cannot query Craigslist via Apify");
   }
 
-  const CL_BOROUGHS = ["brk", "mnh", "que", "brx", "stn"];
+  // Only scrape Manhattan + Brooklyn to save Apify costs (~$15/mo savings).
+  // Full list: ["brk", "mnh", "que", "brx", "stn"]
+  const CL_BOROUGHS = ["brk", "mnh"];
   const queryParams = new URLSearchParams();
   if (priceMin != null) queryParams.set("min_price", String(priceMin));
   if (priceMax != null) queryParams.set("max_price", String(priceMax));
