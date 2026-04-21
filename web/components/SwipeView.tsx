@@ -134,6 +134,11 @@ export default function SwipeView({
   const [hasOpenedMap, setHasOpenedMap] = useState(false);
   const [swipeOverlay, setSwipeOverlay] = useState<'left' | 'right' | 'down' | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  // Track whether we're on a mobile viewport (<600px) so we can conditionally
+  // mount the mini-map on mobile vs the full-screen backdrop map on desktop
+  // (avoids mounting both Leaflet instances at once). Starts null on first
+  // render so SSR output matches either branch until hydration resolves it.
+  const [isMobileViewport, setIsMobileViewport] = useState<boolean | null>(null);
   const saveAnchorRef = useRef<HTMLDivElement>(null);
   const mobileSaveAnchorRef = useRef<HTMLButtonElement>(null);
   const hideBtnRef = useRef<HTMLButtonElement>(null);
@@ -248,37 +253,33 @@ export default function SwipeView({
     currentListingIdRef.current = currentListing?.id ?? null;
   }, [currentListing?.id]);
 
-  // Mark map as "opened" on desktop viewports (where the map is the backdrop)
-  // and once the user triggers the mobile map overlay. We keep it mounted
-  // after that so toggling views doesn't re-init Leaflet.
+  // Mark map as "opened" — the mobile mini-map (Option B2 layout) means the
+  // Leaflet map is always visible on mobile too, so we flip this true as soon
+  // as the component mounts client-side. We keep it mounted after that so
+  // toggling views doesn't re-init Leaflet.
   useEffect(() => {
     if (hasOpenedMap) return;
-    if (typeof window !== 'undefined' && window.innerWidth >= 600) {
-      setHasOpenedMap(true);
-      return;
-    }
-    if (showMobileMap) setHasOpenedMap(true);
-  }, [hasOpenedMap, showMobileMap]);
+    if (typeof window !== 'undefined') setHasOpenedMap(true);
+  }, [hasOpenedMap]);
 
-  // Also watch for viewport resize crossing the 600px threshold (e.g. device rotation)
-  // Debounced + passive so drag-resize doesn't storm React with state updates.
+  // Track viewport size for mobile vs desktop map mounting. Debounced so
+  // drag-resize doesn't hammer state.
   useEffect(() => {
-    if (hasOpenedMap) return;
     if (typeof window === 'undefined') return;
+    const update = () => setIsMobileViewport(window.innerWidth < 600);
+    update();
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const onResize = () => {
       if (timeoutId !== null) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        timeoutId = null;
-        if (window.innerWidth >= 600) setHasOpenedMap(true);
-      }, 150);
+      timeoutId = setTimeout(update, 150);
     };
     window.addEventListener('resize', onResize, { passive: true });
     return () => {
       if (timeoutId !== null) clearTimeout(timeoutId);
       window.removeEventListener('resize', onResize);
     };
-  }, [hasOpenedMap]);
+  }, []);
+
 
   // On mobile, auto-show the nearest subway station on the map (no hover needed)
   useEffect(() => {
@@ -528,13 +529,24 @@ export default function SwipeView({
     return merged;
   }, [savedIds, wishlistedIds]);
 
+  // Mini-map (mobile) should show ONLY the currently-active listing plus
+  // subway stations — no saved-listing pins, no other listings. We build a
+  // dedicated single-listing array for it so the Leaflet map only renders one
+  // CircleMarker. Desktop continues to use the full `mapListings` array.
+  const mobileMapListings = useMemo(() => {
+    if (!currentListing) return [] as typeof mapListings;
+    const found = mapListings.find((l) => l.id === currentListing.id);
+    return found ? [found] : ([] as typeof mapListings);
+  }, [mapListings, currentListing]);
+  const EMPTY_FAVORITES = useMemo(() => new Set<number>(), []);
+
   return (
     <div className="relative flex-1 min-h-0 flex overflow-hidden" style={{ height: '100%' }}>
       {/* Full-screen map backdrop (desktop only — on mobile the mini-map handles it).
           Only mounted once hasOpenedMap flips true. On desktop that happens
           immediately via the viewport effect; on mobile it waits until the user
           taps the map tab (which opens the mobile map overlay below). */}
-      {hasOpenedMap && (
+      {hasOpenedMap && isMobileViewport === false && (
         <div className="absolute inset-0 z-0 hidden min-[600px]:block">
           <MapComponent
             listings={mapListings as unknown as Database['public']['Tables']['listings']['Row'][]}
@@ -553,6 +565,65 @@ export default function SwipeView({
             panOffset={{ x: 210, y: 0 }}
             hoveredStation={hoveredStation}
           />
+        </div>
+      )}
+
+      {/* Mobile mini-map — Option B2 persistent 45vh map above the swipe card.
+          Shows the current listing's pin and nearby subway markers. Tapping the
+          map opens the full-screen expanded overlay below. Only mounts on
+          mobile viewports to avoid running two Leaflet instances side-by-side
+          on desktop. */}
+      {isMobileViewport === true && (
+        <div
+          className="absolute left-0 right-0 z-0 min-[600px]:hidden"
+          style={{
+            top: `var(--swipe-top-inset, 0px)`,
+            height: '45vh',
+            borderBottom: '1px solid #2d333b',
+            overflow: 'hidden',
+          }}
+        >
+          {hasOpenedMap && (
+            <MapComponent
+              // Mini-map renders only the active listing + subway stations —
+              // no saved/other pins (those remain on the desktop backdrop and
+              // the full-screen expanded mobile overlay below).
+              listings={mobileMapListings as unknown as Database['public']['Tables']['listings']['Row'][]}
+              selectedId={currentListing?.id ?? null}
+              onMarkerClick={handleMarkerClick}
+              onSelectDetail={() => {}}
+              favoritedIds={EMPTY_FAVORITES}
+              onHideListing={() => {}}
+              visible={true}
+              commuteInfoMap={commuteInfoMap}
+              initialCenter={currentListing?.lat && currentListing?.lon ? [currentListing.lat, currentListing.lon] : initialCenter}
+              initialZoom={15}
+              hoveredStation={hoveredStation}
+            />
+          )}
+          <button
+            onClick={() => setShowMobileMap(true)}
+            aria-label="Expand map"
+            className="absolute top-2 right-2 rounded-full flex items-center justify-center cursor-pointer"
+            style={{
+              width: 36,
+              height: 36,
+              backgroundColor: 'rgba(28,32,40,0.9)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: '#e1e4e8',
+              zIndex: 5,
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+            }}
+            title="Expand map"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 3 21 3 21 9" />
+              <polyline points="9 21 3 21 3 15" />
+              <line x1="21" y1="3" x2="14" y2="10" />
+              <line x1="3" y1="21" x2="10" y2="14" />
+            </svg>
+          </button>
         </div>
       )}
 
@@ -618,6 +689,7 @@ export default function SwipeView({
                   onExpandDetail={() => {}}
                   isTop={false}
                   layoutOnly
+                  compactMobile
                 />
                 {/* Reserve action-bar height on desktop only — mobile dock floats outside the card */}
                 <div className="h-0 min-[600px]:h-24" />
@@ -658,6 +730,7 @@ export default function SwipeView({
                         onSwipe={() => {}}
                         onExpandDetail={() => {}}
                         isTop={false}
+                        compactMobile
                       />
                     </div>
                   </div>
@@ -690,28 +763,6 @@ export default function SwipeView({
                 }}
               >
 
-                {/* Map button — mobile only, overlaid on photo area */}
-                {currentListing.lat != null && currentListing.lon != null && (
-                  <button
-                    onClick={() => setShowMobileMap(true)}
-                    className="absolute top-2.5 left-3 min-[600px]:hidden rounded-full flex items-center justify-center cursor-pointer"
-                    style={{
-                      zIndex: 6,
-                      width: 36,
-                      height: 36,
-                      backgroundColor: 'rgba(0,0,0,0.5)',
-                      border: 'none',
-                      color: '#fff',
-                    }}
-                    title="Show map"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                      <circle cx="12" cy="10" r="3" />
-                    </svg>
-                  </button>
-                )}
-
                 {/* Card portion — full height on mobile (no attached bar), leaves 96px for action bar on desktop */}
                 <div className="absolute top-0 left-0 right-0 bottom-0 min-[600px]:bottom-24">
                   <SwipeCard
@@ -720,6 +771,7 @@ export default function SwipeView({
                     onSwipe={handleSwipe}
                     onExpandDetail={() => onExpandDetail?.(currentListing)}
                     isTop={true}
+                    compactMobile
                     onPhotoFocusChange={(focused) => { photoFocusedRef.current = focused; }}
                     enterPhotoFocusRef={enterPhotoFocusRef}
                     exitPhotoFocusRef={exitPhotoFocusRef}

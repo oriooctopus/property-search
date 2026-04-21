@@ -157,13 +157,6 @@ const POPUP_STYLES = `
 `;
 
 const STATION_PULSE_STYLES = `
-  @keyframes station-pulse {
-    0%   { transform: scale(1);   opacity: 0.8; }
-    100% { transform: scale(2.5); opacity: 0; }
-  }
-  .station-pulse-ring {
-    animation: station-pulse 1.4s ease-out infinite;
-  }
   .station-hover-tooltip {
     background: transparent !important;
     border: none !important;
@@ -175,19 +168,29 @@ const STATION_PULSE_STYLES = `
   }
 `;
 
+// Static "lit" subway station marker: a steady outer glow ring and a filled
+// inner dot in the line's color. Intentionally non-animated (previously used
+// a keyframe-pulse ring which was distracting on the mini-map).
 function makeStationPulseIcon(color: string): L.DivIcon {
   const size = 40;
   return L.divIcon({
     className: '',
     html: `
       <div style="position:relative;width:${size}px;height:${size}px;">
-        <div class="station-pulse-ring" style="
+        <div style="
           position:absolute;
-          inset:0;
+          inset:6px;
           border-radius:50%;
           background:${color};
-          opacity:0.8;
-          transform-origin:center;
+          opacity:0.22;
+          filter:blur(4px);
+        "></div>
+        <div style="
+          position:absolute;
+          inset:10px;
+          border-radius:50%;
+          background:${color};
+          opacity:0.35;
         "></div>
         <div style="
           position:absolute;
