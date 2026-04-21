@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { createPortal } from 'react-dom';
 import { PrimaryButton } from '@/components/ui';
 import { X, RotateCcw, Heart } from 'lucide-react';
@@ -635,7 +636,7 @@ export default function SwipeView({
             alignItems: 'center',
           }}
         >
-          <a
+          <Link
             href="/"
             aria-label="Home"
             className="cursor-pointer"
@@ -673,7 +674,7 @@ export default function SwipeView({
               <span style={{ display: 'block', width: 14, height: 1.5, background: '#8b949e', borderRadius: 1 }} />
               <span style={{ display: 'block', width: 14, height: 1.5, background: '#8b949e', borderRadius: 1 }} />
             </span>
-          </a>
+          </Link>
         </div>
       )}
 
