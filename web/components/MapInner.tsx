@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useMemo, useState } from 'react';
+import { Fragment, useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Marker, Popup, Tooltip, GeoJSON, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -210,6 +210,32 @@ function makeStationPulseIcon(color: string): L.DivIcon {
   });
 }
 
+/**
+ * Tiny white heart glyph overlaid on saved-listing pins (Option 3 color
+ * scheme). Rendered as a non-interactive divIcon Marker above the green
+ * CircleMarker so saved-ness stays legible at small zoom levels and for
+ * colorblind users. Non-interactive so all clicks hit the underlying dot.
+ *
+ * Lazy init so Leaflet's L isn't touched until first render on the client
+ * (MapInner is already dynamic({ ssr: false }) but defensive).
+ */
+let heartGlyphIconCache: L.DivIcon | null = null;
+function getHeartGlyphIcon(): L.DivIcon {
+  if (heartGlyphIconCache) return heartGlyphIconCache;
+  const size = 14;
+  heartGlyphIconCache = L.divIcon({
+    className: '',
+    html: `
+      <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="#ffffff" aria-hidden="true" style="display:block;pointer-events:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.35));">
+        <path d="M12 21s-7-4.35-7-10a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 5.65-7 10-7 10z" />
+      </svg>
+    `,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+  return heartGlyphIconCache;
+}
+
 function InjectPopupStyles() {
   useEffect(() => {
     const id = 'dwelligence-popup-styles';
@@ -228,9 +254,16 @@ function InjectPopupStyles() {
 function InvalidateSize({ visible }: { visible: boolean }) {
   const map = useMap();
 
-  // On mount: initial invalidation
+  // On mount: initial invalidation. Also: attach the map instance to
+  // `window.__leafletMap` so E2E tests can drive user-like interactions
+  // (e.g. `map.setView(...)`) without relying on CSS-layer hit-testing,
+  // which the floating swipe card disrupts on mobile. No-op in production
+  // unless a test harness looks for it.
   useEffect(() => {
     const timer = setTimeout(() => map.invalidateSize(), 100);
+    if (typeof window !== 'undefined') {
+      (window as unknown as { __leafletMap?: L.Map }).__leafletMap = map;
+    }
     return () => clearTimeout(timer);
   }, [map]);
 
@@ -272,6 +305,109 @@ function InvalidateSize({ visible }: { visible: boolean }) {
 // are allowed to move the viewport. The currently-selected listing is still
 // visually emphasized in the marker layer below (larger radius, white ring)
 // via the `isSelected` derived flag — no map movement required.
+//
+// EXCEPTION: On mobile Option-D layout the floating swipe card covers the
+// bottom ~60% of the viewport. If the active listing's pin falls under the
+// card, the user can't see it. `EnsurePinVisibleOnMobile` below is the one
+// sanctioned exception — it pans (but never zooms) just enough to surface an
+// occluded pin in the top map bleed, and ONLY when the active listing id
+// changes (never on search/bounds/other state changes). The pan is gated by
+// `suppressBoundsRef` so the move does NOT trigger a listings re-query.
+
+/**
+ * Mobile-only: when the active listing changes, if its pin is occluded by the
+ * floating swipe card, pan the map so the pin appears above the card.
+ *
+ * - Skips on desktop / when activeListingId or card bounds are missing.
+ * - Runs ONLY on activeListingId change (ref-based dedupe). Re-renders,
+ *   bounds changes, and search completions do not trigger.
+ * - Uses the caller-supplied `suppressBoundsRef` to prevent BoundsWatcher
+ *   from issuing a listings re-query in response to the programmatic pan.
+ * - Keeps zoom constant; only pans.
+ */
+function EnsurePinVisibleOnMobile({
+  activeListingId,
+  activeLatLon,
+  getCardBounds,
+  mobile,
+  suppressBoundsRef,
+}: {
+  activeListingId: number | null;
+  activeLatLon: { lat: number; lon: number } | null;
+  getCardBounds: (() => DOMRect | null) | undefined;
+  mobile: boolean;
+  suppressBoundsRef: React.MutableRefObject<boolean>;
+}) {
+  const map = useMap();
+  const lastHandledIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!mobile) return;
+    if (!activeListingId || !activeLatLon) return;
+    if (!getCardBounds) return;
+
+    // Only act when the active listing id actually changed since last run.
+    if (lastHandledIdRef.current === activeListingId) return;
+    lastHandledIdRef.current = activeListingId;
+
+    const cardRect = getCardBounds();
+    if (!cardRect) return;
+
+    const containerEl = map.getContainer();
+    const containerRect = containerEl.getBoundingClientRect();
+
+    // Project the pin's lat/lon into container-relative pixel coordinates.
+    const pinPoint = map.latLngToContainerPoint([activeLatLon.lat, activeLatLon.lon]);
+
+    // Convert card rect to container-relative coords.
+    const cardTopInContainer = cardRect.top - containerRect.top;
+    const cardBottomInContainer = cardRect.bottom - containerRect.top;
+    const cardLeftInContainer = cardRect.left - containerRect.left;
+    const cardRightInContainer = cardRect.right - containerRect.left;
+
+    const pinUnderCard =
+      pinPoint.x >= cardLeftInContainer &&
+      pinPoint.x <= cardRightInContainer &&
+      pinPoint.y >= cardTopInContainer &&
+      pinPoint.y <= cardBottomInContainer;
+
+    if (!pinUnderCard) return;
+
+    // Target pin Y position: roughly halfway between the top of the container
+    // and the top of the card (i.e. the center of the visible map-bleed strip
+    // above the card). Guarded so we never push the pin off-screen upwards.
+    const topBleed = Math.max(0, cardTopInContainer);
+    const targetY = Math.max(24, topBleed / 2);
+
+    const deltaY = pinPoint.y - targetY;
+    // Only pan if there's a meaningful difference.
+    if (Math.abs(deltaY) < 4) return;
+
+    // Compute the new center in container-pixel space, then convert back to LatLng.
+    const currentCenterPoint = map.latLngToContainerPoint(map.getCenter());
+    const newCenterPoint = L.point(currentCenterPoint.x, currentCenterPoint.y + deltaY);
+    const newCenterLatLng = map.containerPointToLatLng(newCenterPoint);
+
+    // Suppress the bounds-watcher so the programmatic pan does NOT re-query.
+    // Leaflet's moveend fires after the animation completes (~400ms with
+    // duration: 0.4). Clear the suppression in the moveend handler so later
+    // user pans DO re-query as normal.
+    suppressBoundsRef.current = true;
+    const clear = () => {
+      // rAF delay so any synchronously-queued moveend handlers still see true.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          suppressBoundsRef.current = false;
+        });
+      });
+    };
+    map.once('moveend', clear);
+
+    map.setView(newCenterLatLng, map.getZoom(), { animate: true, duration: 0.4 });
+  }, [activeListingId, activeLatLon, getCardBounds, mobile, map, suppressBoundsRef]);
+
+  return null;
+}
 
 export interface ViewportBounds {
   latMin: number;
@@ -301,6 +437,13 @@ export interface MapProps {
   commuteInfoMap?: Map<number, CommuteInfo>;
   /** Hovered subway station from SwipeCard — renders a pulsing marker */
   hoveredStation?: HoveredStation | null;
+  /** Mobile-only: when true, the map may auto-shift so the active listing
+   *  pin is not occluded by the floating swipe card. No-op on desktop. */
+  autoShiftActivePinMobile?: boolean;
+  /** Mobile-only: returns the floating swipe card's DOMRect in viewport
+   *  coordinates, or null if the card is not currently rendered. Called
+   *  on-demand when the active listing id changes. */
+  getMobileCardBounds?: () => DOMRect | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -692,7 +835,7 @@ function SubwayLinesLayer({ enabled }: SubwayLinesLayerProps) {
   );
 }
 
-export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, hoveredStation }: MapProps) {
+export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, hoveredStation, autoShiftActivePinMobile, getMobileCardBounds }: MapProps) {
   // Fall back to a local ref if the caller doesn't provide one
   const localSuppressBoundsRef = useRef(false);
   const suppressBoundsRef = suppressBoundsRefProp ?? localSuppressBoundsRef;
@@ -998,6 +1141,19 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
         <InvalidateSize visible={visible} />
         <InjectPopupStyles />
         {onBoundsChange && <BoundsWatcher onBoundsChange={onBoundsChange} onMapMove={onMapMove} suppressBoundsRef={suppressBoundsRef} />}
+        {autoShiftActivePinMobile && (
+          <EnsurePinVisibleOnMobile
+            activeListingId={selectedId}
+            activeLatLon={(() => {
+              if (selectedId == null) return null;
+              const sel = validListings.find((l) => l.id === selectedId);
+              return sel ? { lat: sel.lat, lon: sel.lon } : null;
+            })()}
+            getCardBounds={getMobileCardBounds}
+            mobile={autoShiftActivePinMobile}
+            suppressBoundsRef={suppressBoundsRef}
+          />
+        )}
 
         {renderGroups.map(({ key, listings: groupListings, isCluster }) => {
           if (isCluster) {
@@ -1077,34 +1233,104 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
             );
           }
 
-          // Single listing — render as before
+          // Single listing — render with Option 3 color scheme.
+          //
+          // Regular pin (neither active nor saved):
+          //   muted dark `#4a5568`, smaller radius, low opacity so it recedes
+          //   into the dark map tiles.
+          // Saved pin (isFavorited, not active):
+          //   green `#7ee787` fill, overlaid with a tiny white heart glyph
+          //   (rendered as a non-interactive divIcon Marker on top) so the
+          //   saved-ness is legible at tiny zoom levels and for colorblind
+          //   users.
+          // Active pin (isSelected):
+          //   white `#ffffff` core with a soft white outer glow. If ALSO
+          //   saved, the core is green (`#7ee787`) while the white glow is
+          //   preserved — spotlight + saved hue simultaneously.
           const listing = groupListings[0];
           const isSaved = favoritedIds.has(listing.id);
-          const color = isSaved ? '#7ee787' : '#8b949e';
           const isSelected = listing.id === selectedId;
+
+          // Radius tuning (Option 3): regular pins shrink to 7; saved bump
+          // to 10 so they're slightly more prominent than regular; active
+          // is ~20% larger than regular (9) — the glow does most of the
+          // visual work for "this is the focused one".
+          const regularRadius = 7;
+          const savedRadius = 10;
+          const activeRadius = Math.round(regularRadius * 1.2); // 8–9
+          const radius = isSelected ? activeRadius : isSaved ? savedRadius : regularRadius;
+
+          const mainFill = isSelected
+            ? (isSaved ? '#7ee787' : '#ffffff')
+            : (isSaved ? '#7ee787' : '#4a5568');
+          const mainStroke = isSelected
+            ? (isSaved ? 'rgba(126,231,135,0.5)' : '#ffffff')
+            : (isSaved ? '#7ee787' : '#4a5568');
+          const mainWeight = isSelected ? 1.5 : 1;
+          const mainOpacity = isSelected ? 1 : isSaved ? 1 : 0.75;
+
           return (
-            <CircleMarker
-              key={key}
-              center={[listing.lat, listing.lon]}
-              radius={isSelected ? 18 : isSaved ? 10 : 14}
-              pathOptions={{
-                color: isSelected ? '#ffffff' : color,
-                fillColor: color,
-                fillOpacity: isSaved ? 1 : 0.85,
-                weight: isSelected ? 3 : 1.5,
-              }}
-              eventHandlers={{
-                click: handleClick(listing),
-                mouseover: handleMouseOver(listing),
-                mouseout: handleMouseOut(listing),
-                popupclose: handlePopupClose(listing),
-                popupopen: handlePopupOpen(listing),
-              }}
-            >
-              <Popup className="dark-popup" autoClose={false} closeOnClick={false}>
-                <div dangerouslySetInnerHTML={{ __html: buildPopupContent(listing, favoritedIds.has(listing.id), wouldLiveIds.has(listing.id), commuteInfoMap?.get(listing.id)) }} />
-              </Popup>
-            </CircleMarker>
+            <Fragment key={key}>
+              {/* Active-pin outer glow — a larger white circle behind the
+                  main dot, low-opacity, non-interactive. Provides the
+                  "spotlight" effect without extra DOM/CSS (pure Leaflet). */}
+              {isSelected && (
+                <CircleMarker
+                  key={`${key}__glow`}
+                  center={[listing.lat, listing.lon]}
+                  radius={activeRadius + 10}
+                  interactive={false}
+                  pathOptions={{
+                    color: '#ffffff',
+                    fillColor: '#ffffff',
+                    fillOpacity: 0.25,
+                    weight: 0,
+                    opacity: 0,
+                    className: 'dw-active-glow',
+                  }}
+                />
+              )}
+              <CircleMarker
+                center={[listing.lat, listing.lon]}
+                radius={radius}
+                pathOptions={{
+                  color: mainStroke,
+                  fillColor: mainFill,
+                  fillOpacity: mainOpacity,
+                  weight: mainWeight,
+                  opacity: mainOpacity,
+                  className: isSelected
+                    ? 'dw-active-pin'
+                    : isSaved
+                      ? 'dw-saved-pin'
+                      : 'dw-regular-pin',
+                }}
+                eventHandlers={{
+                  click: handleClick(listing),
+                  mouseover: handleMouseOver(listing),
+                  mouseout: handleMouseOut(listing),
+                  popupclose: handlePopupClose(listing),
+                  popupopen: handlePopupOpen(listing),
+                }}
+              >
+                <Popup className="dark-popup" autoClose={false} closeOnClick={false}>
+                  <div dangerouslySetInnerHTML={{ __html: buildPopupContent(listing, favoritedIds.has(listing.id), wouldLiveIds.has(listing.id), commuteInfoMap?.get(listing.id)) }} />
+                </Popup>
+              </CircleMarker>
+              {/* Saved-pin heart glyph — small white heart overlaid on top
+                  of the green circle so saved-ness is visible at tiny zoom
+                  levels and for colorblind users. Rendered as a
+                  non-interactive divIcon Marker so it doesn't intercept
+                  clicks (the underlying CircleMarker handles those). */}
+              {isSaved && (
+                <Marker
+                  key={`${key}__heart`}
+                  position={[listing.lat, listing.lon]}
+                  interactive={false}
+                  icon={getHeartGlyphIcon()}
+                />
+              )}
+            </Fragment>
           );
         })}
         {hoveredStation && (() => {

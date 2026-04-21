@@ -535,16 +535,26 @@ export default function SwipeView({
     return merged;
   }, [savedIds, wishlistedIds]);
 
-  // Mini-map (mobile) should show ONLY the currently-active listing plus
-  // subway stations — no saved-listing pins, no other listings. We build a
-  // dedicated single-listing array for it so the Leaflet map only renders one
-  // CircleMarker. Desktop continues to use the full `mapListings` array.
-  const mobileMapListings = useMemo(() => {
-    if (!currentListing) return [] as typeof mapListings;
-    const found = mapListings.find((l) => l.id === currentListing.id);
-    return found ? [found] : ([] as typeof mapListings);
-  }, [mapListings, currentListing]);
-  const EMPTY_FAVORITES = useMemo(() => new Set<number>(), []);
+  // Mobile backdrop map now renders the FULL listing set (same as desktop)
+  // plus all saved-listing pins — giving the user spatial context for every
+  // result, not just the active card. Subway pins remain as-is (controlled
+  // via the subway overlay toggle inside MapInner). The single-listing
+  // `mobileMapListings` mini-map behavior has been retired; the active
+  // listing is still visually emphasized via the selectedId ring, and is
+  // now auto-shifted into view when occluded by the floating card (see
+  // `EnsurePinVisibleOnMobile` in MapInner).
+
+  // Stable ref-based callback that returns the floating swipe card's
+  // bounding rect (in viewport coords) or null if it's not currently
+  // rendered. Passed into MapInner so `EnsurePinVisibleOnMobile` can
+  // measure the card on-demand without the rect becoming a prop that
+  // changes every frame / breaks memoization.
+  const getMobileCardBounds = useCallback((): DOMRect | null => {
+    if (typeof document === 'undefined') return null;
+    const el = document.querySelector('.swipe-detail-panel') as HTMLElement | null;
+    if (!el) return null;
+    return el.getBoundingClientRect();
+  }, []);
 
   return (
     <div className="relative flex-1 min-h-0 flex overflow-hidden" style={{ height: '100%' }}>
@@ -588,28 +598,31 @@ export default function SwipeView({
         >
           {hasOpenedMap && (
             <MapComponent
-              // Full-bleed map renders only the active listing + subway
-              // stations — no saved/other pins (those remain on the desktop
-              // backdrop and the full-screen expanded mobile overlay below).
-              listings={mobileMapListings as unknown as Database['public']['Tables']['listings']['Row'][]}
+              // Full-bleed mobile map now renders the full listing set
+              // (same as the desktop backdrop) plus saved-listing pins, so
+              // the user sees every result in spatial context — not just
+              // the active card. The active card's pin is still highlighted
+              // via selectedId, and is auto-shifted into view when occluded
+              // by the floating card (see autoShiftActivePinMobile below).
+              listings={mapListings as unknown as Database['public']['Tables']['listings']['Row'][]}
               selectedId={currentListing?.id ?? null}
               onMarkerClick={handleMarkerClick}
               onSelectDetail={() => {}}
-              favoritedIds={EMPTY_FAVORITES}
+              favoritedIds={mapFavoritedIds}
               onHideListing={() => {}}
               // Wire bounds/move callbacks so user-initiated pan/zoom on the
               // full-bleed map re-queries listings for the new viewport.
-              // Swiping to a new card does NOT move the map (auto-recenter
-              // removed), so bounds-watcher events are always from real user
-              // gestures.
+              // Auto-shift for occluded pins is gated by suppressBoundsRef,
+              // so it never triggers a re-query.
               onBoundsChange={onBoundsChange}
               onMapMove={(center, zoom) => { mapCenterRef.current = center; onMapMove?.(center, zoom); }}
               suppressBoundsRef={suppressBoundsRef}
-              // NOTE: No programmatic re-centering when the active listing
-              // changes. The map viewport is controlled ONLY by user gestures
-              // (drag / scroll-wheel / pinch) or explicit reset actions.
-              // Swiping to a new card highlights the matching pin but does
-              // NOT pan the map.
+              // Opt-in: only on mobile, only when the active listing
+              // changes, pan (never zoom) so the active pin isn't hidden
+              // under the floating card. See EnsurePinVisibleOnMobile in
+              // MapInner for the full rules + guardrails.
+              autoShiftActivePinMobile={true}
+              getMobileCardBounds={getMobileCardBounds}
               visible={true}
               commuteInfoMap={commuteInfoMap}
               initialCenter={currentListing?.lat && currentListing?.lon ? [currentListing.lat, currentListing.lon] : initialCenter}
