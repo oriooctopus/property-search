@@ -19,7 +19,8 @@ import type { FetchDeps, FetchStrategy } from "./types";
 import { fetchCraigslistListings } from "../sources/craigslist";
 import { fetchStreetEasyListings } from "../sources/streeteasy";
 import { fetchStreetEasyFullBisection } from "../sources/streeteasy-bisection";
-import { fetchFacebookMarketplaceListings } from "../sources/facebook-marketplace";
+// Facebook Marketplace disabled to save Apify costs — re-enable when needed
+// import { fetchFacebookMarketplaceListings } from "../sources/facebook-marketplace";
 import { sendIngestAlert } from "./alert";
 
 // ---------------------------------------------------------------------------
@@ -37,10 +38,13 @@ async function runAdapter(source: ListingSource, supabase?: SupabaseClient): Pro
       const res = await fetchCraigslistListings(NYC_PARAMS, { supabase });
       return res.listings;
     }
-    case "facebook-marketplace": {
-      const res = await fetchFacebookMarketplaceListings(NYC_PARAMS);
-      return res.listings;
-    }
+    // Facebook Marketplace disabled to save Apify costs — re-enable when needed
+    // case "facebook-marketplace": {
+    //   const res = await fetchFacebookMarketplaceListings(NYC_PARAMS);
+    //   return res.listings;
+    // }
+    case "facebook-marketplace":
+      throw new Error("facebook-marketplace adapter is disabled — re-enable in strategies.ts and types.ts");
     case "streeteasy": {
       const out: AdapterOutput[] = [];
       const allWarnings: string[] = [];

@@ -231,7 +231,12 @@ function HomeInner() {
   const viewportRequestRef = useRef(0);
   const hasInitialViewportLoad = useRef(false);
   const lastLoadedBounds = useRef<{ latMin: number; latMax: number; lonMin: number; lonMax: number } | null>(null);
-  // Shared ref: BoundsWatcher skips one callback when FlyToSelected sets this
+  // Shared ref: historically used to suppress bounds-watcher callbacks during
+  // a programmatic flyTo. Kept around as a plumbing no-op now that auto-recenter
+  // has been removed — nothing in MapInner sets it to true any more, so all
+  // viewport changes (which can only be user-initiated) feed through to the
+  // bounds watcher. Left intact so we can easily re-introduce a suppression
+  // guard if a future "locate me" / "reset view" button is added.
   const suppressBoundsRef = useRef(false);
 
   // -----------------------------------------------------------------------

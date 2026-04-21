@@ -111,6 +111,7 @@ export async function POST(request: NextRequest) {
     .from("listings")
     .select("*")
     .is("delisted_at", null)
+    .neq("source", "facebook-marketplace")
     .order("last_update_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
     .limit(500);

@@ -191,8 +191,8 @@ export function useConversation({
         minSqft: 'minimum sqft',
         maxSqft: 'maximum sqft',
         excludeNoSqft: 'exclude no sqft',
-        minAvailableDate: 'earliest move-in',
-        maxAvailableDate: 'latest move-in',
+        minAvailableDate: 'earliest move-in date',
+        maxAvailableDate: 'latest move-in date',
         commuteRules: 'commute rules',
       };
 
@@ -231,8 +231,8 @@ export function useConversation({
         minSqft: 'minimum sqft',
         maxSqft: 'maximum sqft',
         excludeNoSqft: 'exclude no sqft',
-        minAvailableDate: 'earliest move-in',
-        maxAvailableDate: 'latest move-in',
+        minAvailableDate: 'earliest move-in date',
+        maxAvailableDate: 'latest move-in date',
         commuteRules: 'commute rules',
       };
 

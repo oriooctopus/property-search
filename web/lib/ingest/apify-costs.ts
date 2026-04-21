@@ -13,7 +13,8 @@ const APIFY_BASE = "https://api.apify.com/v2";
  */
 const ACTOR_ID_TO_SOURCE: Record<string, string> = {
   U5DUNxhH3qKt5PnCf: "facebook-marketplace",
-  owuUx043cdcXvJ6fa: "craigslist",
+  owuUx043cdcXvJ6fa: "craigslist", // old: ivanvs/craigslist-scraper-pay-per-result (retired)
+  YJCnS9qogi9XxDgLB: "craigslist", // current: apify/puppeteer-scraper
   ptsXZUXADV3OKZ5kd: "streeteasy",
 };
 

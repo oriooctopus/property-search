@@ -11,13 +11,12 @@ export type SortField = 'price' | 'beds' | 'listDate';
 
 export type MaxListingAge = '1h' | '3h' | '6h' | '12h' | '1d' | '2d' | '3d' | '1w' | '2w' | '1m' | null;
 
-export const ALL_SOURCES = ['craigslist', 'streeteasy', 'facebook-marketplace'] as const;
+export const ALL_SOURCES = ['craigslist', 'streeteasy'] as const;
 export type ListingSource = (typeof ALL_SOURCES)[number];
 
 export const SOURCE_LABELS: Record<ListingSource, string> = {
   craigslist: 'Craigslist',
   streeteasy: 'StreetEasy',
-  'facebook-marketplace': 'Facebook',
 };
 
 export interface CommuteRule {
@@ -279,6 +278,28 @@ function yearBuiltLabel(minYearBuilt: number | null, maxYearBuilt: number | null
   if (minYearBuilt !== null) parts.push(`${minYearBuilt}+`);
   if (maxYearBuilt !== null) parts.push(`before ${maxYearBuilt}`);
   return parts.join(', ');
+}
+
+function formatShortDate(iso: string): string {
+  // Parse YYYY-MM-DD as a local date to avoid TZ shifts (avoid `new Date("YYYY-MM-DD")` which is UTC)
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  const [, y, mo, d] = m;
+  const date = new Date(Number(y), Number(mo) - 1, Number(d));
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function availableDateLabel(
+  minAvailableDate: string | null,
+  maxAvailableDate: string | null,
+): string {
+  if (!minAvailableDate && !maxAvailableDate) return 'Move-in Date';
+  if (minAvailableDate && maxAvailableDate) {
+    return `${formatShortDate(minAvailableDate)} – ${formatShortDate(maxAvailableDate)}`;
+  }
+  if (maxAvailableDate) return `By ${formatShortDate(maxAvailableDate)}`;
+  return `After ${formatShortDate(minAvailableDate!)}`;
 }
 
 function sqftLabel(minSqft: number | null, maxSqft: number | null, excludeNoSqft?: boolean): string {
@@ -1160,7 +1181,7 @@ function ListingAgeSlider({
   );
 }
 
-type ChipId = 'price' | 'bedsBaths' | 'listingAge' | 'source' | 'commute' | 'yearBuilt' | 'sqft';
+type ChipId = 'price' | 'bedsBaths' | 'listingAge' | 'availableDate' | 'source' | 'commute' | 'yearBuilt' | 'sqft';
 
 // ---------------------------------------------------------------------------
 // Active filter count helper
@@ -1173,6 +1194,7 @@ function countActiveFilters(filters: FiltersState): number {
   if (filters.minRent !== null) count++;
   if (filters.maxRent !== null) count++;
   if (filters.maxListingAge !== null) count++;
+  if (filters.minAvailableDate !== null || filters.maxAvailableDate !== null) count++;
   if (filters.photosFirst) count++;
   if (filters.selectedSources !== null) count++;
   if (filters.minYearBuilt !== null || filters.maxYearBuilt !== null) count++;
@@ -1243,6 +1265,8 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
   const [draftMinSqft, setDraftMinSqft] = useState<number | null>(filters.minSqft);
   const [draftMaxSqft, setDraftMaxSqft] = useState<number | null>(filters.maxSqft);
   const [draftExcludeNoSqft, setDraftExcludeNoSqft] = useState<boolean>(filters.excludeNoSqft);
+  const [draftMinAvailableDate, setDraftMinAvailableDate] = useState<string | null>(filters.minAvailableDate);
+  const [draftMaxAvailableDate, setDraftMaxAvailableDate] = useState<string | null>(filters.maxAvailableDate);
 
   // Mobile filter bottom sheet state
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
@@ -1279,7 +1303,9 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
     setDraftMinSqft(filters.minSqft);
     setDraftMaxSqft(filters.maxSqft);
     setDraftExcludeNoSqft(filters.excludeNoSqft);
-  }, [openChip, filters.minRent, filters.maxRent, filters.priceMode, filters.selectedBeds, filters.minBaths, filters.includeNaBaths, filters.maxListingAge, filters.selectedSources, filters.commuteRules, filters.minYearBuilt, filters.maxYearBuilt, filters.minSqft, filters.maxSqft, filters.excludeNoSqft]);
+    setDraftMinAvailableDate(filters.minAvailableDate);
+    setDraftMaxAvailableDate(filters.maxAvailableDate);
+  }, [openChip, filters.minRent, filters.maxRent, filters.priceMode, filters.selectedBeds, filters.minBaths, filters.includeNaBaths, filters.maxListingAge, filters.selectedSources, filters.commuteRules, filters.minYearBuilt, filters.maxYearBuilt, filters.minSqft, filters.maxSqft, filters.excludeNoSqft, filters.minAvailableDate, filters.maxAvailableDate]);
 
   // Click-outside handler — discard drafts. We don't close `saveOpen` here
   // because the SaveWishlistPanel renders in a fixed-position element outside
@@ -1323,6 +1349,9 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
         setDraftMinSqft(filters.minSqft);
         setDraftMaxSqft(filters.maxSqft);
         setDraftExcludeNoSqft(filters.excludeNoSqft);
+      } else if (chip === 'availableDate') {
+        setDraftMinAvailableDate(filters.minAvailableDate);
+        setDraftMaxAvailableDate(filters.maxAvailableDate);
       }
       return chip;
     });
@@ -1492,7 +1521,77 @@ const Filters = memo(function Filters({ filters, onChange, listingCount, viewTog
             }}
           />
         </FilterChip>
-    
+
+        {/* Move-in Date chip */}
+        <FilterChip
+          compact
+          label={availableDateLabel(filters.minAvailableDate, filters.maxAvailableDate)}
+          active={filters.minAvailableDate !== null || filters.maxAvailableDate !== null}
+          open={openChip === 'availableDate'}
+          onToggle={() => toggleChip('availableDate')}
+        >
+          <SectionTitle>Move-in Date</SectionTitle>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: '#8b949e' }}>
+                From
+              </label>
+              <input
+                type="date"
+                value={draftMinAvailableDate ?? ''}
+                onChange={(e) => setDraftMinAvailableDate(e.target.value || null)}
+                onClick={(e) => {
+                  try { e.currentTarget.showPicker?.(); } catch {}
+                }}
+                className="w-full h-8 rounded px-2 text-sm border cursor-pointer"
+                style={{
+                  backgroundColor: '#0d1117',
+                  color: '#e1e4e8',
+                  borderColor: '#2d333b',
+                  colorScheme: 'dark',
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1" style={{ color: '#8b949e' }}>
+                To
+              </label>
+              <input
+                type="date"
+                value={draftMaxAvailableDate ?? ''}
+                onChange={(e) => setDraftMaxAvailableDate(e.target.value || null)}
+                onClick={(e) => {
+                  try { e.currentTarget.showPicker?.(); } catch {}
+                }}
+                className="w-full h-8 rounded px-2 text-sm border cursor-pointer"
+                style={{
+                  backgroundColor: '#0d1117',
+                  color: '#e1e4e8',
+                  borderColor: '#2d333b',
+                  colorScheme: 'dark',
+                }}
+              />
+            </div>
+          </div>
+          <p className="text-[11px] leading-snug mb-2" style={{ color: '#8b949e' }}>
+            Only showing listings with a known availability date.
+          </p>
+          <DropdownFooter
+            onReset={() => {
+              onChange({ ...filters, minAvailableDate: null, maxAvailableDate: null });
+              setOpenChip(null);
+            }}
+            onDone={() => {
+              onChange({
+                ...filters,
+                minAvailableDate: draftMinAvailableDate,
+                maxAvailableDate: draftMaxAvailableDate,
+              });
+              setOpenChip(null);
+            }}
+          />
+        </FilterChip>
+
         {/* Source chip */}
         <FilterChip
           compact
