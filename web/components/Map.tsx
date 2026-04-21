@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { memo } from 'react';
 import type React from 'react';
 import type { Database } from '@/lib/types';
 import type { ViewportBounds } from './MapInner';
@@ -42,7 +43,10 @@ interface MapProps {
   hoveredStation?: HoveredStation | null;
 }
 
-export default function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, initialCenter, initialZoom, visible, commuteInfoMap, panOffset, hoveredStation }: MapProps) {
+// Memoized so parent re-renders (e.g. view-switches on mobile) don't force
+// the Leaflet tree to re-run its own render cycle. Stable callback references
+// from the parent are required for the memo to be effective.
+function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, initialCenter, initialZoom, visible, commuteInfoMap, panOffset, hoveredStation }: MapProps) {
   return (
     <MapInner
       listings={listings}
@@ -50,9 +54,9 @@ export default function Map({ listings, selectedId, onMarkerClick, onSelectDetai
       onMarkerClick={onMarkerClick}
       onSelectDetail={onSelectDetail}
       favoritedIds={favoritedIds}
-      wouldLiveIds={wouldLiveIds ?? new Set()}
-      onToggleFavorite={onToggleFavorite ?? (() => {})}
-      onToggleWouldLive={onToggleWouldLive ?? (() => {})}
+      wouldLiveIds={wouldLiveIds ?? EMPTY_SET}
+      onToggleFavorite={onToggleFavorite ?? NOOP}
+      onToggleWouldLive={onToggleWouldLive ?? NOOP}
       onHideListing={onHideListing}
       onBoundsChange={onBoundsChange}
       onMapMove={onMapMove}
@@ -66,3 +70,12 @@ export default function Map({ listings, selectedId, onMarkerClick, onSelectDetai
     />
   );
 }
+
+// Stable sentinels for optional props — using `new Set()` / `() => {}` inline
+// would break React.memo's shallow equality on MapInner by creating a new
+// reference on every render, forcing a cascade of expensive re-renders in
+// Leaflet's children (which render markers for ~2000 listings).
+const EMPTY_SET: Set<number> = new Set();
+const NOOP = () => {};
+
+export default memo(Map);
