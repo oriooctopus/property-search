@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
+import NativeShell from "@/components/NativeShell";
 import Providers from "@/components/Providers";
 
 const geistSans = Geist({
@@ -64,6 +65,7 @@ export default function RootLayout({
         style={{ backgroundColor: "#0f1117", color: "#e1e4e8" }}
       >
         <Providers>
+          <NativeShell />
           <Navbar />
           <main className="pt-0 lg:pt-[60px] overflow-x-hidden">{children}</main>
           <footer className="hidden" aria-hidden="true">Built {BUILD_TIME}</footer>

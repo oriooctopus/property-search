@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { triggerHaptic } from '@/lib/native';
 
 function SearchIcon() {
   return (
@@ -45,6 +46,7 @@ export default function AISearchBar({ onSearch, isLoading, lastQuery, lastError,
   const handleSubmit = useCallback(() => {
     const value = input.trim();
     if (!value || isLoading) return;
+    void triggerHaptic('selection');
     onSearch(value);
     setInput('');
   }, [input, isLoading, onSearch]);
