@@ -68,9 +68,16 @@ Launch ALL implementation tasks, bug fixes, and multi-step work as background ag
 
 When agents complete and the user hasn't acknowledged or acted on the results (e.g., picking a design option, reviewing a fix), gently remind them at the end of your next message. With many parallel agents it's easy to lose track of pending decisions.
 
-## Dev Server
+## BLOCKING: Dev Server MUST Run on Port 8000
 
-The dev server runs on port **8000** (`http://localhost:8000`), not the Next.js default of 3000. Always use port 8000 when linking to local pages.
+The dev server runs on port **8000** (`http://localhost:8000`), NOT the Next.js default of 3000. This is non-negotiable.
+
+- `web/package.json` pins the port: `"dev": "next dev --port 8000"`. Do NOT remove the `--port 8000` flag under any circumstances. If you see a dev script without it, that's a bug — fix it.
+- Before starting the dev server, confirm the script still has `--port 8000`. If an agent stripped it, add it back before running.
+- Never run `next dev` or any other dev command that lets the framework pick a default port. If you need to start dev in a non-standard way, pass `--port 8000` explicitly.
+- If you see `localhost:3000` in any URL, screenshot, or log output related to this project, STOP — something launched the wrong port. Kill it (`lsof -ti:3000 | xargs kill -9`) and restart on 8000.
+- When linking to local pages in status tables, reports, or messages: always use `http://localhost:8000/...`.
+- Never tell the user "dev server is running on 3000" — that's a regression. Fix it silently and report 8000.
 
 ## Deployment
 
