@@ -228,8 +228,9 @@ describe('getVisibleMapRect', () => {
     const out = getVisibleMapRect(MAP_RECT, [occluder('swipe-card', SWIPE_CARD)]);
     expect(out).not.toBeNull();
     expect(out!.top).toBe(0);
-    // Swipe card top is 380 — visible region ends there.
-    expect(out!.bottom).toBe(380);
+    // Swipe card top is 380 — visible region ends MIN_CLEARANCE_PX above
+    // the card so it stays in sync with isPinVisible's hysteresis.
+    expect(out!.bottom).toBe(380 - MIN_CLEARANCE_PX);
     expect(out!.left).toBe(0);
     expect(out!.right).toBe(390);
   });
@@ -242,7 +243,7 @@ describe('getVisibleMapRect', () => {
       occluder('swipe-card', SWIPE_CARD),
     ]);
     expect(out).not.toBeNull();
-    expect(out!.bottom).toBe(380);
+    expect(out!.bottom).toBe(380 - MIN_CLEARANCE_PX);
   });
 
   it('shrinks the top edge for a top-anchored nav bar', () => {
@@ -250,7 +251,7 @@ describe('getVisibleMapRect', () => {
     const topNav = r(0, 0, 390, 60);
     const out = getVisibleMapRect(MAP_RECT, [occluder('top-nav', topNav)]);
     expect(out).not.toBeNull();
-    expect(out!.top).toBe(60);
+    expect(out!.top).toBe(60 + MIN_CLEARANCE_PX);
     expect(out!.bottom).toBe(844);
   });
 
@@ -261,8 +262,8 @@ describe('getVisibleMapRect', () => {
       occluder('swipe-card', SWIPE_CARD),
     ]);
     expect(out).not.toBeNull();
-    expect(out!.top).toBe(60);
-    expect(out!.bottom).toBe(380);
+    expect(out!.top).toBe(60 + MIN_CLEARANCE_PX);
+    expect(out!.bottom).toBe(380 - MIN_CLEARANCE_PX);
   });
 
   it('returns null when an occluder fully covers the map', () => {
@@ -301,6 +302,62 @@ describe('getVisibleMapRect', () => {
   it('returns null for a degenerate map rect', () => {
     expect(getVisibleMapRect(r(0, 0, 0, 0), [])).toBeNull();
     expect(getVisibleMapRect(r(0, 0, 100, 0), [])).toBeNull();
+  });
+
+  // Invariant: a pin sitting exactly at an edge of the visible rect
+  // that was shrunk by an occluder MUST also be considered visible by
+  // isPinVisible given the same map rect + occluders. This guarantees
+  // no "phantom pin auto-pan" where the bounds query includes a pin
+  // that isPinVisible's 16px hysteresis then rejects.
+  //
+  // NOTE: the invariant applies only to edges actually SHRUNK by an
+  // occluder. Edges left at mapRect.top/bottom are separately governed
+  // by isPinVisible's own map-bounds clearance — that's a different
+  // contract (keeping pins off the very edge of the viewport).
+  it('invariant: a pin at the bottom edge of the visible rect passes isPinVisible (shrunk-edge case)', () => {
+    const occluders = [
+      occluder('swipe-card', SWIPE_CARD),
+      occluder('action-pill', ACTION_PILL),
+    ];
+    const visible = getVisibleMapRect(MAP_RECT, occluders);
+    expect(visible).not.toBeNull();
+
+    // Pin centered horizontally inside the visible rect, hugging the
+    // bottom edge (pin-center.y = visible.bottom - PIN_RADIUS_PX so the
+    // pin's bottom coincides with the visible rect's bottom).
+    const pinAtBottomEdge = {
+      x: visible!.left + visible!.width / 2,
+      y: visible!.bottom - PIN_RADIUS_PX,
+    };
+    const bottomResult = isPinVisible(pinAtBottomEdge, MAP_RECT, occluders);
+    expect(bottomResult.visible).toBe(true);
+    expect(bottomResult.occludedBy).toBeNull();
+  });
+
+  it('invariant: a pin at the top edge of the visible rect passes isPinVisible when top was shrunk', () => {
+    const topNav = r(0, 0, 390, 60);
+    const occluders = [
+      occluder('top-nav', topNav),
+      occluder('swipe-card', SWIPE_CARD),
+    ];
+    const visible = getVisibleMapRect(MAP_RECT, occluders);
+    expect(visible).not.toBeNull();
+
+    const pinAtTopEdge = {
+      x: visible!.left + visible!.width / 2,
+      y: visible!.top + PIN_RADIUS_PX,
+    };
+    const topResult = isPinVisible(pinAtTopEdge, MAP_RECT, occluders);
+    expect(topResult.visible).toBe(true);
+    expect(topResult.occludedBy).toBeNull();
+
+    const pinAtBottomEdge = {
+      x: visible!.left + visible!.width / 2,
+      y: visible!.bottom - PIN_RADIUS_PX,
+    };
+    const bottomResult = isPinVisible(pinAtBottomEdge, MAP_RECT, occluders);
+    expect(bottomResult.visible).toBe(true);
+    expect(bottomResult.occludedBy).toBeNull();
   });
 });
 

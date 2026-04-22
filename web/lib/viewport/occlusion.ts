@@ -234,30 +234,37 @@ export function sampleAllRects(
 
 /**
  * Compute the largest axis-aligned sub-rectangle of `mapRect` that is NOT
- * covered by any of the provided occluders.
+ * covered by any of the provided occluders — inset by `MIN_CLEARANCE_PX`
+ * on every edge that was actually shrunk by an occluder.
  *
  * Used by the listings-search bounds query (see `BoundsWatcher` in
  * `MapInner.tsx`) so that map-bounds-driven fetches only consider the
  * portion of the map the user can actually SEE — not the area hidden
  * behind the swipe card / action pill on mobile.
  *
- * Modelling assumption: the dominant chrome occluders (swipe-card,
- * action-pill) sit at the BOTTOM of the viewport, and the top-nav (when
- * registered) sits at the TOP. We therefore shrink `mapRect` by:
- *   - Pushing `top` down to the lowest `bottom` of any top-anchored
- *     occluder that overlaps the map.
- *   - Pushing `bottom` up to the highest `top` of any bottom-anchored
- *     occluder that overlaps the map.
+ * Modelling assumption: occluders are classified as top-anchored or
+ * bottom-anchored by their vertical center relative to the map's
+ * midpoint. Any occluder whose center sits at or below the map's midline
+ * is treated as bottom-anchored; otherwise top-anchored. We do NOT model
+ * L-shaped visible regions or ignore mid-map straddlers — every overlapping
+ * occluder shrinks either the top or the bottom edge.
  *
- * "Top-anchored" means the occluder's top edge is at or above the map's
- * top, and its bottom is in the upper half of the map (covers the top
- * but not the bottom). Symmetric for bottom-anchored. Floating mid-map
- * overlays are ignored — we don't try to model L-shaped visible regions.
+ * Shrink behavior:
+ *   - Bottom-anchored occluder → push `bottom` up to `occluder.top`.
+ *   - Top-anchored occluder → push `top` down to `occluder.bottom`.
+ *
+ * Hysteresis: the returned rect is further inset by `MIN_CLEARANCE_PX` on
+ * each edge that was actually shrunk. This matches the clearance used by
+ * `isPinVisible` so a pin sitting at the edge of the returned visible rect
+ * is ALSO considered visible by `isPinVisible` — preventing "phantom pin
+ * auto-pan" drift where the listings query includes a pin that the
+ * visibility check then rejects by the hysteresis margin.
  *
  * Returns `null` if the resulting rect has no positive area, OR if there
  * are no occluders and the map rect itself has no positive area. On
  * desktop (where no swipe-card / action-pill is registered), this
- * naturally returns the full `mapRect` unchanged.
+ * naturally returns the full `mapRect` unchanged (no edges were shrunk,
+ * so no hysteresis inset is applied).
  */
 export function getVisibleMapRect(
   mapRect: DOMRect,
@@ -269,6 +276,12 @@ export function getVisibleMapRect(
   let bottom = mapRect.bottom;
   const left = mapRect.left;
   const right = mapRect.right;
+
+  // Track which edges were actually shrunk by an occluder; only those
+  // get the hysteresis inset applied (we don't want to gratuitously
+  // shrink an untouched edge).
+  let shrunkTop = false;
+  let shrunkBottom = false;
 
   const mapMidY = mapRect.top + mapRect.height / 2;
 
@@ -289,12 +302,24 @@ export function getVisibleMapRect(
     // Pull the visible bottom up to the occluder's top edge.
     const occCenterY = r.top + r.height / 2;
     if (occCenterY >= mapMidY) {
-      if (r.top < bottom) bottom = r.top;
+      if (r.top < bottom) {
+        bottom = r.top;
+        shrunkBottom = true;
+      }
     } else {
       // Top-anchored: pull the visible top down to the occluder's bottom.
-      if (r.bottom > top) top = r.bottom;
+      if (r.bottom > top) {
+        top = r.bottom;
+        shrunkTop = true;
+      }
     }
   }
+
+  // Apply hysteresis inset ONLY on edges actually shrunk by an occluder.
+  // This keeps the returned rect in sync with `isPinVisible`'s clearance
+  // check: a pin at the edge of this rect also passes `isPinVisible`.
+  if (shrunkTop) top += MIN_CLEARANCE_PX;
+  if (shrunkBottom) bottom -= MIN_CLEARANCE_PX;
 
   if (bottom - top <= 0 || right - left <= 0) return null;
 
