@@ -342,18 +342,61 @@ export default function SwipeView({
   );
 
   // After deck recomputes, restore position to the listing the user was viewing.
-  // If that listing is gone (swiped/hidden), stay at the same index (next in line).
+  // If the tracked listing is gone (or there's no tracked id yet — e.g. fresh
+  // search result for a brand-new viewport), pick the first deck item whose
+  // pin is currently visible per the occlusion model. This prevents Bug B:
+  // "panned to a new area, deck initialized at index 0, that pin happened to
+  // be hidden behind the swipe card, then EnsurePinVisible auto-panned."
+  //
+  // Falls back to index 0 if no candidate is visible, OR if we can't sample
+  // the map yet (Leaflet not mounted on SSR / first paint). The subsequent
+  // EnsurePinVisible auto-pan will then take over as before — same behavior
+  // as today, but only as a true last resort.
   useEffect(() => {
     const trackedId = currentListingIdRef.current;
-    if (trackedId === null) return;
-    const newIdx = deck.findIndex((l) => l.id === trackedId);
-    if (newIdx >= 0 && newIdx !== currentIndex) {
-      setCurrentIndex(newIdx);
-    } else if (newIdx === -1) {
-      // Listing was removed — clamp index to deck bounds
-      if (currentIndex >= deck.length && deck.length > 0) {
-        setCurrentIndex(deck.length - 1);
+    const trackedIdx = trackedId === null ? -1 : deck.findIndex((l) => l.id === trackedId);
+
+    if (trackedIdx >= 0) {
+      if (trackedIdx !== currentIndex) setCurrentIndex(trackedIdx);
+      return;
+    }
+
+    // Tracked listing missing (deleted from deck, OR no tracked id at all —
+    // first-load / fresh-search). Find the first deck item whose pin is
+    // visible per the occlusion model. Mobile-only — desktop has no
+    // occluders registered, so the predicate always returns visible and we
+    // pick index 0 anyway.
+    if (isMobileViewport === true && typeof window !== 'undefined' && deck.length > 0) {
+      const map = (window as unknown as { __leafletMap?: import('leaflet').Map }).__leafletMap;
+      if (map) {
+        const containerEl = map.getContainer();
+        const mapRect = containerEl.getBoundingClientRect();
+        const occluders = occluderRegistry?.getAll() ?? [];
+        const SEARCH_CAP = 40;
+        const end = Math.min(deck.length, SEARCH_CAP);
+        for (let i = 0; i < end; i++) {
+          const cand = deck[i];
+          if (!cand || cand.lat == null || cand.lon == null) continue;
+          try {
+            const pt = map.latLngToContainerPoint([cand.lat, cand.lon]);
+            const vp = { x: pt.x + mapRect.left, y: pt.y + mapRect.top };
+            if (isPinVisible(vp, mapRect, occluders).visible) {
+              if (i !== currentIndex) setCurrentIndex(i);
+              currentListingIdRef.current = cand.id;
+              return;
+            }
+          } catch {
+            // ignore — fall through to next candidate
+          }
+        }
       }
+    }
+
+    // No visible candidate (or map not ready / desktop) — clamp index.
+    if (currentIndex >= deck.length && deck.length > 0) {
+      setCurrentIndex(deck.length - 1);
+    } else if (trackedId === null && currentIndex !== 0 && deck.length > 0) {
+      setCurrentIndex(0);
     }
   }, [deck]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -432,27 +475,65 @@ export default function SwipeView({
   }, [deck]);
 
   // ---------------------------------------------------------------------
-  // Prefer-visible-above-card: when the active listing changes on mobile,
-  // before MapInner runs its auto-shift, check whether any un-swiped
-  // upcoming listing's pin is ALREADY in the map-bleed area above the
-  // floating swipe card. If so, swap the active card to THAT listing by
-  // advancing currentIndex — avoiding a map pan entirely.
+  // Map-pan tick: bumped on every Leaflet `moveend`. The deck-skip effect
+  // below re-runs on every bump so visibility is re-evaluated after the
+  // user pans the map even when the active listing id hasn't changed.
+  // Without this, Bug A surfaces: the user pans so the active pin slides
+  // under the card, but no swap fires because nothing tells us to look.
+  // ---------------------------------------------------------------------
+  const [mapMoveTick, setMapMoveTick] = useState(0);
+  useEffect(() => {
+    if (isMobileViewport !== true) return;
+    if (typeof window === 'undefined') return;
+    let cancelled = false;
+    let bound = false;
+    let map: import('leaflet').Map | null = null;
+    const onMoveEnd = () => {
+      if (cancelled) return;
+      setMapMoveTick((t) => t + 1);
+    };
+    // Leaflet may not be mounted yet; poll briefly until __leafletMap exists.
+    const tryBind = () => {
+      if (cancelled || bound) return;
+      const m = (window as unknown as { __leafletMap?: import('leaflet').Map }).__leafletMap;
+      if (!m) {
+        window.setTimeout(tryBind, 200);
+        return;
+      }
+      map = m;
+      m.on('moveend', onMoveEnd);
+      bound = true;
+    };
+    tryBind();
+    return () => {
+      cancelled = true;
+      if (map && bound) map.off('moveend', onMoveEnd);
+    };
+  }, [isMobileViewport]);
+
+  // ---------------------------------------------------------------------
+  // Prefer-visible-above-card: re-evaluate the active pin's visibility
+  // whenever the active listing changes OR the map finishes panning. If
+  // the active pin is occluded (under card / pill / off-map), search the
+  // deck for an already-visible candidate and swap to it. If none, leave
+  // the index alone — MapInner's EnsurePinVisibleOnMobile will pan as
+  // the last resort.
   //
-  // Fallback (no candidate above card) → leave the index alone and let
-  // MapInner's EnsurePinVisibleOnMobile pan the map as the last resort.
+  // Idempotency: the predicate's "is current already visible" early-return
+  // (below) is the natural debounce — once we land on a visible pin, the
+  // effect short-circuits on every subsequent run with no state changes,
+  // so it can't loop. We deliberately do NOT use a `lastCheckedIdRef`
+  // dedupe because that would prevent re-checks after a map pan changed
+  // the visibility of the same listing (Bug A's root cause).
   //
   // Safety guards:
   // - Only runs on mobile viewports.
-  // - Only runs when Leaflet's map instance and the floating card DOM
-  //   are both measurable.
+  // - Only runs when Leaflet's map instance is measurable.
   // - Never runs during an active pan gesture (isPanningRef).
-  // - Never runs twice for the same active-listing id (lastCheckedIdRef).
   // ---------------------------------------------------------------------
-  const lastCheckedIdRef = useRef<number | null>(null);
   useEffect(() => {
     if (isMobileViewport !== true) return;
     if (!currentListing || !currentListing.lat || !currentListing.lon) return;
-    if (lastCheckedIdRef.current === currentListing.id) return;
     if (isPanningRef?.current) return;
     if (typeof window === 'undefined') return;
 
@@ -483,13 +564,9 @@ export default function SwipeView({
     };
 
     // Is the CURRENT active pin already visible? If yes, no swap needed.
-    if (currentListing.lat != null && currentListing.lon != null) {
-      if (isPinFullyVisible(currentListing.lat, currentListing.lon)) {
-        lastCheckedIdRef.current = currentListing.id;
-        return;
-      }
-    } else {
-      lastCheckedIdRef.current = currentListing.id;
+    // (This early-return is what makes the effect idempotent across
+    // re-runs from `mapMoveTick`: once visible, subsequent ticks no-op.)
+    if (isPinFullyVisible(currentListing.lat, currentListing.lon)) {
       return;
     }
 
@@ -506,7 +583,6 @@ export default function SwipeView({
       if (isPinFullyVisible(candidate.lat, candidate.lon)) {
         // Swap: advance index to the candidate. The previously-active (occluded)
         // listing remains in the deck for a future visit.
-        lastCheckedIdRef.current = candidate.id;
         currentListingIdRef.current = candidate.id;
         setCurrentIndex(i);
         return;
@@ -514,9 +590,8 @@ export default function SwipeView({
     }
 
     // No forward candidate found; let MapInner's auto-shift handle it.
-    lastCheckedIdRef.current = currentListing.id;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentListing?.id, isMobileViewport, deck, currentIndex, isPanningRef, occluderRegistry]);
+  }, [currentListing?.id, isMobileViewport, deck, currentIndex, isPanningRef, occluderRegistry, mapMoveTick]);
 
   // ---------------------------------------------------------------------------
   // Swipe handler
