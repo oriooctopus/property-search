@@ -11,7 +11,8 @@ import { ButtonBase } from './ui/ButtonBase';
 import type { CommuteInfo } from './ListingCard';
 import type { HoveredStation } from './SwipeCard';
 import { useOccluders } from '@/lib/viewport/OccluderRegistry';
-import { isPinVisible, findVisiblePosition, MIN_CLEARANCE_PX } from '@/lib/viewport/occlusion';
+import { useLeafletMapSetter } from '@/lib/viewport/LeafletMapContext';
+import { isPinVisible, findVisiblePosition, MIN_CLEARANCE_PX, projectPinToViewport } from '@/lib/viewport/occlusion';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -363,19 +364,32 @@ function InjectPopupStyles() {
 
 function InvalidateSize({ visible }: { visible: boolean }) {
   const map = useMap();
+  const setLeafletMap = useLeafletMapSetter();
 
-  // On mount: initial invalidation. Also: attach the map instance to
-  // `window.__leafletMap` so E2E tests can drive user-like interactions
-  // (e.g. `map.setView(...)`) without relying on CSS-layer hit-testing,
-  // which the floating swipe card disrupts on mobile. No-op in production
-  // unless a test harness looks for it.
+  // On mount: initial invalidation. Also: publish the map instance two ways:
+  //   1. LeafletMapContext — the production-code path. Consumers (SwipeView,
+  //      debug overlay) read `useLeafletMap()` to get a reactive handle
+  //      that goes null on unmount.
+  //   2. `window.__leafletMap` — legacy test-only escape hatch. The E2E
+  //      spec at `tests/verify-mobile-dots-autoshift.spec.ts` drives the
+  //      map via `window.__leafletMap.setView(...)` and we preserve that
+  //      for now. DO NOT read this global from React components — use
+  //      `useLeafletMap()` instead.
   useEffect(() => {
     const timer = setTimeout(() => map.invalidateSize(), 100);
     if (typeof window !== 'undefined') {
       (window as unknown as { __leafletMap?: L.Map }).__leafletMap = map;
     }
-    return () => clearTimeout(timer);
-  }, [map]);
+    setLeafletMap(map);
+    return () => {
+      clearTimeout(timer);
+      setLeafletMap(null);
+      if (typeof window !== 'undefined') {
+        const w = window as unknown as { __leafletMap?: L.Map };
+        if (w.__leafletMap === map) delete w.__leafletMap;
+      }
+    };
+  }, [map, setLeafletMap]);
 
   // When the container transitions from hidden→visible (e.g. mobile list→map toggle),
   // ResizeObserver may not fire because display:none elements have no layout.
@@ -459,6 +473,15 @@ function EnsurePinVisibleOnMobile({
     activeLatLonRef.current = activeLatLon;
   }, [activeListingId, activeLatLon]);
 
+  // Blocker 2 fix: when the user is mid-gesture we can't evaluate (the map
+  // is still settling). Previously we just early-returned and hoped the
+  // next `moveend` would re-trigger — but if the caller's own `moveend`
+  // listener fires while `isPanningRef === true` (a common race during
+  // overlapping user pans + auto-pans) we drop the evaluation and never
+  // re-schedule. This ref guards a single `map.once('moveend', ...)`
+  // re-eval so we never stack listeners if evaluate() re-enters.
+  const pendingReevalRef = useRef(false);
+
   // Single re-evaluation function: invoked both on activeListingId change
   // (the original trigger) AND on every map `moveend` (so user-initiated
   // pans that move the active pin under the card / pill auto-correct).
@@ -475,17 +498,28 @@ function EnsurePinVisibleOnMobile({
     const id = activeIdRef.current;
     const latLon = activeLatLonRef.current;
     if (!id || !latLon) return;
-    if (isPanningRef?.current) return;
+    // Blocker 2 fix: while the user is mid-pan, the map is still settling
+    // and any pin position we read is stale. Defer until the gesture ends
+    // by registering a one-shot `moveend` re-eval. Idempotent: the
+    // `pendingReevalRef` guard prevents stacking duplicates if evaluate()
+    // re-enters during the same gesture.
+    if (isPanningRef?.current) {
+      if (!pendingReevalRef.current) {
+        pendingReevalRef.current = true;
+        map.once('moveend', () => {
+          pendingReevalRef.current = false;
+          evaluate();
+        });
+      }
+      return;
+    }
     if (suppressBoundsRef.current) return;
 
     const containerEl = map.getContainer();
     const mapRect = containerEl.getBoundingClientRect();
 
-    const pinPointContainer = map.latLngToContainerPoint([latLon.lat, latLon.lon]);
-    const pinViewport = {
-      x: pinPointContainer.x + mapRect.left,
-      y: pinPointContainer.y + mapRect.top,
-    };
+    const pinViewport = projectPinToViewport(map, latLon.lat, latLon.lon);
+    if (!pinViewport) return;
 
     const occluders = occluderRegistry?.getAll() ?? [];
 

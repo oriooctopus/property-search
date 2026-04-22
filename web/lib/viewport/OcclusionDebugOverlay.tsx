@@ -16,6 +16,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useOccluders } from './OccluderRegistry';
+import { useLeafletMap } from './LeafletMapContext';
 import { isPinVisible, PIN_RADIUS_PX, type ViewportPoint } from './occlusion';
 
 const COLORS = {
@@ -38,6 +39,7 @@ export function OcclusionDebugOverlay() {
   const params = useSearchParams();
   const enabled = params?.get('debug') === 'pins';
   const occluders = useOccluders();
+  const map = useLeafletMap();
   const [state, setState] = useState<OverlayState>({
     rects: [],
     pin: null,
@@ -57,19 +59,14 @@ export function OcclusionDebugOverlay() {
         if (r && r.width > 0 && r.height > 0) rects.push({ id: occ.id, rect: r });
       }
 
-      // Find the active map pin via Leaflet. The map exposes itself on
-      // window.__leafletMap; the active marker is the largest one (it's
-      // the visually emphasized "selected" marker).
-      type LeafletMap = import('leaflet').Map;
-      const map = (window as unknown as { __leafletMap?: LeafletMap }).__leafletMap;
+      // Find the active map pin. The Leaflet map handle now comes from
+      // `useLeafletMap()` (LeafletMapContext) instead of polling
+      // `window.__leafletMap`. The active marker is identified via its
+      // `.dw-active-pin` SVG class (set in MapInner).
       let pin: ViewportPoint | null = null;
       let mapRect: DOMRect | null = null;
       if (map) {
         mapRect = map.getContainer().getBoundingClientRect();
-        // Find the active pin in the DOM. The active CircleMarker has
-        // class `dw-active-pin` (set in MapInner). Leaflet renders
-        // CircleMarkers as <path> nodes inside the SVG overlay, so we
-        // query for the path and use its bounding box.
         const activeEl = document.querySelector('.dw-active-pin') as SVGGraphicsElement | null;
         if (activeEl) {
           const r = activeEl.getBoundingClientRect();
@@ -89,7 +86,7 @@ export function OcclusionDebugOverlay() {
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [enabled, occluders]);
+  }, [enabled, occluders, map]);
 
   if (!enabled) return null;
 
