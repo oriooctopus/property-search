@@ -589,17 +589,17 @@ export interface MapProps {
 /* ------------------------------------------------------------------ */
 /*  Viewport bounds watcher — fires onBoundsChange after idle period  */
 /*                                                                    */
-/*  Tightened from 500ms → 300ms idle so pan-driven searches feel     */
-/*  more responsive, while still letting rapid consecutive pans       */
-/*  coalesce into a single request (the TTL of the debounce resets    */
-/*  on every moveend). Any in-flight fetch that was triggered by a    */
-/*  previous moveend is aborted by the caller (see loadForViewport    */
-/*  AbortController in web/app/page.tsx) when a new bounds change     */
-/*  fires.                                                            */
+/*  1000ms debounce so users can pan/zoom across several regions      */
+/*  without every intermediate idle triggering a new search. The TTL  */
+/*  resets on every moveend, and any in-flight fetch from a previous  */
+/*  trigger is aborted by the caller (loadForViewport AbortController */
+/*  in web/app/page.tsx) when a new bounds change fires.              */
 /*                                                                    */
 /*  isPanningRef is exposed so components like EnsurePinVisibleOnMobile*/
 /*  can defer / skip work while the user is actively dragging the map.*/
 /* ------------------------------------------------------------------ */
+const BOUNDS_DEBOUNCE_MS = 1000;
+
 function BoundsWatcher({
   onBoundsChange,
   onMapMove,
@@ -644,7 +644,7 @@ function BoundsWatcher({
           const c = map.getCenter();
           onMapMoveRef.current({ lat: c.lat, lng: c.lng }, map.getZoom());
         }
-      }, 300);
+      }, BOUNDS_DEBOUNCE_MS);
     };
 
     const onMoveStart = () => {
