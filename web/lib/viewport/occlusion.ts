@@ -232,6 +232,75 @@ export function sampleAllRects(
   return out;
 }
 
+/**
+ * Compute the largest axis-aligned sub-rectangle of `mapRect` that is NOT
+ * covered by any of the provided occluders.
+ *
+ * Used by the listings-search bounds query (see `BoundsWatcher` in
+ * `MapInner.tsx`) so that map-bounds-driven fetches only consider the
+ * portion of the map the user can actually SEE — not the area hidden
+ * behind the swipe card / action pill on mobile.
+ *
+ * Modelling assumption: the dominant chrome occluders (swipe-card,
+ * action-pill) sit at the BOTTOM of the viewport, and the top-nav (when
+ * registered) sits at the TOP. We therefore shrink `mapRect` by:
+ *   - Pushing `top` down to the lowest `bottom` of any top-anchored
+ *     occluder that overlaps the map.
+ *   - Pushing `bottom` up to the highest `top` of any bottom-anchored
+ *     occluder that overlaps the map.
+ *
+ * "Top-anchored" means the occluder's top edge is at or above the map's
+ * top, and its bottom is in the upper half of the map (covers the top
+ * but not the bottom). Symmetric for bottom-anchored. Floating mid-map
+ * overlays are ignored — we don't try to model L-shaped visible regions.
+ *
+ * Returns `null` if the resulting rect has no positive area, OR if there
+ * are no occluders and the map rect itself has no positive area. On
+ * desktop (where no swipe-card / action-pill is registered), this
+ * naturally returns the full `mapRect` unchanged.
+ */
+export function getVisibleMapRect(
+  mapRect: DOMRect,
+  occluders: Occluder[],
+): DOMRect | null {
+  if (mapRect.width <= 0 || mapRect.height <= 0) return null;
+
+  let top = mapRect.top;
+  let bottom = mapRect.bottom;
+  const left = mapRect.left;
+  const right = mapRect.right;
+
+  const mapMidY = mapRect.top + mapRect.height / 2;
+
+  for (const occ of occluders) {
+    const r = occ.getRect();
+    if (!r) continue;
+    if (r.width <= 0 || r.height <= 0) continue;
+
+    // Must overlap the map horizontally to occlude any of its area.
+    const hOverlap = Math.min(r.right, right) - Math.max(r.left, left);
+    if (hOverlap <= 0) continue;
+
+    // Must overlap the map vertically at all.
+    const vOverlap = Math.min(r.bottom, bottom) - Math.max(r.top, top);
+    if (vOverlap <= 0) continue;
+
+    // Bottom-anchored: occluder's center sits in the lower half of the map.
+    // Pull the visible bottom up to the occluder's top edge.
+    const occCenterY = r.top + r.height / 2;
+    if (occCenterY >= mapMidY) {
+      if (r.top < bottom) bottom = r.top;
+    } else {
+      // Top-anchored: pull the visible top down to the occluder's bottom.
+      if (r.bottom > top) top = r.bottom;
+    }
+  }
+
+  if (bottom - top <= 0 || right - left <= 0) return null;
+
+  return new DOMRect(left, top, right - left, bottom - top);
+}
+
 export interface FindVisiblePositionResult {
   /**
    * Pixel delta to add to the pin's CURRENT viewport y so it lands in a

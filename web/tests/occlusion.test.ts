@@ -9,6 +9,7 @@ import {
   isPinVisible,
   findVisiblePosition,
   projectPinToViewport,
+  getVisibleMapRect,
   PIN_RADIUS_PX,
   MIN_CLEARANCE_PX,
   type Occluder,
@@ -210,6 +211,96 @@ describe('findVisiblePosition', () => {
       [occluder('left-panel', leftPanel)],
     );
     expect(out.deltaY).toBe(0);
+  });
+});
+
+describe('getVisibleMapRect', () => {
+  it('returns the full map rect when there are no occluders', () => {
+    const out = getVisibleMapRect(MAP_RECT, []);
+    expect(out).not.toBeNull();
+    expect(out!.top).toBe(0);
+    expect(out!.bottom).toBe(844);
+    expect(out!.left).toBe(0);
+    expect(out!.right).toBe(390);
+  });
+
+  it('shrinks the bottom edge for a bottom-anchored swipe card', () => {
+    const out = getVisibleMapRect(MAP_RECT, [occluder('swipe-card', SWIPE_CARD)]);
+    expect(out).not.toBeNull();
+    expect(out!.top).toBe(0);
+    // Swipe card top is 380 — visible region ends there.
+    expect(out!.bottom).toBe(380);
+    expect(out!.left).toBe(0);
+    expect(out!.right).toBe(390);
+  });
+
+  it('uses the highest top edge among multiple bottom-anchored occluders', () => {
+    // Action pill (top=780) and swipe card (top=380). Swipe card wins
+    // because its top is HIGHER (smaller y) — it occludes more.
+    const out = getVisibleMapRect(MAP_RECT, [
+      occluder('action-pill', ACTION_PILL),
+      occluder('swipe-card', SWIPE_CARD),
+    ]);
+    expect(out).not.toBeNull();
+    expect(out!.bottom).toBe(380);
+  });
+
+  it('shrinks the top edge for a top-anchored nav bar', () => {
+    // Top nav: 60px tall at the top of the viewport.
+    const topNav = r(0, 0, 390, 60);
+    const out = getVisibleMapRect(MAP_RECT, [occluder('top-nav', topNav)]);
+    expect(out).not.toBeNull();
+    expect(out!.top).toBe(60);
+    expect(out!.bottom).toBe(844);
+  });
+
+  it('handles top + bottom occluders simultaneously (L-shape collapsed to bbox)', () => {
+    const topNav = r(0, 0, 390, 60);
+    const out = getVisibleMapRect(MAP_RECT, [
+      occluder('top-nav', topNav),
+      occluder('swipe-card', SWIPE_CARD),
+    ]);
+    expect(out).not.toBeNull();
+    expect(out!.top).toBe(60);
+    expect(out!.bottom).toBe(380);
+  });
+
+  it('returns null when an occluder fully covers the map', () => {
+    const cover = r(0, 0, 390, 844);
+    const out = getVisibleMapRect(MAP_RECT, [occluder('cover', cover)]);
+    expect(out).toBeNull();
+  });
+
+  it('ignores occluders that do not overlap the map horizontally', () => {
+    // Off to the right of the map (map is 0..390).
+    const sidePanel = r(500, 100, 100, 400);
+    const out = getVisibleMapRect(MAP_RECT, [occluder('side', sidePanel)]);
+    expect(out).not.toBeNull();
+    expect(out!.bottom).toBe(844);
+    expect(out!.top).toBe(0);
+  });
+
+  it('ignores occluders that do not overlap the map vertically', () => {
+    // Above the map (map starts at y=0).
+    const above = r(0, -200, 390, 100);
+    const out = getVisibleMapRect(MAP_RECT, [occluder('above', above)]);
+    expect(out).not.toBeNull();
+    expect(out!.top).toBe(0);
+    expect(out!.bottom).toBe(844);
+  });
+
+  it('ignores zero-sized and null-rect occluders', () => {
+    const out = getVisibleMapRect(MAP_RECT, [
+      occluder('null', null),
+      occluder('zero', r(0, 0, 0, 0)),
+    ]);
+    expect(out!.top).toBe(0);
+    expect(out!.bottom).toBe(844);
+  });
+
+  it('returns null for a degenerate map rect', () => {
+    expect(getVisibleMapRect(r(0, 0, 0, 0), [])).toBeNull();
+    expect(getVisibleMapRect(r(0, 0, 100, 0), [])).toBeNull();
   });
 });
 

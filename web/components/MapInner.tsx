@@ -12,7 +12,7 @@ import type { CommuteInfo } from './ListingCard';
 import type { HoveredStation } from './SwipeCard';
 import { useOccluders } from '@/lib/viewport/OccluderRegistry';
 import { useLeafletMapSetter } from '@/lib/viewport/LeafletMapContext';
-import { isPinVisible, findVisiblePosition, MIN_CLEARANCE_PX, projectPinToViewport } from '@/lib/viewport/occlusion';
+import { isPinVisible, findVisiblePosition, MIN_CLEARANCE_PX, projectPinToViewport, getVisibleMapRect } from '@/lib/viewport/occlusion';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -660,6 +660,12 @@ function BoundsWatcher({
   onBoundsChangeRef.current = onBoundsChange;
   const onMapMoveRef = useRef(onMapMove);
   onMapMoveRef.current = onMapMove;
+  // Occluder registry is shared across the page tree (provider in
+  // app/page.tsx). We use it to shrink the queried bounds to the
+  // VISIBLE portion of the map — see comment in fireBounds().
+  const occluderRegistry = useOccluders();
+  const occluderRegistryRef = useRef(occluderRegistry);
+  occluderRegistryRef.current = occluderRegistry;
 
   useEffect(() => {
     const fireBounds = () => {
@@ -673,14 +679,59 @@ function BoundsWatcher({
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
-        const b = map.getBounds();
-        const latMin = b.getSouth();
-        const latMax = b.getNorth();
-        const lonMin = b.getWest();
-        const lonMax = b.getEast();
+
+        // Shrink the queried bounds to the area the user can actually
+        // SEE. On mobile, the swipe-card and action-pill register as
+        // bottom-anchored occluders; on desktop the registry is empty,
+        // so the visible rect equals the full map rect → no behavior
+        // change. This prevents the surprising "I see no results, but
+        // the map auto-pans to surface a pin behind the card" behavior.
+        const container = map.getContainer();
+        const mapRect = container.getBoundingClientRect();
+        const occluders = occluderRegistryRef.current?.getAll() ?? [];
+        const visibleRect = getVisibleMapRect(mapRect, occluders);
+
+        let latMin: number, latMax: number, lonMin: number, lonMax: number;
+        if (visibleRect) {
+          // Convert visible rect's NW + SE corners (in viewport coords)
+          // back to lat/lon via the map's container coord space.
+          const nwContainer = L.point(
+            visibleRect.left - mapRect.left,
+            visibleRect.top - mapRect.top,
+          );
+          const seContainer = L.point(
+            visibleRect.right - mapRect.left,
+            visibleRect.bottom - mapRect.top,
+          );
+          const nw = map.containerPointToLatLng(nwContainer);
+          const se = map.containerPointToLatLng(seContainer);
+          latMin = Math.min(nw.lat, se.lat);
+          latMax = Math.max(nw.lat, se.lat);
+          lonMin = Math.min(nw.lng, se.lng);
+          lonMax = Math.max(nw.lng, se.lng);
+        } else {
+          // Fallback (visibleRect == null when occluders fully cover the
+          // map): fall back to the full map bounds so we don't silently
+          // stop fetching.
+          const b = map.getBounds();
+          latMin = b.getSouth();
+          latMax = b.getNorth();
+          lonMin = b.getWest();
+          lonMax = b.getEast();
+        }
+
         // Guard against degenerate bbox (map not sized yet, or immediate
-        // list→map toggle before invalidateSize completes).
-        if (latMax === latMin || Math.abs(latMax - latMin) > 5 || Math.abs(lonMax - lonMin) > 5) return;
+        // list→map toggle before invalidateSize completes), NaN from
+        // detached map, or unreasonably large spans.
+        if (
+          !Number.isFinite(latMin) ||
+          !Number.isFinite(latMax) ||
+          !Number.isFinite(lonMin) ||
+          !Number.isFinite(lonMax) ||
+          latMax === latMin ||
+          Math.abs(latMax - latMin) > 5 ||
+          Math.abs(lonMax - lonMin) > 5
+        ) return;
         onBoundsChangeRef.current({ latMin, latMax, lonMin, lonMax });
         // Also sync map center + zoom to URL (only for user-initiated moves)
         if (onMapMoveRef.current) {
