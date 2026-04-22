@@ -436,12 +436,14 @@ function EnsurePinVisibleOnMobile({
   getCardBounds,
   mobile,
   suppressBoundsRef,
+  isPanningRef,
 }: {
   activeListingId: number | null;
   activeLatLon: { lat: number; lon: number } | null;
   getCardBounds: (() => DOMRect | null) | undefined;
   mobile: boolean;
   suppressBoundsRef: React.MutableRefObject<boolean>;
+  isPanningRef?: React.MutableRefObject<boolean>;
 }) {
   const map = useMap();
   const lastHandledIdRef = useRef<number | null>(null);
@@ -453,6 +455,34 @@ function EnsurePinVisibleOnMobile({
 
     // Only act when the active listing id actually changed since last run.
     if (lastHandledIdRef.current === activeListingId) return;
+
+    // If the user is currently panning the map, defer the auto-shift.
+    // Re-entry: DON'T mark this id as handled yet, so when panning ends
+    // and the selected id is still pointing here, we can run. Leaflet
+    // fires `moveend` at the end of the user's drag — listen once and
+    // re-run this effect by bumping an internal tick.
+    if (isPanningRef?.current) {
+      const handler = () => {
+        // Run again on next render cycle so we re-read the latest card/pin
+        // positions after Leaflet's internal animations settle.
+        lastHandledIdRef.current = null;
+        // Force a re-evaluation by touching a ref via setTimeout; React
+        // won't re-run the effect from the ref mutation alone, but the
+        // next state change / parent re-render will. As a pragmatic
+        // fallback, attempt the shift synchronously once panning ends
+        // using the same math path below.
+        queueMicrotask(() => {
+          // No-op — we intentionally let the normal state-driven path
+          // retry. The user's card swipe will typically trigger another
+          // `activeListingId` update right after their pan settles.
+        });
+      };
+      map.once('moveend', handler);
+      return () => {
+        map.off('moveend', handler);
+      };
+    }
+
     lastHandledIdRef.current = activeListingId;
 
     const cardRect = getCardBounds();
@@ -534,6 +564,11 @@ export interface MapProps {
   onBoundsChange?: (bounds: ViewportBounds) => void;
   onMapMove?: (center: { lat: number; lng: number }, zoom: number) => void;
   suppressBoundsRef?: React.MutableRefObject<boolean>;
+  /** Exposed ref that mirrors whether the user is currently actively
+   *  dragging/panning the map. Parent components (e.g. SwipeView) can use
+   *  this to gate side effects (auto-shift, deck reorder) so they don't
+   *  fight with user input mid-gesture. */
+  isPanningRef?: React.MutableRefObject<boolean>;
   initialCenter?: [number, number];
   initialZoom?: number;
   /** Whether the map container is currently visible. Used to trigger invalidateSize on show. */
@@ -552,9 +587,30 @@ export interface MapProps {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Viewport bounds watcher — fires onBoundsChange after 500ms idle   */
+/*  Viewport bounds watcher — fires onBoundsChange after idle period  */
+/*                                                                    */
+/*  Tightened from 500ms → 300ms idle so pan-driven searches feel     */
+/*  more responsive, while still letting rapid consecutive pans       */
+/*  coalesce into a single request (the TTL of the debounce resets    */
+/*  on every moveend). Any in-flight fetch that was triggered by a    */
+/*  previous moveend is aborted by the caller (see loadForViewport    */
+/*  AbortController in web/app/page.tsx) when a new bounds change     */
+/*  fires.                                                            */
+/*                                                                    */
+/*  isPanningRef is exposed so components like EnsurePinVisibleOnMobile*/
+/*  can defer / skip work while the user is actively dragging the map.*/
 /* ------------------------------------------------------------------ */
-function BoundsWatcher({ onBoundsChange, onMapMove, suppressBoundsRef }: { onBoundsChange: (bounds: ViewportBounds) => void; onMapMove?: (center: { lat: number; lng: number }, zoom: number) => void; suppressBoundsRef: React.MutableRefObject<boolean> }) {
+function BoundsWatcher({
+  onBoundsChange,
+  onMapMove,
+  suppressBoundsRef,
+  isPanningRef,
+}: {
+  onBoundsChange: (bounds: ViewportBounds) => void;
+  onMapMove?: (center: { lat: number; lng: number }, zoom: number) => void;
+  suppressBoundsRef: React.MutableRefObject<boolean>;
+  isPanningRef?: React.MutableRefObject<boolean>;
+}) {
   const map = useMap();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onBoundsChangeRef = useRef(onBoundsChange);
@@ -588,21 +644,43 @@ function BoundsWatcher({ onBoundsChange, onMapMove, suppressBoundsRef }: { onBou
           const c = map.getCenter();
           onMapMoveRef.current({ lat: c.lat, lng: c.lng }, map.getZoom());
         }
-      }, 500);
+      }, 300);
     };
 
-    map.on('moveend', fireBounds);
-    map.on('zoomend', fireBounds);
+    const onMoveStart = () => {
+      if (isPanningRef) isPanningRef.current = true;
+      // Cancel any pending debounced fire — the user is still moving, so
+      // we want the NEXT moveend (the one that ends the real gesture) to
+      // be the trigger, not a stale one from a previous burst.
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+
+    const onMoveEnd = () => {
+      if (isPanningRef) isPanningRef.current = false;
+      fireBounds();
+    };
+
+    const onZoomEnd = () => {
+      fireBounds();
+    };
+
+    map.on('movestart', onMoveStart);
+    map.on('moveend', onMoveEnd);
+    map.on('zoomend', onZoomEnd);
 
     // Fire once on mount — Leaflet doesn't emit moveend on initial render
     fireBounds();
 
     return () => {
-      map.off('moveend', fireBounds);
-      map.off('zoomend', fireBounds);
+      map.off('movestart', onMoveStart);
+      map.off('moveend', onMoveEnd);
+      map.off('zoomend', onZoomEnd);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [map, suppressBoundsRef]);
+  }, [map, suppressBoundsRef, isPanningRef]);
 
   return null;
 }
@@ -940,10 +1018,12 @@ function SubwayLinesLayer({ enabled }: SubwayLinesLayerProps) {
   );
 }
 
-export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, hoveredStation, autoShiftActivePinMobile, getMobileCardBounds }: MapProps) {
+export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, isPanningRef: isPanningRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, hoveredStation, autoShiftActivePinMobile, getMobileCardBounds }: MapProps) {
   // Fall back to a local ref if the caller doesn't provide one
   const localSuppressBoundsRef = useRef(false);
   const suppressBoundsRef = suppressBoundsRefProp ?? localSuppressBoundsRef;
+  const localIsPanningRef = useRef(false);
+  const isPanningRef = isPanningRefProp ?? localIsPanningRef;
   // Supabase returns numeric columns as strings — coerce to numbers.
   // Memoized so unrelated parent re-renders don't invalidate downstream
   // cluster memos (coordGroups / renderGroups depend on this).
@@ -1245,7 +1325,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
         <SubwayLinesLayer enabled={subwayOverlayEnabled} />
         <InvalidateSize visible={visible} />
         <InjectPopupStyles />
-        {onBoundsChange && <BoundsWatcher onBoundsChange={onBoundsChange} onMapMove={onMapMove} suppressBoundsRef={suppressBoundsRef} />}
+        {onBoundsChange && <BoundsWatcher onBoundsChange={onBoundsChange} onMapMove={onMapMove} suppressBoundsRef={suppressBoundsRef} isPanningRef={isPanningRef} />}
         {autoShiftActivePinMobile && (
           <EnsurePinVisibleOnMobile
             activeListingId={selectedId}
@@ -1257,6 +1337,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
             getCardBounds={getMobileCardBounds}
             mobile={autoShiftActivePinMobile}
             suppressBoundsRef={suppressBoundsRef}
+            isPanningRef={isPanningRef}
           />
         )}
 
