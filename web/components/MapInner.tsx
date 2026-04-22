@@ -10,6 +10,8 @@ import { cn } from '@/lib/cn';
 import { ButtonBase } from './ui/ButtonBase';
 import type { CommuteInfo } from './ListingCard';
 import type { HoveredStation } from './SwipeCard';
+import { useOccluders } from '@/lib/viewport/OccluderRegistry';
+import { isPinVisible, findVisiblePosition, MIN_CLEARANCE_PX } from '@/lib/viewport/occlusion';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -433,49 +435,33 @@ function InvalidateSize({ visible }: { visible: boolean }) {
 function EnsurePinVisibleOnMobile({
   activeListingId,
   activeLatLon,
-  getCardBounds,
   mobile,
   suppressBoundsRef,
   isPanningRef,
 }: {
   activeListingId: number | null;
   activeLatLon: { lat: number; lon: number } | null;
-  getCardBounds: (() => DOMRect | null) | undefined;
   mobile: boolean;
   suppressBoundsRef: React.MutableRefObject<boolean>;
   isPanningRef?: React.MutableRefObject<boolean>;
 }) {
   const map = useMap();
+  const occluderRegistry = useOccluders();
   const lastHandledIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!mobile) return;
     if (!activeListingId || !activeLatLon) return;
-    if (!getCardBounds) return;
 
     // Only act when the active listing id actually changed since last run.
     if (lastHandledIdRef.current === activeListingId) return;
 
     // If the user is currently panning the map, defer the auto-shift.
     // Re-entry: DON'T mark this id as handled yet, so when panning ends
-    // and the selected id is still pointing here, we can run. Leaflet
-    // fires `moveend` at the end of the user's drag — listen once and
-    // re-run this effect by bumping an internal tick.
+    // and the selected id is still pointing here, we can run.
     if (isPanningRef?.current) {
       const handler = () => {
-        // Run again on next render cycle so we re-read the latest card/pin
-        // positions after Leaflet's internal animations settle.
         lastHandledIdRef.current = null;
-        // Force a re-evaluation by touching a ref via setTimeout; React
-        // won't re-run the effect from the ref mutation alone, but the
-        // next state change / parent re-render will. As a pragmatic
-        // fallback, attempt the shift synchronously once panning ends
-        // using the same math path below.
-        queueMicrotask(() => {
-          // No-op — we intentionally let the normal state-driven path
-          // retry. The user's card swipe will typically trigger another
-          // `activeListingId` update right after their pan settles.
-        });
       };
       map.once('moveend', handler);
       return () => {
@@ -485,51 +471,57 @@ function EnsurePinVisibleOnMobile({
 
     lastHandledIdRef.current = activeListingId;
 
-    const cardRect = getCardBounds();
-    if (!cardRect) return;
-
     const containerEl = map.getContainer();
-    const containerRect = containerEl.getBoundingClientRect();
+    const mapRect = containerEl.getBoundingClientRect();
 
-    // Project the pin's lat/lon into container-relative pixel coordinates.
-    const pinPoint = map.latLngToContainerPoint([activeLatLon.lat, activeLatLon.lon]);
+    // Project the pin's lat/lon into container-relative pixel coords,
+    // then translate into viewport coords (the model's coord space).
+    const pinPointContainer = map.latLngToContainerPoint([activeLatLon.lat, activeLatLon.lon]);
+    const pinViewport = {
+      x: pinPointContainer.x + mapRect.left,
+      y: pinPointContainer.y + mapRect.top,
+    };
 
-    // Convert card rect to container-relative coords.
-    const cardTopInContainer = cardRect.top - containerRect.top;
-    const cardBottomInContainer = cardRect.bottom - containerRect.top;
-    const cardLeftInContainer = cardRect.left - containerRect.left;
-    const cardRightInContainer = cardRect.right - containerRect.left;
+    // Sample all occluders for this frame.
+    const occluders = occluderRegistry?.getAll() ?? [];
 
-    const pinUnderCard =
-      pinPoint.x >= cardLeftInContainer &&
-      pinPoint.x <= cardRightInContainer &&
-      pinPoint.y >= cardTopInContainer &&
-      pinPoint.y <= cardBottomInContainer;
+    // Already visible? No pan needed.
+    const visibility = isPinVisible(pinViewport, mapRect, occluders);
+    if (visibility.visible) return;
+    // If the pin is occluded only by the map's own bounds, the parent
+    // (SwipeView's deck-skip logic) cannot help — but a pan won't help
+    // either if the pin is far outside the rect. We still try the model;
+    // if no visible band exists at the pin's column, give up gracefully.
 
-    if (!pinUnderCard) return;
+    const target = findVisiblePosition(pinViewport, mapRect, occluders);
+    if (target.target === null || target.deltaY === null) return;
 
-    // Target pin Y position: roughly halfway between the top of the container
-    // and the top of the card (i.e. the center of the visible map-bleed strip
-    // above the card). Guarded so we never push the pin off-screen upwards.
-    const topBleed = Math.max(0, cardTopInContainer);
-    const targetY = Math.max(24, topBleed / 2);
+    // Only pan vertically — lateral pans for occlusion would be jarring
+    // and aren't required (the action pill and card span the full width
+    // in practice). Skip if the pan is sub-pixel.
+    const deltaY = target.deltaY;
+    if (Math.abs(deltaY) < Math.max(4, MIN_CLEARANCE_PX / 4)) return;
 
-    const deltaY = pinPoint.y - targetY;
-    // Only pan if there's a meaningful difference.
-    if (Math.abs(deltaY) < 4) return;
-
-    // Compute the new center in container-pixel space, then convert back to LatLng.
+    // Compute the new center in container-pixel space, then convert back
+    // to LatLng. We move the *map center* by the OPPOSITE of deltaY (to
+    // shift the pin down, the camera must move up — i.e. center.y += -deltaY
+    // in container space). Wait — actually: if pin needs to move from
+    // currentY → currentY + deltaY (deltaY positive = down), we shift
+    // the map's center by the same amount in the SAME direction (because
+    // moving the camera down moves all on-screen points up). Standard
+    // Leaflet semantics: setView(newCenter) recenters the viewport so
+    // the new center occupies the middle pixel of the container. If we
+    // want a point that was at y=200 to now appear at y=400, the map's
+    // top-left edge must shift up by 200px — equivalent to moving the
+    // center DOWN by 200px in the world. In container-pixel terms we
+    // add deltaY to the center point's y, then convert back.
     const currentCenterPoint = map.latLngToContainerPoint(map.getCenter());
-    const newCenterPoint = L.point(currentCenterPoint.x, currentCenterPoint.y + deltaY);
+    const newCenterPoint = L.point(currentCenterPoint.x, currentCenterPoint.y - deltaY);
     const newCenterLatLng = map.containerPointToLatLng(newCenterPoint);
 
     // Suppress the bounds-watcher so the programmatic pan does NOT re-query.
-    // Leaflet's moveend fires after the animation completes (~400ms with
-    // duration: 0.4). Clear the suppression in the moveend handler so later
-    // user pans DO re-query as normal.
     suppressBoundsRef.current = true;
     const clear = () => {
-      // rAF delay so any synchronously-queued moveend handlers still see true.
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           suppressBoundsRef.current = false;
@@ -539,7 +531,7 @@ function EnsurePinVisibleOnMobile({
     map.once('moveend', clear);
 
     map.setView(newCenterLatLng, map.getZoom(), { animate: true, duration: 0.4 });
-  }, [activeListingId, activeLatLon, getCardBounds, mobile, map, suppressBoundsRef]);
+  }, [activeListingId, activeLatLon, mobile, map, suppressBoundsRef, occluderRegistry, isPanningRef]);
 
   return null;
 }
@@ -578,12 +570,12 @@ export interface MapProps {
   /** Hovered subway station from SwipeCard — renders a pulsing marker */
   hoveredStation?: HoveredStation | null;
   /** Mobile-only: when true, the map may auto-shift so the active listing
-   *  pin is not occluded by the floating swipe card. No-op on desktop. */
+   *  pin is not occluded by registered occluders (swipe card, action pill,
+   *  etc.). Reads from the OccluderProvider in the page tree. No-op on
+   *  desktop. The legacy `getMobileCardBounds` prop has been replaced by
+   *  the registry — chrome components self-register via
+   *  `useRegisterOccluder`. See `web/lib/viewport/`. */
   autoShiftActivePinMobile?: boolean;
-  /** Mobile-only: returns the floating swipe card's DOMRect in viewport
-   *  coordinates, or null if the card is not currently rendered. Called
-   *  on-demand when the active listing id changes. */
-  getMobileCardBounds?: () => DOMRect | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1018,7 +1010,7 @@ function SubwayLinesLayer({ enabled }: SubwayLinesLayerProps) {
   );
 }
 
-export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, isPanningRef: isPanningRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, hoveredStation, autoShiftActivePinMobile, getMobileCardBounds }: MapProps) {
+export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, isPanningRef: isPanningRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, hoveredStation, autoShiftActivePinMobile }: MapProps) {
   // Fall back to a local ref if the caller doesn't provide one
   const localSuppressBoundsRef = useRef(false);
   const suppressBoundsRef = suppressBoundsRefProp ?? localSuppressBoundsRef;
@@ -1334,7 +1326,6 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
               const sel = validListings.find((l) => l.id === selectedId);
               return sel ? { lat: sel.lat, lon: sel.lon } : null;
             })()}
-            getCardBounds={getMobileCardBounds}
             mobile={autoShiftActivePinMobile}
             suppressBoundsRef={suppressBoundsRef}
             isPanningRef={isPanningRef}

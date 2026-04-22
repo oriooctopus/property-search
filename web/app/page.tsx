@@ -28,6 +28,8 @@ import ManageWishlistsModal from '@/components/ManageWishlistsModal';
 import AuthModal from '@/components/AuthModal';
 import { setLastUsedWishlistId } from '@/lib/wishlist-storage';
 import type { WishlistFilterSelection } from '@/components/SaveWishlistPanel';
+import { OccluderProvider } from '@/lib/viewport/OccluderRegistry';
+import { OcclusionDebugOverlay } from '@/lib/viewport/OcclusionDebugOverlay';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -99,6 +101,13 @@ interface MapPosition {
 
 function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatMode?: boolean, listingId?: number | null, mapPos?: MapPosition | null, wishlistSel?: string | null): string {
   const p = new URLSearchParams();
+  // Preserve debug=pins so the viewport-occlusion overlay survives the
+  // URL-state rewrites that fire on filter / map position changes.
+  if (typeof window !== 'undefined') {
+    const current = new URLSearchParams(window.location.search);
+    const debugVal = current.get('debug');
+    if (debugVal) p.set('debug', debugVal);
+  }
   if (listingId != null) p.set('listing', String(listingId));
   if (chatMode) p.set('chat', '1');
   if (view !== 'list') p.set('view', view);
@@ -1670,7 +1679,10 @@ export default function Home() {
     <Suspense
       fallback={<RadarLoader />}
     >
-      <HomeInner />
+      <OccluderProvider>
+        <HomeInner />
+        <OcclusionDebugOverlay />
+      </OccluderProvider>
     </Suspense>
   );
 }

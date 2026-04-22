@@ -42,13 +42,12 @@ interface MapProps {
   commuteInfoMap?: Map<number, CommuteInfo>;
   hoveredStation?: HoveredStation | null;
   autoShiftActivePinMobile?: boolean;
-  getMobileCardBounds?: () => DOMRect | null;
 }
 
 // Memoized so parent re-renders (e.g. view-switches on mobile) don't force
 // the Leaflet tree to re-run its own render cycle. Stable callback references
 // from the parent are required for the memo to be effective.
-function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, isPanningRef, initialCenter, initialZoom, visible, commuteInfoMap, hoveredStation, autoShiftActivePinMobile, getMobileCardBounds }: MapProps) {
+function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, isPanningRef, initialCenter, initialZoom, visible, commuteInfoMap, hoveredStation, autoShiftActivePinMobile }: MapProps) {
   return (
     <MapInner
       listings={listings}
@@ -70,7 +69,6 @@ function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds
       commuteInfoMap={commuteInfoMap}
       hoveredStation={hoveredStation ?? null}
       autoShiftActivePinMobile={autoShiftActivePinMobile}
-      getMobileCardBounds={getMobileCardBounds}
     />
   );
 }
