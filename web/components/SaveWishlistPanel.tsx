@@ -95,11 +95,31 @@ export default function SaveWishlistPanel({
   const MIN_PANEL_HEIGHT = 240;
 
   let top = 96;
-  let right = 20;
+  let left: number | undefined;
+  let right: number | undefined = 20;
   let maxHeight: number | undefined;
 
   if (anchorRect && typeof window !== 'undefined') {
-    right = Math.max(8, window.innerWidth - anchorRect.right);
+    // Horizontal placement: prefer right-align (panel's right edge = chip's
+    // right edge) so the panel hangs off the right side of the dual-chip. If
+    // right-aligning pushes the panel off the left side of the viewport (as
+    // happens when the chip sits near the left edge, e.g. the desktop filter
+    // sidebar), fall back to left-align (panel.left = chip.left) and clamp
+    // so the panel stays fully in-viewport with 8px padding.
+    const vw = window.innerWidth;
+    const effectiveWidth = Math.min(PANEL_WIDTH, vw - 16);
+    const rightAlignedLeft = anchorRect.right - effectiveWidth;
+    if (rightAlignedLeft >= 8) {
+      right = Math.max(8, vw - anchorRect.right);
+      left = undefined;
+    } else {
+      right = undefined;
+      left = Math.max(
+        8,
+        Math.min(anchorRect.left, vw - effectiveWidth - 8),
+      );
+    }
+
     const spaceBelow = window.innerHeight - anchorRect.bottom - GAP - MIN_EDGE_PADDING;
     const spaceAbove = anchorRect.top - GAP - MIN_EDGE_PADDING;
     const openAbove = spaceBelow < MIN_PANEL_HEIGHT && spaceAbove > spaceBelow;
@@ -136,6 +156,7 @@ export default function SaveWishlistPanel({
       className="fixed z-[2000] rounded-xl shadow-2xl flex flex-col"
       style={{
         top,
+        left,
         right,
         width: PANEL_WIDTH,
         maxWidth: 'calc(100vw - 16px)',
