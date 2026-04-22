@@ -39,7 +39,6 @@ export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
     function getDropdownStyle(): React.CSSProperties {
       if (!chipRef.current) return { top: 0, left: 0 };
       const rect = chipRef.current.getBoundingClientRect();
-      const top = rect.bottom + 8;
       // Estimated max dropdown width — used for clamping only.
       // The actual max-width is enforced by CSS (calc(100vw - 16px)).
       const estimatedWidth = 460;
@@ -52,7 +51,30 @@ export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
       }
       // Clamp: keep at least 8px from each viewport edge
       left = Math.max(8, Math.min(left, window.innerWidth - estimatedWidth - 8));
-      return { top, left };
+      // Decide whether to open above or below the chip based on available
+      // space. Inside the mobile bottom sheet the chip sits near the bottom
+      // of the viewport, so opening below would push the dropdown offscreen
+      // (and our internal scroll wouldn't help if the panel itself is past
+      // the bottom edge). Prefer the side with more room.
+      const gap = 8;
+      const minBottomEdgePadding = 16;
+      const spaceBelow = window.innerHeight - rect.bottom - gap - minBottomEdgePadding;
+      const spaceAbove = rect.top - gap - minBottomEdgePadding;
+      const openAbove = spaceBelow < 240 && spaceAbove > spaceBelow;
+      let top: number;
+      let maxHeight: number;
+      if (openAbove) {
+        // Anchor bottom of dropdown to top of chip; cap height at spaceAbove.
+        maxHeight = Math.max(160, spaceAbove);
+        top = Math.max(minBottomEdgePadding, rect.top - gap - maxHeight);
+        // If the dropdown ended up shorter than maxHeight (because we capped
+        // at the chip top), recompute so it fully uses the room above.
+        maxHeight = rect.top - gap - top;
+      } else {
+        top = rect.bottom + gap;
+        maxHeight = Math.max(160, spaceBelow);
+      }
+      return { top, left, maxHeight };
     }
 
     function isChipVisible(): boolean {
@@ -101,11 +123,15 @@ export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
           // relative to the sheet instead of the viewport and renders far
           // offscreen.
           <div
-            className="fixed z-[9999] rounded-xl border border-[#2d333b] p-5 shadow-xl"
+            data-filter-chip-dropdown
+            className="fixed z-[9999] rounded-xl border border-[#2d333b] p-5 shadow-xl overflow-y-auto overscroll-contain"
             style={{
               backgroundColor: '#1c2028',
               minWidth: '320px',
               maxWidth: 'calc(100vw - 16px)',
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'thin',
+              scrollbarColor: '#2d333b #1c2028',
               ...getDropdownStyle(),
             }}
           >
