@@ -1391,10 +1391,14 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as Node | null;
       if (!target) return;
-      // Treat clicks inside a portaled FilterChip dropdown as "inside" — the
-      // dropdown lives outside containerRef because it's portaled to
-      // document.body so it can escape the mobile sheet's transform context.
-      if (target instanceof Element && target.closest('[data-filter-chip-dropdown]')) {
+      // Treat clicks inside a portaled FilterChip dropdown or the portaled
+      // SaveWishlistPanel as "inside" — both live outside containerRef
+      // because they're portaled to document.body so they can escape the
+      // mobile sheet's transform context.
+      if (
+        target instanceof Element &&
+        target.closest('[data-filter-chip-dropdown], [data-save-wishlist-panel]')
+      ) {
         return;
       }
       if (containerRef.current && !containerRef.current.contains(target)) {
@@ -2103,10 +2107,10 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           <div className="relative shrink-0" ref={saveDropdownRef}>
             <div
               className={cn(
-                'inline-flex items-center rounded-[20px] overflow-hidden border h-[26px] font-medium whitespace-nowrap',
+                'inline-flex items-center rounded-[20px] overflow-hidden border h-[30px] font-medium whitespace-nowrap',
                 saveOpen
                   ? 'border-[#58a6ff]'
-                  : 'border-[#2d333b] hover:border-[#58a6ff]/40',
+                  : 'border-[#2d333b] hover:border-[#58a6ff]/60',
               )}
               style={{ background: 'transparent' }}
             >
@@ -2127,14 +2131,20 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                     setTimeout(() => saveInputRef.current?.focus(), 50);
                   }
                 }}
-                className="flex items-center gap-1 px-2.5 h-full text-[11px]"
+                className="flex items-center gap-1.5 px-3 h-full text-[12px]"
                 style={{
-                  color: saveOpen && savePanelTab === 'save-search' ? '#58a6ff' : '#8b949e',
+                  color:
+                    saveOpen && savePanelTab === 'save-search'
+                      ? '#58a6ff'
+                      : '#e1e4e8',
                   borderRight: '1px solid #2d333b',
-                  background: 'transparent',
+                  background:
+                    saveOpen && savePanelTab === 'save-search'
+                      ? 'rgba(88,166,255,0.08)'
+                      : 'rgba(88,166,255,0.06)',
                 }}
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
                 </svg>
                 Save
@@ -2154,7 +2164,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                   }
                 }}
                 aria-label="Filter by wishlist"
-                className="flex items-center gap-1 px-2 h-full text-[11px]"
+                className="flex items-center gap-1 px-2.5 h-full text-[12px]"
                 style={{
                   color: saveOpen && savePanelTab === 'wishlist' ? '#58a6ff' : '#e1e4e8',
                   background: selectedWishlist ? 'rgba(126,231,135,0.1)' : 'transparent',
