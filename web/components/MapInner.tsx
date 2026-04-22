@@ -450,51 +450,47 @@ function EnsurePinVisibleOnMobile({
 }) {
   const map = useMap();
   const occluderRegistry = useOccluders();
-  const lastHandledIdRef = useRef<number | null>(null);
-
+  // Track the most recent inputs in refs so the moveend listener (bound
+  // once) always sees the freshest values without re-binding on every render.
+  const activeIdRef = useRef<number | null>(activeListingId);
+  const activeLatLonRef = useRef<{ lat: number; lon: number } | null>(activeLatLon);
   useEffect(() => {
+    activeIdRef.current = activeListingId;
+    activeLatLonRef.current = activeLatLon;
+  }, [activeListingId, activeLatLon]);
+
+  // Single re-evaluation function: invoked both on activeListingId change
+  // (the original trigger) AND on every map `moveend` (so user-initiated
+  // pans that move the active pin under the card / pill auto-correct).
+  // Idempotent: if the current pin is already visible OR no visible band
+  // exists in its column, returns early without state change.
+  //
+  // Loop safety:
+  //  - We never run while the user is mid-gesture (isPanningRef).
+  //  - We never run while suppressBoundsRef is true (which is set to true
+  //    by THIS function for the duration of its own programmatic pan).
+  //    That gates re-entry on the moveend that ends our own pan.
+  const evaluate = useCallback(() => {
     if (!mobile) return;
-    if (!activeListingId || !activeLatLon) return;
-
-    // Only act when the active listing id actually changed since last run.
-    if (lastHandledIdRef.current === activeListingId) return;
-
-    // If the user is currently panning the map, defer the auto-shift.
-    // Re-entry: DON'T mark this id as handled yet, so when panning ends
-    // and the selected id is still pointing here, we can run.
-    if (isPanningRef?.current) {
-      const handler = () => {
-        lastHandledIdRef.current = null;
-      };
-      map.once('moveend', handler);
-      return () => {
-        map.off('moveend', handler);
-      };
-    }
-
-    lastHandledIdRef.current = activeListingId;
+    const id = activeIdRef.current;
+    const latLon = activeLatLonRef.current;
+    if (!id || !latLon) return;
+    if (isPanningRef?.current) return;
+    if (suppressBoundsRef.current) return;
 
     const containerEl = map.getContainer();
     const mapRect = containerEl.getBoundingClientRect();
 
-    // Project the pin's lat/lon into container-relative pixel coords,
-    // then translate into viewport coords (the model's coord space).
-    const pinPointContainer = map.latLngToContainerPoint([activeLatLon.lat, activeLatLon.lon]);
+    const pinPointContainer = map.latLngToContainerPoint([latLon.lat, latLon.lon]);
     const pinViewport = {
       x: pinPointContainer.x + mapRect.left,
       y: pinPointContainer.y + mapRect.top,
     };
 
-    // Sample all occluders for this frame.
     const occluders = occluderRegistry?.getAll() ?? [];
 
-    // Already visible? No pan needed.
     const visibility = isPinVisible(pinViewport, mapRect, occluders);
     if (visibility.visible) return;
-    // If the pin is occluded only by the map's own bounds, the parent
-    // (SwipeView's deck-skip logic) cannot help — but a pan won't help
-    // either if the pin is far outside the rect. We still try the model;
-    // if no visible band exists at the pin's column, give up gracefully.
 
     const target = findVisiblePosition(pinViewport, mapRect, occluders);
     if (target.target === null || target.deltaY === null) return;
@@ -534,7 +530,25 @@ function EnsurePinVisibleOnMobile({
     map.once('moveend', clear);
 
     map.setView(newCenterLatLng, map.getZoom(), { animate: true, duration: 0.4 });
-  }, [activeListingId, activeLatLon, mobile, map, suppressBoundsRef, occluderRegistry, isPanningRef]);
+  }, [mobile, map, suppressBoundsRef, occluderRegistry, isPanningRef]);
+
+  // Trigger 1: active-listing-id change (existing behavior).
+  useEffect(() => {
+    evaluate();
+  }, [activeListingId, activeLatLon, evaluate]);
+
+  // Trigger 2: map `moveend` (Bug A fix). When the user pans, the active
+  // pin's viewport position changes — re-check visibility and auto-pan if
+  // it's now occluded. The `evaluate()` function's own guards
+  // (suppressBoundsRef + isPanningRef) prevent self-triggering loops.
+  useEffect(() => {
+    if (!mobile) return;
+    const handler = () => evaluate();
+    map.on('moveend', handler);
+    return () => {
+      map.off('moveend', handler);
+    };
+  }, [mobile, map, evaluate]);
 
   return null;
 }
