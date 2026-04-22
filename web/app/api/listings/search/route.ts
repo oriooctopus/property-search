@@ -40,6 +40,7 @@ interface SearchFilters {
     | "2w"
     | "1m"
     | null;
+  includeNaListingAge?: boolean;
   selectedSources?: string[] | null;
   minYearBuilt?: number | null;
   maxYearBuilt?: number | null;
@@ -167,12 +168,17 @@ function applyBoundsAndFilters(
     if (filters.maxRent != null) q = q.lte("price", filters.maxRent);
   }
 
-  // Listing age
+  // Listing age. By default we EXCLUDE listings without a list_date when this
+  // filter is active (otherwise "Listed within 7 days" misleadingly leaks
+  // sources like Craigslist that often lack list_date). Users can opt back in
+  // via includeNaListingAge — same shape as includeNaBaths above.
   if (filters.maxListingAge && MAX_AGE_MS[filters.maxListingAge]) {
     const cutoffIso = new Date(Date.now() - MAX_AGE_MS[filters.maxListingAge]).toISOString();
-    // list_date IS NULL OR list_date >= cutoff — keep null-date listings
-    // visible (matches the pre-refactor client behavior on line 625).
-    q = q.or(`list_date.is.null,list_date.gte.${cutoffIso}`);
+    if (filters.includeNaListingAge) {
+      q = q.or(`list_date.is.null,list_date.gte.${cutoffIso}`);
+    } else {
+      q = q.gte("list_date", cutoffIso);
+    }
   }
 
   // Source
