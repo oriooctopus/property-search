@@ -22,7 +22,7 @@ import { parallelMap } from "../../sources/verify/shared";
 import type { VerifyResult } from "../../sources/verify/types";
 
 const STALE_AGE_DAYS = 3;
-const BATCH_LIMIT = 500;
+const BATCH_LIMIT = 2000;
 
 interface Candidate {
   id: number;
@@ -43,6 +43,7 @@ async function loadCandidates(
     .select("id, url, source, external_id")
     .is("delisted_at", null)
     .lt("last_seen_at", cutoff)
+    .order("last_seen_at", { ascending: true })
     .limit(limit);
   if (error) throw new Error(`verify-stale candidate query failed: ${error.message}`);
   return (data ?? []) as Candidate[];
@@ -138,27 +139,36 @@ export async function runVerifyStalePhase(
     const limit = VERIFY_CONCURRENCY[source] ?? 5;
     log.info(`${src}: ${rows.length} candidates (concurrency=${limit})`);
 
-    const results = await parallelMap(rows, limit, async (row) => {
+    // Apply per-row inside the parallelMap callback so partial progress
+    // persists if the run is killed mid-flight (the previous batch-after-all
+    // pattern lost ALL writes when the parent process was reaped).
+    let progressCount = 0;
+    const progressTotal = rows.length;
+    let sourceUnknown = 0;
+    await parallelMap(rows, limit, async (row) => {
+      let result: VerifyResult;
       try {
-        const result = await verifier(row.url, verifyDeps);
-        return { result, candidate: row };
+        result = await verifier(row.url, verifyDeps);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        return {
-          result: { status: "unknown", reason: `exception: ${msg}` } as VerifyResult,
-          candidate: row,
-        };
+        result = { status: "unknown", reason: `exception: ${msg}` };
       }
-    });
-
-    let sourceUnknown = 0;
-    for (const applied of results) {
-      const outcome = await applyResult(deps.supabase, applied, deps.dryRun);
+      const outcome = await applyResult(
+        deps.supabase,
+        { result, candidate: row },
+        deps.dryRun,
+      );
       if (outcome === "active") summary.activeConfirmed++;
       else if (outcome === "delisted") summary.delistedConfirmed++;
       else if (outcome === "unknown") { summary.unknown++; sourceUnknown++; }
       else summary.errors++;
-    }
+      progressCount++;
+      if (progressCount % 25 === 0 || progressCount === progressTotal) {
+        log.info(
+          `progress ${progressCount}/${progressTotal} a=${summary.activeConfirmed} d=${summary.delistedConfirmed} u=${summary.unknown} (last: ${result.status})`,
+        );
+      }
+    });
 
     if (sourceUnknown === rows.length && rows.length > 0) {
       log.warn(
