@@ -90,6 +90,7 @@ export interface FiltersState {
   excludeNoSqft: boolean;
   minAvailableDate: string | null;
   maxAvailableDate: string | null;
+  includeNaAvailableDate: boolean;
   commuteRules: CommuteRule[];
 }
 
@@ -1283,6 +1284,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
   const [draftExcludeNoSqft, setDraftExcludeNoSqft] = useState<boolean>(filters.excludeNoSqft);
   const [draftMinAvailableDate, setDraftMinAvailableDate] = useState<string | null>(filters.minAvailableDate);
   const [draftMaxAvailableDate, setDraftMaxAvailableDate] = useState<string | null>(filters.maxAvailableDate);
+  const [draftIncludeNaAvailableDate, setDraftIncludeNaAvailableDate] = useState<boolean>(filters.includeNaAvailableDate);
 
   // Mobile filter bottom sheet state
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
@@ -1385,7 +1387,8 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
     setDraftExcludeNoSqft(filters.excludeNoSqft);
     setDraftMinAvailableDate(filters.minAvailableDate);
     setDraftMaxAvailableDate(filters.maxAvailableDate);
-  }, [openChip, filters.minRent, filters.maxRent, filters.priceMode, filters.selectedBeds, filters.minBaths, filters.includeNaBaths, filters.maxListingAge, filters.includeNaListingAge, filters.selectedSources, filters.commuteRules, filters.minYearBuilt, filters.maxYearBuilt, filters.minSqft, filters.maxSqft, filters.excludeNoSqft, filters.minAvailableDate, filters.maxAvailableDate]);
+    setDraftIncludeNaAvailableDate(filters.includeNaAvailableDate);
+  }, [openChip, filters.minRent, filters.maxRent, filters.priceMode, filters.selectedBeds, filters.minBaths, filters.includeNaBaths, filters.maxListingAge, filters.includeNaListingAge, filters.selectedSources, filters.commuteRules, filters.minYearBuilt, filters.maxYearBuilt, filters.minSqft, filters.maxSqft, filters.excludeNoSqft, filters.minAvailableDate, filters.maxAvailableDate, filters.includeNaAvailableDate]);
 
   // Click-outside handler — discard drafts. We don't close `saveOpen` here
   // because the SaveWishlistPanel renders in a fixed-position element outside
@@ -1445,6 +1448,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
       } else if (chip === 'availableDate') {
         setDraftMinAvailableDate(filters.minAvailableDate);
         setDraftMaxAvailableDate(filters.maxAvailableDate);
+        setDraftIncludeNaAvailableDate(filters.includeNaAvailableDate);
       }
       return chip;
     });
@@ -1686,12 +1690,25 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
               />
             </div>
           </div>
-          <p className="text-[11px] leading-snug mb-2" style={{ color: '#8b949e' }}>
-            Only showing listings with a known availability date.
-          </p>
+          {(draftMinAvailableDate !== null || draftMaxAvailableDate !== null) && (
+            <>
+              <label className="flex items-center gap-2 cursor-pointer mt-1">
+                <input
+                  type="checkbox"
+                  checked={draftIncludeNaAvailableDate}
+                  onChange={(e) => setDraftIncludeNaAvailableDate(e.target.checked)}
+                  className="accent-[#58a6ff] w-4 h-4 rounded cursor-pointer"
+                />
+                <span className="text-sm" style={{ color: '#8b949e' }}>Include N/A</span>
+              </label>
+              <p className="text-xs mt-1 ml-6" style={{ color: '#6e7681', fontStyle: 'italic' }}>
+                Some listings on Craigslist or Marketplace may not have a move-in date
+              </p>
+            </>
+          )}
           <DropdownFooter
             onReset={() => {
-              onChange({ ...filters, minAvailableDate: null, maxAvailableDate: null });
+              onChange({ ...filters, minAvailableDate: null, maxAvailableDate: null, includeNaAvailableDate: false });
               setOpenChip(null);
             }}
             onDone={() => {
@@ -1699,6 +1716,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                 ...filters,
                 minAvailableDate: draftMinAvailableDate,
                 maxAvailableDate: draftMaxAvailableDate,
+                includeNaAvailableDate: draftIncludeNaAvailableDate,
               });
               setOpenChip(null);
             }}

@@ -49,6 +49,7 @@ interface SearchFilters {
   excludeNoSqft?: boolean;
   minAvailableDate?: string | null;
   maxAvailableDate?: string | null;
+  includeNaAvailableDate?: boolean;
 }
 
 interface SearchRequest {
@@ -195,13 +196,25 @@ function applyBoundsAndFilters(
   if (filters.minSqft != null) q = q.gte("sqft", filters.minSqft);
   if (filters.maxSqft != null) q = q.lte("sqft", filters.maxSqft);
 
-  // Move-in / availability date. When either bound is set, exclude listings
-  // with NULL availability_date (otherwise the filter would silently let
-  // unknown-availability rows through).
+  // Move-in / availability date. When a bound is set, default to EXCLUDING
+  // rows with NULL availability_date so the filter doesn't silently leak
+  // unknown-availability listings. Users can opt back in via
+  // includeNaAvailableDate (mirrors includeNaBaths / includeNaListingAge).
   if (filters.minAvailableDate || filters.maxAvailableDate) {
-    q = q.not("availability_date", "is", null);
-    if (filters.minAvailableDate) q = q.gte("availability_date", filters.minAvailableDate);
-    if (filters.maxAvailableDate) q = q.lte("availability_date", filters.maxAvailableDate);
+    const mind = filters.minAvailableDate;
+    const maxd = filters.maxAvailableDate;
+    if (filters.includeNaAvailableDate) {
+      // IS NULL OR within bounds
+      const clauses: string[] = ["availability_date.is.null"];
+      if (mind && maxd) clauses.push(`and(availability_date.gte.${mind},availability_date.lte.${maxd})`);
+      else if (mind) clauses.push(`availability_date.gte.${mind}`);
+      else if (maxd) clauses.push(`availability_date.lte.${maxd}`);
+      q = q.or(clauses.join(","));
+    } else {
+      q = q.not("availability_date", "is", null);
+      if (mind) q = q.gte("availability_date", mind);
+      if (maxd) q = q.lte("availability_date", maxd);
+    }
   }
 
   // Scam filter (matches client): per-room < $800 is spam. Keep beds=0.
