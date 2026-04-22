@@ -14,6 +14,8 @@ import { getLastUsedWishlistId, setLastUsedWishlistId } from '@/lib/wishlist-sto
 import { geoSort } from '@/lib/geo-sort';
 import { triggerHaptic } from '@/lib/native';
 import WishlistPicker from './WishlistPicker';
+import { useRegisterOccluder, useOccluders } from '@/lib/viewport/OccluderRegistry';
+import { isPinVisible } from '@/lib/viewport/occlusion';
 
 // Dynamically import MapComponent to avoid SSR issues (uses Leaflet)
 const MapComponent = dynamic(() => import('./Map'), { ssr: false });
@@ -157,6 +159,40 @@ export default function SwipeView({
   const laterBtnRef = useRef<HTMLButtonElement>(null);
   const saveBtnRef = useRef<HTMLButtonElement>(null);
   const photoBtnRef = useRef<HTMLButtonElement>(null);
+  // Refs for the viewport-occlusion model. The mobile pin visibility checks
+  // (in MapInner's EnsurePinVisibleOnMobile and the deck-skip predicate
+  // below) compare the pin's bounding circle against every registered
+  // occluder. Both are mobile-only; on desktop the registrations are
+  // disabled so the model sees an empty list and never trips.
+  const mobileSwipeCardRef = useRef<HTMLDivElement>(null);
+  const mobileActionPillRef = useRef<HTMLDivElement>(null);
+  const occluderRegistry = useOccluders();
+
+  // Stable getRect callbacks for the registry. We use refs to the DOM
+  // nodes directly — no document.querySelector — and fall back to the
+  // legacy `.swipe-detail-panel` selector so the registration still
+  // resolves the right rect even before the new ref is attached. The
+  // `enabled` flag passes mobile-only so the model sees no occluders on
+  // desktop.
+  const getSwipeCardRect = useCallback((): DOMRect | null => {
+    const el = mobileSwipeCardRef.current
+      ?? (typeof document !== 'undefined'
+        ? (document.querySelector('.swipe-detail-panel') as HTMLElement | null)
+        : null);
+    return el?.getBoundingClientRect() ?? null;
+  }, []);
+  const getActionPillRect = useCallback((): DOMRect | null => {
+    const el = mobileActionPillRef.current;
+    return el?.getBoundingClientRect() ?? null;
+  }, []);
+  // Register both as occluders for the mobile pin-visibility model.
+  // `enabled = isMobileViewport === true` so desktop never registers them.
+  // Note: we register the swipe-card unconditionally on mobile (even when
+  // dismissed). When dismissed it's translateY(100%) off-screen, so its
+  // rect is below the viewport — the model's map-bounds clip naturally
+  // ignores it without needing a separate "is-dismissed" gate here.
+  useRegisterOccluder('swipe-card', getSwipeCardRect, isMobileViewport === true);
+  useRegisterOccluder('action-pill', getActionPillRect, isMobileViewport === true);
 
   // Flash a button for 500ms to show keyboard activation
   const flashButton = useCallback((ref: React.RefObject<HTMLButtonElement | null>) => {
@@ -423,56 +459,43 @@ export default function SwipeView({
     const map = (window as unknown as { __leafletMap?: import('leaflet').Map }).__leafletMap;
     if (!map) return;
 
-    const cardEl = document.querySelector('.swipe-detail-panel') as HTMLElement | null;
-    if (!cardEl) return;
-    const cardRect = cardEl.getBoundingClientRect();
     const containerEl = map.getContainer();
-    const containerRect = containerEl.getBoundingClientRect();
+    const mapRect = containerEl.getBoundingClientRect();
 
-    const cardTop = cardRect.top - containerRect.top;
-    const cardLeft = cardRect.left - containerRect.left;
-    const cardRight = cardRect.right - containerRect.left;
-    const cardBottom = cardRect.bottom - containerRect.top;
+    // Sample all occluders ONCE per evaluation so every predicate call
+    // below sees the same frame's geometry (no async waits between reads).
+    const occluders = occluderRegistry?.getAll() ?? [];
 
-    // Predicate: is the given lat/lon visible in the map-bleed area
-    // above the card (i.e. above cardTop, within the map container)?
-    const isVisibleAboveCard = (lat: number, lon: number): boolean => {
+    // Predicate: is the given lat/lon visible by the new occlusion model?
+    // Treats the pin as a circle (PIN_RADIUS_PX), enforces MIN_CLEARANCE_PX
+    // hysteresis, and checks against EVERY registered occluder — not just
+    // the swipe card. (Previously this only checked card-top, missing pins
+    // that peeked out from under the action pill at the bottom.)
+    const isPinFullyVisible = (lat: number, lon: number): boolean => {
       try {
         const pt = map.latLngToContainerPoint([lat, lon]);
-        // Must be above the card (y < cardTop) and inside container horizontally.
-        if (pt.y < 0 || pt.y >= cardTop) return false;
-        if (pt.x < 0 || pt.x > containerRect.width) return false;
-        // Also ensure a minimum clearance from the card top so partially-occluded
-        // pins don't count (avoids the same visual problem as full occlusion).
-        const MIN_CLEARANCE = 12;
-        if (cardTop - pt.y < MIN_CLEARANCE) return false;
-        return true;
+        // Convert container-relative point → viewport coords.
+        const viewportPoint = { x: pt.x + mapRect.left, y: pt.y + mapRect.top };
+        return isPinVisible(viewportPoint, mapRect, occluders).visible;
       } catch {
         return false;
       }
     };
 
-    // Is the CURRENT active pin under the card? If yes AND a forward
-    // candidate exists whose pin is visible above card, prefer that.
-    const curPt = (() => {
-      try { return map.latLngToContainerPoint([currentListing.lat, currentListing.lon]); } catch { return null; }
-    })();
-    if (!curPt) {
-      lastCheckedIdRef.current = currentListing.id;
-      return;
-    }
-    const currentUnderCard =
-      curPt.x >= cardLeft && curPt.x <= cardRight &&
-      curPt.y >= cardTop && curPt.y <= cardBottom;
-
-    if (!currentUnderCard) {
-      // Current pin is already in view — no swap needed.
+    // Is the CURRENT active pin already visible? If yes, no swap needed.
+    if (currentListing.lat != null && currentListing.lon != null) {
+      if (isPinFullyVisible(currentListing.lat, currentListing.lon)) {
+        lastCheckedIdRef.current = currentListing.id;
+        return;
+      }
+    } else {
       lastCheckedIdRef.current = currentListing.id;
       return;
     }
 
-    // Search forward in the deck for a listing whose pin is visible above card.
-    // Cap the search so we don't scan the entire deck (O(n) per swipe is fine
+    // Search forward in the deck for a listing whose pin is visible
+    // (clear of card AND pill AND map bounds, with hysteresis). Cap the
+    // search so we don't scan the entire deck (O(n) per swipe is fine
     // for n ≤ ~500, but capping protects against huge result sets).
     const SEARCH_CAP = 40;
     const start = currentIndex + 1;
@@ -480,7 +503,7 @@ export default function SwipeView({
     for (let i = start; i < end; i++) {
       const candidate = deck[i];
       if (!candidate || candidate.lat == null || candidate.lon == null) continue;
-      if (isVisibleAboveCard(candidate.lat, candidate.lon)) {
+      if (isPinFullyVisible(candidate.lat, candidate.lon)) {
         // Swap: advance index to the candidate. The previously-active (occluded)
         // listing remains in the deck for a future visit.
         lastCheckedIdRef.current = candidate.id;
@@ -493,7 +516,7 @@ export default function SwipeView({
     // No forward candidate found; let MapInner's auto-shift handle it.
     lastCheckedIdRef.current = currentListing.id;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentListing?.id, isMobileViewport, deck, currentIndex, isPanningRef]);
+  }, [currentListing?.id, isMobileViewport, deck, currentIndex, isPanningRef, occluderRegistry]);
 
   // ---------------------------------------------------------------------------
   // Swipe handler
@@ -723,17 +746,10 @@ export default function SwipeView({
   // now auto-shifted into view when occluded by the floating card (see
   // `EnsurePinVisibleOnMobile` in MapInner).
 
-  // Stable ref-based callback that returns the floating swipe card's
-  // bounding rect (in viewport coords) or null if it's not currently
-  // rendered. Passed into MapInner so `EnsurePinVisibleOnMobile` can
-  // measure the card on-demand without the rect becoming a prop that
-  // changes every frame / breaks memoization.
-  const getMobileCardBounds = useCallback((): DOMRect | null => {
-    if (typeof document === 'undefined') return null;
-    const el = document.querySelector('.swipe-detail-panel') as HTMLElement | null;
-    if (!el) return null;
-    return el.getBoundingClientRect();
-  }, []);
+  // Note: the swipe card's bounding rect used to be threaded down to
+  // MapInner via `getMobileCardBounds`. It now self-registers via
+  // `useRegisterOccluder('swipe-card', ...)` above, and MapInner reads
+  // the registry directly. See `web/lib/viewport/`.
 
   return (
     <div className="relative flex-1 min-h-0 flex overflow-hidden" style={{ height: '100%' }}>
@@ -803,7 +819,6 @@ export default function SwipeView({
               // under the floating card. See EnsurePinVisibleOnMobile in
               // MapInner for the full rules + guardrails.
               autoShiftActivePinMobile={true}
-              getMobileCardBounds={getMobileCardBounds}
               visible={true}
               commuteInfoMap={commuteInfoMap}
               initialCenter={currentListing?.lat && currentListing?.lon ? [currentListing.lat, currentListing.lon] : initialCenter}
@@ -911,6 +926,7 @@ export default function SwipeView({
           no longer need to reserve space for it. Keep the CSS var for any
           future use but it stays 0 in practice. */}
       <div
+        ref={mobileSwipeCardRef}
         className="swipe-detail-panel absolute z-10 flex flex-col"
         data-testid="swipe-detail-panel"
         data-dismissed={mobileCardDismissed ? 'true' : 'false'}
@@ -1210,6 +1226,8 @@ export default function SwipeView({
                 the app chrome regardless of parent stacking context. */}
             {typeof document !== 'undefined' && createPortal(
               <div
+                ref={mobileActionPillRef}
+                data-testid="action-pill"
                 className="fixed left-1/2 -translate-x-1/2 min-[600px]:hidden"
                 style={{
                   bottom: 'calc(env(safe-area-inset-bottom) + 12px)',
