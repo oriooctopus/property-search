@@ -96,12 +96,17 @@ function getClient() {
 }
 
 // Only fetch the columns the UI actually needs. Dropping photos (legacy),
-// availability_date, external_id, last_seen_at, delisted_at etc. saves ~1MB+.
+// availability_date, external_id, last_seen_at etc. saves ~1MB+.
+//
+// `delisted_at` is included so wishlist-mode callers can group removed
+// listings into a separate "Removed" section. For non-wishlist callers it is
+// always NULL (filtered out in `applyBoundsAndFilters`) so the extra bytes
+// are negligible.
 const LISTING_SELECT = [
   "id", "address", "area", "price", "beds", "baths", "sqft",
   "lat", "lon", "transit_summary", "photo_urls", "url",
   "list_date", "last_update_date", "source", "year_built",
-  "photos", "created_at", "availability_date",
+  "photos", "created_at", "availability_date", "delisted_at",
 ].join(", ");
 
 // Supabase query builder type is complex; use any locally to avoid
@@ -112,8 +117,11 @@ function applyBoundsAndFilters(
   q: any,
   bounds: Bounds | null | undefined,
   filters: SearchFilters,
+  options: { includeDelisted?: boolean } = {},
 ): any {
-  q = q.is("delisted_at", null);
+  if (!options.includeDelisted) {
+    q = q.is("delisted_at", null);
+  }
   q = q.neq("source", "facebook-marketplace");
 
   if (bounds) {
@@ -312,6 +320,12 @@ export async function POST(request: NextRequest) {
 
     const commuteIds = effectiveIds;
 
+    // In wishlist mode we want the user to see *everything* they saved,
+    // including listings that have since been delisted (they'll be grouped
+    // into a "Removed" section in the UI). For all other queries we keep the
+    // default behavior of excluding delisted rows.
+    const includeDelisted = wishlistListingIds !== null;
+
     // ---- 2. Build and run the listings query (offset + limit pagination).
     //
     // The `last_update_date` + `created_at` sort can produce ties (e.g. many
@@ -334,7 +348,7 @@ export async function POST(request: NextRequest) {
         .order("created_at", { ascending: false })
         .order("id", { ascending: true })
         .range(offset, offset + limit - 1);
-      pageQ = applyBoundsAndFilters(pageQ, bounds, filters);
+      pageQ = applyBoundsAndFilters(pageQ, bounds, filters, { includeDelisted });
       const { data, error } = await pageQ;
       if (error) {
         console.error("[listings-search] query error:", error.message);
@@ -361,7 +375,7 @@ export async function POST(request: NextRequest) {
           .order("created_at", { ascending: false })
           .order("id", { ascending: true })
           .in("id", chunk);
-        chunkQ = applyBoundsAndFilters(chunkQ, bounds, filters);
+        chunkQ = applyBoundsAndFilters(chunkQ, bounds, filters, { includeDelisted });
         const { data, error } = await chunkQ;
         if (error) {
           console.error("[listings-search] chunk query error:", error.message);

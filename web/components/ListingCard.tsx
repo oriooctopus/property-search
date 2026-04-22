@@ -53,6 +53,10 @@ interface ListingCardProps {
   isSelected: boolean;
   isFavorited: boolean;
   isHiding?: boolean;
+  /** True when this card represents a delisted listing being shown in the
+   *  wishlist's "Removed" section — fades the card and shows a small badge
+   *  so users can still see what they had saved without thinking it's live. */
+  isRemoved?: boolean;
   commuteInfo?: CommuteInfo;
   /** True for cards in the first visible grid row — hints the browser to
    *  prioritize their hero photos (LCP candidates). */
@@ -68,6 +72,7 @@ function ListingCard({
   isSelected,
   isFavorited,
   isHiding,
+  isRemoved = false,
   commuteInfo,
   priority = false,
   onClick,
@@ -147,12 +152,15 @@ function ListingCard({
   return (
     <div
       data-listing-id={listing.id}
+      data-removed={isRemoved ? 'true' : undefined}
       className={`rounded-xl cursor-pointer transition-all group ${isHiding ? 'pointer-events-none' : ''}`}
       style={{
         backgroundColor: '#1c2028',
         border: `1px solid ${isSelected ? '#58a6ff' : '#2d333b'}`,
         boxShadow: isSelected ? '0 0 0 1px #58a6ff' : '0 2px 8px rgba(0,0,0,0.2)',
-        opacity: isHiding ? 0 : 1,
+        // Removed cards stay clickable (users may want to inspect why it
+        // came down) but are clearly de-emphasized via reduced opacity.
+        opacity: isHiding ? 0 : isRemoved ? 0.6 : 1,
         transform: isHiding ? 'scale(0.95)' : 'scale(1)',
         transition: 'opacity 300ms ease, transform 300ms ease, border-color 150ms ease, box-shadow 150ms ease',
       }}
@@ -257,6 +265,22 @@ function ListingCard({
           >
             ${listing.price.toLocaleString()}<span className="text-xs font-normal" style={{ color: '#8b949e' }}>/mo</span>
           </div>
+          {isRemoved && (
+            <div
+              data-testid="removed-badge"
+              className="absolute top-2 left-2 z-[3] px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider"
+              style={{
+                color: '#fda4af',
+                background: 'rgba(15, 17, 23, 0.85)',
+                border: '1px solid rgba(244, 63, 94, 0.35)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                letterSpacing: '0.06em',
+              }}
+            >
+              Removed
+            </div>
+          )}
           {totalPhotos > 1 && (
             <>
               <IconButton

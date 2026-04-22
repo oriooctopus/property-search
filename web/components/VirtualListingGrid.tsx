@@ -24,6 +24,16 @@ export interface VirtualListingGridHandle {
 
 interface VirtualListingGridProps {
   listings: Listing[];
+  /**
+   * Listings to render in a separate "Removed" section below the active ones.
+   * When provided (and non-empty), the grid renders:
+   *   [active rows] [section header row] [removed rows]
+   * Removed cards are visually deprioritized inside <ListingCard> via the
+   * `isRemoved` prop. Pass an empty array (or omit) to skip the section.
+   * Used by wishlist views so users can still see saved listings whose
+   * `delisted_at` is set.
+   */
+  removedListings?: Listing[];
   selectedId: number | null;
   wishlistedIds: Set<number>;
   hidingId: number | null;
@@ -88,10 +98,18 @@ function getColumnCount(width: number, prevCols: number): number {
   return 1;
 }
 
+// Row-plan describes a single virtualizer row. Mixing card rows with a
+// section-header "Removed" row keeps everything inside one virtualizer so
+// scrolling, height measurement, and infinite-scroll guards stay simple.
+type RowDescriptor =
+  | { kind: 'cards'; section: 'active' | 'removed'; listings: Listing[] }
+  | { kind: 'removed-header'; count: number };
+
 const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGridProps>(
   function VirtualListingGrid(
     {
       listings,
+      removedListings,
       selectedId,
       wishlistedIds,
       hidingId,
@@ -147,13 +165,47 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
       };
     }, []);
 
-    // Split listings into virtual "rows" of `cols` cards each.
-    const rowCount = Math.ceil(listings.length / cols);
+    // Build the row plan: active card rows, then (if any removed listings) a
+    // section header row, then removed card rows. The header row participates
+    // in the virtualizer so its height is measured naturally; we just give it
+    // a smaller estimate so the initial size is reasonable.
+    //
+    // `removed` is wrapped in useMemo so its identity only changes when the
+    // caller passes a new array — keeps the row-plan and measure effects
+    // stable across unrelated parent re-renders.
+    const removed = useMemo<Listing[]>(() => removedListings ?? [], [removedListings]);
+    const rowPlan = useMemo<RowDescriptor[]>(() => {
+      const rows: RowDescriptor[] = [];
+      for (let i = 0; i < listings.length; i += cols) {
+        rows.push({ kind: 'cards', section: 'active', listings: listings.slice(i, i + cols) });
+      }
+      if (removed.length > 0) {
+        rows.push({ kind: 'removed-header', count: removed.length });
+        for (let i = 0; i < removed.length; i += cols) {
+          rows.push({ kind: 'cards', section: 'removed', listings: removed.slice(i, i + cols) });
+        }
+      }
+      return rows;
+    }, [listings, removed, cols]);
+    const rowCount = rowPlan.length;
+    // Used by the infinite-scroll trigger: only the *active* tail should
+    // request more pages. Once we're inside the removed section the user has
+    // already paged past the active list.
+    const lastActiveRowIndex = useMemo(() => {
+      let idx = -1;
+      for (let i = 0; i < rowPlan.length; i++) {
+        if (rowPlan[i].kind === 'cards' && (rowPlan[i] as { section: 'active' | 'removed' }).section === 'active') {
+          idx = i;
+        }
+      }
+      return idx;
+    }, [rowPlan]);
 
     const virtualizer = useVirtualizer({
       count: rowCount,
       getScrollElement: () => scrollRef.current,
-      estimateSize: () => ESTIMATED_ROW_HEIGHT,
+      estimateSize: (index) =>
+        rowPlan[index]?.kind === 'removed-header' ? 64 : ESTIMATED_ROW_HEIGHT,
       overscan: OVERSCAN,
       // Re-key when cols changes so cache gets reset at the breakpoint
       getItemKey: (index) => `${cols}-${index}`,
@@ -163,16 +215,22 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
     // height cache isn't stale for a different slice of listings.
     useEffect(() => {
       virtualizer.measure();
-    }, [listings, cols, virtualizer]);
+    }, [listings, removed, cols, virtualizer]);
 
     const scrollToListing = useCallback(
       (id: number) => {
-        const idx = listings.findIndex((l) => l.id === id);
-        if (idx < 0) return;
-        const rowIndex = Math.floor(idx / cols);
-        virtualizer.scrollToIndex(rowIndex, { align: 'center', behavior: 'smooth' });
+        // Search the row plan directly so we can scroll to either an active
+        // or a removed listing transparently.
+        for (let rowIdx = 0; rowIdx < rowPlan.length; rowIdx++) {
+          const row = rowPlan[rowIdx];
+          if (row.kind !== 'cards') continue;
+          if (row.listings.some((l) => l.id === id)) {
+            virtualizer.scrollToIndex(rowIdx, { align: 'center', behavior: 'smooth' });
+            return;
+          }
+        }
       },
-      [listings, cols, virtualizer],
+      [rowPlan, virtualizer],
     );
 
     useImperativeHandle(
@@ -217,12 +275,16 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
       }
       const lastItem = virtualItems[virtualItems.length - 1];
       if (!lastItem) return;
-      if (lastItem.index >= rowCount - 1 - LOAD_MORE_ROW_THRESHOLD) {
+      // Trigger load-more relative to the end of the *active* section. The
+      // removed section comes after it in the row plan but represents already
+      // saved-by-user listings, not server-paginated results.
+      const triggerIndex = lastActiveRowIndex >= 0 ? lastActiveRowIndex : rowCount - 1;
+      if (lastItem.index >= triggerIndex - LOAD_MORE_ROW_THRESHOLD) {
         onLoadMoreRef.current();
       }
       // virtualItems array identity changes on every scroll tick, which is
       // what drives this effect. rowCount/hasMore/isLoadingMore gate it.
-    }, [virtualItems, rowCount, hasMore, isLoadingMore]);
+    }, [virtualItems, rowCount, lastActiveRowIndex, hasMore, isLoadingMore]);
 
     // Grid layout inside each virtual row
     const rowGridStyle = useMemo<React.CSSProperties>(
@@ -252,7 +314,7 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
       >
         {/* Horizontal padding wrapper — matches the previous px-3 py-3 */}
         <div style={{ paddingLeft: 12, paddingRight: 12, paddingTop: 12 }}>
-          {listings.length === 0 ? null : (
+          {rowCount === 0 ? null : (
             <div
               style={{
                 height: totalSize,
@@ -262,8 +324,62 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
             >
               {virtualItems.map((virtualRow) => {
                 const rowIndex = virtualRow.index;
-                const startIdx = rowIndex * cols;
-                const rowListings = listings.slice(startIdx, startIdx + cols);
+                const row = rowPlan[rowIndex];
+                if (!row) return null;
+                if (row.kind === 'removed-header') {
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      data-index={rowIndex}
+                      data-testid="removed-section-header"
+                      ref={virtualizer.measureElement}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${virtualRow.start}px)`,
+                        paddingTop: 16,
+                        paddingBottom: 12,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          color: '#8b949e',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.06em',
+                        }}
+                      >
+                        <span>Removed ({row.count})</span>
+                        <span
+                          style={{
+                            flex: 1,
+                            height: 1,
+                            background: '#2d333b',
+                          }}
+                        />
+                      </div>
+                      <div
+                        style={{
+                          marginTop: 6,
+                          color: '#6b7280',
+                          fontSize: 11,
+                          fontWeight: 400,
+                          textTransform: 'none',
+                          letterSpacing: 0,
+                        }}
+                      >
+                        These listings have been taken down by the source.
+                      </div>
+                    </div>
+                  );
+                }
+                const isRemovedRow = row.section === 'removed';
                 return (
                   <div
                     key={virtualRow.key}
@@ -278,13 +394,14 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
                       ...rowGridStyle,
                     }}
                   >
-                    {rowListings.map((listing) => (
+                    {row.listings.map((listing) => (
                       <ListingCard
                         key={listing.id}
                         listing={listing}
                         isSelected={listing.id === selectedId}
                         isFavorited={wishlistedIds.has(listing.id)}
                         isHiding={hidingId === listing.id}
+                        isRemoved={isRemovedRow}
                         commuteInfo={commuteInfoMap?.get(listing.id)}
                         priority={rowIndex === 0}
                         onClick={onCardSelect}
@@ -302,7 +419,7 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
           {/* Footers / empty states — match previous behavior */}
           {/* Infinite-scroll bottom indicator. Sits below the virtualized
               list so it doesn't pollute the virtualizer's row height cache. */}
-          {listings.length > 0 && (hasMore || isLoadingMore) && (
+          {rowCount > 0 && (hasMore || isLoadingMore) && (
             <div
               className="text-center py-4 text-xs"
               style={{ color: '#6b7280' }}
@@ -317,7 +434,7 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
               {commuteMessage}
             </div>
           )}
-          {listings.length === 0 && !suppressEmptyState && (
+          {rowCount === 0 && !suppressEmptyState && (
             <div
               className="flex items-center justify-center min-h-[200px] text-center text-sm"
               style={{ color: '#8b949e' }}
