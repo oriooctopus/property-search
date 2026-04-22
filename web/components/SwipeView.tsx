@@ -891,6 +891,13 @@ export default function SwipeView({
               initialCenter={currentListing?.lat && currentListing?.lon ? [currentListing.lat, currentListing.lon] : initialCenter}
               initialZoom={15}
               hoveredStation={hoveredStation}
+              // Mobile swipe: pin tap selects listing as the active swipe
+              // card (via handleMarkerClick) and suppresses the desktop
+              // popup/tooltip. Cluster taps zoom in instead of opening
+              // the cluster popup. Desktop swipe + list/map views keep
+              // the popup — only this mobile-full-bleed map uses swipe
+              // selection.
+              swipeSelectMode={true}
             />
           )}
         </div>
@@ -961,6 +968,12 @@ export default function SwipeView({
             onMapMove={(center, zoom) => { mapCenterRef.current = center; onMapMove?.(center, zoom); }}
             suppressBoundsRef={suppressBoundsRef}
             isPanningRef={isPanningRef}
+            // Expanded mobile map overlay is still part of swipe mode —
+            // the user tapped "Full map" from the swipe card but the
+            // swipe deck is still the primary UI. Pin tap should select
+            // the listing (bringing its card to the front) rather than
+            // open the desktop popup.
+            swipeSelectMode={true}
             visible={showMobileMap}
             commuteInfoMap={commuteInfoMap}
             initialCenter={currentListing?.lat && currentListing?.lon ? [currentListing.lat, currentListing.lon] : initialCenter}
