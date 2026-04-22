@@ -330,11 +330,14 @@ let heartGlyphIconCache: L.DivIcon | null = null;
 function getHeartGlyphIcon(): L.DivIcon {
   if (heartGlyphIconCache) return heartGlyphIconCache;
   const size = 14;
+  // Centered solid heart. The previous path was asymmetric — its right lobe
+  // extended past x=23 in a 24-wide viewBox so the visual center sat ~2 units
+  // right of the marker, making the heart look off-center on saved pins.
   heartGlyphIconCache = L.divIcon({
     className: '',
     html: `
       <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="#ffffff" aria-hidden="true" style="display:block;pointer-events:none;filter:drop-shadow(0 1px 1px rgba(0,0,0,0.35));">
-        <path d="M12 21s-7-4.35-7-10a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 5.65-7 10-7 10z" />
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
       </svg>
     `,
     iconSize: [size, size],
