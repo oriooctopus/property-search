@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ButtonBase, PrimaryButton, TextButton } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import type { Wishlist } from '@/lib/hooks/useWishlists';
@@ -82,12 +83,35 @@ export default function SaveWishlistPanel({
     if (showNewInput) setTimeout(() => newInputRef.current?.focus(), 40);
   }, [showNewInput]);
 
-  // Position panel anchored to the dual-chip
+  // Position panel anchored to the dual-chip. Mirrors FilterChip's flip-above
+  // logic so the panel stays fully on-screen inside the mobile filters bottom
+  // sheet (where the chip sits near the viewport's bottom edge). Without this
+  // the panel rendered at anchor.bottom+8 which was well past window.innerHeight
+  // and the Save form was completely unreachable on mobile.
   const anchorRect = anchorRef.current?.getBoundingClientRect() ?? null;
-  const top = anchorRect ? anchorRect.bottom + 8 : 96;
-  const right = anchorRect
-    ? Math.max(8, window.innerWidth - anchorRect.right)
-    : 20;
+  const PANEL_WIDTH = 340;
+  const GAP = 8;
+  const MIN_EDGE_PADDING = 16;
+  const MIN_PANEL_HEIGHT = 240;
+
+  let top = 96;
+  let right = 20;
+  let maxHeight: number | undefined;
+
+  if (anchorRect && typeof window !== 'undefined') {
+    right = Math.max(8, window.innerWidth - anchorRect.right);
+    const spaceBelow = window.innerHeight - anchorRect.bottom - GAP - MIN_EDGE_PADDING;
+    const spaceAbove = anchorRect.top - GAP - MIN_EDGE_PADDING;
+    const openAbove = spaceBelow < MIN_PANEL_HEIGHT && spaceAbove > spaceBelow;
+    if (openAbove) {
+      maxHeight = Math.max(MIN_PANEL_HEIGHT, spaceAbove);
+      top = Math.max(MIN_EDGE_PADDING, anchorRect.top - GAP - maxHeight);
+      maxHeight = anchorRect.top - GAP - top;
+    } else {
+      top = anchorRect.bottom + GAP;
+      maxHeight = Math.max(MIN_PANEL_HEIGHT, spaceBelow);
+    }
+  }
 
   const totalSaved = new Set<number>();
   for (const w of [...myWishlists, ...sharedWishlists]) {
@@ -103,23 +127,27 @@ export default function SaveWishlistPanel({
     if (id) onSelect(id);
   }
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  const panel = (
     <div
       ref={panelRef}
-      className="fixed z-[2000] rounded-xl shadow-2xl"
+      data-save-wishlist-panel
+      className="fixed z-[2000] rounded-xl shadow-2xl flex flex-col"
       style={{
         top,
         right,
-        width: 340,
+        width: PANEL_WIDTH,
         maxWidth: 'calc(100vw - 16px)',
+        maxHeight,
         backgroundColor: '#1c2028',
         border: '1px solid #2d333b',
         boxShadow: '0 12px 40px rgba(0,0,0,0.65)',
         overflow: 'hidden',
       }}
     >
-      {/* Tabs */}
-      <div className="flex" style={{ borderBottom: '1px solid #2d333b' }}>
+      {/* Tabs — fixed at top of panel */}
+      <div className="flex shrink-0" style={{ borderBottom: '1px solid #2d333b' }}>
         <TabButton
           active={tab === 'save-search'}
           onClick={() => setTab('save-search')}
@@ -142,11 +170,19 @@ export default function SaveWishlistPanel({
       </div>
 
       {tab === 'save-search' && (
-        <div className="p-4">{saveSearchContent}</div>
+        <div
+          className="p-4 overflow-y-auto overscroll-contain"
+          style={{ WebkitOverflowScrolling: 'touch', minHeight: 0 }}
+        >
+          {saveSearchContent}
+        </div>
       )}
 
       {tab === 'wishlist' && (
-        <>
+        <div
+          className="overflow-y-auto overscroll-contain flex flex-col"
+          style={{ WebkitOverflowScrolling: 'touch', minHeight: 0 }}
+        >
           <div className="px-4 pt-3 pb-2">
             {/* All saved */}
             <WishlistRow
@@ -360,10 +396,18 @@ export default function SaveWishlistPanel({
               </ButtonBase>
             </span>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
+
+  // Portal to document.body so the fixed-position panel escapes any ancestor
+  // with a `transform` (notably the mobile filters sheet, which uses
+  // `transform: translateY(...)` for drag-to-dismiss). A non-none transform
+  // makes the element the containing block for `position: fixed` children,
+  // which otherwise renders the panel relative to the sheet instead of the
+  // viewport — effectively hiding it offscreen on mobile.
+  return createPortal(panel, document.body);
 }
 
 // ---------------------------------------------------------------------------
