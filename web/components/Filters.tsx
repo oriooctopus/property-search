@@ -498,7 +498,7 @@ function PillGroup<T extends number | string | null>({
   onSelect: (v: T) => void;
 }) {
   return (
-    <div className="flex">
+    <div className="flex overflow-x-auto -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {options.map((opt, i) => {
         const position = options.length === 1
           ? 'only' as const
@@ -533,7 +533,7 @@ function MultiPillGroup({
   onToggle: (v: number | null) => void;
 }) {
   return (
-    <div className="flex">
+    <div className="flex overflow-x-auto -mx-1 px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {options.map((opt, i) => {
         const position = options.length === 1
           ? 'only' as const
