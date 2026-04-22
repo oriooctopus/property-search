@@ -17,13 +17,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useOccluders } from './OccluderRegistry';
 import { useLeafletMap } from './LeafletMapContext';
-import { isPinVisible, PIN_RADIUS_PX, type ViewportPoint } from './occlusion';
+import { isPinVisible, PIN_RADIUS_PX, getVisibleMapRect, type ViewportPoint } from './occlusion';
 
 const COLORS = {
   occluder: 'rgba(239, 68, 68, 0.30)', // red @ 30% alpha
   occluderBorder: 'rgba(239, 68, 68, 0.85)',
   pinVisible: 'rgba(34, 197, 94, 0.85)', // green
   pinOccluded: 'rgba(239, 68, 68, 0.85)', // red
+  visibleRect: 'rgba(34, 197, 94, 0.95)', // green outline of the queried (visible) bounds
   label: '#ffffff',
   labelBg: 'rgba(0, 0, 0, 0.78)',
 };
@@ -32,6 +33,7 @@ interface OverlayState {
   rects: Array<{ id: string; rect: DOMRect }>;
   pin: ViewportPoint | null;
   mapRect: DOMRect | null;
+  visibleRect: DOMRect | null;
   visibility: { visible: boolean; occludedBy: string | null; margin: number } | null;
 }
 
@@ -44,6 +46,7 @@ export function OcclusionDebugOverlay() {
     rects: [],
     pin: null,
     mapRect: null,
+    visibleRect: null,
     visibility: null,
   });
   const rafRef = useRef<number | null>(null);
@@ -78,7 +81,12 @@ export function OcclusionDebugOverlay() {
         ? isPinVisible(pin, mapRect, list)
         : null;
 
-      setState({ rects, pin, mapRect, visibility });
+      // Visible rect = the queried-bounds region (what the listings
+      // search sees). Mirrors the BoundsWatcher computation so it's
+      // obvious what the search is actually looking at.
+      const visibleRect = mapRect ? getVisibleMapRect(mapRect, list) : null;
+
+      setState({ rects, pin, mapRect, visibleRect, visibility });
       rafRef.current = requestAnimationFrame(tick);
     };
 
@@ -90,7 +98,7 @@ export function OcclusionDebugOverlay() {
 
   if (!enabled) return null;
 
-  const { rects, pin, visibility } = state;
+  const { rects, pin, visibleRect, visibility } = state;
   const pinColor = visibility?.visible ? COLORS.pinVisible : COLORS.pinOccluded;
 
   return (
@@ -104,6 +112,36 @@ export function OcclusionDebugOverlay() {
       aria-hidden
       data-testid="occlusion-debug-overlay"
     >
+      {visibleRect && (
+        <div
+          style={{
+            position: 'fixed',
+            left: visibleRect.left,
+            top: visibleRect.top,
+            width: visibleRect.width,
+            height: visibleRect.height,
+            border: `2px dashed ${COLORS.visibleRect}`,
+            boxSizing: 'border-box',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 4,
+              left: 4,
+              padding: '2px 6px',
+              fontSize: 10,
+              fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+              color: COLORS.label,
+              background: COLORS.labelBg,
+              borderRadius: 3,
+            }}
+          >
+            visible bounds (queried)
+          </div>
+        </div>
+      )}
+
       {rects.map(({ id, rect }) => (
         <div
           key={id}
