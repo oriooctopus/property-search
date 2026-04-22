@@ -5,6 +5,7 @@ import Image from 'next/image';
 import type { Database } from '@/lib/types';
 import { formatListedDate, formatAvailabilityDate } from '@/lib/format-date';
 import { ActionButton, IconButton, CompactStats } from '@/components/ui';
+import ListingCardPeekMap from '@/components/ListingCardPeekMap';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -61,10 +62,17 @@ interface ListingCardProps {
   /** True for cards in the first visible grid row — hints the browser to
    *  prioritize their hero photos (LCP candidates). */
   priority?: boolean;
+  /** Sibling listings used to render dimmed context pins inside the card's
+   *  tap-to-peek mini-map. Optional — when omitted the peek map shows only
+   *  the primary pin + nearest subway. */
+  allListings?: Listing[];
   onClick: (id: number) => void;
   onStarClick: (listingId: number, anchorRect: DOMRect) => void;
   onExpand: (listing: Listing) => void;
   onHide: (id: number) => void;
+  /** Opens the full map view centered on this listing (uses the existing
+   *  `?view=map&listing=<id>` query-param contract). Optional. */
+  onOpenFullMap?: (listing: Listing) => void;
 }
 
 function ListingCard({
@@ -75,10 +83,12 @@ function ListingCard({
   isRemoved = false,
   commuteInfo,
   priority = false,
+  allListings,
   onClick,
   onStarClick,
   onExpand,
   onHide,
+  onOpenFullMap,
 }: ListingCardProps) {
   const pricePerBed = listing.beds > 0 ? Math.round(listing.price / listing.beds) : null;
   const photos = listing.photo_urls ?? [];
@@ -86,7 +96,25 @@ function ListingCard({
   const totalPhotos = photos.length + (hasMorePhotosSlide ? 1 : 0);
 
   const [photoIndex, setPhotoIndex] = useState(0);
+  // Per-card transient peek state — NOT persisted across re-mounts. When the
+  // virtualized list scrolls a card out of view it unmounts; coming back
+  // mounts a fresh instance so peek correctly resets to false.
+  const [peeked, setPeeked] = useState(false);
   const starButtonRef = useRef<HTMLButtonElement>(null);
+
+  const handleTogglePeek = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPeeked((p) => !p);
+  }, []);
+
+  const handleClosePeek = useCallback(() => {
+    setPeeked(false);
+  }, []);
+
+  const handleOpenFullMap = useCallback(() => {
+    setPeeked(false);
+    onOpenFullMap?.(listing);
+  }, [onOpenFullMap, listing]);
 
   // Touch/swipe handling
   const touchStartX = useRef<number | null>(null);
@@ -156,8 +184,11 @@ function ListingCard({
       className={`rounded-xl cursor-pointer transition-all group ${isHiding ? 'pointer-events-none' : ''}`}
       style={{
         backgroundColor: '#1c2028',
-        border: `1px solid ${isSelected ? '#58a6ff' : '#2d333b'}`,
-        boxShadow: isSelected ? '0 0 0 1px #58a6ff' : '0 2px 8px rgba(0,0,0,0.2)',
+        border: `1px solid ${isSelected || peeked ? '#58a6ff' : '#2d333b'}`,
+        boxShadow:
+          isSelected || peeked
+            ? '0 0 0 1px rgba(88, 166, 255, 0.35), 0 8px 24px rgba(0,0,0,0.5)'
+            : '0 2px 8px rgba(0,0,0,0.2)',
         // Removed cards stay clickable (users may want to inspect why it
         // came down) but are clearly de-emphasized via reduced opacity.
         opacity: isHiding ? 0 : isRemoved ? 0.6 : 1,
@@ -316,6 +347,55 @@ function ListingCard({
               </div>
             </>
           )}
+
+          {/* Tap-to-peek mini-map button — top-right of photo area. Only
+              renders when we have coordinates to show. */}
+          {listing.lat != null && listing.lon != null && (
+            <button
+              type="button"
+              onClick={handleTogglePeek}
+              aria-label={peeked ? 'Close map preview' : 'Open map preview'}
+              aria-pressed={peeked}
+              className="absolute top-2 right-2 z-[4] flex items-center justify-center cursor-pointer"
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                background: peeked
+                  ? 'rgba(88, 166, 255, 0.2)'
+                  : 'rgba(13, 17, 23, 0.75)',
+                border: `1px solid ${peeked ? '#58a6ff' : 'rgba(88, 166, 255, 0.35)'}`,
+                backdropFilter: 'blur(6px)',
+                WebkitBackdropFilter: 'blur(6px)',
+                transition: 'background 150ms ease, border-color 150ms ease',
+                padding: 0,
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M8 1C5.2 1 3 3.2 3 6c0 3.8 5 9 5 9s5-5.2 5-9c0-2.8-2.2-5-5-5zm0 7a2 2 0 110-4 2 2 0 010 4z"
+                  fill="#58a6ff"
+                />
+              </svg>
+            </button>
+          )}
+
+          {/* Peek overlay — leaflet inner is dynamically loaded, so the
+              bundle stays out of non-peeked cards. */}
+          {peeked && listing.lat != null && listing.lon != null && (
+            <ListingCardPeekMap
+              listing={listing}
+              nearbyListings={allListings ?? []}
+              onClose={handleClosePeek}
+              onOpenFullMap={handleOpenFullMap}
+            />
+          )}
         </div>
       ) : (
         <div
@@ -327,6 +407,45 @@ function ListingCard({
             <circle cx="8.5" cy="8.5" r="1.5" />
             <polyline points="21 15 16 10 5 21" />
           </svg>
+
+          {listing.lat != null && listing.lon != null && (
+            <button
+              type="button"
+              onClick={handleTogglePeek}
+              aria-label={peeked ? 'Close map preview' : 'Open map preview'}
+              aria-pressed={peeked}
+              className="absolute top-2 right-2 z-[4] flex items-center justify-center cursor-pointer"
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                background: peeked
+                  ? 'rgba(88, 166, 255, 0.2)'
+                  : 'rgba(13, 17, 23, 0.75)',
+                border: `1px solid ${peeked ? '#58a6ff' : 'rgba(88, 166, 255, 0.35)'}`,
+                backdropFilter: 'blur(6px)',
+                WebkitBackdropFilter: 'blur(6px)',
+                transition: 'background 150ms ease, border-color 150ms ease',
+                padding: 0,
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path
+                  d="M8 1C5.2 1 3 3.2 3 6c0 3.8 5 9 5 9s5-5.2 5-9c0-2.8-2.2-5-5-5zm0 7a2 2 0 110-4 2 2 0 010 4z"
+                  fill="#58a6ff"
+                />
+              </svg>
+            </button>
+          )}
+
+          {peeked && listing.lat != null && listing.lon != null && (
+            <ListingCardPeekMap
+              listing={listing}
+              nearbyListings={allListings ?? []}
+              onClose={handleClosePeek}
+              onOpenFullMap={handleOpenFullMap}
+            />
+          )}
         </div>
       )}
 
