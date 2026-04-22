@@ -20,9 +20,16 @@ import type { ListingSource } from "../../sources/types";
 import { verifiers, VERIFY_CONCURRENCY } from "../../sources/verify/registry";
 import { parallelMap } from "../../sources/verify/shared";
 import type { VerifyResult } from "../../sources/verify/types";
+import { sendIngestAlert } from "../alert";
 
 const STALE_AGE_DAYS = 3;
 const BATCH_LIMIT = 2000;
+// If a source's verify batch returns this fraction of `unknown` or higher AND
+// at least MIN_BATCH_SIZE_FOR_ALERT candidates ran, fire an alert — that's the
+// silent-failure pattern that kept delisted_at from being written for weeks
+// (proxy blocked / captcha wall / wrong verifier).
+const UNKNOWN_ALERT_RATIO = 0.8;
+const MIN_BATCH_SIZE_FOR_ALERT = 50;
 
 interface Candidate {
   id: number;
@@ -170,10 +177,20 @@ export async function runVerifyStalePhase(
       }
     });
 
-    if (sourceUnknown === rows.length && rows.length > 0) {
+    const unknownRatio = rows.length > 0 ? sourceUnknown / rows.length : 0;
+    if (
+      rows.length >= MIN_BATCH_SIZE_FOR_ALERT &&
+      unknownRatio >= UNKNOWN_ALERT_RATIO
+    ) {
+      const pct = Math.round(unknownRatio * 100);
       log.warn(
-        `WARNING: all ${rows.length} candidates for ${src} returned unknown — verifier may be a stub`,
+        `WARNING: ${sourceUnknown}/${rows.length} (${pct}%) ${src} candidates returned unknown — verifier likely blocked`,
       );
+      // Fire-and-forget alert so stale detection can't silently degrade again.
+      sendIngestAlert(
+        `[Dwelligence] verify-stale degraded: ${pct}% unknown for ${src}`,
+        `verify-stale phase returned ${sourceUnknown}/${rows.length} (${pct}%) unknown for source=${src}. Zero progress is being made against the stale backlog. Common causes: Apify proxy budget exceeded, PerimeterX tightening, or verifier regex drift. Check https://console.apify.com usage and the ingest_runs table for the latest run id.`,
+      ).catch(() => {});
     }
   }
 

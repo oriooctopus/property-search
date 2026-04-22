@@ -5,7 +5,12 @@
  * Free tier: 100 emails/day, single API key, no OAuth.
  */
 
-const ALERT_FROM = "Dwelligence Ingest <alerts@dwelligence.ai>";
+// Resend requires a verified sender domain. dwelligence.ai isn't verified yet,
+// so fall back to Resend's universal onboarding sender when ALERT_FROM isn't
+// set. Override via INGEST_ALERT_FROM once the domain is verified.
+const ALERT_FROM =
+  process.env.INGEST_ALERT_FROM ??
+  "Dwelligence Ingest <onboarding@resend.dev>";
 
 export async function sendIngestAlert(
   subject: string,
