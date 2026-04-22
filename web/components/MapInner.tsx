@@ -627,6 +627,12 @@ export interface MapProps {
    *  the registry — chrome components self-register via
    *  `useRegisterOccluder`. See `web/lib/viewport/`. */
   autoShiftActivePinMobile?: boolean;
+  /** Mobile swipe context: when true, pin taps fire `onMarkerClick` only
+   *  (for selecting the listing as the active swipe card) and suppress the
+   *  desktop-style popup/tooltip. Cluster taps zoom in instead of opening
+   *  the cluster popup. Leave false for desktop / list / map views where
+   *  the popup is the intended interaction. */
+  swipeSelectMode?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1120,7 +1126,7 @@ function SubwayLinesLayer({ enabled }: SubwayLinesLayerProps) {
   );
 }
 
-export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, isPanningRef: isPanningRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, hoveredStation, autoShiftActivePinMobile }: MapProps) {
+export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, isPanningRef: isPanningRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, hoveredStation, autoShiftActivePinMobile, swipeSelectMode = false }: MapProps) {
   // Fall back to a local ref if the caller doesn't provide one
   const localSuppressBoundsRef = useRef(false);
   const suppressBoundsRef = suppressBoundsRefProp ?? localSuppressBoundsRef;
@@ -1194,6 +1200,11 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
   onHideListingRef.current = onHideListing;
   const onSelectDetailRef = useRef(onSelectDetail);
   onSelectDetailRef.current = onSelectDetail;
+  // Keep a stable ref so the memoized click/hover handlers always see the
+  // latest swipeSelectMode without tearing down + reattaching Leaflet
+  // event wiring for every pin on every render.
+  const swipeSelectModeRef = useRef(swipeSelectMode);
+  swipeSelectModeRef.current = swipeSelectMode;
   // Keep a map of listings by id for the detail callback
   const listingsMapRef = useRef<Map<number, Listing>>(new Map());
   useEffect(() => {
@@ -1316,6 +1327,9 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
     return (e: L.LeafletMouseEvent) => {
       // Skip synthetic mouseover events on touch devices
       if (e.originalEvent && 'touches' in (e.originalEvent as unknown as object)) return;
+      // In mobile swipe mode, hover popups are suppressed entirely — the
+      // only pin interaction is tap-to-select (handled by click + map pan).
+      if (swipeSelectModeRef.current) return;
       // Cancel any pending close timer for this marker
       const timer = closeTimerRef.current.get(listing.id);
       if (timer) {
@@ -1346,6 +1360,20 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
 
   const handleClick = useCallback((listing: Listing) => {
     return (e: L.LeafletMouseEvent) => {
+      // Swipe-select mode (mobile swipe view): tapping a pin selects the
+      // listing as the active swipe card via onMarkerClick ONLY. No popup,
+      // no detail modal — the card is already the primary UI. The popup/
+      // detail flow is reserved for desktop + mobile list/map views.
+      if (swipeSelectModeRef.current) {
+        console.log(`[popup] marker CLICK #${listing.id} — swipe-select (no popup)`);
+        onMarkerClick(listing.id);
+        // Belt-and-braces: even though we don't render <Popup> in
+        // swipeSelectMode, Leaflet's default click→openPopup is already
+        // noop'd by the missing child. Explicitly close any stale popup
+        // that may have been opened before the mode flipped.
+        e.target.closePopup?.();
+        return;
+      }
       console.log(`[popup] marker CLICK #${listing.id} — opening detail view`);
       onMarkerClick(listing.id);
       onSelectDetailRef.current(listing);
@@ -1492,7 +1520,22 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
                   click: (e) => {
                     // Stop propagation so the map doesn't also receive the click
                     L.DomEvent.stopPropagation(e);
-                    // The popup will open; wire delegation after popupopen
+                    // Swipe-select mode: instead of opening the cluster
+                    // popup (desktop interaction), zoom in one step so
+                    // the cluster visually expands into its constituent
+                    // pins. User can then tap the specific pin they want
+                    // to set as the active swipe card. Clamp to the
+                    // map's configured max zoom.
+                    if (swipeSelectModeRef.current) {
+                      const leafletMap = (e.target as L.Marker & { _map?: L.Map })._map;
+                      if (leafletMap) {
+                        const current = leafletMap.getZoom();
+                        const maxZoom = leafletMap.getMaxZoom();
+                        const nextZoom = Math.min(current + 2, maxZoom);
+                        leafletMap.setView([rep.lat, rep.lon], nextZoom, { animate: true });
+                      }
+                    }
+                    // Otherwise the popup will open; wire delegation after popupopen
                   },
                   popupopen: (e) => {
                     const popup = (e as unknown as { popup: L.Popup }).popup;
@@ -1513,9 +1556,15 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
                   },
                 }}
               >
-                <Popup className="dark-popup" autoClose={false} closeOnClick={false}>
-                  <div dangerouslySetInnerHTML={{ __html: clusterPopupHtml }} />
-                </Popup>
+                {/* Cluster popup is desktop / list / map interaction only.
+                    In mobile swipe mode the cluster tap zooms in instead
+                    (see click handler above) so omit the <Popup> entirely
+                    — otherwise Leaflet auto-opens it on click. */}
+                {!swipeSelectMode && (
+                  <Popup className="dark-popup" autoClose={false} closeOnClick={false}>
+                    <div dangerouslySetInnerHTML={{ __html: clusterPopupHtml }} />
+                  </Popup>
+                )}
               </Marker>
             );
           }
@@ -1606,9 +1655,16 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
                   popupopen: handlePopupOpen(listing),
                 }}
               >
-                <Popup className="dark-popup" autoClose={false} closeOnClick={false}>
-                  <div dangerouslySetInnerHTML={{ __html: buildPopupContent(listing, favoritedIds.has(listing.id), wouldLiveIds.has(listing.id), commuteInfoMap?.get(listing.id)) }} />
-                </Popup>
+                {/* Popup is the DESKTOP / list / map-view interaction.
+                    In mobile swipe mode the pin tap selects the listing
+                    as the active swipe card instead — rendering <Popup>
+                    here would let Leaflet auto-open it on click, so we
+                    omit it entirely under swipeSelectMode. */}
+                {!swipeSelectMode && (
+                  <Popup className="dark-popup" autoClose={false} closeOnClick={false}>
+                    <div dangerouslySetInnerHTML={{ __html: buildPopupContent(listing, favoritedIds.has(listing.id), wouldLiveIds.has(listing.id), commuteInfoMap?.get(listing.id)) }} />
+                  </Popup>
+                )}
               </CircleMarker>
               {/* Saved-pin heart glyph — small white heart overlaid on top
                   of the green circle so saved-ness is visible at tiny zoom

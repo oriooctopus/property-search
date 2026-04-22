@@ -42,12 +42,18 @@ interface MapProps {
   commuteInfoMap?: Map<number, CommuteInfo>;
   hoveredStation?: HoveredStation | null;
   autoShiftActivePinMobile?: boolean;
+  /** Mobile swipe context: when true, tapping a pin fires `onMarkerClick`
+   *  (which parent uses to select the listing for the swipe deck) WITHOUT
+   *  opening the desktop-style popup/tooltip. Tapping a cluster zooms in
+   *  instead of opening the cluster popup. Desktop / list / map views
+   *  should leave this false so popup behavior is unchanged. */
+  swipeSelectMode?: boolean;
 }
 
 // Memoized so parent re-renders (e.g. view-switches on mobile) don't force
 // the Leaflet tree to re-run its own render cycle. Stable callback references
 // from the parent are required for the memo to be effective.
-function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, isPanningRef, initialCenter, initialZoom, visible, commuteInfoMap, hoveredStation, autoShiftActivePinMobile }: MapProps) {
+function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, isPanningRef, initialCenter, initialZoom, visible, commuteInfoMap, hoveredStation, autoShiftActivePinMobile, swipeSelectMode }: MapProps) {
   return (
     <MapInner
       listings={listings}
@@ -69,6 +75,7 @@ function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds
       commuteInfoMap={commuteInfoMap}
       hoveredStation={hoveredStation ?? null}
       autoShiftActivePinMobile={autoShiftActivePinMobile}
+      swipeSelectMode={swipeSelectMode}
     />
   );
 }
