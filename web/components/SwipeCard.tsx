@@ -127,8 +127,8 @@ interface SwipeCardProps {
   compactMobile?: boolean;
 }
 
-const SWIPE_X_THRESHOLD = 100;
-const SWIPE_Y_THRESHOLD = 100; // down only
+const SWIPE_X_THRESHOLD = 70;
+const SWIPE_Y_THRESHOLD = 70; // down only
 const STAMP_FADE_RATIO = 0.5;
 
 export default function SwipeCard({
