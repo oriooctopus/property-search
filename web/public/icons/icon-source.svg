@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#0f1117"/>
+
+  <!-- Art Deco building, scaled from logo-deco-1 (48x48 → ~10.67x scale)
+       Centered with margin so it works as both regular and maskable.
+       Original 48x48 viewBox content lives at center: translate by 16, scale 9.5x
+       to leave a safe ~10% margin on all sides for maskable safe zone. -->
+  <g transform="translate(102.4, 102.4) scale(6.4)">
+    <!-- Sunburst rays behind building -->
+    <line x1="24" y1="8" x2="24" y2="2" stroke="#fff" stroke-width="1"/>
+    <line x1="24" y1="8" x2="18" y2="3" stroke="#fff" stroke-width="0.75"/>
+    <line x1="24" y1="8" x2="30" y2="3" stroke="#fff" stroke-width="0.75"/>
+    <line x1="24" y1="8" x2="14" y2="5" stroke="#fff" stroke-width="0.5"/>
+    <line x1="24" y1="8" x2="34" y2="5" stroke="#fff" stroke-width="0.5"/>
+    <line x1="24" y1="8" x2="10" y2="7" stroke="#fff" stroke-width="0.5"/>
+    <line x1="24" y1="8" x2="38" y2="7" stroke="#fff" stroke-width="0.5"/>
+
+    <!-- Spire -->
+    <rect x="23" y="8" width="2" height="4" fill="#fff"/>
+
+    <!-- Top tier -->
+    <rect x="20" y="12" width="8" height="4" fill="#fff"/>
+    <line x1="21" y1="13.5" x2="27" y2="13.5" stroke="#fff" stroke-width="0.5"/>
+
+    <!-- Second tier -->
+    <rect x="17" y="16" width="14" height="5" fill="#fff"/>
+    <polyline points="21,17.5 24,19 27,17.5" fill="none" stroke="#fff" stroke-width="0.5"/>
+
+    <!-- Third tier -->
+    <rect x="14" y="21" width="20" height="6" fill="#fff"/>
+    <rect x="16" y="22.5" width="1.5" height="2" fill="#fff"/>
+    <rect x="19" y="22.5" width="1.5" height="2" fill="#fff"/>
+    <rect x="22" y="22.5" width="1.5" height="2" fill="#fff"/>
+    <rect x="25" y="22.5" width="1.5" height="2" fill="#fff"/>
+    <rect x="28" y="22.5" width="1.5" height="2" fill="#fff"/>
+    <rect x="31" y="22.5" width="1.5" height="2" fill="#fff"/>
+
+    <!-- Main body -->
+    <rect x="11" y="27" width="26" height="16" fill="#fff"/>
+    <rect x="13" y="29" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="16.5" y="29" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="20" y="29" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="23.5" y="29" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="27" y="29" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="30.5" y="29" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="34" y="29" width="1.5" height="2" fill="#0f1117"/>
+
+    <rect x="13" y="33" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="16.5" y="33" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="20" y="33" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="23.5" y="33" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="27" y="33" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="30.5" y="33" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="34" y="33" width="1.5" height="2" fill="#0f1117"/>
+
+    <rect x="13" y="37" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="16.5" y="37" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="20" y="37" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="23.5" y="37" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="27" y="37" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="30.5" y="37" width="1.5" height="2" fill="#0f1117"/>
+    <rect x="34" y="37" width="1.5" height="2" fill="#0f1117"/>
+
+    <!-- Door -->
+    <rect x="21.5" y="39" width="5" height="4" fill="#fff"/>
+    <path d="M22 39 L24 37.5 L26 39" fill="none" stroke="#fff" stroke-width="0.5"/>
+
+    <!-- Base line -->
+    <rect x="8" y="43" width="32" height="1.5" fill="#fff"/>
+    <rect x="10" y="42" width="2" height="1" fill="#fff"/>
+    <rect x="36" y="42" width="2" height="1" fill="#fff"/>
+  </g>
+</svg>
