@@ -208,3 +208,31 @@ body[data-swipe-mobile="1"] [data-swipe-sidebar="1"] {
     display: flex !important;
   }
 }
+
+/* Lock the viewport when mobile swipe view is active.
+   Prevents the user from vertically scrolling the whole page (which would
+   pull the map up and reveal a gray gap below the action pill, especially
+   after iOS Safari's address bar collapses). The map pan, horizontal card
+   swipe, and "Show listing" expand all live inside the swipe shell and use
+   their own internal touch handlers, so a global overflow lock here does
+   not regress them. overscroll-behavior:none also blocks pull-to-refresh
+   and rubber-banding without affecting inner scrollable panels.
+   Scoped to <600px only — desktop keeps its normal scroll behavior. */
+@media (max-width: 599px) {
+  html:has(body[data-swipe-mobile="1"]),
+  body[data-swipe-mobile="1"] {
+    overflow: hidden !important;
+    overscroll-behavior: none;
+    height: 100dvh;
+    /* Override Tailwind's min-h-screen (100vh) on body, which would otherwise
+       force the body taller than the dynamic viewport on iOS Safari and
+       reintroduce vertical scrolling. */
+    min-height: 0 !important;
+    max-height: 100dvh;
+  }
+  body[data-swipe-mobile="1"] > main {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+}
