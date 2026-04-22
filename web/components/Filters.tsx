@@ -80,7 +80,6 @@ export interface FiltersState {
   priceMode: 'total' | 'perRoom';
   sort: SortField;
   maxListingAge: MaxListingAge;
-  includeNaListingAge: boolean;
   photosFirst: boolean;
   selectedSources: string[] | null;
   minYearBuilt: number | null;
@@ -1272,9 +1271,6 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
   const [draftMaxListingAge, setDraftMaxListingAge] = useState<MaxListingAge>(
     filters.maxListingAge,
   );
-  const [draftIncludeNaListingAge, setDraftIncludeNaListingAge] = useState<boolean>(
-    filters.includeNaListingAge,
-  );
   const [draftSources, setDraftSources] = useState<string[] | null>(filters.selectedSources);
   const [draftCommuteRules, setDraftCommuteRules] = useState<CommuteRule[]>(filters.commuteRules ?? []);
   const [draftMinYearBuilt, setDraftMinYearBuilt] = useState<number | null>(filters.minYearBuilt);
@@ -1377,7 +1373,6 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
     setDraftMinBaths(filters.minBaths);
     setDraftIncludeNaBaths(filters.includeNaBaths);
     setDraftMaxListingAge(filters.maxListingAge);
-    setDraftIncludeNaListingAge(filters.includeNaListingAge);
     setDraftSources(filters.selectedSources);
     setDraftCommuteRules(filters.commuteRules ?? []);
     setDraftMinYearBuilt(filters.minYearBuilt);
@@ -1388,7 +1383,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
     setDraftMinAvailableDate(filters.minAvailableDate);
     setDraftMaxAvailableDate(filters.maxAvailableDate);
     setDraftIncludeNaAvailableDate(filters.includeNaAvailableDate);
-  }, [openChip, filters.minRent, filters.maxRent, filters.priceMode, filters.selectedBeds, filters.minBaths, filters.includeNaBaths, filters.maxListingAge, filters.includeNaListingAge, filters.selectedSources, filters.commuteRules, filters.minYearBuilt, filters.maxYearBuilt, filters.minSqft, filters.maxSqft, filters.excludeNoSqft, filters.minAvailableDate, filters.maxAvailableDate, filters.includeNaAvailableDate]);
+  }, [openChip, filters.minRent, filters.maxRent, filters.priceMode, filters.selectedBeds, filters.minBaths, filters.includeNaBaths, filters.maxListingAge, filters.selectedSources, filters.commuteRules, filters.minYearBuilt, filters.maxYearBuilt, filters.minSqft, filters.maxSqft, filters.excludeNoSqft, filters.minAvailableDate, filters.maxAvailableDate, filters.includeNaAvailableDate]);
 
   // Click-outside handler — discard drafts. We don't close `saveOpen` here
   // because the SaveWishlistPanel renders in a fixed-position element outside
@@ -1433,7 +1428,6 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
         setDraftIncludeNaBaths(filters.includeNaBaths);
       } else if (chip === 'listingAge') {
         setDraftMaxListingAge(filters.maxListingAge);
-        setDraftIncludeNaListingAge(filters.includeNaListingAge);
       } else if (chip === 'source') {
         setDraftSources(filters.selectedSources);
       } else if (chip === 'commute') {
@@ -1607,33 +1601,13 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
             value={draftMaxListingAge}
             onChange={setDraftMaxListingAge}
           />
-          {draftMaxListingAge !== null && (
-            <>
-              <label className="flex items-center gap-2 cursor-pointer mt-3">
-                <input
-                  type="checkbox"
-                  checked={draftIncludeNaListingAge}
-                  onChange={(e) => setDraftIncludeNaListingAge(e.target.checked)}
-                  className="accent-[#58a6ff] w-4 h-4 rounded cursor-pointer"
-                />
-                <span className="text-sm" style={{ color: '#8b949e' }}>Include N/A</span>
-              </label>
-              <p className="text-xs mt-1 ml-6" style={{ color: '#6e7681', fontStyle: 'italic' }}>
-                Some listings on Craigslist or Marketplace may not have a list date
-              </p>
-            </>
-          )}
           <DropdownFooter
             onReset={() => {
-              onChange({ ...filters, maxListingAge: null, includeNaListingAge: false });
+              onChange({ ...filters, maxListingAge: null });
               setOpenChip(null);
             }}
             onDone={() => {
-              onChange({
-                ...filters,
-                maxListingAge: draftMaxListingAge,
-                includeNaListingAge: draftIncludeNaListingAge,
-              });
+              onChange({ ...filters, maxListingAge: draftMaxListingAge });
               setOpenChip(null);
             }}
           />
