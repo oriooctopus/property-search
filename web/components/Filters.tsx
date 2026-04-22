@@ -2188,28 +2188,36 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                 </svg>
               </ButtonBase>
             </div>
-    
-            {saveOpen && (
-              <SaveWishlistPanel
-                anchorRef={saveDropdownRef}
-                initialTab={savePanelTab}
-                onClose={() => setSaveOpen(false)}
-                myWishlists={myWishlists}
-                sharedWishlists={sharedWishlists}
-                selected={selectedWishlist}
-                onSelect={(sel) => {
-                  onSelectWishlist?.(sel);
-                  setSaveOpen(false);
-                }}
-                onCreateWishlist={async (name) => {
-                  const id = await onCreateWishlist?.(name);
-                  return id ?? null;
-                }}
-                onOpenManager={() => {
-                  setSaveOpen(false);
-                  onOpenWishlistManager?.();
-                }}
-                saveSearchContent={(
+          </div>
+        </>
+    </>
+  );
+
+  // Save/wishlist panel — rendered ONCE at the Filters root (not inside
+  // filterChipsContent which gets inlined into both the desktop top bar AND
+  // the mobile bottom sheet). Without this, two copies of the panel would
+  // render simultaneously, sharing the same anchor ref.
+  const saveWishlistPanelEl = saveOpen ? (
+    <SaveWishlistPanel
+      anchorRef={saveDropdownRef}
+      initialTab={savePanelTab}
+      onClose={() => setSaveOpen(false)}
+      myWishlists={myWishlists}
+      sharedWishlists={sharedWishlists}
+      selected={selectedWishlist}
+      onSelect={(sel) => {
+        onSelectWishlist?.(sel);
+        setSaveOpen(false);
+      }}
+      onCreateWishlist={async (name) => {
+        const id = await onCreateWishlist?.(name);
+        return id ?? null;
+      }}
+      onOpenManager={() => {
+        setSaveOpen(false);
+        onOpenWishlistManager?.();
+      }}
+      saveSearchContent={(
                   <>
                     <div className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: '#8b949e', letterSpacing: '0.05em' }}>
                       Save Search
@@ -2290,11 +2298,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                   </>
                 )}
               />
-            )}
-          </div>
-        </>
-    </>
-  );
+    ) : null;
 
   return (
     <div
@@ -2631,6 +2635,12 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
         </>,
         document.body,
       )}
+
+      {/* Save / wishlist panel — single instance, portaled to document.body
+          inside SaveWishlistPanel. Rendered here (not inside filterChipsContent)
+          so we don't get a duplicate when the chip JSX is inlined into both
+          the desktop top bar and the mobile bottom sheet. */}
+      {saveWishlistPanelEl}
 
       {/* Save success toast — positioned at bottom center */}
       {saveToastVisible && (
