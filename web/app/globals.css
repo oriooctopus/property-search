@@ -236,3 +236,47 @@ body[data-swipe-mobile="1"] [data-swipe-sidebar="1"] {
     overflow: hidden;
   }
 }
+
+/* Per-card peek mini-map (Option C) — fade/slide in animation, plus
+   styling overrides for the leaflet Tooltips used to label the listing's
+   price and the nearest subway station inside the peek map. */
+@keyframes cardPeekIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.leaflet-tooltip.peek-price-tooltip {
+  background: #1c2028;
+  color: #e1e4e8;
+  border: 1px solid #58a6ff;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+}
+.leaflet-tooltip.peek-price-tooltip::before {
+  border-top-color: #58a6ff;
+}
+
+.leaflet-tooltip.peek-station-tooltip {
+  background: rgba(13, 17, 23, 0.85);
+  color: #c9d1d9;
+  border: 1px solid #2d333b;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  box-shadow: none;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+}
+.leaflet-tooltip.peek-station-tooltip::before {
+  display: none;
+}

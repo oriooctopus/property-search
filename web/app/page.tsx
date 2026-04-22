@@ -1049,6 +1049,16 @@ function HomeInner() {
     }
   }, []);
 
+  // Card peek mini-map → "Full map" shortcut. Selects the listing so the
+  // map view auto-centers/auto-shifts onto its pin, then switches the
+  // mobile view to map. Desktop already shows the map alongside the list,
+  // so the switchMobileView call there is a no-op visually but still
+  // updates the URL contract (`?view=map&listing=<id>`) for shareability.
+  const handleOpenFullMapFromCard = useCallback((listing: Listing) => {
+    setSelectedId(listing.id);
+    switchMobileView('map');
+  }, [switchMobileView]);
+
   // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
@@ -1370,6 +1380,7 @@ function HomeInner() {
                 onStarClick={handleStarClick}
                 onExpand={handleCardExpand}
                 onHide={handleHideListing}
+                onOpenFullMap={handleOpenFullMapFromCard}
                 commuteMessage={commuteMessage}
                 commuteLoading={commuteLoading}
                 isDimmed={filterChanging || commuteLoading}

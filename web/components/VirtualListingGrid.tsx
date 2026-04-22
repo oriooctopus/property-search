@@ -42,6 +42,10 @@ interface VirtualListingGridProps {
   onStarClick: (listingId: number, anchorRect: DOMRect) => void;
   onExpand: (listing: Listing) => void;
   onHide: (id: number) => void;
+  /** Switches to the full map view centered on this listing. Threaded down
+   *  to ListingCard so the per-card peek mini-map's "Full map" shortcut can
+   *  use the existing `?view=map&listing=<id>` query-param contract. */
+  onOpenFullMap?: (listing: Listing) => void;
   // Footer messages — rendered below the virtualized list
   commuteMessage?: string | null;
   commuteLoading?: boolean;
@@ -118,6 +122,7 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
       onStarClick,
       onExpand,
       onHide,
+      onOpenFullMap,
       commuteMessage,
       commuteLoading,
       isDimmed,
@@ -404,10 +409,12 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
                         isRemoved={isRemovedRow}
                         commuteInfo={commuteInfoMap?.get(listing.id)}
                         priority={rowIndex === 0}
+                        allListings={listings}
                         onClick={onCardSelect}
                         onStarClick={onStarClick}
                         onExpand={onExpand}
                         onHide={onHide}
+                        onOpenFullMap={onOpenFullMap}
                       />
                     ))}
                   </div>
