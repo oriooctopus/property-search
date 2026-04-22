@@ -1389,7 +1389,15 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
   const containerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node | null;
+      if (!target) return;
+      // Treat clicks inside a portaled FilterChip dropdown as "inside" — the
+      // dropdown lives outside containerRef because it's portaled to
+      // document.body so it can escape the mobile sheet's transform context.
+      if (target instanceof Element && target.closest('[data-filter-chip-dropdown]')) {
+        return;
+      }
+      if (containerRef.current && !containerRef.current.contains(target)) {
         setOpenChip(null);
         setSortOpen(false);
         setEditingSearchId(null);
