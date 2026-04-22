@@ -6,6 +6,7 @@ import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { useDrag } from '@use-gesture/react';
 import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
 import { CompactStats } from '@/components/ui';
+import { formatAvailabilityDate } from '@/lib/format-date';
 
 // NYC lat/lon degree-to-miles conversion factors
 const MI_PER_DEG_LAT = 69;
@@ -392,18 +393,10 @@ export default function SwipeCard({
     ? new Date(listing.list_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : null;
 
-  // Move-in / availability date. Past-or-today → "Available now"; future → "Available Mon D, YYYY".
-  // Compare in UTC so a date string like "2026-04-15" isn't treated as local-midnight
-  // (which drifts a day west of UTC).
-  const moveInFormatted = (() => {
-    if (!listing.availability_date) return null;
-    const d = new Date(listing.availability_date);
-    if (isNaN(d.getTime())) return null;
-    const todayUtc = new Date();
-    todayUtc.setUTCHours(0, 0, 0, 0);
-    if (d.getTime() <= todayUtc.getTime()) return 'now';
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
-  })();
+  // Move-in / availability copy. Always renders — null → "Move-in TBD",
+  // past-or-today → "Available now", future → "Available <date>".
+  // See web/lib/format-date.ts for canonical formatting.
+  const availabilityLabel = formatAvailabilityDate(listing.availability_date);
 
   // Layout-only mode: render content in normal flow to establish natural height
   if (layoutOnly) {
@@ -422,7 +415,7 @@ export default function SwipeCard({
             <span style={{ fontSize: 22, fontWeight: 700, color: '#7ee787' }}>${listing.price.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 400, color: '#8b949e' }}>/mo</span></span>
           </div>
           {listDateFormatted && <div className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Listed {listDateFormatted}</div>}
-          {moveInFormatted && <div className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>Available {moveInFormatted}</div>}
+          <div className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>{availabilityLabel}</div>
           <div
             className={compactMobile ? 'hidden min-[600px]:block' : ''}
             style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }}
@@ -765,12 +758,10 @@ export default function SwipeCard({
               </div>
             )}
 
-            {/* Move-in / availability date */}
-            {moveInFormatted && (
-              <div className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                Available {moveInFormatted}
-              </div>
-            )}
+            {/* Move-in / availability date — always renders ("Move-in TBD" if unknown) */}
+            <div className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
+              {availabilityLabel}
+            </div>
 
             {/* Divider: price/address section → stats. Hidden on mobile
                 (compactMobile) to save vertical space so the stats row fits

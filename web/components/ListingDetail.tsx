@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import Image from 'next/image';
 import type { Database } from '@/lib/types';
 import { ActionButton, IconButton } from '@/components/ui';
-import { formatShortDate } from '@/lib/format-date';
+import { formatShortDate, formatAvailabilityDate } from '@/lib/format-date';
 import { shareListing } from '@/lib/native';
 import DetailMap from './DetailMap';
 import CommuteItinerary from './CommuteItinerary';
@@ -374,9 +374,7 @@ export default function ListingDetail({
           {/* Dates info */}
           <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4 text-xs" style={{ color: '#8b949e' }}>
             <span>Listed: {formatShortDate(listing.list_date ?? listing.created_at)}</span>
-            {listing.availability_date && (
-              <span>Move-in: {formatShortDate(listing.availability_date)}</span>
-            )}
+            <span>{formatAvailabilityDate(listing.availability_date)}</span>
           </div>
 
           {/* Details grid */}
