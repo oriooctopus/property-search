@@ -238,6 +238,16 @@ function HomeInner() {
   // bounds watcher. Left intact so we can easily re-introduce a suppression
   // guard if a future "locate me" / "reset view" button is added.
   const suppressBoundsRef = useRef(false);
+  // Tracks whether the user is currently actively dragging/panning the map.
+  // Threaded into MapInner via BoundsWatcher's `isPanningRef` so components
+  // like `EnsurePinVisibleOnMobile` can defer their work mid-gesture.
+  const isPanningRef = useRef(false);
+  // AbortController for the CURRENT in-flight /api/listings/search call
+  // triggered by a viewport change. A new pan aborts the previous request so
+  // rapid successive pans only ever resolve to the LAST query's response;
+  // late responses from aborted fetches throw `AbortError` in loadForViewport
+  // and are caught silently.
+  const viewportAbortRef = useRef<AbortController | null>(null);
 
   // -----------------------------------------------------------------------
   // Infinite-scroll pagination state
@@ -306,6 +316,13 @@ function HomeInner() {
   const loadForViewport = useCallback(async (bounds: { latMin: number; latMax: number; lonMin: number; lonMax: number }) => {
     lastLoadedBounds.current = bounds;
     const requestId = ++viewportRequestRef.current;
+    // Abort any in-flight viewport search — a newer pan supersedes it so
+    // we stop waiting on (and paying network/CPU for) the stale response.
+    if (viewportAbortRef.current) {
+      viewportAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    viewportAbortRef.current = controller;
     setViewportLoading(true);
     const currentFilters = filtersRef.current;
     const commuteRules = currentFilters?.commuteRules ?? [];
@@ -324,6 +341,7 @@ function HomeInner() {
       const res = await fetch('/api/listings/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           bounds,
           wishlistIds,
@@ -447,11 +465,25 @@ function HomeInner() {
         setViewportCount(0);
       }
     } catch (err) {
+      // An AbortError is expected whenever the user pans again before the
+      // previous query finishes — that's the correct behavior, not an error.
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
+      }
+      // Also treat TypeError('AbortError') thrown by older runtimes gracefully.
+      if (err && typeof err === 'object' && 'name' in err && (err as { name?: string }).name === 'AbortError') {
+        return;
+      }
       console.error('[viewport] fetch failed:', err);
     } finally {
       if (requestId === viewportRequestRef.current) {
         setViewportLoading(false);
         setCommuteLoading(false);
+        // Clear the controller ref only if it's still the one we owned;
+        // a later call may have replaced it.
+        if (viewportAbortRef.current === controller) {
+          viewportAbortRef.current = null;
+        }
       }
     }
   }, []);
@@ -1038,6 +1070,7 @@ function HomeInner() {
         onBoundsChange={handleBoundsChange}
         onMapMove={handleMapMove}
         suppressBoundsRef={suppressBoundsRef}
+        isPanningRef={isPanningRef}
         initialCenter={initialCenter}
         initialZoom={initialZoom}
         visible={isMapView}
@@ -1413,6 +1446,7 @@ function HomeInner() {
             onBoundsChange={handleBoundsChange}
             onMapMove={handleMapMove}
             suppressBoundsRef={suppressBoundsRef}
+            isPanningRef={isPanningRef}
             initialCenter={initialCenter}
             initialZoom={initialZoom}
             commuteInfoMap={commuteInfoMap ?? undefined}

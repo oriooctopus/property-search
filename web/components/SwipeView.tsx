@@ -50,6 +50,10 @@ export interface SwipeViewProps {
   onBoundsChange?: (bounds: ViewportBounds) => void;
   onMapMove?: (center: { lat: number; lng: number }, zoom: number) => void;
   suppressBoundsRef?: React.MutableRefObject<boolean>;
+  /** Exposed ref mirroring whether the user is actively panning the map.
+   *  Used by mobile card-swipe logic (and MapInner's auto-shift) to defer
+   *  side effects mid-gesture. */
+  isPanningRef?: React.MutableRefObject<boolean>;
   initialCenter?: [number, number];
   initialZoom?: number;
   commuteInfoMap?: Map<number, CommuteInfo>;
@@ -113,6 +117,7 @@ export default function SwipeView({
   onBoundsChange,
   onMapMove,
   suppressBoundsRef,
+  isPanningRef,
   initialCenter,
   initialZoom,
   commuteInfoMap,
@@ -176,6 +181,70 @@ export default function SwipeView({
 
   // After undo, track which listing id needs its index restored once deck recomputes
   const pendingUndoId = useRef<number | null>(null);
+
+  // ---------------------------------------------------------------------
+  // Mobile: drag-down-to-dismiss for the floating swipe card.
+  //
+  // A 24px grabber strip above the card captures pointer-down / move / up
+  // and translates the whole `.swipe-detail-panel` down. Released past a
+  // threshold (100px OR velocity > 0.5 px/ms) dismisses the card — it
+  // slides off-screen and a "Show listing" pill appears at the bottom.
+  // Tapping that pill restores the card. Released below threshold snaps
+  // back to 0 via the CSS transition.
+  //
+  // Horizontal swipe-to-like/reject on the photo area is unaffected: the
+  // grabber sits ABOVE the card body so the two gesture surfaces never
+  // overlap.
+  // ---------------------------------------------------------------------
+  const [mobileCardDismissed, setMobileCardDismissed] = useState(false);
+  const [mobileCardDragY, setMobileCardDragY] = useState(0);
+  const cardDragActiveRef = useRef(false);
+  const cardDragStartYRef = useRef(0);
+  const cardDragStartTimeRef = useRef(0);
+  const MOBILE_CARD_DISMISS_DISTANCE_PX = 100;
+  const MOBILE_CARD_DISMISS_VELOCITY_PX_PER_MS = 0.5;
+
+  const handleCardPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    cardDragActiveRef.current = true;
+    cardDragStartYRef.current = e.clientY;
+    cardDragStartTimeRef.current = performance.now();
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* noop */ }
+  }, []);
+
+  const handleCardPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!cardDragActiveRef.current) return;
+    const dy = e.clientY - cardDragStartYRef.current;
+    setMobileCardDragY(Math.max(0, dy));
+  }, []);
+
+  const handleCardPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!cardDragActiveRef.current) return;
+    cardDragActiveRef.current = false;
+    const dy = Math.max(0, e.clientY - cardDragStartYRef.current);
+    const elapsed = Math.max(1, performance.now() - cardDragStartTimeRef.current);
+    const velocity = dy / elapsed;
+    const shouldDismiss =
+      dy >= MOBILE_CARD_DISMISS_DISTANCE_PX ||
+      (dy > 25 && velocity >= MOBILE_CARD_DISMISS_VELOCITY_PX_PER_MS);
+    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* noop */ }
+    if (shouldDismiss) {
+      // Slide card fully off-screen, then flip the dismissed flag so it
+      // unmounts and the "Show listing" pill renders.
+      setMobileCardDragY(window.innerHeight);
+      window.setTimeout(() => {
+        setMobileCardDismissed(true);
+        setMobileCardDragY(0);
+      }, 220);
+    } else {
+      setMobileCardDragY(0);
+    }
+  }, []);
+
+  const showCardAgain = useCallback(() => {
+    setMobileCardDismissed(false);
+    setMobileCardDragY(0);
+  }, []);
 
   // Wishlist hooks
   const { data: wishlists = [] } = useWishlists(userId);
@@ -325,6 +394,106 @@ export default function SwipeView({
       pendingUndoId.current = null;
     }
   }, [deck]);
+
+  // ---------------------------------------------------------------------
+  // Prefer-visible-above-card: when the active listing changes on mobile,
+  // before MapInner runs its auto-shift, check whether any un-swiped
+  // upcoming listing's pin is ALREADY in the map-bleed area above the
+  // floating swipe card. If so, swap the active card to THAT listing by
+  // advancing currentIndex — avoiding a map pan entirely.
+  //
+  // Fallback (no candidate above card) → leave the index alone and let
+  // MapInner's EnsurePinVisibleOnMobile pan the map as the last resort.
+  //
+  // Safety guards:
+  // - Only runs on mobile viewports.
+  // - Only runs when Leaflet's map instance and the floating card DOM
+  //   are both measurable.
+  // - Never runs during an active pan gesture (isPanningRef).
+  // - Never runs twice for the same active-listing id (lastCheckedIdRef).
+  // ---------------------------------------------------------------------
+  const lastCheckedIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (isMobileViewport !== true) return;
+    if (!currentListing || !currentListing.lat || !currentListing.lon) return;
+    if (lastCheckedIdRef.current === currentListing.id) return;
+    if (isPanningRef?.current) return;
+    if (typeof window === 'undefined') return;
+
+    const map = (window as unknown as { __leafletMap?: import('leaflet').Map }).__leafletMap;
+    if (!map) return;
+
+    const cardEl = document.querySelector('.swipe-detail-panel') as HTMLElement | null;
+    if (!cardEl) return;
+    const cardRect = cardEl.getBoundingClientRect();
+    const containerEl = map.getContainer();
+    const containerRect = containerEl.getBoundingClientRect();
+
+    const cardTop = cardRect.top - containerRect.top;
+    const cardLeft = cardRect.left - containerRect.left;
+    const cardRight = cardRect.right - containerRect.left;
+    const cardBottom = cardRect.bottom - containerRect.top;
+
+    // Predicate: is the given lat/lon visible in the map-bleed area
+    // above the card (i.e. above cardTop, within the map container)?
+    const isVisibleAboveCard = (lat: number, lon: number): boolean => {
+      try {
+        const pt = map.latLngToContainerPoint([lat, lon]);
+        // Must be above the card (y < cardTop) and inside container horizontally.
+        if (pt.y < 0 || pt.y >= cardTop) return false;
+        if (pt.x < 0 || pt.x > containerRect.width) return false;
+        // Also ensure a minimum clearance from the card top so partially-occluded
+        // pins don't count (avoids the same visual problem as full occlusion).
+        const MIN_CLEARANCE = 12;
+        if (cardTop - pt.y < MIN_CLEARANCE) return false;
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    // Is the CURRENT active pin under the card? If yes AND a forward
+    // candidate exists whose pin is visible above card, prefer that.
+    const curPt = (() => {
+      try { return map.latLngToContainerPoint([currentListing.lat, currentListing.lon]); } catch { return null; }
+    })();
+    if (!curPt) {
+      lastCheckedIdRef.current = currentListing.id;
+      return;
+    }
+    const currentUnderCard =
+      curPt.x >= cardLeft && curPt.x <= cardRight &&
+      curPt.y >= cardTop && curPt.y <= cardBottom;
+
+    if (!currentUnderCard) {
+      // Current pin is already in view — no swap needed.
+      lastCheckedIdRef.current = currentListing.id;
+      return;
+    }
+
+    // Search forward in the deck for a listing whose pin is visible above card.
+    // Cap the search so we don't scan the entire deck (O(n) per swipe is fine
+    // for n ≤ ~500, but capping protects against huge result sets).
+    const SEARCH_CAP = 40;
+    const start = currentIndex + 1;
+    const end = Math.min(deck.length, start + SEARCH_CAP);
+    for (let i = start; i < end; i++) {
+      const candidate = deck[i];
+      if (!candidate || candidate.lat == null || candidate.lon == null) continue;
+      if (isVisibleAboveCard(candidate.lat, candidate.lon)) {
+        // Swap: advance index to the candidate. The previously-active (occluded)
+        // listing remains in the deck for a future visit.
+        lastCheckedIdRef.current = candidate.id;
+        currentListingIdRef.current = candidate.id;
+        setCurrentIndex(i);
+        return;
+      }
+    }
+
+    // No forward candidate found; let MapInner's auto-shift handle it.
+    lastCheckedIdRef.current = currentListing.id;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentListing?.id, isMobileViewport, deck, currentIndex, isPanningRef]);
 
   // ---------------------------------------------------------------------------
   // Swipe handler
@@ -503,8 +672,13 @@ export default function SwipeView({
       setCurrentIndex(idx);
       // Update tracked ID immediately so the deck-change effect doesn't snap it back
       currentListingIdRef.current = id;
+      // If the mobile card was dismissed, tapping a pin brings it back.
+      if (mobileCardDismissed) {
+        setMobileCardDismissed(false);
+        setMobileCardDragY(0);
+      }
     }
-  }, [deck]);
+  }, [deck, mobileCardDismissed]);
 
   // Convert SwipeListing[] to Listing-compatible shape for Map.
   // Exclude hidden (left-swiped) listings but keep saved (right-swiped) ones.
@@ -579,6 +753,7 @@ export default function SwipeView({
             onBoundsChange={onBoundsChange}
             onMapMove={(center, zoom) => { mapCenterRef.current = center; onMapMove?.(center, zoom); }}
             suppressBoundsRef={suppressBoundsRef}
+            isPanningRef={isPanningRef}
             initialCenter={initialCenter}
             initialZoom={initialZoom}
             visible={true}
@@ -622,6 +797,7 @@ export default function SwipeView({
               onBoundsChange={onBoundsChange}
               onMapMove={(center, zoom) => { mapCenterRef.current = center; onMapMove?.(center, zoom); }}
               suppressBoundsRef={suppressBoundsRef}
+              isPanningRef={isPanningRef}
               // Opt-in: only on mobile, only when the active listing
               // changes, pan (never zoom) so the active pin isn't hidden
               // under the floating card. See EnsurePinVisibleOnMobile in
@@ -702,6 +878,7 @@ export default function SwipeView({
             onBoundsChange={onBoundsChange}
             onMapMove={(center, zoom) => { mapCenterRef.current = center; onMapMove?.(center, zoom); }}
             suppressBoundsRef={suppressBoundsRef}
+            isPanningRef={isPanningRef}
             visible={showMobileMap}
             commuteInfoMap={commuteInfoMap}
             initialCenter={currentListing?.lat && currentListing?.lon ? [currentListing.lat, currentListing.lon] : initialCenter}
@@ -735,8 +912,59 @@ export default function SwipeView({
           future use but it stays 0 in practice. */}
       <div
         className="swipe-detail-panel absolute z-10 flex flex-col"
-        style={{ ['--swipe-top-inset' as string]: `${topInset}px` }}
+        data-testid="swipe-detail-panel"
+        data-dismissed={mobileCardDismissed ? 'true' : 'false'}
+        style={{
+          ['--swipe-top-inset' as string]: `${topInset}px`,
+          // Mobile-only translate: follows finger during drag, slides off
+          // to window-height when dismissed, snaps back to 0 otherwise.
+          // Desktop (≥600px) always renders at 0 — the drag handlers are
+          // only wired when `isMobileViewport === true`.
+          transform: isMobileViewport === true && mobileCardDismissed
+            ? 'translateY(100%)'
+            : `translateY(${mobileCardDragY}px)`,
+          transition: cardDragActiveRef.current ? 'none' : 'transform 220ms ease-out',
+          // Hide from pointer events when fully dismissed so map pins underneath
+          // receive taps. The "Show listing" pill renders via a separate overlay.
+          pointerEvents: isMobileViewport === true && mobileCardDismissed ? 'none' : undefined,
+        }}
       >
+        {/* Mobile grabber handle — sits above the photo area, drag-down to
+            dismiss. Only rendered on mobile + when a listing exists + when
+            the card isn't already dismissed. touchAction:none so the
+            browser doesn't scroll instead. */}
+        {isMobileViewport === true && currentListing && !mobileCardDismissed && (
+          <div
+            data-testid="swipe-card-grabber"
+            onPointerDown={handleCardPointerDown}
+            onPointerMove={handleCardPointerMove}
+            onPointerUp={handleCardPointerUp}
+            onPointerCancel={handleCardPointerUp}
+            style={{
+              position: 'absolute',
+              top: -24,
+              left: 0,
+              right: 0,
+              height: 24,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              touchAction: 'none',
+              cursor: 'grab',
+              zIndex: 11,
+            }}
+          >
+            <div
+              style={{
+                width: 44,
+                height: 4,
+                borderRadius: 9999,
+                backgroundColor: 'rgba(255,255,255,0.35)',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.4)',
+              }}
+            />
+          </div>
+        )}
         {currentListing ? (
           <>
             {/* Card + action bar — fills available space, content scrolls if needed.
@@ -1190,6 +1418,45 @@ export default function SwipeView({
           </div>
         )}
       </div>
+
+      {/* "Show listing" restore pill — appears when the mobile card is
+          dismissed via drag-down. Tap or click to bring the card back.
+          Only rendered on mobile + when dismissed + when there's something
+          to show. Positioned above the bottom dock with safe-area inset. */}
+      {isMobileViewport === true && mobileCardDismissed && currentListing && (
+        <button
+          type="button"
+          onClick={showCardAgain}
+          data-testid="swipe-card-restore-pill"
+          className="absolute min-[600px]:hidden cursor-pointer"
+          style={{
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 88px)',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 30,
+            height: 40,
+            padding: '0 18px',
+            background: 'rgba(28,32,40,0.92)',
+            backdropFilter: 'blur(14px)',
+            WebkitBackdropFilter: 'blur(14px)',
+            border: '1px solid rgba(255,255,255,0.14)',
+            borderRadius: 9999,
+            boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            color: '#e1e4e8',
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+          aria-label="Show listing"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="18 15 12 9 6 15" />
+          </svg>
+          Show listing
+        </button>
+      )}
 
     </div>
   );

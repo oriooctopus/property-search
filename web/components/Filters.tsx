@@ -1282,6 +1282,62 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
 
   // Mobile filter bottom sheet state
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  // Drag-to-dismiss translate for the mobile sheet. Starts at 0 (fully open).
+  // While the user drags the header/handle downward, this tracks finger Y
+  // delta. On release past threshold, closes the sheet; otherwise snaps
+  // back to 0 via CSS transition.
+  const [mobileSheetDragY, setMobileSheetDragY] = useState(0);
+  const mobileSheetDragActiveRef = useRef(false);
+  const mobileSheetDragStartYRef = useRef(0);
+  const mobileSheetDragStartTimeRef = useRef(0);
+  // Fade the backdrop proportional to drag progress so the user sees the
+  // dismiss happening live.
+  const MOBILE_SHEET_DISMISS_DISTANCE_PX = 80;
+  const MOBILE_SHEET_DISMISS_VELOCITY_PX_PER_MS = 0.5;
+
+  const handleMobileSheetPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    // Only left mouse / primary touch. Ignore multi-touch, etc.
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    mobileSheetDragActiveRef.current = true;
+    mobileSheetDragStartYRef.current = e.clientY;
+    mobileSheetDragStartTimeRef.current = performance.now();
+    // Capture the pointer so we keep receiving move/up even if the finger
+    // slides outside the header element.
+    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* noop */ }
+  }, []);
+
+  const handleMobileSheetPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!mobileSheetDragActiveRef.current) return;
+    const dy = e.clientY - mobileSheetDragStartYRef.current;
+    // Clamp to >=0 so the sheet can only move DOWN, never up above its
+    // resting position.
+    setMobileSheetDragY(Math.max(0, dy));
+  }, []);
+
+  const handleMobileSheetPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!mobileSheetDragActiveRef.current) return;
+    mobileSheetDragActiveRef.current = false;
+    const dy = Math.max(0, e.clientY - mobileSheetDragStartYRef.current);
+    const elapsed = Math.max(1, performance.now() - mobileSheetDragStartTimeRef.current);
+    const velocity = dy / elapsed;
+    const shouldClose =
+      dy >= MOBILE_SHEET_DISMISS_DISTANCE_PX ||
+      (dy > 20 && velocity >= MOBILE_SHEET_DISMISS_VELOCITY_PX_PER_MS);
+    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* noop */ }
+    if (shouldClose) {
+      // Animate to off-screen via the snapback transition and then unmount.
+      // Using a large offset here so the slide-down is visible; transition
+      // duration on the sheet's style provides the animation.
+      setMobileSheetDragY(800);
+      window.setTimeout(() => {
+        setMobileSheetOpen(false);
+        setMobileSheetDragY(0);
+      }, 220);
+    } else {
+      // Snap back
+      setMobileSheetDragY(0);
+    }
+  }, []);
 
   // Expose imperative openMobileSheet() so ancestors (e.g. the SwipeView
   // floating Filters pill via page.tsx) can open this single source-of-truth
@@ -2460,13 +2516,19 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           component as the single source of truth for filter state). */}
       {mobileSheetOpen && typeof document !== 'undefined' && createPortal(
         <>
-          {/* Backdrop */}
+          {/* Backdrop — opacity fades as the sheet is dragged down so the
+              dismiss feels physical. */}
           <div
             className="fixed inset-0 z-[1400] min-[600px]:hidden"
-            style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+            style={{
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              opacity: Math.max(0, 1 - mobileSheetDragY / 250),
+              transition: mobileSheetDragActiveRef.current ? 'none' : 'opacity 220ms ease-out',
+            }}
             onClick={() => setMobileSheetOpen(false)}
           />
-          {/* Sheet */}
+          {/* Sheet — translateY follows drag; snaps back or slides off on
+              release via handleMobileSheetPointerUp. */}
           <div
             className="fixed bottom-0 left-0 right-0 z-[1401] min-[600px]:hidden rounded-t-2xl"
             data-testid="mobile-filters-sheet"
@@ -2474,27 +2536,43 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
               backgroundColor: '#1c2028',
               paddingBottom: 'env(safe-area-inset-bottom)',
               boxShadow: '0 -8px 32px rgba(0,0,0,0.5)',
-              animation: 'mobileSheetSlideUp 200ms ease-out',
+              animation: mobileSheetDragY === 0 && !mobileSheetDragActiveRef.current ? 'mobileSheetSlideUp 200ms ease-out' : undefined,
+              transform: `translateY(${mobileSheetDragY}px)`,
+              transition: mobileSheetDragActiveRef.current ? 'none' : 'transform 220ms ease-out',
+              touchAction: 'pan-y',
             }}
           >
-            {/* Drag handle */}
-            <div className="flex justify-center pt-3 pb-2">
-              <div className="w-10 h-1 rounded-full" style={{ backgroundColor: '#484f58' }} />
-            </div>
+            {/* Drag header (handle + title row) — pointer events here start
+                the drag-to-dismiss gesture. Covers the top ~60px so the user
+                has a comfortable target. */}
+            <div
+              data-testid="mobile-filters-sheet-drag-header"
+              onPointerDown={handleMobileSheetPointerDown}
+              onPointerMove={handleMobileSheetPointerMove}
+              onPointerUp={handleMobileSheetPointerUp}
+              onPointerCancel={handleMobileSheetPointerUp}
+              style={{ touchAction: 'none', cursor: 'grab' }}
+            >
+              {/* Drag handle pill */}
+              <div className="flex justify-center pt-3 pb-2">
+                <div className="w-10 h-1 rounded-full" style={{ backgroundColor: '#484f58' }} />
+              </div>
 
-            {/* Close button */}
-            <div className="flex items-center justify-between px-4 pb-2">
-              <span className="text-sm font-semibold" style={{ color: '#e1e4e8' }}>Sort &amp; Filter</span>
-              <button
-                onClick={() => setMobileSheetOpen(false)}
-                className="rounded p-1.5 transition-colors hover:bg-white/5 cursor-pointer"
-                style={{ color: '#8b949e' }}
-                aria-label="Close"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                  <path d="M3 3L13 13M13 3L3 13" />
-                </svg>
-              </button>
+              {/* Close button + title */}
+              <div className="flex items-center justify-between px-4 pb-2">
+                <span className="text-sm font-semibold" style={{ color: '#e1e4e8' }}>Sort &amp; Filter</span>
+                <button
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => setMobileSheetOpen(false)}
+                  className="rounded p-1.5 transition-colors hover:bg-white/5 cursor-pointer"
+                  style={{ color: '#8b949e' }}
+                  aria-label="Close"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M3 3L13 13M13 3L3 13" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* Sort section */}

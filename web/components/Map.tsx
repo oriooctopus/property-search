@@ -35,6 +35,7 @@ interface MapProps {
   onBoundsChange?: (bounds: ViewportBounds) => void;
   onMapMove?: (center: { lat: number; lng: number }, zoom: number) => void;
   suppressBoundsRef?: React.MutableRefObject<boolean>;
+  isPanningRef?: React.MutableRefObject<boolean>;
   initialCenter?: [number, number];
   initialZoom?: number;
   visible?: boolean;
@@ -47,7 +48,7 @@ interface MapProps {
 // Memoized so parent re-renders (e.g. view-switches on mobile) don't force
 // the Leaflet tree to re-run its own render cycle. Stable callback references
 // from the parent are required for the memo to be effective.
-function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, initialCenter, initialZoom, visible, commuteInfoMap, hoveredStation, autoShiftActivePinMobile, getMobileCardBounds }: MapProps) {
+function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, isPanningRef, initialCenter, initialZoom, visible, commuteInfoMap, hoveredStation, autoShiftActivePinMobile, getMobileCardBounds }: MapProps) {
   return (
     <MapInner
       listings={listings}
@@ -62,6 +63,7 @@ function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds
       onBoundsChange={onBoundsChange}
       onMapMove={onMapMove}
       suppressBoundsRef={suppressBoundsRef}
+      isPanningRef={isPanningRef}
       initialCenter={initialCenter}
       initialZoom={initialZoom}
       visible={visible}
