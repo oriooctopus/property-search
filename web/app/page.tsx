@@ -30,6 +30,7 @@ import { setLastUsedWishlistId } from '@/lib/wishlist-storage';
 import type { WishlistFilterSelection } from '@/components/SaveWishlistPanel';
 import { OccluderProvider } from '@/lib/viewport/OccluderRegistry';
 import { OcclusionDebugOverlay } from '@/lib/viewport/OcclusionDebugOverlay';
+import { LeafletMapProvider } from '@/lib/viewport/LeafletMapContext';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -85,6 +86,7 @@ function readFiltersFromParams(params: URLSearchParams): FiltersState {
     excludeNoSqft: params.get('excludeNoSqft') === '1',
     minAvailableDate: params.get('minAvailableDate') || null,
     maxAvailableDate: params.get('maxAvailableDate') || null,
+    includeNaAvailableDate: params.get('includeNaAvailableDate') === '1',
     commuteRules: (() => {
       try {
         const raw = params.get('commute');
@@ -131,6 +133,7 @@ function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatM
   if (f.excludeNoSqft) p.set('excludeNoSqft', '1');
   if (f.minAvailableDate) p.set('minAvailableDate', f.minAvailableDate);
   if (f.maxAvailableDate) p.set('maxAvailableDate', f.maxAvailableDate);
+  if (f.includeNaAvailableDate) p.set('includeNaAvailableDate', '1');
   if (f.commuteRules && f.commuteRules.length > 0) p.set('commute', JSON.stringify(f.commuteRules));
   if (mapPos != null) {
     p.set('lat', mapPos.lat.toFixed(4));
@@ -373,6 +376,7 @@ function HomeInner() {
             excludeNoSqft: currentFilters.excludeNoSqft,
             minAvailableDate: currentFilters.minAvailableDate,
             maxAvailableDate: currentFilters.maxAvailableDate,
+            includeNaAvailableDate: currentFilters.includeNaAvailableDate,
           } : {},
           commuteRules,
           limit: PAGE_SIZE,
@@ -551,6 +555,7 @@ function HomeInner() {
             excludeNoSqft: currentFilters.excludeNoSqft,
             minAvailableDate: currentFilters.minAvailableDate,
             maxAvailableDate: currentFilters.maxAvailableDate,
+            includeNaAvailableDate: currentFilters.includeNaAvailableDate,
           } : {},
           commuteRules,
           limit: PAGE_SIZE,
@@ -1684,8 +1689,10 @@ export default function Home() {
       fallback={<RadarLoader />}
     >
       <OccluderProvider>
-        <HomeInner />
-        <OcclusionDebugOverlay />
+        <LeafletMapProvider>
+          <HomeInner />
+          <OcclusionDebugOverlay />
+        </LeafletMapProvider>
       </OccluderProvider>
     </Suspense>
   );
