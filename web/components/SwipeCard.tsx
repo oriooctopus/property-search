@@ -85,6 +85,7 @@ interface SwipeCardListing {
   lat?: number | null;
   lon?: number | null;
   list_date?: string | null;
+  availability_date?: string | null;
   year_built?: number | null;
   transit_summary?: string | null;
   [key: string]: unknown;
@@ -391,6 +392,19 @@ export default function SwipeCard({
     ? new Date(listing.list_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : null;
 
+  // Move-in / availability date. Past-or-today → "Available now"; future → "Available Mon D, YYYY".
+  // Compare in UTC so a date string like "2026-04-15" isn't treated as local-midnight
+  // (which drifts a day west of UTC).
+  const moveInFormatted = (() => {
+    if (!listing.availability_date) return null;
+    const d = new Date(listing.availability_date);
+    if (isNaN(d.getTime())) return null;
+    const todayUtc = new Date();
+    todayUtc.setUTCHours(0, 0, 0, 0);
+    if (d.getTime() <= todayUtc.getTime()) return 'now';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  })();
+
   // Layout-only mode: render content in normal flow to establish natural height
   if (layoutOnly) {
     return (
@@ -408,6 +422,7 @@ export default function SwipeCard({
             <span style={{ fontSize: 22, fontWeight: 700, color: '#7ee787' }}>${listing.price.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 400, color: '#8b949e' }}>/mo</span></span>
           </div>
           {listDateFormatted && <div className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Listed {listDateFormatted}</div>}
+          {moveInFormatted && <div className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>Available {moveInFormatted}</div>}
           <div
             className={compactMobile ? 'hidden min-[600px]:block' : ''}
             style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }}
@@ -747,6 +762,13 @@ export default function SwipeCard({
             {listDateFormatted && (
               <div className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>
                 Listed {listDateFormatted}
+              </div>
+            )}
+
+            {/* Move-in / availability date */}
+            {moveInFormatted && (
+              <div className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                Available {moveInFormatted}
               </div>
             )}
 
