@@ -13,7 +13,7 @@ export const verifiers: Record<ListingSource, Verifier> = {
 
 /** Max concurrent per-source verify calls. SE is rate-sensitive, CL is fine. */
 export const VERIFY_CONCURRENCY: Record<ListingSource, number> = {
-  streeteasy: 5,
+  streeteasy: 2,
   craigslist: 10,
   "facebook-marketplace": 1,
 };
