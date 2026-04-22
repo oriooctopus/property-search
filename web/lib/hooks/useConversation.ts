@@ -20,6 +20,7 @@ const DEFAULT_FILTERS: FiltersState = {
   maxRent: null,
   priceMode: 'total' as const,
   maxListingAge: null as MaxListingAge,
+  includeNaListingAge: false,
   photosFirst: false,
   selectedSources: null,
   minYearBuilt: null,
