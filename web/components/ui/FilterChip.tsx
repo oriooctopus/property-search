@@ -1,4 +1,5 @@
 import { forwardRef, useRef, type ComponentPropsWithoutRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/cn';
 import { ButtonBase } from './ButtonBase';
 
@@ -54,6 +55,19 @@ export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
       return { top, left };
     }
 
+    function isChipVisible(): boolean {
+      if (!chipRef.current) return false;
+      const rect = chipRef.current.getBoundingClientRect();
+      // A hidden ancestor (display:none) yields a 0×0 rect at origin. We use
+      // this to skip rendering dropdowns from the sidebar Filters instance
+      // when the sidebar is hidden via CSS on mobile (the same <Filters>
+      // children JSX is rendered both in the sidebar and inside the mobile
+      // bottom sheet — see Filters.tsx). Without this guard, the hidden
+      // chip's portaled dropdown would still render at top:8/left:8, on top
+      // of the visible mobile dropdown.
+      return rect.width > 0 && rect.height > 0;
+    }
+
     return (
       <div className="relative shrink-0" ref={chipRef}>
         <ButtonBase
@@ -77,7 +91,15 @@ export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
           )}
         </ButtonBase>
 
-        {open && children && (
+        {open && children && typeof document !== 'undefined' && isChipVisible() && createPortal(
+          // Portal to document.body so the dropdown escapes any ancestor that
+          // creates a containing block for fixed-position descendants — most
+          // notably the mobile filters sheet, which uses `transform: translateY(...)`
+          // for its drag-to-dismiss animation. A `transform` value other than
+          // `none` makes the element the containing block for `position: fixed`
+          // children, so without this portal the dropdown gets positioned
+          // relative to the sheet instead of the viewport and renders far
+          // offscreen.
           <div
             className="fixed z-[9999] rounded-xl border border-[#2d333b] p-5 shadow-xl"
             style={{
@@ -88,7 +110,8 @@ export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
             }}
           >
             {children}
-          </div>
+          </div>,
+          document.body,
         )}
       </div>
     );
