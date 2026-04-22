@@ -950,6 +950,28 @@ function HomeInner() {
     return result;
   }, [listings, filters.photosFirst, filters.sort, hiddenIds, showHidden]);
 
+  // Wishlist mode: partition the visible listings into active (still live)
+  // and removed (delisted_at IS NOT NULL) so the grid can show removed items
+  // in a separate section below the active ones. The /api/listings/search
+  // endpoint includes delisted rows whenever wishlistIds is provided, so this
+  // partition is a no-op outside wishlist mode.
+  //
+  // We only branch on `selectedWishlist` to avoid leaking removed cards into
+  // non-wishlist views (where the API filters them out anyway, but a future
+  // caller might not — belt and suspenders).
+  const { activeFilteredListings, removedFilteredListings } = useMemo(() => {
+    if (selectedWishlist === null) {
+      return { activeFilteredListings: filteredListings, removedFilteredListings: [] as Listing[] };
+    }
+    const active: Listing[] = [];
+    const removed: Listing[] = [];
+    for (const l of filteredListings) {
+      if (l.delisted_at != null) removed.push(l);
+      else active.push(l);
+    }
+    return { activeFilteredListings: active, removedFilteredListings: removed };
+  }, [filteredListings, selectedWishlist]);
+
   // Keep the ref in sync so the chat hook's getListingCount stays current
   filteredListingsRef.current = filteredListings;
 
@@ -1024,6 +1046,9 @@ function HomeInner() {
   // Shared listing cards renderer — virtualized via VirtualListingGrid.
   // Renders only visible rows (+ overscan) instead of all ~2000 cards.
   // -----------------------------------------------------------------------
+  // For loading-spinner gating we only consider the active listings — when
+  // a wishlist contains nothing but removed items we still want the cards to
+  // render (in the Removed section) instead of a perpetual loader.
   const listingGridLoading = filteredListings.length === 0 && (loading || viewportLoading || commuteLoading);
 
   const viewToggle = (
@@ -1060,7 +1085,7 @@ function HomeInner() {
       style={{ minHeight: 'calc(100vh - 60px - 42px)' }}
     >
       <Map
-        listings={filteredListings}
+        listings={activeFilteredListings}
         selectedId={selectedId}
         favoritedIds={wishlistedIds}
         onHideListing={handleHideListing}
@@ -1321,7 +1346,8 @@ function HomeInner() {
               */}
               <VirtualListingGrid
                 ref={virtualGridRef}
-                listings={filteredListings}
+                listings={activeFilteredListings}
+                removedListings={removedFilteredListings}
                 selectedId={selectedId}
                 wishlistedIds={wishlistedIds}
                 hidingId={hidingId}
@@ -1434,11 +1460,11 @@ function HomeInner() {
       {isSwipeView && (
         <div className="relative flex-1">
           <SwipeView
-            listings={filteredListings}
+            listings={activeFilteredListings}
             userId={userId}
             onHideListing={handleHideListing}
             onUnhideListing={(id) => unhideMutation.mutate(id)}
-            onExpandDetail={(listing) => { setSelectedId(listing.id); setDetailListing(filteredListings.find(l => l.id === listing.id) ?? null); }}
+            onExpandDetail={(listing) => { setSelectedId(listing.id); setDetailListing(activeFilteredListings.find(l => l.id === listing.id) ?? null); }}
             onSwitchView={() => switchMobileView('list')}
             onSwitchToMap={() => switchMobileView('map')}
             onOpenFilters={() => filtersHandleRef.current?.openMobileSheet()}
