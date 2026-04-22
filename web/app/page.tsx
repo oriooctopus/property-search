@@ -76,7 +76,6 @@ function readFiltersFromParams(params: URLSearchParams): FiltersState {
     maxRent: parseNumOrNull(params.get('maxRent')),
     priceMode: params.get('priceMode') === 'perRoom' ? 'perRoom' : 'total',
     maxListingAge: (age && VALID_LISTING_AGES.has(age) ? age : null) as MaxListingAge,
-    includeNaListingAge: params.get('includeNaListingAge') === '1',
     photosFirst: params.get('photosFirst') === '1',
     selectedSources: params.get('sources') ? params.get('sources')!.split(',') : null,
     minYearBuilt: parseNumOrNull(params.get('minYearBuilt')),
@@ -123,7 +122,6 @@ function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatM
   if (f.maxRent != null) p.set('maxRent', String(f.maxRent));
   if (f.priceMode === 'perRoom') p.set('priceMode', 'perRoom');
   if (f.maxListingAge !== null) p.set('maxAge', f.maxListingAge);
-  if (f.includeNaListingAge) p.set('includeNaListingAge', '1');
   if (f.photosFirst) p.set('photosFirst', '1');
   if (f.selectedSources !== null) p.set('sources', f.selectedSources.join(','));
   if (f.minYearBuilt != null) p.set('minYearBuilt', String(f.minYearBuilt));
@@ -367,7 +365,6 @@ function HomeInner() {
             maxRent: currentFilters.maxRent,
             priceMode: currentFilters.priceMode,
             maxListingAge: currentFilters.maxListingAge,
-            includeNaListingAge: currentFilters.includeNaListingAge,
             selectedSources: currentFilters.selectedSources,
             minYearBuilt: currentFilters.minYearBuilt,
             maxYearBuilt: currentFilters.maxYearBuilt,
@@ -546,7 +543,6 @@ function HomeInner() {
             maxRent: currentFilters.maxRent,
             priceMode: currentFilters.priceMode,
             maxListingAge: currentFilters.maxListingAge,
-            includeNaListingAge: currentFilters.includeNaListingAge,
             selectedSources: currentFilters.selectedSources,
             minYearBuilt: currentFilters.minYearBuilt,
             maxYearBuilt: currentFilters.maxYearBuilt,
