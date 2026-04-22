@@ -13,6 +13,43 @@
 export const PIN_RADIUS_PX = 12;
 export const MIN_CLEARANCE_PX = 16;
 
+/**
+ * Minimal Leaflet map shape used by `projectPinToViewport`. Typed
+ * structurally so this file doesn't have to import `leaflet` (which would
+ * leak browser globals into the test env).
+ */
+export interface ProjectableMap {
+  latLngToContainerPoint: (latlng: [number, number]) => { x: number; y: number };
+  getContainer: () => { getBoundingClientRect: () => DOMRect };
+}
+
+/**
+ * Project a (lat, lon) onto viewport pixel coordinates via the given
+ * Leaflet map. Returns `null` if Leaflet throws for any reason
+ * (map not sized yet, out-of-range coordinate, detached container, etc.).
+ *
+ * Extracted from three duplicated inline blocks in SwipeView + MapInner.
+ * See `tests/occlusion.test.ts` for the mocked-map unit tests.
+ */
+export function projectPinToViewport(
+  map: ProjectableMap,
+  lat: number,
+  lon: number,
+): ViewportPoint | null {
+  try {
+    const containerPoint = map.latLngToContainerPoint([lat, lon]);
+    const containerRect = map.getContainer().getBoundingClientRect();
+    // Guard against NaN from degenerate container rects (map not laid out).
+    if (!Number.isFinite(containerPoint.x) || !Number.isFinite(containerPoint.y)) return null;
+    return {
+      x: containerRect.left + containerPoint.x,
+      y: containerRect.top + containerPoint.y,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export interface Occluder {
   /** Stable identifier (e.g. "swipe-card", "action-pill", "top-nav"). */
   id: string;

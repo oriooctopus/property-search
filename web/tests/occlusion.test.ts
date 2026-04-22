@@ -8,9 +8,11 @@ import { describe, it, expect } from 'vitest';
 import {
   isPinVisible,
   findVisiblePosition,
+  projectPinToViewport,
   PIN_RADIUS_PX,
   MIN_CLEARANCE_PX,
   type Occluder,
+  type ProjectableMap,
 } from '../lib/viewport/occlusion';
 
 // DOMRect polyfill for the Vitest node environment. The real browser
@@ -208,5 +210,45 @@ describe('findVisiblePosition', () => {
       [occluder('left-panel', leftPanel)],
     );
     expect(out.deltaY).toBe(0);
+  });
+});
+
+describe('projectPinToViewport', () => {
+  // Tiny mock that mimics the slice of Leaflet's `Map` interface we depend
+  // on. Container rect is (10, 20, 390, 844) — i.e. shifted off the
+  // viewport origin so the projection's add-of-rect-offset is exercised.
+  const mockMap = (
+    containerPointFn: (latlng: [number, number]) => { x: number; y: number },
+  ): ProjectableMap => ({
+    latLngToContainerPoint: containerPointFn,
+    getContainer: () => ({
+      getBoundingClientRect: () => r(10, 20, 390, 844),
+    }),
+  });
+
+  it('returns container-rect-offset viewport coords on success', () => {
+    const map = mockMap(() => ({ x: 100, y: 200 }));
+    const out = projectPinToViewport(map, 40.7128, -74.006);
+    expect(out).toEqual({ x: 110, y: 220 }); // (10 + 100, 20 + 200)
+  });
+
+  it('returns null when latLngToContainerPoint throws', () => {
+    const map = mockMap(() => {
+      throw new Error('detached map');
+    });
+    const out = projectPinToViewport(map, 40.7128, -74.006);
+    expect(out).toBeNull();
+  });
+
+  it('returns null when projection yields NaN (degenerate map size)', () => {
+    const map = mockMap(() => ({ x: NaN, y: NaN }));
+    const out = projectPinToViewport(map, 40.7128, -74.006);
+    expect(out).toBeNull();
+  });
+
+  it('handles negative container points (pin off-screen)', () => {
+    const map = mockMap(() => ({ x: -50, y: -75 }));
+    const out = projectPinToViewport(map, 40.7128, -74.006);
+    expect(out).toEqual({ x: -40, y: -55 });
   });
 });

@@ -15,7 +15,8 @@ import { geoSort } from '@/lib/geo-sort';
 import { triggerHaptic } from '@/lib/native';
 import WishlistPicker from './WishlistPicker';
 import { useRegisterOccluder, useOccluders } from '@/lib/viewport/OccluderRegistry';
-import { isPinVisible } from '@/lib/viewport/occlusion';
+import { useLeafletMap } from '@/lib/viewport/LeafletMapContext';
+import { isPinVisible, projectPinToViewport } from '@/lib/viewport/occlusion';
 
 // Dynamically import MapComponent to avoid SSR issues (uses Leaflet)
 const MapComponent = dynamic(() => import('./Map'), { ssr: false });
@@ -167,6 +168,10 @@ export default function SwipeView({
   const mobileSwipeCardRef = useRef<HTMLDivElement>(null);
   const mobileActionPillRef = useRef<HTMLDivElement>(null);
   const occluderRegistry = useOccluders();
+  // Blocker 3 fix: live Leaflet map via context (not `window.__leafletMap`).
+  // Re-renders the consumers when the map mounts/unmounts, so we can drop
+  // the legacy `setTimeout(200)` polling loop entirely.
+  const leafletMap = useLeafletMap();
 
   // Stable getRect callbacks for the registry. We use refs to the DOM
   // nodes directly — no document.querySelector — and fall back to the
@@ -330,6 +335,12 @@ export default function SwipeView({
 
   // Track current listing by ID so we can restore position after re-sorts
   const currentListingIdRef = useRef<number | null>(null);
+  // Blocker 1 fix: track the deck ARRAY IDENTITY so we can detect "this is
+  // a fresh deck build" (new listings from a fresh-area pan) and reset the
+  // tracked-id before running the find-by-id step. Without this, an old id
+  // may coincidentally match a listing in the new deck (returning ≥ 0 from
+  // `findIndex`), silently short-circuiting the find-first-visible-pin scan.
+  const prevDeckRef = useRef<SwipeListing[] | null>(null);
 
   // Geo-sort when listings change
   const geoSorted = useMemo(() => {
@@ -353,6 +364,17 @@ export default function SwipeView({
   // EnsurePinVisible auto-pan will then take over as before — same behavior
   // as today, but only as a true last resort.
   useEffect(() => {
+    // Blocker 1 fix: when the deck array ITSELF is a new object (different
+    // reference from the previous render), treat the tracked-id as stale.
+    // This guarantees the find-visible-pin scan runs after any fresh-area
+    // pan even if an id from the previous deck happens to appear in the new
+    // one. Without this, `findIndex` could return ≥ 0 by coincidence and
+    // silently short-circuit the scan.
+    if (prevDeckRef.current !== null && prevDeckRef.current !== deck) {
+      currentListingIdRef.current = null;
+    }
+    prevDeckRef.current = deck;
+
     const trackedId = currentListingIdRef.current;
     const trackedIdx = trackedId === null ? -1 : deck.findIndex((l) => l.id === trackedId);
 
@@ -361,33 +383,24 @@ export default function SwipeView({
       return;
     }
 
-    // Tracked listing missing (deleted from deck, OR no tracked id at all —
-    // first-load / fresh-search). Find the first deck item whose pin is
-    // visible per the occlusion model. Mobile-only — desktop has no
-    // occluders registered, so the predicate always returns visible and we
-    // pick index 0 anyway.
-    if (isMobileViewport === true && typeof window !== 'undefined' && deck.length > 0) {
-      const map = (window as unknown as { __leafletMap?: import('leaflet').Map }).__leafletMap;
-      if (map) {
-        const containerEl = map.getContainer();
-        const mapRect = containerEl.getBoundingClientRect();
-        const occluders = occluderRegistry?.getAll() ?? [];
-        const SEARCH_CAP = 40;
-        const end = Math.min(deck.length, SEARCH_CAP);
-        for (let i = 0; i < end; i++) {
-          const cand = deck[i];
-          if (!cand || cand.lat == null || cand.lon == null) continue;
-          try {
-            const pt = map.latLngToContainerPoint([cand.lat, cand.lon]);
-            const vp = { x: pt.x + mapRect.left, y: pt.y + mapRect.top };
-            if (isPinVisible(vp, mapRect, occluders).visible) {
-              if (i !== currentIndex) setCurrentIndex(i);
-              currentListingIdRef.current = cand.id;
-              return;
-            }
-          } catch {
-            // ignore — fall through to next candidate
-          }
+    // Tracked listing missing (deleted from deck, OR deck just rebuilt from
+    // a fresh-area pan). Find the first deck item whose pin is visible per
+    // the occlusion model. Mobile-only — desktop has no occluders registered,
+    // so the predicate always returns visible and we pick index 0 anyway.
+    if (isMobileViewport === true && leafletMap && deck.length > 0) {
+      const mapRect = leafletMap.getContainer().getBoundingClientRect();
+      const occluders = occluderRegistry?.getAll() ?? [];
+      const SEARCH_CAP = 40;
+      const end = Math.min(deck.length, SEARCH_CAP);
+      for (let i = 0; i < end; i++) {
+        const cand = deck[i];
+        if (!cand || cand.lat == null || cand.lon == null) continue;
+        const vp = projectPinToViewport(leafletMap, cand.lat, cand.lon);
+        if (!vp) continue;
+        if (isPinVisible(vp, mapRect, occluders).visible) {
+          if (i !== currentIndex) setCurrentIndex(i);
+          currentListingIdRef.current = cand.id;
+          return;
         }
       }
     }
@@ -398,7 +411,7 @@ export default function SwipeView({
     } else if (trackedId === null && currentIndex !== 0 && deck.length > 0) {
       setCurrentIndex(0);
     }
-  }, [deck]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [deck, leafletMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const currentListing = deck[currentIndex] ?? null;
   const totalRemaining = deck.length - currentIndex;
@@ -480,36 +493,24 @@ export default function SwipeView({
   // user pans the map even when the active listing id hasn't changed.
   // Without this, Bug A surfaces: the user pans so the active pin slides
   // under the card, but no swap fires because nothing tells us to look.
+  //
+  // Blocker 3 fix: binds via the LeafletMapContext (`leafletMap`) instead
+  // of polling `window.__leafletMap` every 200ms. The context re-runs this
+  // effect whenever the map mounts/unmounts — no polling, no max-retries
+  // needed, and teardown on remount is automatic.
   // ---------------------------------------------------------------------
   const [mapMoveTick, setMapMoveTick] = useState(0);
   useEffect(() => {
     if (isMobileViewport !== true) return;
-    if (typeof window === 'undefined') return;
-    let cancelled = false;
-    let bound = false;
-    let map: import('leaflet').Map | null = null;
+    if (!leafletMap) return;
     const onMoveEnd = () => {
-      if (cancelled) return;
       setMapMoveTick((t) => t + 1);
     };
-    // Leaflet may not be mounted yet; poll briefly until __leafletMap exists.
-    const tryBind = () => {
-      if (cancelled || bound) return;
-      const m = (window as unknown as { __leafletMap?: import('leaflet').Map }).__leafletMap;
-      if (!m) {
-        window.setTimeout(tryBind, 200);
-        return;
-      }
-      map = m;
-      m.on('moveend', onMoveEnd);
-      bound = true;
-    };
-    tryBind();
+    leafletMap.on('moveend', onMoveEnd);
     return () => {
-      cancelled = true;
-      if (map && bound) map.off('moveend', onMoveEnd);
+      leafletMap.off('moveend', onMoveEnd);
     };
-  }, [isMobileViewport]);
+  }, [isMobileViewport, leafletMap]);
 
   // ---------------------------------------------------------------------
   // Prefer-visible-above-card: re-evaluate the active pin's visibility
@@ -535,13 +536,9 @@ export default function SwipeView({
     if (isMobileViewport !== true) return;
     if (!currentListing || !currentListing.lat || !currentListing.lon) return;
     if (isPanningRef?.current) return;
-    if (typeof window === 'undefined') return;
+    if (!leafletMap) return;
 
-    const map = (window as unknown as { __leafletMap?: import('leaflet').Map }).__leafletMap;
-    if (!map) return;
-
-    const containerEl = map.getContainer();
-    const mapRect = containerEl.getBoundingClientRect();
+    const mapRect = leafletMap.getContainer().getBoundingClientRect();
 
     // Sample all occluders ONCE per evaluation so every predicate call
     // below sees the same frame's geometry (no async waits between reads).
@@ -553,14 +550,9 @@ export default function SwipeView({
     // the swipe card. (Previously this only checked card-top, missing pins
     // that peeked out from under the action pill at the bottom.)
     const isPinFullyVisible = (lat: number, lon: number): boolean => {
-      try {
-        const pt = map.latLngToContainerPoint([lat, lon]);
-        // Convert container-relative point → viewport coords.
-        const viewportPoint = { x: pt.x + mapRect.left, y: pt.y + mapRect.top };
-        return isPinVisible(viewportPoint, mapRect, occluders).visible;
-      } catch {
-        return false;
-      }
+      const vp = projectPinToViewport(leafletMap, lat, lon);
+      if (!vp) return false;
+      return isPinVisible(vp, mapRect, occluders).visible;
     };
 
     // Is the CURRENT active pin already visible? If yes, no swap needed.
@@ -591,7 +583,7 @@ export default function SwipeView({
 
     // No forward candidate found; let MapInner's auto-shift handle it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentListing?.id, isMobileViewport, deck, currentIndex, isPanningRef, occluderRegistry, mapMoveTick]);
+  }, [currentListing?.id, isMobileViewport, deck, currentIndex, isPanningRef, occluderRegistry, mapMoveTick, leafletMap]);
 
   // ---------------------------------------------------------------------------
   // Swipe handler
