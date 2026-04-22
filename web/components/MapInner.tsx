@@ -712,7 +712,15 @@ function BoundsWatcher({
         } else {
           // Fallback (visibleRect == null when occluders fully cover the
           // map): fall back to the full map bounds so we don't silently
-          // stop fetching.
+          // stop fetching. This reintroduces the pre-fix full-bounds
+          // behavior, so emit a dev-only warning — if this fires in the
+          // wild, the UI is in a state where the user sees nothing but
+          // chrome, and we're about to auto-pan to pins behind it.
+          if (process.env.NODE_ENV !== 'production') {
+            console.warn(
+              '[bounds] visibleRect=null, falling back to map.getBounds() — occluders fully cover the map',
+            );
+          }
           const b = map.getBounds();
           latMin = b.getSouth();
           latMax = b.getNorth();
