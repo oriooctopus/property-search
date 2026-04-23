@@ -1444,12 +1444,6 @@ function HomeInner() {
             has set a preferred destination. Renders nothing. */}
         <DestinationCommuteFetcher listings={activeFilteredListings} />
 
-        {/* Preferred-destination pill — informational chip on every card,
-            tap-to-popup with full transit breakdown. Doesn't filter results. */}
-        <div className="flex items-center gap-2 px-4 py-2" style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}>
-          <SetDestinationPill />
-        </div>
-
         <div className="relative z-[1100]">
           <Filters
             ref={filtersHandleRef}
@@ -1457,6 +1451,7 @@ function HomeInner() {
             onChange={setFilters}
             listingCount={filteredListings.length}
             viewToggle={viewToggle}
+            destinationSlot={<SetDestinationPill />}
             userId={userId}
             savedSearches={savedSearches}
             onSaveSearch={async (name) => saveSavedSearch(name, filters)}
