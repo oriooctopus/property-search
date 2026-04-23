@@ -357,7 +357,7 @@ export default function ListingDetail({
           </div>
 
           {/* Price block */}
-          <div className="flex items-baseline gap-3 mb-4">
+          <div className="flex items-baseline gap-3 mb-1">
             <span className="text-2xl font-bold" style={{ color: '#7ee787' }}>
               ${listing.price.toLocaleString()}
             </span>
@@ -370,6 +370,30 @@ export default function ListingDetail({
               </span>
             )}
           </div>
+
+          {/* Concession-adjusted rent (e.g. "1 month free → $3,667 net effective").
+              Only show when the source actually advertises a promo. We render
+              gross + net side by side so the user immediately understands the
+              math, instead of just seeing one number with no context. */}
+          {(listing.net_effective_price != null && listing.concession_months_free != null) && (
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mb-4 text-xs" style={{ color: '#8b949e' }}>
+              <span>
+                ${listing.net_effective_price.toLocaleString()}/mo net effective
+              </span>
+              <span>&middot;</span>
+              <span>
+                {listing.concession_months_free === 1
+                  ? '1 month free'
+                  : listing.concession_months_free < 1
+                    ? `${Math.round(listing.concession_months_free * 4)} weeks free`
+                    : `${listing.concession_months_free} months free`}
+              </span>
+              {listing.gross_price != null && listing.gross_price !== listing.net_effective_price && (
+                <span>(gross ${listing.gross_price.toLocaleString()})</span>
+              )}
+            </div>
+          )}
+          {!(listing.net_effective_price != null && listing.concession_months_free != null) && <div className="mb-4" />}
 
           {/* Dates info */}
           <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4 text-xs" style={{ color: '#8b949e' }}>
@@ -420,6 +444,23 @@ export default function ListingDetail({
           {(listing as Record<string, unknown>).year_built != null && (
             <div className="text-sm mb-4" style={{ color: '#8b949e' }}>
               Built in {String((listing as Record<string, unknown>).year_built)}
+            </div>
+          )}
+
+          {/* About / description. SE backfill is pending — this section
+              just no-ops when the listing has no description, so it ships
+              safely before any data is populated. */}
+          {listing.description && listing.description.trim().length > 0 && (
+            <div className="mb-4">
+              <div className="text-xs font-medium mb-1" style={{ color: '#8b949e' }}>
+                About
+              </div>
+              <div
+                className="text-sm whitespace-pre-line"
+                style={{ color: '#e1e4e8', lineHeight: 1.5 }}
+              >
+                {listing.description}
+              </div>
             </div>
           )}
 

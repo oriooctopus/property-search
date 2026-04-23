@@ -63,6 +63,12 @@ export type Database = {
           external_id: string | null;
           last_seen_at: string | null;
           delisted_at: string | null;
+          // Phase D additions — DB columns from
+          // 20260422_add_listing_description_and_concessions migration.
+          description: string | null;
+          gross_price: number | null;
+          net_effective_price: number | null;
+          concession_months_free: number | null;
         };
         Insert: {
           id?: number;
@@ -87,6 +93,10 @@ export type Database = {
           external_id?: string | null;
           last_seen_at?: string | null;
           delisted_at?: string | null;
+          description?: string | null;
+          gross_price?: number | null;
+          net_effective_price?: number | null;
+          concession_months_free?: number | null;
         };
         Update: {
           id?: number;
@@ -111,6 +121,10 @@ export type Database = {
           external_id?: string | null;
           last_seen_at?: string | null;
           delisted_at?: string | null;
+          description?: string | null;
+          gross_price?: number | null;
+          net_effective_price?: number | null;
+          concession_months_free?: number | null;
         };
         Relationships: [];
       };

@@ -291,14 +291,30 @@ function nodesToListings(nodes: SENode[], city: string): AdapterOutput[] {
         ? (n.fullBathroomCount ?? 0) + (n.halfBathroomCount ?? 0) * 0.5
         : null;
 
+    // SE listings can carry up to ~60 photos; we used to slice at 20 which
+    // truncated ~21% of listings. Cap raised to 60 (matches the empirical max
+    // seen in a 100-listing sample). The validator and composite-dedup caps
+    // were also raised in lockstep.
     const photoUrls = (n.photos ?? [])
       .filter((p): p is { key: string } => typeof p.key === "string")
       .map((p) => sePhotoUrl(p.key))
-      .slice(0, 20);
+      .slice(0, 60);
 
     if (photoUrls.length === 0 && n.leadMedia?.photo?.key) {
       photoUrls.push(sePhotoUrl(n.leadMedia.photo.key));
     }
+
+    // Concession-adjusted ("net effective") rent. SE's `price` is the
+    // FACE/GROSS monthly rent; `netEffectivePrice` already accounts for any
+    // promotion (e.g. "1 month free" on a 12-mo lease). Capture both so the
+    // detail view can show "$4,000/mo, $3,667 with 1 mo free" without us
+    // having to do the math ourselves.
+    const monthsFree =
+      typeof n.monthsFree === "number" && n.monthsFree > 0 ? n.monthsFree : null;
+    const netEffectivePrice =
+      typeof n.netEffectivePrice === "number" && n.netEffectivePrice > 0
+        ? n.netEffectivePrice
+        : null;
 
     listings.push({
       address,
@@ -316,6 +332,15 @@ function nodesToListings(nodes: SENode[], city: string): AdapterOutput[] {
       availability_date: n.availableAt ?? null,
       source: "streeteasy" as const,
       external_id: n.id ?? null,
+      // Concession-adjusted pricing (SE-only fields; null for other sources).
+      gross_price: price,
+      net_effective_price: netEffectivePrice,
+      concession_months_free: monthsFree,
+      // Description is NOT in the SE search GraphQL response — only available
+      // by fetching each detail HTML page. Left null here; a separate
+      // backfill job (see scripts/backfill-se-descriptions.ts when it
+      // exists) can populate it from JSON-LD on the detail page.
+      description: null,
     });
   }
 
