@@ -448,10 +448,9 @@ function newRuleId(): string {
 export function createDefaultRule(): CommuteRule {
   return {
     id: newRuleId(),
-    type: 'subway-line',
-    lines: [],
-    stops: [],
-    maxMinutes: 10,
+    type: 'address',
+    address: '',
+    maxMinutes: 30,
     mode: 'walk',
   };
 }
@@ -598,10 +597,15 @@ export const CommuteRuleEditor = memo(function CommuteRuleEditor({
   rule,
   onChange,
   onDelete,
+  hideMaxMinutes = false,
 }: {
   rule: CommuteRule;
   onChange: (updated: CommuteRule) => void;
   onDelete: () => void;
+  /** Hide the "Within X min" slider — used by Set Destination (which doesn't
+   *  filter, so a max-minutes value is meaningless there). The mode selector
+   *  remains visible so the user can pick a preferred travel mode. */
+  hideMaxMinutes?: boolean;
 }) {
   const [expandedLine, setExpandedLine] = useState<string | null>(null);
 
@@ -1073,27 +1077,40 @@ export const CommuteRuleEditor = memo(function CommuteRuleEditor({
 
       {/* Time slider + mode toggle */}
       <div className="flex items-center gap-2 mt-2">
-        <span className="text-[11px]" style={{ color: '#8b949e' }}>Within</span>
-        <div className="flex-1 relative">
-          <input
-            type="range"
-            min={minSlider}
-            max={maxSlider}
-            step={1}
-            value={localMaxMinutes}
-            onChange={(e) => setLocalMaxMinutes(Number(e.target.value))}
-            onPointerUp={(e) => onChange({ ...rule, maxMinutes: Number((e.target as HTMLInputElement).value) })}
-            onKeyUp={(e) => onChange({ ...rule, maxMinutes: localMaxMinutes })}
-            className="range-slider w-full"
-            style={{
-              background: `linear-gradient(to right, #58a6ff 0%, #58a6ff ${sliderPct}%, #2d333b ${sliderPct}%, #2d333b 100%)`,
-            }}
-          />
-        </div>
-        <span className="text-[11px] font-semibold min-w-[42px] text-right whitespace-nowrap" style={{ color: '#58a6ff' }}>
-          {localMaxMinutes} min
-        </span>
-        <div className="inline-flex rounded-[5px] border overflow-hidden h-7" style={{ borderColor: '#2d333b' }}>
+        {!hideMaxMinutes && (
+          <>
+            <span className="text-[11px]" style={{ color: '#8b949e' }}>Within</span>
+            <div className="flex-1 relative">
+              <input
+                type="range"
+                min={minSlider}
+                max={maxSlider}
+                step={1}
+                value={localMaxMinutes}
+                onChange={(e) => setLocalMaxMinutes(Number(e.target.value))}
+                onPointerUp={(e) => onChange({ ...rule, maxMinutes: Number((e.target as HTMLInputElement).value) })}
+                onKeyUp={(e) => onChange({ ...rule, maxMinutes: localMaxMinutes })}
+                className="range-slider w-full"
+                style={{
+                  background: `linear-gradient(to right, #58a6ff 0%, #58a6ff ${sliderPct}%, #2d333b ${sliderPct}%, #2d333b 100%)`,
+                }}
+              />
+            </div>
+            <span className="text-[11px] font-semibold min-w-[42px] text-right whitespace-nowrap" style={{ color: '#58a6ff' }}>
+              {localMaxMinutes} min
+            </span>
+          </>
+        )}
+        {hideMaxMinutes && (
+          <span className="text-[11px]" style={{ color: '#8b949e' }}>Preferred mode</span>
+        )}
+        <div
+          className={cn(
+            'inline-flex rounded-[5px] border overflow-hidden h-7',
+            hideMaxMinutes && 'ml-auto',
+          )}
+          style={{ borderColor: '#2d333b' }}
+        >
           {(['walk', 'transit', 'bike'] as const)
             .filter((m) => rule.type === 'subway-line' ? m !== 'transit' : true)
             .map((m) => (

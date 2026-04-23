@@ -102,7 +102,7 @@ export function useDestinationCommutes(
 
   const cacheKey = destinationCacheKey(destination);
   const coords = useMemo(() => destinationCoords(destination), [destination]);
-  const mode = (destination?.mode ?? 'transit') as 'walk' | 'transit' | 'bike';
+  const mode = (destination?.mode ?? 'walk') as 'walk' | 'transit' | 'bike';
   const otpMode = destinationOtpMode(destination);
 
   // The Map returned to the consumer — built fresh from the module cache on

@@ -22,6 +22,11 @@ function readFromStorage(): SavedDestination | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as SavedDestination;
     if (!parsed || typeof parsed !== 'object' || !parsed.type) return null;
+    // Backward-compat: older saved destinations predate the `mode` field —
+    // default to 'walk' so the destination chip's commute lookup has a mode.
+    if (!parsed.mode) {
+      parsed.mode = 'walk';
+    }
     return parsed;
   } catch {
     return null;
