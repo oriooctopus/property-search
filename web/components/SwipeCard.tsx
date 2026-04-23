@@ -7,6 +7,9 @@ import { useDrag } from '@use-gesture/react';
 import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
 import { CompactStats } from '@/components/ui';
 import { formatAvailabilityDate } from '@/lib/format-date';
+import DestinationChip from '@/components/DestinationChip';
+import { useSavedDestination } from '@/lib/hooks/useSavedDestination';
+import { useListingDestinationCommute } from '@/lib/hooks/useDestinationCommutes';
 
 // NYC lat/lon degree-to-miles conversion factors
 const MI_PER_DEG_LAT = 69;
@@ -398,6 +401,13 @@ export default function SwipeCard({
   // See web/lib/format-date.ts for canonical formatting.
   const availabilityLabel = formatAvailabilityDate(listing.availability_date);
 
+  // Preferred-destination chip (informational; does not filter results).
+  const { destination } = useSavedDestination();
+  const destinationCommute = useListingDestinationCommute(
+    { id: listing.id, lat: listing.lat ?? null, lon: listing.lon ?? null },
+    destination,
+  );
+
   // Layout-only mode: render content in normal flow to establish natural height
   if (layoutOnly) {
     return (
@@ -416,6 +426,13 @@ export default function SwipeCard({
           </div>
           {listDateFormatted && <div className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Listed {listDateFormatted}</div>}
           <div className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>{availabilityLabel}</div>
+          {destination && (
+            <DestinationChip
+              listing={{ id: listing.id, lat: listing.lat ?? null, lon: listing.lon ?? null }}
+              destination={destination}
+              commute={destinationCommute ?? undefined}
+            />
+          )}
           <div
             className={compactMobile ? 'hidden min-[600px]:block' : ''}
             style={{ borderTop: '1px solid #2d333b', margin: '4px 0' }}
@@ -762,6 +779,15 @@ export default function SwipeCard({
             <div className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
               {availabilityLabel}
             </div>
+
+            {/* Preferred-destination chip — only renders when user has saved one. */}
+            {destination && (
+              <DestinationChip
+                listing={{ id: listing.id, lat: listing.lat ?? null, lon: listing.lon ?? null }}
+                destination={destination}
+                commute={destinationCommute ?? undefined}
+              />
+            )}
 
             {/* Divider: price/address section → stats. Hidden on mobile
                 (compactMobile) to save vertical space so the stats row fits
