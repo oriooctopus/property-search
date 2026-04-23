@@ -1380,7 +1380,7 @@ export default function SwipeView({
           >
             <div
               className="w-8 h-8 rounded-full border-2 animate-spin"
-              style={{ borderColor: '#3d444d', borderTopColor: '#58a6ff' }}
+              style={{ borderColor: '#3d444d', borderTopColor: '#e1e4e8' }}
             />
             <div className="text-sm" style={{ color: '#8b949e' }}>
               Loading listings...

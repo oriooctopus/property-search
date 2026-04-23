@@ -31,7 +31,7 @@ export default function RadarLoader() {
             width="140"
             height="140"
             rx="28"
-            stroke="#58a6ff"
+            stroke="#e1e4e8"
             strokeWidth="1.5"
             fill="none"
             opacity="0.15"
@@ -42,7 +42,7 @@ export default function RadarLoader() {
             width="100"
             height="100"
             rx="18"
-            stroke="#58a6ff"
+            stroke="#e1e4e8"
             strokeWidth="1"
             fill="none"
             opacity="0.1"
@@ -70,9 +70,9 @@ export default function RadarLoader() {
                 width: dot.size,
                 height: dot.size,
                 borderRadius: '50%',
-                backgroundColor: '#58a6ff',
+                backgroundColor: '#e1e4e8',
                 opacity: dot.opacity,
-                boxShadow: `0 0 ${dot.size * 2}px rgba(88,166,255,${dot.opacity * 0.6})`,
+                boxShadow: `0 0 ${dot.size * 2}px rgba(225,228,232,${dot.opacity * 0.6})`,
               }}
             />
           </div>
@@ -94,9 +94,9 @@ export default function RadarLoader() {
           }}
         >
           {/* Roof (triangle) */}
-          <path d="M18 4 L4 18 L32 18 Z" fill="#58a6ff" opacity="0.9" />
+          <path d="M18 4 L4 18 L32 18 Z" fill="#e1e4e8" opacity="0.9" />
           {/* Body (rectangle) */}
-          <rect x="8" y="18" width="20" height="14" fill="#58a6ff" opacity="0.9" rx="1" />
+          <rect x="8" y="18" width="20" height="14" fill="#e1e4e8" opacity="0.9" rx="1" />
           {/* Door */}
           <rect x="15" y="22" width="6" height="10" fill="#0f1117" rx="1" />
           {/* Window left */}
