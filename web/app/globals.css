@@ -148,17 +148,21 @@ body {
   border-color: var(--src-color) !important;
 }
 
-/* Root container heights for the unified page layout. On mobile swipe view
-   we hide the global Navbar (see data-swipe-mobile rule below), so the
-   swipe-root-height class uses the full viewport. Desktop (≥600px) keeps
-   the 60px reservation because the Navbar stays visible there. */
+/* Root container heights for the unified page layout. On mobile (<600px)
+   the global Navbar is hidden across all views (list/map/swipe) — the
+   merged MobileMenuPill replaces it — so neither root-height class needs
+   to reserve 60px on mobile. Desktop (≥600px) keeps the 60px reservation
+   because the Navbar stays visible there. */
 .normal-root-height {
-  height: calc(100dvh - 60px - env(safe-area-inset-top));
+  height: calc(100dvh - env(safe-area-inset-top));
 }
 .swipe-root-height {
   height: calc(100dvh - env(safe-area-inset-top));
 }
 @media (min-width: 600px) {
+  .normal-root-height {
+    height: calc(100dvh - 60px - env(safe-area-inset-top));
+  }
   .swipe-root-height {
     height: calc(100dvh - 60px - env(safe-area-inset-top));
   }
@@ -206,6 +210,18 @@ body[data-swipe-mobile="1"] [data-swipe-sidebar="1"] {
   }
   body[data-swipe-mobile="1"] [data-swipe-sidebar="1"] {
     display: flex !important;
+  }
+}
+
+/* Mobile (<600px) — hide the global Navbar across ALL views (list, map,
+   swipe). The merged MobileMenuPill (top-right) replaces the navbar's
+   avatar/login affordance, and the sidebar Filters bar above the listing
+   grid still hosts the Filters/sort/view-toggle row in list view. Without
+   this rule, list view on mobile would render BOTH the navbar avatar AND
+   the merged pill — duplicate UI. Desktop is unaffected. */
+@media (max-width: 599px) {
+  nav[data-global-nav="1"] {
+    display: none !important;
   }
 }
 

@@ -68,10 +68,9 @@ export interface SwipeViewProps {
       the SwipeView on mobile. Used to shift the card downward so it doesn't
       render underneath the absolute filter bar. */
   topInset?: number;
-  /** Called when the user taps the mobile floating Filters pill. The host
-      (page.tsx) owns the filter state and renders the drawer so the same
-      <Filters> props pipeline can be reused without threading every prop
-      through SwipeView. */
+  /** @deprecated The mobile filter pill moved to the page-level
+   *  MobileMenuPill (Option C merged "Filters | Avatar" pill). This prop
+   *  is unused; remove once the call-site in page.tsx is dropped. */
   onOpenFilters?: () => void;
   /** Optional content rendered inside the "No listings found" empty state
    *  (e.g. a "Go to nearest match" button). */
@@ -198,7 +197,9 @@ export default function SwipeView({
   isLoading,
   wishlistedIds,
   topInset = 0,
-  onOpenFilters,
+  // onOpenFilters is no longer rendered here — the merged MobileMenuPill in
+  // page.tsx now owns the filter-sheet trigger. Prop kept on the interface
+  // for one release so the call-site can drop it without a build break.
   emptyStateExtra,
   onClearFilters,
 }: SwipeViewProps) {
@@ -907,47 +908,10 @@ export default function SwipeView({
         </div>
       )}
 
-      {/* Mobile floating Filters pill (top-right). Opens the mobile filters
-          drawer rendered by page.tsx (host owns the filter state). Exists so
-          the layout matches the Option D mockup when the global Navbar +
-          sidebar filter bar are hidden on mobile swipe. */}
-      {isMobileViewport === true && (
-        <button
-          type="button"
-          onClick={onOpenFilters}
-          className="absolute min-[600px]:hidden cursor-pointer"
-          style={{
-            top: 'calc(env(safe-area-inset-top) + 12px)',
-            right: 14,
-            zIndex: 20,
-            height: 36,
-            padding: '0 12px',
-            background: 'rgba(28,32,40,0.88)',
-            backdropFilter: 'blur(14px)',
-            WebkitBackdropFilter: 'blur(14px)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            borderRadius: 9999,
-            boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            color: '#c9d1d9',
-            fontSize: 12,
-            fontWeight: 500,
-          }}
-          aria-label="Open filters"
-          title="Filters"
-          data-testid="swipe-filters-pill"
-          data-tour="filters-mobile"
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b949e" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="4" y1="6" x2="20" y2="6" />
-            <line x1="8" y1="12" x2="16" y2="12" />
-            <line x1="11" y1="18" x2="13" y2="18" />
-          </svg>
-          Filters
-        </button>
-      )}
+      {/* Mobile floating Filters pill — moved to MobileMenuPill (Option C
+          merged "Filters | Avatar" pill rendered by page.tsx top-level). The
+          new pill is mounted across all mobile views (swipe + list + map)
+          because the global Navbar is hidden on mobile. */}
 
       {/* Expanded mobile map overlay — portal to escape parent stacking context.
           Mounted on first open (hasOpenedMap) and kept mounted afterward; we
