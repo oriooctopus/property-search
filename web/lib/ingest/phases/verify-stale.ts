@@ -23,7 +23,19 @@ import type { VerifyResult } from "../../sources/verify/types";
 import { sendIngestAlert } from "../alert";
 
 const STALE_AGE_DAYS = 3;
-const BATCH_LIMIT = 2000;
+// Per-source candidate cap. We fan out one query per source so that a
+// stuck/blocked verifier on source A (e.g. FB-Marketplace returning 100%
+// unknown) cannot starve sources B and C of their share of the daily budget.
+// The previous behavior — one global ORDER BY last_seen_at LIMIT 2000 — let
+// whichever source had the oldest backlog dominate the entire batch.
+const PER_SOURCE_LIMIT = 1000;
+// Sources we run verify-stale against. Adding a new source = add it here
+// AND register a verifier in sources/verify/registry.ts.
+const VERIFY_SOURCES: ListingSource[] = [
+  "streeteasy",
+  "craigslist",
+  "facebook-marketplace",
+];
 // If a source's verify batch returns this fraction of `unknown` or higher AND
 // at least MIN_BATCH_SIZE_FOR_ALERT candidates ran, fire an alert — that's the
 // silent-failure pattern that kept delisted_at from being written for weeks
@@ -38,22 +50,44 @@ interface Candidate {
   external_id: string | null;
 }
 
-async function loadCandidates(
+async function loadCandidatesForSource(
   supabase: SupabaseClient,
+  source: ListingSource,
   limit: number,
+  cutoff: string,
 ): Promise<Candidate[]> {
-  const cutoff = new Date(
-    Date.now() - STALE_AGE_DAYS * 24 * 60 * 60 * 1000,
-  ).toISOString();
   const { data, error } = await supabase
     .from("listings")
     .select("id, url, source, external_id")
+    .eq("source", source)
     .is("delisted_at", null)
     .lt("last_seen_at", cutoff)
     .order("last_seen_at", { ascending: true })
     .limit(limit);
-  if (error) throw new Error(`verify-stale candidate query failed: ${error.message}`);
+  if (error) {
+    throw new Error(
+      `verify-stale candidate query failed for source=${source}: ${error.message}`,
+    );
+  }
   return (data ?? []) as Candidate[];
+}
+
+async function loadCandidates(
+  supabase: SupabaseClient,
+  perSourceLimit: number,
+): Promise<Candidate[]> {
+  const cutoff = new Date(
+    Date.now() - STALE_AGE_DAYS * 24 * 60 * 60 * 1000,
+  ).toISOString();
+  // Fan out one query per source with its own limit. The total processed is
+  // bounded by VERIFY_SOURCES.length * perSourceLimit (currently 3 * 1000 = 3000)
+  // and no single source can crowd out another regardless of backlog size.
+  const perSource = await Promise.all(
+    VERIFY_SOURCES.map((source) =>
+      loadCandidatesForSource(supabase, source, perSourceLimit, cutoff),
+    ),
+  );
+  return perSource.flat();
 }
 
 function groupBySource(rows: Candidate[]): Map<string, Candidate[]> {
@@ -103,9 +137,9 @@ export async function runVerifyStalePhase(
   const startedAt = new Date().toISOString();
   const t0 = Date.now();
 
-  const candidates = await loadCandidates(deps.supabase, BATCH_LIMIT);
+  const candidates = await loadCandidates(deps.supabase, PER_SOURCE_LIMIT);
   log.info(
-    `found ${candidates.length} candidates with last_seen_at older than ${STALE_AGE_DAYS}d`,
+    `found ${candidates.length} candidates with last_seen_at older than ${STALE_AGE_DAYS}d (per-source cap=${PER_SOURCE_LIMIT}, sources=${VERIFY_SOURCES.length})`,
   );
 
   const summary: VerifyStaleOutput = {
