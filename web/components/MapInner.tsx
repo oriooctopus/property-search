@@ -467,8 +467,10 @@ export interface MapProps {
   visible?: boolean;
   /** Per-listing commute info keyed by listing id */
   commuteInfoMap?: Map<number, CommuteInfo>;
-  /** Hovered subway station from SwipeCard — renders a pulsing marker */
-  hoveredStation?: HoveredStation | null;
+  /** Hovered / auto-surfaced subway stations from SwipeCard — renders a
+   *  pulsing marker per entry. Desktop hover passes a single-item array;
+   *  mobile swipe auto-surfaces the two closest stations. */
+  hoveredStations?: HoveredStation[] | null;
   /** Mobile swipe context: when true, pin taps fire `onMarkerClick` only
    *  (for selecting the listing as the active swipe card) and suppress the
    *  desktop-style popup/tooltip. Cluster taps zoom in instead of opening
@@ -968,7 +970,7 @@ function SubwayLinesLayer({ enabled }: SubwayLinesLayerProps) {
   );
 }
 
-export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, isPanningRef: isPanningRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, hoveredStation, swipeSelectMode = false }: MapProps) {
+export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, isPanningRef: isPanningRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, hoveredStations, swipeSelectMode = false }: MapProps) {
   // Fall back to a local ref if the caller doesn't provide one
   const localSuppressBoundsRef = useRef(false);
   const suppressBoundsRef = suppressBoundsRefProp ?? localSuppressBoundsRef;
@@ -1514,14 +1516,14 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
             </Fragment>
           );
         })}
-        {hoveredStation && (() => {
-          const primaryLine = hoveredStation.lines[0] ?? '';
+        {hoveredStations && hoveredStations.map((station) => {
+          const primaryLine = station.lines[0] ?? '';
           const markerColor = LINE_COLORS[primaryLine] ?? '#ffffff';
           const icon = makeStationPulseIcon(markerColor);
           return (
             <Marker
-              key={`hovered-station-${hoveredStation.lat}-${hoveredStation.lon}`}
-              position={[hoveredStation.lat, hoveredStation.lon]}
+              key={`hovered-station-${station.lat}-${station.lon}`}
+              position={[station.lat, station.lon]}
               icon={icon}
               interactive={false}
               zIndexOffset={1000}
@@ -1544,12 +1546,17 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
                   whiteSpace: 'nowrap',
                   display: 'block',
                 }}>
-                  {hoveredStation.name}
+                  {station.name}
+                  {typeof station.walkMin === 'number' && (
+                    <span style={{ marginLeft: 6, fontWeight: 500, color: '#8b949e' }}>
+                      · {station.walkMin} min walk
+                    </span>
+                  )}
                 </span>
               </Tooltip>
             </Marker>
           );
-        })()}
+        })}
       </MapContainer>
       <SubwayOverlayChip enabled={subwayOverlayEnabled} onToggle={toggleSubwayOverlay} />
     </div>

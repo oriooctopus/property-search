@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { createPortal } from 'react-dom';
 import { PrimaryButton } from '@/components/ui';
 import { X, RotateCcw, Heart } from 'lucide-react';
-import SwipeCard, { type HoveredStation, getClosestStations } from './SwipeCard';
+import SwipeCard, { type HoveredStation, getClosestStations, walkMinFromMiles } from './SwipeCard';
 import type { ViewportBounds } from './MapInner';
 import type { CommuteInfo } from './ListingCard';
 import type { Database } from '@/lib/types';
@@ -142,7 +142,13 @@ export default function SwipeView({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
   const [wishlistDropdownOpen, setWishlistDropdownOpen] = useState(false);
-  const [hoveredStation, setHoveredStation] = useState<HoveredStation | null>(null);
+  // Array so we can glow 1 (desktop hover) or 2 (mobile auto) stations.
+  const [hoveredStations, setHoveredStations] = useState<HoveredStation[] | null>(null);
+  // Adapter for SwipeCard's single-station hover callback (desktop-only);
+  // converts null → null, and station → [station].
+  const setHoveredFromHover = useCallback((s: HoveredStation | null) => {
+    setHoveredStations(s ? [s] : null);
+  }, []);
   const [showMobileMap, setShowMobileMap] = useState(false);
   // Defer mounting the Map component until the user actually needs it.
   // On desktop (viewport >= 600px) the map is the full-screen backdrop, so
@@ -457,31 +463,44 @@ export default function SwipeView({
   }, []);
 
 
-  // On mobile, auto-show the nearest subway station on the map (no hover needed)
+  // On mobile, auto-show the TWO closest subway stations on the map with
+  // a walking-time tooltip (no hover needed).
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (window.innerWidth >= 600) return; // desktop keeps hover behavior
     if (!currentListing?.lat || !currentListing?.lon) {
-      setHoveredStation(null);
+      setHoveredStations(null);
       return;
     }
-    const nearest = getClosestStations(currentListing.lat, currentListing.lon, 1);
+    const nearest = getClosestStations(currentListing.lat, currentListing.lon, 2)
+      .filter(({ station }) => Array.isArray(station.lines) && station.lines.length > 0);
     if (nearest.length > 0) {
-      const { station } = nearest[0];
-      setHoveredStation({ lat: station.lat, lon: station.lon, name: station.name, lines: station.lines });
+      setHoveredStations(nearest.map(({ station, distMi }) => ({
+        lat: station.lat,
+        lon: station.lon,
+        name: station.name,
+        lines: station.lines,
+        walkMin: walkMinFromMiles(distMi),
+      })));
     } else {
-      setHoveredStation(null);
+      setHoveredStations(null);
     }
   }, [currentListing?.id, currentListing?.lat, currentListing?.lon]);
 
-  // Re-set nearest subway station when mobile map overlay opens
+  // Re-set two-nearest subway stations when mobile map overlay opens
   useEffect(() => {
     if (!showMobileMap || typeof window === 'undefined' || window.innerWidth >= 600) return;
     if (!currentListing?.lat || !currentListing?.lon) return;
-    const nearest = getClosestStations(currentListing.lat, currentListing.lon, 1);
+    const nearest = getClosestStations(currentListing.lat, currentListing.lon, 2)
+      .filter(({ station }) => Array.isArray(station.lines) && station.lines.length > 0);
     if (nearest.length > 0) {
-      const { station } = nearest[0];
-      setHoveredStation({ lat: station.lat, lon: station.lon, name: station.name, lines: station.lines });
+      setHoveredStations(nearest.map(({ station, distMi }) => ({
+        lat: station.lat,
+        lon: station.lon,
+        name: station.name,
+        lines: station.lines,
+        walkMin: walkMinFromMiles(distMi),
+      })));
     }
   }, [showMobileMap, currentListing?.id, currentListing?.lat, currentListing?.lon]);
 
@@ -765,7 +784,7 @@ export default function SwipeView({
             initialZoom={initialZoom}
             visible={true}
             commuteInfoMap={commuteInfoMap}
-            hoveredStation={hoveredStation}
+            hoveredStations={hoveredStations}
           />
         </div>
       )}
@@ -808,7 +827,7 @@ export default function SwipeView({
               commuteInfoMap={commuteInfoMap}
               initialCenter={currentListing?.lat && currentListing?.lon ? [currentListing.lat, currentListing.lon] : initialCenter}
               initialZoom={15}
-              hoveredStation={hoveredStation}
+              hoveredStations={hoveredStations}
               // Mobile swipe: pin tap selects listing as the active swipe
               // card (via handleMarkerClick) and suppresses the desktop
               // popup/tooltip. Cluster taps zoom in instead of opening
@@ -896,7 +915,7 @@ export default function SwipeView({
             commuteInfoMap={commuteInfoMap}
             initialCenter={currentListing?.lat && currentListing?.lon ? [currentListing.lat, currentListing.lon] : initialCenter}
             initialZoom={15}
-            hoveredStation={hoveredStation}
+            hoveredStations={hoveredStations}
           />
           <button
             onClick={() => setShowMobileMap(false)}
@@ -1086,7 +1105,7 @@ export default function SwipeView({
                     onPhotoFocusChange={(focused) => { photoFocusedRef.current = focused; }}
                     enterPhotoFocusRef={enterPhotoFocusRef}
                     exitPhotoFocusRef={exitPhotoFocusRef}
-                    onSubwayHover={setHoveredStation}
+                    onSubwayHover={setHoveredFromHover}
                     onDragStateChange={setIsDragging}
                     resetRef={resetCardRef}
                     footerLeadingSlot={(

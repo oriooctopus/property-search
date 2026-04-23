@@ -100,6 +100,14 @@ export interface HoveredStation {
   lon: number;
   name: string;
   lines: string[];
+  /** Walking time in whole minutes (3 mph). Optional for back-compat; used by
+   *  the map tooltip on mobile swipe to show "~N min walk". */
+  walkMin?: number;
+}
+
+// Walking-speed conversion: 3 mph → 20 min per mile.
+export function walkMinFromMiles(distMi: number): number {
+  return Math.max(1, Math.round(distMi * 20));
 }
 
 interface SwipeCardProps {
@@ -484,6 +492,25 @@ export default function SwipeCard({
                     </div>
                     <span className="text-xs truncate" style={{ color: '#e1e4e8' }}>{station.name}</span>
                     <span className="text-xs ml-auto flex-shrink-0" style={{ color: '#8b949e' }}>{distMi < 0.1 ? '<0.1' : distMi.toFixed(1)} mi</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+          {compactMobile && listing.lat != null && listing.lon != null && (() => {
+            const stations = getClosestStations(listing.lat as number, listing.lon as number, 2)
+              .filter(({ station }) => Array.isArray(station.lines) && station.lines.length > 0);
+            if (stations.length === 0) return null;
+            return (
+              <div
+                className="min-[600px]:hidden flex items-center gap-3 text-[12px]"
+                style={{ color: '#c9d1d9' }}
+                data-testid="compact-subway-row"
+              >
+                {stations.map(({ station, distMi }) => (
+                  <div key={station.stopId} className="flex items-center gap-1">
+                    <LineBadge line={station.lines[0]} />
+                    <span style={{ color: '#8b949e' }}>{walkMinFromMiles(distMi)} min</span>
                   </div>
                 ))}
               </div>
@@ -901,6 +928,29 @@ export default function SwipeCard({
                 ))}
               </div>
             )}
+
+            {/* Compact subway indicator — mobile compactMobile only.
+                Shows the two closest lines + walking time inline so the
+                information is visible on the mobile swipe card where the
+                full "Nearest Subway" section is hidden. */}
+            {compactMobile && nearbyStations.length > 0 && (() => {
+              const rows = nearbyStations.filter(({ station }) => Array.isArray(station.lines) && station.lines.length > 0);
+              if (rows.length === 0) return null;
+              return (
+                <div
+                  className="min-[600px]:hidden flex items-center gap-3 text-[12px]"
+                  style={{ color: '#c9d1d9' }}
+                  data-testid="compact-subway-row"
+                >
+                  {rows.map(({ station, distMi }) => (
+                    <div key={station.stopId} className="flex items-center gap-1" title={`${station.name} — ${walkMinFromMiles(distMi)} min walk`}>
+                      <LineBadge line={station.lines[0]} />
+                      <span style={{ color: '#8b949e' }}>{walkMinFromMiles(distMi)} min</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
 
             {/* External link + optional leading slot (e.g. mobile "Save to" control) */}
             <div

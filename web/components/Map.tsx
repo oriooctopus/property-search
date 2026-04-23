@@ -40,7 +40,7 @@ interface MapProps {
   initialZoom?: number;
   visible?: boolean;
   commuteInfoMap?: Map<number, CommuteInfo>;
-  hoveredStation?: HoveredStation | null;
+  hoveredStations?: HoveredStation[] | null;
   /** Mobile swipe context: when true, tapping a pin fires `onMarkerClick`
    *  (which parent uses to select the listing for the swipe deck) WITHOUT
    *  opening the desktop-style popup/tooltip. Tapping a cluster zooms in
@@ -52,7 +52,7 @@ interface MapProps {
 // Memoized so parent re-renders (e.g. view-switches on mobile) don't force
 // the Leaflet tree to re-run its own render cycle. Stable callback references
 // from the parent are required for the memo to be effective.
-function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, isPanningRef, initialCenter, initialZoom, visible, commuteInfoMap, hoveredStation, swipeSelectMode }: MapProps) {
+function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, isPanningRef, initialCenter, initialZoom, visible, commuteInfoMap, hoveredStations, swipeSelectMode }: MapProps) {
   return (
     <MapInner
       listings={listings}
@@ -72,7 +72,7 @@ function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds
       initialZoom={initialZoom}
       visible={visible}
       commuteInfoMap={commuteInfoMap}
-      hoveredStation={hoveredStation ?? null}
+      hoveredStations={hoveredStations ?? null}
       swipeSelectMode={swipeSelectMode}
     />
   );
