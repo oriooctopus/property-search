@@ -6,6 +6,9 @@ import type { Database } from '@/lib/types';
 import { formatListedDate, formatAvailabilityDate } from '@/lib/format-date';
 import { ActionButton, IconButton, CompactStats } from '@/components/ui';
 import ListingCardPeekMap from '@/components/ListingCardPeekMap';
+import DestinationChip from '@/components/DestinationChip';
+import { useSavedDestination } from '@/lib/hooks/useSavedDestination';
+import { useListingDestinationCommute } from '@/lib/hooks/useDestinationCommutes';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -175,6 +178,13 @@ function ListingCard({
   const listedDateLabel = useMemo(
     () => formatListedDate(listing.list_date ?? listing.created_at),
     [listing.list_date, listing.created_at],
+  );
+
+  // Preferred-destination chip (informational; does not filter results).
+  const { destination } = useSavedDestination();
+  const destinationCommute = useListingDestinationCommute(
+    { id: listing.id, lat: listing.lat ?? null, lon: listing.lon ?? null },
+    destination,
   );
 
   return (
@@ -459,6 +469,17 @@ function ListingCard({
           {listing.area}
         </div>
       </div>
+
+      {/* Preferred-destination chip — only renders when user has saved one. */}
+      {destination && (
+        <div className="mt-2">
+          <DestinationChip
+            listing={{ id: listing.id, lat: listing.lat ?? null, lon: listing.lon ?? null }}
+            destination={destination}
+            commute={destinationCommute ?? undefined}
+          />
+        </div>
+      )}
 
       {/* Details row with micro-icons */}
       <CompactStats

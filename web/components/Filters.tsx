@@ -441,7 +441,7 @@ function newRuleId(): string {
   return `rule-${Date.now()}-${++_ruleIdCounter}`;
 }
 
-function createDefaultRule(): CommuteRule {
+export function createDefaultRule(): CommuteRule {
   return {
     id: newRuleId(),
     type: 'subway-line',
@@ -590,7 +590,7 @@ function DropdownFooter({
 // Commute Rule Editor
 // ---------------------------------------------------------------------------
 
-const CommuteRuleEditor = memo(function CommuteRuleEditor({
+export const CommuteRuleEditor = memo(function CommuteRuleEditor({
   rule,
   onChange,
   onDelete,
