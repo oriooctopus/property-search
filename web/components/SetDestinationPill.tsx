@@ -7,7 +7,9 @@ import { ButtonBase, PrimaryButton, TextButton } from '@/components/ui';
 import {
   destinationCoords,
   destinationShortName,
+  MAX_DESTINATIONS,
   useSavedDestination,
+  type SavedDestination,
 } from '@/lib/hooks/useSavedDestination';
 
 /**
@@ -16,20 +18,23 @@ import {
  * for commute filter rules) so the user gets address autocomplete, station
  * picker, park picker, and subway-line picker for free.
  *
- * When a destination is already saved, the pill shows the short name and an
- * inline ✕ to clear it.
+ * Supports up to MAX_DESTINATIONS (currently 2). When 0 destinations are
+ * saved the pill reads "Set destination". When ≥1 is saved the pill shows
+ * the first short name plus a "+N" badge for any additional destinations.
  */
 export default function SetDestinationPill() {
-  const { destination, setDestination, clearDestination } = useSavedDestination();
+  const { destinations, setDestinations, clearDestination } = useSavedDestination();
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<CommuteRule>(() => destination ?? createDefaultRule());
+  const [drafts, setDrafts] = useState<CommuteRule[]>(() =>
+    destinations.length > 0 ? destinations : [createDefaultRule()],
+  );
 
-  // Re-seed draft whenever the modal opens with the latest saved destination
+  // Re-seed drafts whenever the modal opens with the latest saved destinations
   useEffect(() => {
     if (open) {
-      setDraft(destination ?? createDefaultRule());
+      setDrafts(destinations.length > 0 ? destinations : [createDefaultRule()]);
     }
-  }, [open, destination]);
+  }, [open, destinations]);
 
   // Close on Escape
   useEffect(() => {
@@ -45,11 +50,14 @@ export default function SetDestinationPill() {
     };
   }, [open]);
 
-  const isResolvable = destinationCoords(draft) !== null;
+  // A draft is saveable if it resolves to coordinates (so the chip's commute
+  // lookup will actually work). Save button is enabled as long as EVERY draft
+  // resolves — no partially-resolvable destination sets.
+  const allResolvable = drafts.length > 0 && drafts.every((d) => destinationCoords(d) !== null);
 
   const handleSave = () => {
-    if (!isResolvable) return;
-    setDestination(draft);
+    if (!allResolvable) return;
+    setDestinations(drafts);
     setOpen(false);
   };
 
@@ -58,14 +66,37 @@ export default function SetDestinationPill() {
     clearDestination();
   };
 
-  const shortName = destination ? destinationShortName(destination) : null;
+  const handleAddAnother = () => {
+    if (drafts.length >= MAX_DESTINATIONS) return;
+    setDrafts((prev) => [...prev, createDefaultRule()]);
+  };
+
+  const handleUpdateDraft = (id: string, updated: CommuteRule) => {
+    setDrafts((prev) => prev.map((d) => (d.id === id ? updated : d)));
+  };
+
+  const handleRemoveDraft = (id: string) => {
+    setDrafts((prev) => {
+      const filtered = prev.filter((d) => d.id !== id);
+      // Always keep at least one draft visible so the user has something to edit
+      return filtered.length === 0 ? [createDefaultRule()] : filtered;
+    });
+  };
+
+  // Pill display: short name of FIRST destination, with "+1" badge if a
+  // second is saved. Keeps the pill narrow on mobile.
+  const firstName = destinations[0] ? destinationShortName(destinations[0]) : null;
+  const extraCount = Math.max(0, destinations.length - 1);
+  const ariaLabel = destinations.length > 0
+    ? `Edit destinations: ${destinations.map((d) => destinationShortName(d, 32)).join(' and ')}`
+    : 'Set a preferred destination';
 
   return (
     <>
-      {destination ? (
+      {destinations.length > 0 ? (
         <ButtonBase
           onClick={() => setOpen(true)}
-          aria-label={`Edit destination: ${shortName}`}
+          aria-label={ariaLabel}
           className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border h-7 whitespace-nowrap"
           style={{
             backgroundColor: 'rgba(126,231,135,0.08)',
@@ -74,7 +105,22 @@ export default function SetDestinationPill() {
           }}
         >
           <span aria-hidden style={{ fontSize: 11, lineHeight: 1 }}>📍</span>
-          <span>{shortName}</span>
+          <span>{firstName}</span>
+          {extraCount > 0 && (
+            <span
+              aria-hidden
+              className="inline-flex items-center justify-center rounded-full px-1.5 text-[10px] font-semibold"
+              style={{
+                backgroundColor: 'rgba(126,231,135,0.18)',
+                color: '#7ee787',
+                minWidth: 18,
+                height: 16,
+                lineHeight: 1,
+              }}
+            >
+              +{extraCount}
+            </span>
+          )}
           <span
             role="button"
             tabIndex={0}
@@ -82,7 +128,7 @@ export default function SetDestinationPill() {
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') handleClear(e as unknown as React.MouseEvent);
             }}
-            aria-label="Clear destination"
+            aria-label="Clear all destinations"
             className="inline-flex items-center justify-center rounded-full w-4 h-4 ml-0.5 transition-colors hover:bg-white/15 cursor-pointer"
           >
             <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
@@ -131,25 +177,79 @@ export default function SetDestinationPill() {
             </button>
             <div className="px-4 pt-4 pb-2">
               <div className="text-base font-semibold" style={{ color: '#e1e4e8' }}>
-                Preferred destination
+                Preferred destinations
               </div>
               <div className="text-xs mt-0.5" style={{ color: '#8b949e' }}>
                 Show commute time on every listing card. Doesn’t filter results.
+                Save up to {MAX_DESTINATIONS} destinations.
               </div>
             </div>
-            <div className="px-4 pb-2">
-              <CommuteRuleEditor
-                rule={draft}
-                onChange={setDraft}
-                onDelete={() => setDraft(createDefaultRule())}
-                hideMaxMinutes
-              />
+
+            <div className="px-4 pb-2 flex flex-col gap-3" data-testid="destination-drafts">
+              {drafts.map((draft, idx) => (
+                <div
+                  key={draft.id}
+                  className="rounded-lg"
+                  style={{ border: '1px solid #2d333b', backgroundColor: 'rgba(255,255,255,0.015)' }}
+                  data-testid={`destination-draft-${idx}`}
+                >
+                  <div
+                    className="flex items-center justify-between px-3 pt-2"
+                    style={{ color: '#8b949e' }}
+                  >
+                    <div className="text-[11px] uppercase tracking-wider font-semibold">
+                      Destination {idx + 1}
+                    </div>
+                    {drafts.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveDraft(draft.id)}
+                        aria-label={`Remove destination ${idx + 1}`}
+                        data-testid={`remove-destination-${idx}`}
+                        className="inline-flex items-center justify-center w-6 h-6 rounded-full transition-colors cursor-pointer hover:bg-white/10 hover:text-white"
+                      >
+                        <svg width="11" height="11" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                          <path d="M2 2L8 8M8 2L2 8" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                  <div className="px-1 pb-1">
+                    <CommuteRuleEditor
+                      rule={draft}
+                      onChange={(updated) => handleUpdateDraft(draft.id, updated as SavedDestination)}
+                      onDelete={() => handleRemoveDraft(draft.id)}
+                      hideMaxMinutes
+                    />
+                  </div>
+                </div>
+              ))}
+
+              {drafts.length < MAX_DESTINATIONS && (
+                <ButtonBase
+                  onClick={handleAddAnother}
+                  data-testid="add-another-destination"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium border w-full"
+                  style={{
+                    borderStyle: 'dashed',
+                    borderColor: '#3a3f4a',
+                    color: '#8b949e',
+                    backgroundColor: 'transparent',
+                  }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  <span>Add another destination</span>
+                </ButtonBase>
+              )}
             </div>
+
             <div
               className="flex items-center justify-between gap-2 px-4 py-3 sticky bottom-0"
               style={{ backgroundColor: '#1c2028', borderTop: '1px solid #2d333b' }}
             >
-              {destination ? (
+              {destinations.length > 0 ? (
                 <TextButton
                   onClick={() => {
                     clearDestination();
@@ -157,7 +257,7 @@ export default function SetDestinationPill() {
                   }}
                   className="text-xs"
                 >
-                  Remove
+                  Remove all
                 </TextButton>
               ) : (
                 <span />
@@ -168,7 +268,7 @@ export default function SetDestinationPill() {
                 </TextButton>
                 <PrimaryButton
                   onClick={handleSave}
-                  disabled={!isResolvable}
+                  disabled={!allResolvable}
                   className="h-8 px-4 text-xs font-bold"
                 >
                   Save

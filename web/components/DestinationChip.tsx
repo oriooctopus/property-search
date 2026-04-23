@@ -7,14 +7,24 @@ import { ButtonBase } from '@/components/ui';
 import {
   destinationCoords,
   destinationOtpMode,
+  destinationShortName,
   type SavedDestination,
 } from '@/lib/hooks/useSavedDestination';
 import type { DestinationCommute } from '@/lib/hooks/useDestinationCommutes';
 
 interface DestinationChipProps {
   listing: { id: number; lat?: number | null; lon?: number | null };
-  destination: SavedDestination;
-  commute: DestinationCommute | undefined;
+  /**
+   * One or more saved destinations. Length 1 → renders as it always has
+   * (single chip with mode label). Length 2 → renders both commute times
+   * compactly inside the same chip.
+   */
+  destinations: SavedDestination[];
+  /**
+   * One commute entry per destination, in the same order. Pass `undefined`
+   * for any entry that's still resolving / hasn't been requested yet.
+   */
+  commutes: Array<DestinationCommute | undefined>;
   /** Optional className appended to the wrapper row (e.g. for layout tweaks). */
   className?: string;
 }
@@ -88,22 +98,31 @@ function modeLabel(mode: 'walk' | 'transit' | 'bike'): string {
   return 'transit';
 }
 
-function chipText(commute: DestinationCommute | undefined, fallbackMode: 'walk' | 'transit' | 'bike'): string {
+/** Single-destination chip text: "12 min walk" / "… walk" / "— walk". */
+function singleChipText(commute: DestinationCommute | undefined, fallbackMode: 'walk' | 'transit' | 'bike'): string {
   if (!commute) return `… ${modeLabel(fallbackMode)}`;
   if (commute.loading) return `… ${modeLabel(commute.mode)}`;
   if (commute.errored || commute.minutes == null) return `— ${modeLabel(commute.mode)}`;
   return `${commute.minutes} min ${modeLabel(commute.mode)}`;
 }
 
+/** Two-destination chip text: just the minutes ("12m") — no mode label, since
+ * each destination may have its own mode and we'd run out of width. The mode
+ * is communicated via the per-segment icon. */
+function dualMinutesText(commute: DestinationCommute | undefined): string {
+  if (!commute) return '…';
+  if (commute.loading) return '…';
+  if (commute.errored || commute.minutes == null) return '—';
+  return `${commute.minutes}m`;
+}
+
 interface PopupProps {
   listing: { id: number; lat?: number | null; lon?: number | null };
-  destination: SavedDestination;
+  destinations: SavedDestination[];
   onClose: () => void;
 }
 
-function CommutePopup({ listing, destination, onClose }: PopupProps) {
-  const coords = destinationCoords(destination);
-  const otpMode = destinationOtpMode(destination);
+function CommutePopup({ listing, destinations, onClose }: PopupProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -120,7 +139,18 @@ function CommutePopup({ listing, destination, onClose }: PopupProps) {
   }, [onClose]);
 
   if (!mounted) return null;
-  if (!coords || listing.lat == null || listing.lon == null) {
+
+  // Resolve every destination up-front so we can render an itinerary per
+  // destination (or a single "unavailable" message if NONE of them resolve).
+  const resolved = destinations.map((d) => ({
+    destination: d,
+    coords: destinationCoords(d),
+    otpMode: destinationOtpMode(d),
+  }));
+  const anyResolvable =
+    listing.lat != null && listing.lon != null && resolved.some((r) => r.coords);
+
+  if (!anyResolvable) {
     return createPortal(
       <div
         className="fixed inset-0 z-[2000] flex items-center justify-center p-4"
@@ -155,29 +185,48 @@ function CommutePopup({ listing, destination, onClose }: PopupProps) {
         <button
           onClick={onClose}
           aria-label="Close"
-          className="absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer text-[#8b949e] hover:text-white hover:bg-white/10"
+          className="absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer text-[#8b949e] hover:text-white hover:bg-white/10 z-10"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         </button>
-        <div className="px-4 pt-4 pb-1">
-          <div className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: '#8b949e' }}>
-            Commute to
-          </div>
-          <div className="text-base font-semibold mt-0.5" style={{ color: '#e1e4e8' }}>
-            {coords.label}
-          </div>
-        </div>
-        <div className="px-4 pb-2">
-          <CommuteItinerary
-            listingLat={listing.lat as number}
-            listingLon={listing.lon as number}
-            destinationLat={coords.lat}
-            destinationLon={coords.lon}
-            destinationName={coords.label}
-            mode={otpMode}
-          />
+        <div className="px-4 pt-4 pb-2 flex flex-col gap-4">
+          {resolved.map((r, idx) => {
+            if (!r.coords || listing.lat == null || listing.lon == null) {
+              return (
+                <div key={idx}>
+                  <div className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: '#8b949e' }}>
+                    Commute to
+                  </div>
+                  <div className="text-base font-semibold mt-0.5" style={{ color: '#e1e4e8' }}>
+                    {destinationShortName(r.destination, 64)}
+                  </div>
+                  <div className="text-xs mt-1" style={{ color: '#8b949e' }}>
+                    Commute details unavailable for this destination.
+                  </div>
+                </div>
+              );
+            }
+            return (
+              <div key={idx}>
+                <div className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: '#8b949e' }}>
+                  Commute to
+                </div>
+                <div className="text-base font-semibold mt-0.5 mb-1" style={{ color: '#e1e4e8' }}>
+                  {r.coords.label}
+                </div>
+                <CommuteItinerary
+                  listingLat={listing.lat as number}
+                  listingLon={listing.lon as number}
+                  destinationLat={r.coords.lat}
+                  destinationLon={r.coords.lon}
+                  destinationName={r.coords.label}
+                  mode={r.otpMode}
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>,
@@ -187,19 +236,66 @@ function CommutePopup({ listing, destination, onClose }: PopupProps) {
 
 export default function DestinationChip({
   listing,
-  destination,
-  commute,
+  destinations,
+  commutes,
   className,
 }: DestinationChipProps) {
   const [popupOpen, setPopupOpen] = useState(false);
-  const mode = (commute?.mode ?? destination.mode) as 'walk' | 'transit' | 'bike';
-  const label = chipText(commute, mode);
+
+  if (destinations.length === 0) return null;
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     setPopupOpen(true);
   };
+
+  // Single-destination layout — preserved exactly as the previous version
+  // ("12 min walk").
+  if (destinations.length === 1) {
+    const dest = destinations[0];
+    const commute = commutes[0];
+    const mode = (commute?.mode ?? dest.mode) as 'walk' | 'transit' | 'bike';
+    const label = singleChipText(commute, mode);
+    return (
+      <>
+        <div
+          className={`flex items-center gap-1.5 ${className ?? ''}`}
+          style={{ marginTop: 1 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <ButtonBase
+            onClick={handleClick}
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium border whitespace-nowrap"
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.04)',
+              borderColor: '#2d333b',
+              color: '#c9d1d9',
+              lineHeight: 1.2,
+            }}
+            aria-label={`Commute to destination: ${label}. Tap for details.`}
+          >
+            <span className="inline-flex items-center justify-center" style={{ color: '#8b949e' }}>
+              {modeIcon(mode)}
+            </span>
+            <span>{label}</span>
+          </ButtonBase>
+        </div>
+        {popupOpen && (
+          <CommutePopup listing={listing} destinations={destinations} onClose={() => setPopupOpen(false)} />
+        )}
+      </>
+    );
+  }
+
+  // Two-destination layout — both commutes inside one chip, separated by a
+  // thin divider. Each segment has its own mode icon + minutes ("12m / 18m").
+  const ariaParts = destinations.map((d, i) => {
+    const c = commutes[i];
+    const mode = (c?.mode ?? d.mode) as 'walk' | 'transit' | 'bike';
+    return `${singleChipText(c, mode)} to ${destinationShortName(d, 32)}`;
+  });
+  const ariaLabel = `Commute: ${ariaParts.join('; ')}. Tap for details.`;
 
   return (
     <>
@@ -210,23 +306,41 @@ export default function DestinationChip({
       >
         <ButtonBase
           onClick={handleClick}
-          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium border whitespace-nowrap"
+          className="inline-flex items-center rounded-full border whitespace-nowrap"
           style={{
             backgroundColor: 'rgba(255,255,255,0.04)',
             borderColor: '#2d333b',
             color: '#c9d1d9',
             lineHeight: 1.2,
           }}
-          aria-label={`Commute to destination: ${label}. Tap for details.`}
+          aria-label={ariaLabel}
         >
-          <span className="inline-flex items-center justify-center" style={{ color: '#8b949e' }}>
-            {modeIcon(mode)}
-          </span>
-          <span>{label}</span>
+          {destinations.map((d, i) => {
+            const c = commutes[i];
+            const mode = (c?.mode ?? d.mode) as 'walk' | 'transit' | 'bike';
+            const minutes = dualMinutesText(c);
+            const isFirst = i === 0;
+            return (
+              <span
+                key={i}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium"
+                style={
+                  isFirst
+                    ? undefined
+                    : { borderLeft: '1px solid #2d333b' }
+                }
+              >
+                <span className="inline-flex items-center justify-center" style={{ color: '#8b949e' }}>
+                  {modeIcon(mode)}
+                </span>
+                <span>{minutes}</span>
+              </span>
+            );
+          })}
         </ButtonBase>
       </div>
       {popupOpen && (
-        <CommutePopup listing={listing} destination={destination} onClose={() => setPopupOpen(false)} />
+        <CommutePopup listing={listing} destinations={destinations} onClose={() => setPopupOpen(false)} />
       )}
     </>
   );

@@ -8,6 +8,9 @@ import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
 const STORAGE_KEY = 'dwelligence.preferredDestination';
 const EVENT_NAME = 'dwelligence:preferredDestinationChanged';
 
+/** Maximum number of destinations a user can save at once. */
+export const MAX_DESTINATIONS = 2;
+
 /**
  * A single saved destination is just a CommuteRule (same shape as the existing
  * commute filter rule). Stored in localStorage for now (per-device); cross-
@@ -15,21 +18,77 @@ const EVENT_NAME = 'dwelligence:preferredDestinationChanged';
  */
 export type SavedDestination = CommuteRule;
 
-function readFromStorage(): SavedDestination | null {
-  if (typeof window === 'undefined') return null;
+/**
+ * Storage shape (versioned). v2 stores an array of up to MAX_DESTINATIONS
+ * destinations. v1 stored a single object — we migrate transparently on read.
+ */
+interface StoredV2 {
+  v: 2;
+  destinations: SavedDestination[];
+}
+
+function ensureMode(d: SavedDestination): SavedDestination {
+  // Backward-compat: older saved destinations predate the `mode` field —
+  // default to 'walk' so the destination chip's commute lookup has a mode.
+  if (!d.mode) {
+    return { ...d, mode: 'walk' };
+  }
+  return d;
+}
+
+function isValidDestination(x: unknown): x is SavedDestination {
+  if (!x || typeof x !== 'object') return false;
+  const d = x as { type?: unknown };
+  return typeof d.type === 'string';
+}
+
+function readFromStorage(): SavedDestination[] {
+  if (typeof window === 'undefined') return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as SavedDestination;
-    if (!parsed || typeof parsed !== 'object' || !parsed.type) return null;
-    // Backward-compat: older saved destinations predate the `mode` field —
-    // default to 'walk' so the destination chip's commute lookup has a mode.
-    if (!parsed.mode) {
-      parsed.mode = 'walk';
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+
+    // v2 array shape
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      'v' in (parsed as Record<string, unknown>) &&
+      (parsed as { v: unknown }).v === 2 &&
+      Array.isArray((parsed as StoredV2).destinations)
+    ) {
+      const arr = (parsed as StoredV2).destinations
+        .filter(isValidDestination)
+        .slice(0, MAX_DESTINATIONS)
+        .map(ensureMode);
+      return arr;
     }
-    return parsed;
+
+    // v1 single-object shape — migrate to a 1-element array
+    if (isValidDestination(parsed)) {
+      return [ensureMode(parsed)];
+    }
+
+    return [];
   } catch {
-    return null;
+    return [];
+  }
+}
+
+function writeToStorage(destinations: SavedDestination[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (destinations.length === 0) {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } else {
+      const payload: StoredV2 = {
+        v: 2,
+        destinations: destinations.slice(0, MAX_DESTINATIONS),
+      };
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    }
+  } catch {
+    /* quota / private mode — ignore */
   }
 }
 
@@ -38,12 +97,31 @@ function notifyChange() {
   window.dispatchEvent(new CustomEvent(EVENT_NAME));
 }
 
+/**
+ * Primary hook — returns the array of saved destinations (0–MAX) plus
+ * mutation helpers.
+ *
+ * Backward-compat note: the legacy `destination` (singular) accessor still
+ * works and returns the FIRST destination in the array, so callers that only
+ * care about "is there at least one destination" don't need to be updated.
+ */
 export function useSavedDestination(): {
+  /** Array of saved destinations (0..MAX_DESTINATIONS). */
+  destinations: SavedDestination[];
+  /** Convenience accessor for callers that only care about the first. */
   destination: SavedDestination | null;
+  /** Replace the entire array. Truncated to MAX_DESTINATIONS. */
+  setDestinations: (d: SavedDestination[]) => void;
+  /** Replace the first destination (legacy single-destination API). */
   setDestination: (d: SavedDestination | null) => void;
+  /** Append a destination if room remains (no-op if already at MAX). */
+  addDestination: (d: SavedDestination) => void;
+  /** Remove the destination at the given index. */
+  removeDestinationAt: (idx: number) => void;
+  /** Clear all destinations. */
   clearDestination: () => void;
 } {
-  const [destination, setLocal] = useState<SavedDestination | null>(null);
+  const [destinations, setLocal] = useState<SavedDestination[]>([]);
 
   // Hydrate after mount (avoid SSR mismatches)
   useEffect(() => {
@@ -66,24 +144,67 @@ export function useSavedDestination(): {
     };
   }, []);
 
-  const setDestination = useCallback((d: SavedDestination | null) => {
-    if (typeof window === 'undefined') return;
-    try {
-      if (d == null) {
-        window.localStorage.removeItem(STORAGE_KEY);
-      } else {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(d));
-      }
-    } catch {
-      /* quota / private mode — ignore */
-    }
-    setLocal(d);
+  const setDestinations = useCallback((next: SavedDestination[]) => {
+    const trimmed = next.slice(0, MAX_DESTINATIONS);
+    writeToStorage(trimmed);
+    setLocal(trimmed);
     notifyChange();
   }, []);
 
-  const clearDestination = useCallback(() => setDestination(null), [setDestination]);
+  const setDestination = useCallback(
+    (d: SavedDestination | null) => {
+      // Replace the FIRST destination only; preserve any second destination.
+      // If d is null, clear ALL (matches legacy single-destination semantics
+      // where setting null removed the saved destination).
+      if (d == null) {
+        writeToStorage([]);
+        setLocal([]);
+        notifyChange();
+        return;
+      }
+      setDestinations([d]);
+    },
+    [setDestinations],
+  );
 
-  return { destination, setDestination, clearDestination };
+  const addDestination = useCallback(
+    (d: SavedDestination) => {
+      setLocal((prev) => {
+        if (prev.length >= MAX_DESTINATIONS) return prev;
+        const next = [...prev, d];
+        writeToStorage(next);
+        notifyChange();
+        return next;
+      });
+    },
+    [],
+  );
+
+  const removeDestinationAt = useCallback((idx: number) => {
+    setLocal((prev) => {
+      if (idx < 0 || idx >= prev.length) return prev;
+      const next = prev.filter((_, i) => i !== idx);
+      writeToStorage(next);
+      notifyChange();
+      return next;
+    });
+  }, []);
+
+  const clearDestination = useCallback(() => {
+    writeToStorage([]);
+    setLocal([]);
+    notifyChange();
+  }, []);
+
+  return {
+    destinations,
+    destination: destinations[0] ?? null,
+    setDestinations,
+    setDestination,
+    addDestination,
+    removeDestinationAt,
+    clearDestination,
+  };
 }
 
 /**

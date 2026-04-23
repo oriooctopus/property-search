@@ -14,7 +14,7 @@ interface DestinationCommuteFetcherProps {
  * `useListingDestinationCommute` so this component renders nothing.
  */
 export default function DestinationCommuteFetcher({ listings }: DestinationCommuteFetcherProps) {
-  const { destination } = useSavedDestination();
-  useDestinationCommutes(listings, destination);
+  const { destinations } = useSavedDestination();
+  useDestinationCommutes(listings, destinations);
   return null;
 }
