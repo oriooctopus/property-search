@@ -9,7 +9,7 @@ import { CompactStats } from '@/components/ui';
 import { formatAvailabilityDate } from '@/lib/format-date';
 import DestinationChip from '@/components/DestinationChip';
 import { useSavedDestination } from '@/lib/hooks/useSavedDestination';
-import { useListingDestinationCommute } from '@/lib/hooks/useDestinationCommutes';
+import { useListingDestinationCommutes } from '@/lib/hooks/useDestinationCommutes';
 
 // NYC lat/lon degree-to-miles conversion factors
 const MI_PER_DEG_LAT = 69;
@@ -410,11 +410,13 @@ export default function SwipeCard({
   const availabilityLabel = formatAvailabilityDate(listing.availability_date);
 
   // Preferred-destination chip (informational; does not filter results).
-  const { destination } = useSavedDestination();
-  const destinationCommute = useListingDestinationCommute(
+  const { destinations } = useSavedDestination();
+  const destinationCommutes = useListingDestinationCommutes(
     { id: listing.id, lat: listing.lat ?? null, lon: listing.lon ?? null },
-    destination,
+    destinations,
   );
+  const hasDestination = destinations.length > 0;
+  const commutesArr = destinationCommutes ?? [];
 
   // Layout-only mode: render content in normal flow to establish natural height
   if (layoutOnly) {
@@ -431,24 +433,24 @@ export default function SwipeCard({
           </div>
           <div className="flex items-baseline gap-2">
             <span style={{ fontSize: 22, fontWeight: 700, color: '#7ee787' }}>${listing.price.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 400, color: '#8b949e' }}>/mo</span></span>
-            {compactMobile && destination && (
+            {compactMobile && hasDestination && (
               <span className="ml-auto min-[600px]:hidden">
                 <DestinationChip
                   listing={{ id: listing.id, lat: listing.lat ?? null, lon: listing.lon ?? null }}
-                  destination={destination}
-                  commute={destinationCommute ?? undefined}
+                  destinations={destinations}
+                  commutes={commutesArr}
                 />
               </span>
             )}
           </div>
           {listDateFormatted && <div className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Listed {listDateFormatted}</div>}
           <div className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>{availabilityLabel}</div>
-          {destination && (
+          {hasDestination && (
             <div className={compactMobile ? 'hidden min-[600px]:block' : ''}>
               <DestinationChip
                 listing={{ id: listing.id, lat: listing.lat ?? null, lon: listing.lon ?? null }}
-                destination={destination}
-                commute={destinationCommute ?? undefined}
+                destinations={destinations}
+                commutes={commutesArr}
               />
             </div>
           )}
@@ -805,12 +807,12 @@ export default function SwipeCard({
                 ${listing.price.toLocaleString()}
                 <span style={{ fontSize: 14, fontWeight: 400, color: '#8b949e' }}>/mo</span>
               </span>
-              {compactMobile && destination && (
+              {compactMobile && hasDestination && (
                 <span className="ml-auto min-[600px]:hidden">
                   <DestinationChip
                     listing={{ id: listing.id, lat: listing.lat ?? null, lon: listing.lon ?? null }}
-                    destination={destination}
-                    commute={destinationCommute ?? undefined}
+                    destinations={destinations}
+                    commutes={commutesArr}
                   />
                 </span>
               )}
@@ -831,12 +833,12 @@ export default function SwipeCard({
             {/* Preferred-destination chip — only renders when user has saved one.
                 Hidden on mobile compact layout (rendered inline next to the price
                 instead, so it sits above the fold). Desktop unchanged. */}
-            {destination && (
+            {hasDestination && (
               <div className={compactMobile ? 'hidden min-[600px]:block' : ''}>
                 <DestinationChip
                   listing={{ id: listing.id, lat: listing.lat ?? null, lon: listing.lon ?? null }}
-                  destination={destination}
-                  commute={destinationCommute ?? undefined}
+                  destinations={destinations}
+                  commutes={commutesArr}
                 />
               </div>
             )}

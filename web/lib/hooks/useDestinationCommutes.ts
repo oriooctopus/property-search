@@ -3,9 +3,11 @@
 /**
  * Per-listing destination commute lookup.
  *
- * Given a saved destination + a list of listings, fetches the trip-plan
- * total minutes for each (listing → destination) pair via /api/trip-plan and
- * exposes a Map<listingId, { minutes, mode }>.
+ * Given saved destinations (1 or more) + a list of listings, fetches the
+ * trip-plan total minutes for each (listing → destination) pair via
+ * /api/trip-plan and exposes a Map<listingId, DestinationCommute[]> — one
+ * commute entry per saved destination, in the same order as the destinations
+ * array.
  *
  * Throttled to a small concurrency cap so the OTP server isn't blasted with
  * 50 simultaneous requests when the user first sets a destination. Results
@@ -43,7 +45,7 @@ const CONCURRENCY = 4;
 const FETCH_TIMEOUT_MS = 25_000;
 
 // Module-level cache so the data survives component re-mounts and view
-// switches (list ↔ map ↔ swipe).
+// switches (list ↔ map ↔ swipe). Keyed by `${listingId}:${destCacheKey}`.
 const cache = new Map<string, DestinationCommute>();
 
 // Subscribers (per-listing readers) — each card re-renders when its own
@@ -93,51 +95,86 @@ async function fetchOne(
   return data.totalDuration;
 }
 
+/**
+ * Fetch commute data for every (listing, destination) pair. Returns a
+ * Map<listingId, DestinationCommute[]> where the inner array mirrors the
+ * order of the `destinations` argument.
+ */
 export function useDestinationCommutes(
   listings: ListingLike[],
-  destination: SavedDestination | null,
-): Map<number, DestinationCommute> {
+  destinations: SavedDestination[],
+): Map<number, DestinationCommute[]> {
   const [, force] = useState(0);
   const inflightKeysRef = useRef<Set<string>>(new Set());
 
-  const cacheKey = destinationCacheKey(destination);
-  const coords = useMemo(() => destinationCoords(destination), [destination]);
-  const mode = (destination?.mode ?? 'walk') as 'walk' | 'transit' | 'bike';
-  const otpMode = destinationOtpMode(destination);
+  // Pre-compute resolution data per destination
+  const destMeta = useMemo(() => {
+    return destinations.map((d) => ({
+      destination: d,
+      cacheKey: destinationCacheKey(d),
+      coords: destinationCoords(d),
+      mode: (d.mode ?? 'walk') as 'walk' | 'transit' | 'bike',
+      otpMode: destinationOtpMode(d),
+    }));
+  }, [destinations]);
 
   // The Map returned to the consumer — built fresh from the module cache on
   // every render so React sees identity changes when entries fill in.
   const result = useMemo(() => {
-    const out = new Map<number, DestinationCommute>();
-    if (!destination || !cacheKey || !coords) return out;
+    const out = new Map<number, DestinationCommute[]>();
+    if (destMeta.length === 0) return out;
     for (const l of listings) {
-      const key = `${l.id}:${cacheKey}`;
-      const cached = cache.get(key);
-      if (cached) {
-        out.set(l.id, cached);
-      } else if (l.lat == null || l.lon == null) {
-        out.set(l.id, { minutes: null, mode, loading: false, errored: true });
-      } else {
-        out.set(l.id, { minutes: null, mode, loading: true, errored: false });
-      }
+      const arr: DestinationCommute[] = destMeta.map((meta) => {
+        if (!meta.cacheKey || !meta.coords) {
+          return { minutes: null, mode: meta.mode, loading: false, errored: true };
+        }
+        if (l.lat == null || l.lon == null) {
+          return { minutes: null, mode: meta.mode, loading: false, errored: true };
+        }
+        const key = `${l.id}:${meta.cacheKey}`;
+        const cached = cache.get(key);
+        if (cached) return cached;
+        return { minutes: null, mode: meta.mode, loading: true, errored: false };
+      });
+      out.set(l.id, arr);
     }
     return out;
-  }, [listings, destination, cacheKey, coords, mode]);
+  }, [listings, destMeta]);
 
-  // Schedule fetches for any listing that doesn't have a cached entry yet.
+  // Schedule fetches for any (listing, destination) pair that doesn't have a
+  // cached entry yet. Concurrency is capped across the whole queue (not per
+  // destination) so two destinations × 50 listings still pumps at 4-wide.
   useEffect(() => {
-    if (!destination || !cacheKey || !coords) return;
+    if (destMeta.length === 0) return;
     const ac = new AbortController();
     let cancelled = false;
 
-    // Build the work queue
-    const queue: ListingLike[] = [];
-    for (const l of listings) {
-      if (l.lat == null || l.lon == null) continue;
-      const key = `${l.id}:${cacheKey}`;
-      if (cache.has(key)) continue;
-      if (inflightKeysRef.current.has(key)) continue;
-      queue.push(l);
+    interface QueueItem {
+      listing: ListingLike;
+      destLat: number;
+      destLon: number;
+      otpMode: string;
+      mode: 'walk' | 'transit' | 'bike';
+      key: string;
+    }
+
+    const queue: QueueItem[] = [];
+    for (const meta of destMeta) {
+      if (!meta.cacheKey || !meta.coords) continue;
+      for (const l of listings) {
+        if (l.lat == null || l.lon == null) continue;
+        const key = `${l.id}:${meta.cacheKey}`;
+        if (cache.has(key)) continue;
+        if (inflightKeysRef.current.has(key)) continue;
+        queue.push({
+          listing: l,
+          destLat: meta.coords.lat,
+          destLon: meta.coords.lon,
+          otpMode: meta.otpMode,
+          mode: meta.mode,
+          key,
+        });
+      }
     }
     if (queue.length === 0) return;
 
@@ -147,28 +184,39 @@ export function useDestinationCommutes(
     function pump() {
       if (cancelled) return;
       while (active < CONCURRENCY && idx < queue.length) {
-        const l = queue[idx++];
-        const key = `${l.id}:${cacheKey}`;
-        inflightKeysRef.current.add(key);
+        const item = queue[idx++];
+        inflightKeysRef.current.add(item.key);
         active++;
         const timeoutId = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
-        fetchOne(l.lat as number, l.lon as number, coords!.lat, coords!.lon, otpMode, ac.signal)
+        fetchOne(
+          item.listing.lat as number,
+          item.listing.lon as number,
+          item.destLat,
+          item.destLon,
+          item.otpMode,
+          ac.signal,
+        )
           .then((minutes) => {
-            cache.set(key, {
+            cache.set(item.key, {
               minutes,
-              mode,
+              mode: item.mode,
               loading: false,
               errored: minutes == null,
             });
-            notifyKey(key);
+            notifyKey(item.key);
           })
           .catch(() => {
-            cache.set(key, { minutes: null, mode, loading: false, errored: true });
-            notifyKey(key);
+            cache.set(item.key, {
+              minutes: null,
+              mode: item.mode,
+              loading: false,
+              errored: true,
+            });
+            notifyKey(item.key);
           })
           .finally(() => {
             clearTimeout(timeoutId);
-            inflightKeysRef.current.delete(key);
+            inflightKeysRef.current.delete(item.key);
             active--;
             if (cancelled) return;
             // Trigger a re-render so the consumer Map updates loading flags
@@ -183,43 +231,83 @@ export function useDestinationCommutes(
       cancelled = true;
       ac.abort();
     };
-  }, [listings, destination, cacheKey, coords, mode, otpMode]);
+  }, [listings, destMeta]);
 
   return result;
 }
 
 /**
- * Per-listing reader. Subscribes to cache changes for a single listing+
- * destination combo. Used by SwipeCard / ListingCard so they re-render only
- * their own chip, not the whole grid, when commute info resolves.
+ * Per-listing reader. Subscribes to cache changes for a single listing
+ * across ALL saved destinations. Used by SwipeCard / ListingCard so they
+ * re-render only their own chip(s), not the whole grid, when commute info
+ * resolves.
  *
- * Returns `null` when no destination is set or when the listing has no
- * coordinates. Returns a placeholder `loading: true` entry when the lookup
- * is pending — note that the actual fetch must be triggered elsewhere (via
- * `useDestinationCommutes` mounted at the page level) since per-card readers
- * never start their own OTP burst.
+ * Returns an array (one entry per destination) or `null` when no
+ * destinations are saved or no listing was provided. Returns placeholder
+ * `loading: true` entries when lookups are pending — note that the actual
+ * fetch must be triggered elsewhere (via `useDestinationCommutes` mounted at
+ * the page level) since per-card readers never start their own OTP burst.
+ */
+export function useListingDestinationCommutes(
+  listing: { id: number; lat?: number | null; lon?: number | null } | null | undefined,
+  destinations: SavedDestination[],
+): DestinationCommute[] | null {
+  const [, force] = useState(0);
+
+  // Build subscription keys (one per destination) and re-subscribe whenever
+  // the destination set or the listing identity changes.
+  const keys = useMemo(() => {
+    if (!listing) return [];
+    return destinations.map((d) => {
+      const ck = destinationCacheKey(d);
+      return ck ? `${listing.id}:${ck}` : null;
+    });
+  }, [listing, destinations]);
+
+  useEffect(() => {
+    const unsubs: Array<() => void> = [];
+    for (const k of keys) {
+      if (!k) continue;
+      unsubs.push(subscribeKey(k, () => force((n) => n + 1)));
+    }
+    return () => {
+      for (const u of unsubs) u();
+    };
+  }, [keys]);
+
+  if (!listing || destinations.length === 0) return null;
+
+  return destinations.map((d, i) => {
+    const ck = destinationCacheKey(d);
+    const coords = destinationCoords(d);
+    const mode = (d.mode ?? 'walk') as 'walk' | 'transit' | 'bike';
+    if (!ck || !coords) {
+      return { minutes: null, mode, loading: false, errored: true };
+    }
+    if (listing.lat == null || listing.lon == null) {
+      return { minutes: null, mode, loading: false, errored: true };
+    }
+    const key = keys[i];
+    const cached = key ? cache.get(key) : undefined;
+    if (cached) return cached;
+    return { minutes: null, mode, loading: true, errored: false };
+  });
+}
+
+/**
+ * @deprecated Single-destination reader retained for backward compatibility.
+ * Prefer `useListingDestinationCommutes` (plural). Returns the first
+ * destination's commute, or null.
  */
 export function useListingDestinationCommute(
   listing: { id: number; lat?: number | null; lon?: number | null } | null | undefined,
   destination: SavedDestination | null,
 ): DestinationCommute | null {
-  const cacheKey = destinationCacheKey(destination);
-  const coords = destination ? destinationCoords(destination) : null;
-  const key = listing && cacheKey ? `${listing.id}:${cacheKey}` : null;
-  const [, force] = useState(0);
-
-  useEffect(() => {
-    if (!key) return;
-    return subscribeKey(key, () => force((n) => n + 1));
-  }, [key]);
-
-  if (!destination || !cacheKey || !coords || !listing) return null;
-  if (listing.lat == null || listing.lon == null) {
-    return { minutes: null, mode: destination.mode, loading: false, errored: true };
-  }
-  const cached = cache.get(`${listing.id}:${cacheKey}`);
-  if (cached) return cached;
-  return { minutes: null, mode: destination.mode, loading: true, errored: false };
+  const arr = useListingDestinationCommutes(
+    listing,
+    destination ? [destination] : [],
+  );
+  return arr && arr.length > 0 ? arr[0] : null;
 }
 
 /** For tests / dev: clear the in-memory commute cache. */
