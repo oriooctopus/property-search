@@ -31,10 +31,11 @@ const STALE_AGE_DAYS = 3;
 const PER_SOURCE_LIMIT = 1000;
 // Sources we run verify-stale against. Adding a new source = add it here
 // AND register a verifier in sources/verify/registry.ts.
+// NOTE: facebook-marketplace excluded — verifier is blocked (returns 100% unknown)
+// and the source is disabled in the scraper registry.
 const VERIFY_SOURCES: ListingSource[] = [
   "streeteasy",
   "craigslist",
-  "facebook-marketplace",
 ];
 // If a source's verify batch returns this fraction of `unknown` or higher AND
 // at least MIN_BATCH_SIZE_FOR_ALERT candidates ran, fire an alert — that's the
@@ -80,7 +81,7 @@ async function loadCandidates(
     Date.now() - STALE_AGE_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
   // Fan out one query per source with its own limit. The total processed is
-  // bounded by VERIFY_SOURCES.length * perSourceLimit (currently 3 * 1000 = 3000)
+  // bounded by VERIFY_SOURCES.length * perSourceLimit (currently 2 * 1000 = 2000)
   // and no single source can crowd out another regardless of backlog size.
   const perSource = await Promise.all(
     VERIFY_SOURCES.map((source) =>
