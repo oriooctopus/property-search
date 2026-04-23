@@ -108,6 +108,14 @@ function normalizeString(s: string | null): string {
 function toValidatedListing(raw: AdapterOutput): ValidatedListing {
   const quality = assessQuality(raw);
 
+  // Photo cap raised from 10 → 60. The previous 10-cap was silently dropping
+  // photos for ~60% of SE listings (DB audit showed 7,060 SE rows stuck at
+  // exactly 10 photos). The new cap matches the empirical max in the SE
+  // search response (largest seen: 57 photos in a 100-listing sample).
+  const filteredPhotos = raw.photo_urls
+    .filter((u) => u.length > 0)
+    .slice(0, 60);
+
   return {
     address: normalizeString(raw.address),
     area: normalizeString(raw.area),
@@ -117,14 +125,18 @@ function toValidatedListing(raw: AdapterOutput): ValidatedListing {
     sqft: raw.sqft,
     lat: hasCoords(raw) ? raw.lat! : 0,
     lon: hasCoords(raw) ? raw.lon! : 0,
-    photos: raw.photo_urls.length,
-    photo_urls: raw.photo_urls.filter((u) => u.length > 0).slice(0, 10),
+    photos: filteredPhotos.length,
+    photo_urls: filteredPhotos,
     url: raw.url,
     list_date: raw.list_date,
     last_update_date: raw.last_update_date,
     availability_date: raw.availability_date,
     source: raw.source,
     year_built: raw.year_built ?? null,
+    description: raw.description ?? null,
+    gross_price: raw.gross_price ?? null,
+    net_effective_price: raw.net_effective_price ?? null,
+    concession_months_free: raw.concession_months_free ?? null,
     quality,
   };
 }

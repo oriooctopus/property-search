@@ -26,6 +26,12 @@ export type ListingRow = Database["public"]["Tables"]["listings"]["Insert"] & {
   external_id?: string | null;
   last_seen_at?: string | null;
   delisted_at?: string | null;
+  // Phase D additions — DB columns from
+  // 20260422_add_listing_description_and_concessions migration. Nullable.
+  description?: string | null;
+  gross_price?: number | null;
+  net_effective_price?: number | null;
+  concession_months_free?: number | null;
 };
 
 export function toListingRow(v: ValidatedListing): ListingRow {
@@ -57,6 +63,14 @@ export function toListingRow(v: ValidatedListing): ListingRow {
     // (and created_at) so resurrecting a verified-delisted row via upsert is
     // impossible.
     last_seen_at: new Date().toISOString(),
+    // Phase D fields — DB columns added by
+    // 20260422_add_listing_description_and_concessions migration.
+    // Null = "not provided / no promotion"; backwards-compatible with all
+    // existing rows (which simply have NULLs after the ADD COLUMN ran).
+    description: v.description ?? null,
+    gross_price: v.gross_price ?? null,
+    net_effective_price: v.net_effective_price ?? null,
+    concession_months_free: v.concession_months_free ?? null,
     // Intentionally NOT setting delisted_at here — upsertListings excludes
     // it from the UPDATE SET list so existing delisted rows stay delisted.
   } satisfies ListingRow;

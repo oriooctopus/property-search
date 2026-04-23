@@ -405,7 +405,10 @@ function compositeListings(cluster: ValidatedListing[]): ValidatedListing {
       if (u) allPhotoUrls.add(u);
     }
   }
-  const photoUrls = Array.from(allPhotoUrls).slice(0, 20);
+  // Photo cap raised from 20 → 60 to match the adapter + validator caps. SE
+  // listings can carry up to ~60 photos and the 20-cap was truncating ~21%
+  // of them; the new cap keeps composite-merged clusters in step.
+  const photoUrls = Array.from(allPhotoUrls).slice(0, 60);
 
   const listDates = cluster
     .map((l) => l.list_date)
@@ -440,6 +443,31 @@ function compositeListings(cluster: ValidatedListing[]): ValidatedListing {
     return best;
   };
 
+  // Pick the longest non-empty description across the cluster (more text =
+  // more useful in the detail view). SE may have richer copy than CL etc.
+  let description: string | null = null;
+  for (const l of cluster) {
+    const d = l.description ?? null;
+    if (d && (!description || d.length > description.length)) description = d;
+  }
+
+  // For concession-related fields, prefer the primary (highest-priority)
+  // source's values — mixing concessions across sources is meaningless since
+  // each source describes its own promotion. If the primary doesn't have
+  // them, fall back to any cluster member that does.
+  function firstNonNull<T>(getter: (l: ValidatedListing) => T | null | undefined): T | null {
+    const fromPrimary = getter(primaryListing);
+    if (fromPrimary != null) return fromPrimary;
+    for (const l of sortedByPriority) {
+      const v = getter(l);
+      if (v != null) return v;
+    }
+    return null;
+  }
+  const grossPrice = firstNonNull((l) => l.gross_price);
+  const netEffective = firstNonNull((l) => l.net_effective_price);
+  const monthsFree = firstNonNull((l) => l.concession_months_free);
+
   return {
     address,
     area,
@@ -458,6 +486,10 @@ function compositeListings(cluster: ValidatedListing[]): ValidatedListing {
     source: primaryListing.source,
     sources,
     source_urls: sourceUrls,
+    description,
+    gross_price: grossPrice,
+    net_effective_price: netEffective,
+    concession_months_free: monthsFree,
     quality: {
       beds: bestQuality("beds"),
       baths: bestQuality("baths"),
