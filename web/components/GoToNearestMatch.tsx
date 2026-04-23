@@ -16,6 +16,8 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Database } from '@/lib/types';
 import type { CommuteRule } from '@/components/Filters';
 import { useLeafletMap } from '@/lib/viewport/LeafletMapContext';
+import { useOccluders } from '@/lib/viewport/OccluderRegistry';
+import { getVisibleCenter, panMapToShowLatLng } from '@/lib/viewport/visibleMapView';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -87,6 +89,12 @@ export default function GoToNearestMatch({
   variant = 'default',
 }: GoToNearestMatchProps) {
   const map = useLeafletMap();
+  // Occluder registry — mobile registers swipe-card / action-pill so
+  // "Find nearest" picks (and pans to) a pin that lands in the actually
+  // VISIBLE band of the map, not behind the swipe card. On desktop or any
+  // viewport with no registered occluders, the registry returns [] and
+  // both helpers degrade to plain map.getCenter() / map.setView() behavior.
+  const occluders = useOccluders();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [noMatchAnywhere, setNoMatchAnywhere] = useState(false);
@@ -106,7 +114,13 @@ export default function GoToNearestMatch({
     setLoading(true);
     setError(null);
     try {
-      const center = map.getCenter();
+      // Use the VISIBLE-rect center, not the raw map-container center, so
+      // we find the listing closest to where the user is actually looking.
+      // On mobile this matters: the swipe card covers the bottom ~50%, so
+      // map.getCenter() points underneath it and would select a listing
+      // whose pin lands behind the card.
+      const occluderList = occluders?.getAll?.() ?? [];
+      const center = getVisibleCenter(map, occluderList);
       const payload = getFiltersPayload();
       const res = await fetch('/api/listings/search', {
         method: 'POST',
@@ -135,15 +149,17 @@ export default function GoToNearestMatch({
       if (data.distanceMeters != null) setLastDistanceMeters(data.distanceMeters);
       onBeforePan?.();
       // User-initiated map pan — explicitly allowed under the no-autoscroll
-      // rule. We bump the zoom up to at least 14 so the listing isn't lost
-      // in a sea of other dots, but never zoom further OUT than the user's
-      // current position (Math.max).
-      const currentZoom = map.getZoom();
-      const targetZoom = Math.max(currentZoom, 14);
-      map.setView(
-        [Number(target.lat), Number(target.lon)],
-        targetZoom,
-        { animate: true },
+      // rule. Pan via the occlusion-aware helper so the target lat/lng
+      // lands at the VISIBLE-rect center (above the swipe card), not the
+      // container center (which would put it behind the card on mobile).
+      // Bump zoom to at least 14 so the listing isn't lost in a sea of
+      // dots — never zoom further OUT than the user's current position.
+      panMapToShowLatLng(
+        map,
+        Number(target.lat),
+        Number(target.lon),
+        occluders?.getAll?.() ?? [],
+        { minZoom: 14 },
       );
       onMatchSelected?.(target);
     } catch (err) {
@@ -152,7 +168,7 @@ export default function GoToNearestMatch({
     } finally {
       setLoading(false);
     }
-  }, [loading, map, getFiltersPayload, onBeforePan, onMatchSelected]);
+  }, [loading, map, occluders, getFiltersPayload, onBeforePan, onMatchSelected]);
 
   const disabled = loading || !map || noMatchAnywhere;
 

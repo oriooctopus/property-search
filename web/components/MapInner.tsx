@@ -13,6 +13,7 @@ import type { HoveredStation } from './SwipeCard';
 import { useOccluders } from '@/lib/viewport/OccluderRegistry';
 import { useLeafletMapSetter } from '@/lib/viewport/LeafletMapContext';
 import { getVisibleMapRect } from '@/lib/viewport/occlusion';
+import { panMapToShowLatLng } from '@/lib/viewport/visibleMapView';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -247,25 +248,17 @@ const ACTIVE_PIN_STYLES = `
     height: 28px;
     margin: -14px 0 0 -14px;
     border-radius: 50%;
-    background: rgba(0, 255, 136, 0.18);
-    border: 3px solid #00ff88;
+    /* Solid green dot — no inner core, no inner stroke. The previous
+       design had a translucent green fill + 3px green border + a white
+       (or blue when saved) inner dot. User feedback: the inner dot read
+       as a separate "blue center" against the green ring, which looked
+       like a target reticle rather than a single selected pin. Now the
+       selected pin is a single filled green circle. */
+    background: #00ff88;
+    border: 0;
     box-shadow:
       0 0 0 1px rgba(0, 0, 0, 0.45),
       0 0 12px 2px rgba(0, 255, 136, 0.65);
-  }
-  .dw-active-hero__core {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 14px;
-    height: 14px;
-    margin: -7px 0 0 -7px;
-    border-radius: 50%;
-    background: #ffffff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-  }
-  .dw-active-hero__core--saved {
-    background: #58a6ff;
   }
   @media (prefers-reduced-motion: reduce) {
     .dw-active-hero__halo {
@@ -337,7 +330,14 @@ function makeStationPulseIcon(color: string): L.DivIcon {
  * Non-interactive: the underlying CircleMarker below still handles
  * click/hover/popup for the active listing. This icon is purely visual.
  */
-function makeActivePinHeroIcon(saved: boolean): L.DivIcon {
+function makeActivePinHeroIcon(_saved: boolean): L.DivIcon {
+  // `_saved` was previously used to flip the inner core to brand-blue when
+  // the active pin was also a saved listing. The inner core has been
+  // removed (selected pin is now a single solid green dot per user
+  // feedback), so the parameter is unused. Kept in the signature so the
+  // call sites in the marker layer can stay symmetric and so the
+  // "saved-and-active" branch can be reintroduced (e.g. with a heart
+  // glyph overlay) without changing the icon factory's API.
   const size = 64; // matches .dw-active-hero__halo dimensions
   return L.divIcon({
     className: '',
@@ -345,7 +345,6 @@ function makeActivePinHeroIcon(saved: boolean): L.DivIcon {
       <div class="dw-active-hero" style="position:relative;width:${size}px;height:${size}px;">
         <div class="dw-active-hero__halo"></div>
         <div class="dw-active-hero__ring"></div>
-        <div class="dw-active-hero__core${saved ? ' dw-active-hero__core--saved' : ''}"></div>
       </div>
     `,
     iconSize: [size, size],
@@ -1628,7 +1627,18 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
                         const current = leafletMap.getZoom();
                         const maxZoom = leafletMap.getMaxZoom();
                         const nextZoom = Math.min(current + 2, maxZoom);
-                        leafletMap.setView([rep.lat, rep.lon], nextZoom, { animate: true });
+                        // Pan via the occlusion-aware helper so the
+                        // expanded cluster lands at the visible-rect
+                        // center (above the swipe card on mobile), not
+                        // the container center which would put it behind
+                        // the card.
+                        panMapToShowLatLng(
+                          leafletMap,
+                          rep.lat,
+                          rep.lon,
+                          popupOcclusionRegistryRef.current?.getAll?.() ?? [],
+                          { minZoom: nextZoom, setViewOptions: { animate: true } },
+                        );
                       }
                     }
                     // Otherwise the popup will open; wire delegation after popupopen
@@ -1822,7 +1832,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
               <Tooltip
                 permanent
                 direction="top"
-                offset={[0, -24]}
+                offset={[0, -10]}
                 className="station-hover-tooltip"
               >
                 <span style={{
@@ -1837,10 +1847,9 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
                   whiteSpace: 'nowrap',
                   display: 'block',
                 }}>
-                  {station.name}
                   {typeof station.walkMin === 'number' && (
-                    <span style={{ marginLeft: 6, fontWeight: 500, color: '#8b949e' }}>
-                      · {station.walkMin} min walk
+                    <span style={{ fontWeight: 500, color: '#8b949e' }}>
+                      {station.walkMin} min walk
                     </span>
                   )}
                 </span>

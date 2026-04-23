@@ -19,6 +19,7 @@ import SetDestinationPill from '@/components/SetDestinationPill';
 import DestinationCommuteFetcher from '@/components/DestinationCommuteFetcher';
 import SwipeView from '@/components/SwipeView';
 import GoToNearestMatch from '@/components/GoToNearestMatch';
+import UnhideHiddenButton from '@/components/UnhideHiddenButton';
 import TourGuide from '@/components/TourGuide';
 import { useConversation } from '@/lib/hooks/useConversation';
 import { useConversations } from '@/lib/hooks/useConversations';
@@ -685,8 +686,35 @@ function HomeInner() {
   const [mobileView, setMobileView] = useState<'list' | 'map' | 'swipe'>(() => {
     const v = searchParams.get('view');
     if (v && VALID_VIEWS.has(v)) return v as 'list' | 'map' | 'swipe';
+    // Mobile users land on the swipe view by default — it's the better
+    // mobile experience. Desktop continues to default to the list view.
+    // SSR-safe: `window` is undefined on the server, so default to 'list'
+    // there; the client effect below upgrades to 'swipe' after hydration
+    // when the viewport is narrow AND no ?view= param was supplied.
+    if (typeof window !== 'undefined' && window.innerWidth < 600) {
+      return 'swipe';
+    }
     return 'list';
   });
+
+  // After hydration, if the user is on a mobile viewport AND no explicit
+  // ?view= param was supplied, switch the default to swipe. This handles the
+  // SSR case where window is unavailable on the server and we initially
+  // returned 'list'. We only run on first mount.
+  const didDefaultMobileViewRef = useRef(false);
+  useEffect(() => {
+    if (didDefaultMobileViewRef.current) return;
+    didDefaultMobileViewRef.current = true;
+    if (typeof window === 'undefined') return;
+    const hasExplicitView = !!searchParams.get('view');
+    if (hasExplicitView) return;
+    if (window.innerWidth < 600) {
+      setMobileView('swipe');
+    }
+    // We intentionally read searchParams once at mount; the `view` param is
+    // also reflected back to the URL via buildQueryString on every change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Measured height of the sidebar filter bar. Used in swipe view on mobile to
   // push the swipe card down so it doesn't sit underneath the absolute filter
   // bar. Kept as state so SwipeView re-renders when the filter bar resizes
@@ -1133,22 +1161,42 @@ function HomeInner() {
     setViewportVersion((v) => v + 1);
   }, []);
 
+  // Wrapped getter for UnhideHiddenButton — strips the wishlist payload that
+  // GoToNearestMatch needs but the unhide endpoints don't (the unhide flow
+  // operates on the hidden_listings table directly, not on a wishlist).
+  const getUnhideFiltersPayload = useCallback(() => {
+    const full = getNearestSearchPayload();
+    return { filters: full.filters, commuteRules: full.commuteRules };
+  }, [getNearestSearchPayload]);
+
   const goToNearestEmptyExtra = (
-    <GoToNearestMatch
-      getFiltersPayload={getNearestSearchPayload}
-      onMatchSelected={handleNearestMatchSelected}
-    />
+    <div className="flex flex-col items-center gap-2">
+      <GoToNearestMatch
+        getFiltersPayload={getNearestSearchPayload}
+        onMatchSelected={handleNearestMatchSelected}
+      />
+      <UnhideHiddenButton
+        userId={userId}
+        getFiltersPayload={getUnhideFiltersPayload}
+      />
+    </div>
   );
 
   // Mobile-swipe variant: shorter "Find nearest" label and primary-button
   // styling so it reads as the foreground CTA in the swipe empty state.
   const swipeNearestEmptyExtra = (
-    <GoToNearestMatch
-      getFiltersPayload={getNearestSearchPayload}
-      onMatchSelected={handleNearestMatchSelected}
-      label="Find nearest"
-      variant="primary"
-    />
+    <div className="flex flex-col items-center gap-2">
+      <GoToNearestMatch
+        getFiltersPayload={getNearestSearchPayload}
+        onMatchSelected={handleNearestMatchSelected}
+        label="Find nearest"
+        variant="primary"
+      />
+      <UnhideHiddenButton
+        userId={userId}
+        getFiltersPayload={getUnhideFiltersPayload}
+      />
+    </div>
   );
 
   // Reset all filters back to defaults. Used by the swipe-view empty-state
@@ -1803,6 +1851,7 @@ function HomeInner() {
         <TourGuide
           onComplete={handleTourComplete}
           setMobileView={setMobileView}
+          currentView={mobileView}
         />
       )}
 
