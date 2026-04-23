@@ -18,6 +18,7 @@ import FilterPills from '@/components/FilterPills';
 import SetDestinationPill from '@/components/SetDestinationPill';
 import DestinationCommuteFetcher from '@/components/DestinationCommuteFetcher';
 import SwipeView from '@/components/SwipeView';
+import MobileMenuPill from '@/components/MobileMenuPill';
 import GoToNearestMatch from '@/components/GoToNearestMatch';
 import UnhideHiddenButton from '@/components/UnhideHiddenButton';
 import TourGuide from '@/components/TourGuide';
@@ -1706,7 +1707,6 @@ function HomeInner() {
             onExpandDetail={(listing) => { setSelectedId(listing.id); setDetailListing(activeFilteredListings.find(l => l.id === listing.id) ?? null); }}
             onSwitchView={() => switchMobileView('list')}
             onSwitchToMap={() => switchMobileView('map')}
-            onOpenFilters={() => filtersHandleRef.current?.openMobileSheet()}
             topInset={sidebarHeight}
             onBoundsChange={handleBoundsChange}
             onMapMove={handleMapMove}
@@ -1752,6 +1752,19 @@ function HomeInner() {
 
       {/* Toast */}
       {toastEl}
+
+      {/* Merged "Filters | Avatar" pill (top-right, mobile-only).
+          Replaces the standalone floating Filters pill that used to live
+          inside SwipeView. Renders on mobile in BOTH list and swipe views
+          because the global Navbar is hidden on mobile — so the avatar half
+          is the only path to Profile / wishlists / sign-out at <600px.
+          See globals.css `body.mobile-merged-pill` rule for nav hiding. */}
+      <MobileMenuPill
+        userId={userId}
+        userEmail={userEmail}
+        onOpenFilters={() => filtersHandleRef.current?.openMobileSheet()}
+        onOpenManageWishlists={() => setManageWishlistsOpen(true)}
+      />
 
       {/* Mobile bottom nav — view mode toggle (list/swipe/map).
           Hidden in swipe view: SwipeView renders its own unified pill that
