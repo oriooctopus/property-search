@@ -16,6 +16,7 @@ import ChatPanel from '@/components/ChatPanel';
 import SaveSearchModal from '@/components/SaveSearchModal';
 import FilterPills from '@/components/FilterPills';
 import SwipeView from '@/components/SwipeView';
+import GoToNearestMatch from '@/components/GoToNearestMatch';
 import TourGuide from '@/components/TourGuide';
 import { useConversation } from '@/lib/hooks/useConversation';
 import { useConversations } from '@/lib/hooks/useConversations';
@@ -1061,6 +1062,80 @@ function HomeInner() {
   }, [switchMobileView]);
 
   // -----------------------------------------------------------------------
+  // "Go to nearest match" empty-state CTA. Returns the current filters in
+  // the shape /api/listings/search expects so the button can POST without
+  // re-deriving the payload itself. Stable identity (refs) so the button
+  // doesn't reset its internal state on unrelated parent renders.
+  // -----------------------------------------------------------------------
+  const getNearestSearchPayload = useCallback(() => {
+    const f = filtersRef.current;
+    let wishlistIds: string[] | null = null;
+    const sel = selectedWishlistRef.current;
+    if (sel === 'all-saved') {
+      wishlistIds = allWishlistsRef.current.map((w) => w.id);
+    } else if (typeof sel === 'string') {
+      wishlistIds = [sel];
+    }
+    return {
+      filters: f
+        ? {
+            selectedBeds: f.selectedBeds,
+            minBaths: f.minBaths,
+            includeNaBaths: f.includeNaBaths,
+            minRent: f.minRent,
+            maxRent: f.maxRent,
+            priceMode: f.priceMode,
+            maxListingAge: f.maxListingAge,
+            selectedSources: f.selectedSources,
+            minYearBuilt: f.minYearBuilt,
+            maxYearBuilt: f.maxYearBuilt,
+            minSqft: f.minSqft,
+            maxSqft: f.maxSqft,
+            excludeNoSqft: f.excludeNoSqft,
+            minAvailableDate: f.minAvailableDate,
+            maxAvailableDate: f.maxAvailableDate,
+            includeNaAvailableDate: f.includeNaAvailableDate,
+          }
+        : {},
+      commuteRules: f?.commuteRules ?? null,
+      wishlistIds,
+    };
+  }, []);
+
+  // When the user taps "Go to nearest match" we mark the matched listing as
+  // selected (so the deck/card opens onto it) and seed it into `listings` so
+  // the pin appears immediately — the subsequent viewport-bounds reload (fired
+  // by the map.setView pan) will replace the array with the proper page.
+  const handleNearestMatchSelected = useCallback((listing: Listing) => {
+    setSelectedId(listing.id);
+    setListings((prev) => {
+      if (prev.some((l) => l.id === listing.id)) return prev;
+      return [
+        {
+          ...listing,
+          lat: listing.lat != null ? Number(listing.lat) : null,
+          lon: listing.lon != null ? Number(listing.lon) : null,
+          baths: listing.baths != null ? Number(listing.baths) : null,
+          sqft: listing.sqft != null ? Number(listing.sqft) : null,
+          price: Number(listing.price),
+          beds: Number(listing.beds),
+          photos: Number(listing.photos),
+          photo_urls: listing.photo_urls ?? [],
+        },
+        ...prev,
+      ];
+    });
+    setViewportVersion((v) => v + 1);
+  }, []);
+
+  const goToNearestEmptyExtra = (
+    <GoToNearestMatch
+      getFiltersPayload={getNearestSearchPayload}
+      onMatchSelected={handleNearestMatchSelected}
+    />
+  );
+
+  // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
   if (loading) {
@@ -1145,6 +1220,47 @@ function HomeInner() {
               <path d="M21 12a9 9 0 1 1-6.219-8.56" stroke="#38bdf8" strokeWidth="2.5" />
             </svg>
             Searching...
+          </div>
+        </div>
+      )}
+
+      {/* Mobile-only empty-state CTA: when the visible map area has no
+          listings, surface a "Go to nearest match" button so the user can
+          opt in to leaving the current viewport. Hidden on desktop because
+          the sidebar's VirtualListingGrid empty state already shows the
+          same CTA there. Hidden during loads to avoid a flicker between
+          "Searching..." and "no results".
+
+          Trigger uses `viewportCount === 0` (set by `loadForViewport` after
+          the most recent fetch returned no rows for the visible bounds)
+          rather than `filteredListings.length === 0`, because page.tsx
+          intentionally keeps the previous listings array around when the
+          user pans into an empty area — so the "in-list" length stays
+          positive but the in-viewport count goes to zero. The list-view and
+          swipe-view empty-state buttons still use `listings.length === 0`
+          (they only render when no listings exist in the array at all,
+          which is the right signal for those views). */}
+      {isMapView && !viewportLoading && !commuteLoading && viewportCount === 0 && (
+        <div
+          className="absolute left-1/2 -translate-x-1/2 z-[400] lg:hidden pointer-events-auto"
+          style={{ bottom: 90 }}
+        >
+          <div
+            className="flex flex-col items-center gap-2 rounded-xl px-4 py-3"
+            style={{
+              backgroundColor: 'rgba(28, 32, 40, 0.95)',
+              border: '1px solid #2d333b',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            }}
+          >
+            <div className="text-xs" style={{ color: '#8b949e' }}>
+              No listings in view
+            </div>
+            <GoToNearestMatch
+              getFiltersPayload={getNearestSearchPayload}
+              onMatchSelected={handleNearestMatchSelected}
+              compact
+            />
           </div>
         </div>
       )}
@@ -1390,6 +1506,7 @@ function HomeInner() {
                 isLoadingMore={loadingMoreListings}
                 onLoadMore={loadMoreListings}
                 containerClassName={mobileView === 'map' ? 'max-lg:hidden' : ''}
+                emptyStateExtra={goToNearestEmptyExtra}
               />
               {listingGridLoading && (
                 <div
@@ -1506,6 +1623,7 @@ function HomeInner() {
             showHidden={showHidden}
             isLoading={viewportLoading}
             wishlistedIds={wishlistedIds}
+            emptyStateExtra={goToNearestEmptyExtra}
           />
 
           {/* Loading spinner overlay for swipe mode */}

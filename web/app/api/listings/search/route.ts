@@ -66,6 +66,16 @@ interface SearchRequest {
   limit?: number;
   /** Offset for pagination. Defaults to 0. */
   offset?: number;
+  /**
+   * "Find nearest match" mode. When set, the `bounds` filter is ignored — the
+   * whole DB is searched against the active filters and a single result (the
+   * geographically closest listing to {lat, lon}) is returned. Use this to
+   * power the empty-state "Go to nearest match" button when the user pans to
+   * an area with no listings. All other filters (price, beds, sources, etc.)
+   * still apply, so the returned listing is one the user could reasonably
+   * want.
+   */
+  nearestTo?: { lat: number; lon: number } | null;
 }
 
 // Pagination bounds — initial payload is ~100 rows so the grid renders
@@ -249,8 +259,189 @@ export async function POST(request: NextRequest) {
     const offset = Math.max(body.offset ?? 0, 0);
     const commuteRules = body.commuteRules ?? null;
     const wishlistIds = body.wishlistIds ?? null;
+    const nearestTo = body.nearestTo ?? null;
 
     const supabase = getClient();
+
+    // ---- nearestTo mode: short-circuit. Apply all filters except `bounds`,
+    //      pull every matching row (capped at 20k — the table is ~16k active
+    //      rows), sort by squared lat/lon distance in JS, return the closest.
+    //      We can't ORDER BY a computed expression cleanly through the
+    //      Supabase JS client, so we sort client-side. Squared distance is
+    //      monotonically equivalent to true distance for ranking, and at the
+    //      latitudes we care about (NYC) the lat/lon -> meters distortion is
+    //      uniform enough that the ordering is correct.
+    if (nearestTo) {
+      if (!Number.isFinite(nearestTo.lat) || !Number.isFinite(nearestTo.lon)) {
+        return NextResponse.json(
+          { error: "Invalid nearestTo coordinates" },
+          { status: 400 },
+        );
+      }
+
+      // Resolve commute / wishlist ID intersections (same logic as the main
+      // pipeline) so nearestTo respects every active filter, not just the
+      // SQL-pushdown ones.
+      let nearestWishlistIds: Set<number> | null = null;
+      if (wishlistIds !== null) {
+        if (wishlistIds.length === 0) {
+          return NextResponse.json({ listing: null, distanceMeters: null });
+        }
+        const { data: items, error: itemsErr } = await supabase
+          .from("wishlist_items")
+          .select("listing_id")
+          .in("wishlist_id", wishlistIds);
+        if (itemsErr) {
+          return NextResponse.json({ error: itemsErr.message }, { status: 500 });
+        }
+        nearestWishlistIds = new Set(
+          ((items ?? []) as Array<{ listing_id: number }>).map((r) => r.listing_id),
+        );
+        if (nearestWishlistIds.size === 0) {
+          return NextResponse.json({ listing: null, distanceMeters: null });
+        }
+      }
+
+      const nearestCommute = await resolveCommuteRules(commuteRules);
+      if (nearestCommute.ids !== null && nearestCommute.ids.size === 0) {
+        return NextResponse.json({
+          listing: null,
+          distanceMeters: null,
+          commuteMessage: nearestCommute.message,
+        });
+      }
+
+      let nearestEffective: Set<number> | null = nearestCommute.ids;
+      if (nearestWishlistIds !== null) {
+        if (nearestEffective === null) {
+          nearestEffective = nearestWishlistIds;
+        } else {
+          const inter = new Set<number>();
+          for (const id of nearestEffective) {
+            if (nearestWishlistIds.has(id)) inter.add(id);
+          }
+          nearestEffective = inter;
+          if (nearestEffective.size === 0) {
+            return NextResponse.json({
+              listing: null,
+              distanceMeters: null,
+              commuteMessage: nearestCommute.message,
+            });
+          }
+        }
+      }
+
+      const includeDelistedNearest = nearestWishlistIds !== null;
+      // Hard cap fetch size — guards against table growth blowing up payload.
+      const NEAREST_FETCH_CAP = 20000;
+      let allRows: Listing[] = [];
+      if (nearestEffective === null) {
+        let q: any = supabase
+          .from("listings")
+          .select(LISTING_SELECT)
+          .range(0, NEAREST_FETCH_CAP - 1);
+        // Note: we intentionally pass `null` for bounds — nearestTo is
+        // explicitly a whole-DB search.
+        q = applyBoundsAndFilters(q, null, filters, {
+          includeDelisted: includeDelistedNearest,
+        });
+        const { data, error } = await q;
+        if (error) {
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
+        allRows = (data ?? []) as Listing[];
+      } else {
+        const ids = [...nearestEffective];
+        const CHUNK = 500;
+        const seen = new Set<number>();
+        for (let i = 0; i < ids.length; i += CHUNK) {
+          const chunk = ids.slice(i, i + CHUNK);
+          let q: any = supabase
+            .from("listings")
+            .select(LISTING_SELECT)
+            .in("id", chunk);
+          q = applyBoundsAndFilters(q, null, filters, {
+            includeDelisted: includeDelistedNearest,
+          });
+          const { data, error } = await q;
+          if (error) {
+            return NextResponse.json({ error: error.message }, { status: 500 });
+          }
+          for (const r of (data ?? []) as Listing[]) {
+            if (!seen.has(r.id)) {
+              seen.add(r.id);
+              allRows.push(r);
+            }
+          }
+        }
+      }
+
+      // Apply JS-side filters (perRoom price, scam filter) before ranking so
+      // we never return a listing the regular pipeline would have hidden.
+      allRows = applyJsFilters(allRows, filters);
+
+      if (allRows.length === 0) {
+        return NextResponse.json({
+          listing: null,
+          distanceMeters: null,
+          commuteMessage: nearestCommute.message,
+        });
+      }
+
+      // Find the row with the smallest squared distance. We compare squared
+      // distance (cheap) for the ranking and only convert the winner to
+      // meters for the response.
+      let bestRow: Listing | null = null;
+      let bestSqDist = Infinity;
+      const targetLat = Number(nearestTo.lat);
+      const targetLon = Number(nearestTo.lon);
+      for (const r of allRows) {
+        if (r.lat == null || r.lon == null) continue;
+        const dLat = Number(r.lat) - targetLat;
+        const dLon = Number(r.lon) - targetLon;
+        const sq = dLat * dLat + dLon * dLon;
+        if (sq < bestSqDist) {
+          bestSqDist = sq;
+          bestRow = r;
+        }
+      }
+      if (!bestRow) {
+        return NextResponse.json({
+          listing: null,
+          distanceMeters: null,
+          commuteMessage: nearestCommute.message,
+        });
+      }
+
+      // Convert squared degree-distance → meters using the equirectangular
+      // approximation (good enough for "nearest match" UI). 111,320 m per
+      // degree latitude; longitude shrinks by cos(lat).
+      const cosLat = Math.cos((targetLat * Math.PI) / 180);
+      const dLatM = (Number(bestRow.lat) - targetLat) * 111_320;
+      const dLonM = (Number(bestRow.lon) - targetLon) * 111_320 * cosLat;
+      const distanceMeters = Math.sqrt(dLatM * dLatM + dLonM * dLonM);
+
+      const trimmed = {
+        ...bestRow,
+        photo_urls: (bestRow.photo_urls ?? []).slice(0, 3),
+      };
+
+      // Include commute meta for the returned listing if commute rules were
+      // active (mirrors the main pipeline so the client can render the
+      // commute badge).
+      const commuteInfo: Record<number, ListingCommuteMeta> = {};
+      if (nearestCommute.ids !== null) {
+        const meta = nearestCommute.meta[bestRow.id];
+        if (meta) commuteInfo[bestRow.id] = meta;
+      }
+
+      return NextResponse.json({
+        listing: trimmed,
+        distanceMeters,
+        commuteInfo,
+        commuteMessage: nearestCommute.message,
+      });
+    }
 
     // ---- 0. Resolve wishlistIds to a Set of listing_ids (if provided). Empty
     //        list → explicitly no results.
