@@ -32,7 +32,7 @@ When spawning the verify agent (or any agent that logs in to the app), the promp
 
 1. **Use Playwright in headless mode** for browser automation. Do NOT use Claude-in-Chrome MCP (which logs into whatever Chrome session the user has open — that's the user's real account). Do NOT default to whatever credentials happen to be in `web/.env.local` without checking who they belong to.
 2. **NEVER use `oliverullman@gmail.com` as the login.** That is the user's real personal account. Any data the verify agent saves (wishlist items, saved searches, hidden listings, preferred destination) will pollute the user's real account. It is the wrong audience.
-3. Use a **dedicated test account** — credentials must be a separate, sacrificial account whose data the user doesn't care about. As of this writing, `web/.env.local` has `TEST_USER_EMAIL=oliverullman@gmail.com` which is wrong and needs to be updated to a real test account before more verify runs that touch saved state.
+3. Use the **dedicated test account**: `claude-verify@dwelligence.test` (password and email exposed as `TEST_USER_EMAIL` / `TEST_USER_PASSWORD` in `web/.env.local`). This is a sacrificial account on the `.test` TLD (RFC-2606 reserved, never deliverable) — its saved searches, wishlist, hidden listings, and destination are fair game for verify runs. The real account's credentials are kept under `REAL_USER_EMAIL` / `REAL_USER_PASSWORD_*` for reference only — DO NOT use them in verify runs.
 4. If the verify agent ONLY needs to read public state (no login required to test the change), skip login entirely.
 5. If a verify agent needs to mutate data to demonstrate something (e.g. favorite a listing, add a wishlist item), it MUST clean up after itself in the same run. No leftover test rows.
 

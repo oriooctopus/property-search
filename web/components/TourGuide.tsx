@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PrimaryButton, TextButton } from '@/components/ui';
 
@@ -8,57 +8,161 @@ import { PrimaryButton, TextButton } from '@/components/ui';
 // Types
 // ---------------------------------------------------------------------------
 
+type ViewMode = 'list' | 'swipe' | 'map';
+
 interface TourStep {
+  /** Stable id (debug + dedupe) */
+  id: string;
   /** data-tour attribute value to spotlight, or null for full-screen modal */
   target: string | null;
   title: string;
   body: string;
-  /** If set, switch to this view before showing the step */
-  switchView?: 'list' | 'swipe' | 'map';
+  /** If set, switch to this view before showing the step. */
+  switchView?: ViewMode;
+  /**
+   * If set, this step is only relevant when the user is in this view. Steps
+   * whose `requireView` doesn't match the current view (and that aren't
+   * being switched into via `switchView`) are skipped — they fire later
+   * when the user enters that view, or never if they don't.
+   */
+  requireView?: ViewMode;
+  /**
+   * If true, this step is only relevant on desktop viewports (≥600px).
+   * Mobile-only steps live behind `requireMobile`.
+   */
+  requireDesktop?: boolean;
+  /** Mobile-only (viewport < 600px) */
+  requireMobile?: boolean;
 }
 
 interface TourGuideProps {
   onComplete: () => void;
-  setMobileView: (view: 'list' | 'swipe' | 'map') => void;
+  setMobileView: (view: ViewMode) => void;
+  /** Current view mode — drives which steps are eligible to fire. */
+  currentView: ViewMode;
 }
 
 // ---------------------------------------------------------------------------
 // Steps
 // ---------------------------------------------------------------------------
+//
+// Steps are filtered at runtime against the current view + viewport. When the
+// user switches views mid-tour, the eligible set is recomputed and any steps
+// that just became eligible (and weren't shown yet) appear next.
+//
+// Order matters within the eligible set. Universal steps come first (welcome),
+// then view-specific steps (swipe-card / view-modes), then shared
+// (filters, wishlists, end).
+//
+// On mobile, the user lands on swipe by default, so swipe steps surface near
+// the start. On desktop the user lands on list, so list-only / view-modes
+// steps surface near the start.
 
 const STEPS: TourStep[] = [
   {
+    id: 'welcome',
     target: null,
     title: 'Welcome to Dwelligence!',
     body: "Let's take a quick tour of the features that will help you find your next apartment.",
   },
+
+  // ---- Swipe-mode-specific steps ----
   {
-    target: 'view-modes',
-    title: 'View Modes',
-    body: 'Switch between Swipe and Map views. Swipe is great for quick decisions, and Map for exploring neighborhoods.',
-  },
-  {
+    id: 'swipe-card',
     target: 'swipe-card',
-    switchView: 'swipe',
+    requireView: 'swipe',
     title: 'Swipe Mode',
-    body: 'Swipe right to save a listing, left to skip, or down for later. You can also use arrow keys. Press Z to undo.',
+    body: 'Swipe right to save, left to skip, up for "would live there", or down for later. On desktop you can also use arrow keys.',
   },
   {
-    target: 'filters',
+    id: 'swipe-action-pill',
+    target: 'swipe-action-pill',
+    requireView: 'swipe',
+    requireMobile: true,
+    title: 'Quick actions',
+    body: 'Tap the heart to save, X to skip, or undo your last decision. The list / map icons on the edges switch views.',
+  },
+  {
+    id: 'filters-mobile',
+    target: 'filters-mobile',
+    requireView: 'swipe',
+    requireMobile: true,
     title: 'Filters',
-    body: 'Tap the Filters button to filter by price, bedrooms, commute time, and more. Your filters sync to the URL so you can share searches.',
+    body: 'Tap Filters to narrow down by price, bedrooms, commute time, and more. Your filters sync to the URL so you can share searches.',
   },
+
+  // ---- Desktop list/map view-mode toggle ----
   {
+    id: 'view-modes',
+    target: 'view-modes',
+    requireDesktop: true,
+    title: 'View Modes',
+    body: 'Switch between List, Swipe, and Map. Swipe is great for quick decisions, Map for exploring neighborhoods.',
+  },
+
+  // ---- Desktop filters control ----
+  {
+    id: 'filters-desktop',
+    target: 'filters',
+    requireDesktop: true,
+    title: 'Filters',
+    body: 'Click the Filters button to filter by price, bedrooms, commute time, and more. Your filters sync to the URL so you can share searches.',
+  },
+
+  // ---- Universal closing steps ----
+  {
+    id: 'wishlists',
     target: null,
     title: 'Wishlists',
     body: "Saved listings go to your Wishlists. Create multiple lists and share them with roommates. Access them from the menu in the top right.",
   },
   {
+    id: 'done',
     target: null,
     title: "You're all set!",
     body: 'Happy apartment hunting. You can always explore the filters, try swipe mode, or ask the AI search assistant for help.',
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Eligibility
+// ---------------------------------------------------------------------------
+
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 600;
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const update = () => setIsMobile(window.innerWidth < 600);
+    update();
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const onResize = () => {
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      timeoutId = setTimeout(update, 150);
+    };
+    window.addEventListener('resize', onResize, { passive: true });
+    return () => {
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      window.removeEventListener('resize', onResize);
+    };
+  }, []);
+  return isMobile;
+}
+
+function isStepEligible(
+  step: TourStep,
+  currentView: ViewMode,
+  isMobile: boolean,
+): boolean {
+  // Effective view = the view we'd be in after applying switchView.
+  const effectiveView = step.switchView ?? currentView;
+  if (step.requireView && step.requireView !== effectiveView) return false;
+  if (step.requireDesktop && isMobile) return false;
+  if (step.requireMobile && !isMobile) return false;
+  return true;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -77,6 +181,8 @@ function getTargetRect(target: string): Rect | null {
   const el = document.querySelector(`[data-tour="${target}"]`);
   if (!el) return null;
   const r = el.getBoundingClientRect();
+  // Reject zero-sized rects (element is in DOM but display:none)
+  if (r.width === 0 && r.height === 0) return null;
   return {
     top: r.top - PADDING,
     left: r.left - PADDING,
@@ -142,27 +248,67 @@ function tooltipStyle(rect: Rect, pos: TooltipPosition): React.CSSProperties {
 // Component
 // ---------------------------------------------------------------------------
 
-export default function TourGuide({ onComplete, setMobileView }: TourGuideProps) {
-  const [step, setStep] = useState(0);
+export default function TourGuide({ onComplete, setMobileView, currentView }: TourGuideProps) {
+  const isMobile = useIsMobile();
+
+  // Compute the eligible steps for the current view + viewport. We recompute
+  // on every relevant change so that a view switch mid-tour reveals any
+  // newly-eligible steps the user hasn't seen yet.
+  const eligibleSteps = useMemo(
+    () => STEPS.filter((s) => isStepEligible(s, currentView, isMobile)),
+    [currentView, isMobile],
+  );
+
+  // Track which step ids the user has already seen, so we don't replay them
+  // when a view-switch shifts the eligible set.
+  const seenIdsRef = useRef<Set<string>>(new Set());
+
+  const [activeId, setActiveId] = useState<string | null>(() => eligibleSteps[0]?.id ?? null);
   const [targetRect, setTargetRect] = useState<Rect | null>(null);
   const [visible, setVisible] = useState(false); // for fade-in
   const rafRef = useRef<number>(0);
-  const current = STEPS[step];
+
+  // Find the current step within the (updated) eligible set. If the active
+  // step is no longer eligible (e.g. user switched view mid-step), advance
+  // to the next unseen eligible step.
+  const current = useMemo(() => {
+    if (activeId) {
+      const found = eligibleSteps.find((s) => s.id === activeId);
+      if (found) return found;
+    }
+    // Pick the first unseen eligible step.
+    return eligibleSteps.find((s) => !seenIdsRef.current.has(s.id)) ?? null;
+  }, [activeId, eligibleSteps]);
+
+  // If the active step disappeared (view switch demoted it), keep activeId
+  // pointing at whatever `current` resolved to so subsequent renders are
+  // stable.
+  useEffect(() => {
+    if (current && current.id !== activeId) {
+      setActiveId(current.id);
+    }
+  }, [current, activeId]);
+
+  // Mark each step as seen the moment it becomes the active one.
+  useEffect(() => {
+    if (current) seenIdsRef.current.add(current.id);
+  }, [current]);
 
   // Track the target rect with rAF for smooth following
   const updateRect = useCallback(() => {
-    if (current.target) {
+    if (current?.target) {
       const r = getTargetRect(current.target);
       setTargetRect(r);
     } else {
       setTargetRect(null);
     }
     rafRef.current = requestAnimationFrame(updateRect);
-  }, [current.target]);
+  }, [current?.target]);
 
   // When step changes, switch view if needed, then start tracking
   useEffect(() => {
-    if (current.switchView) {
+    if (!current) return;
+    if (current.switchView && current.switchView !== currentView) {
       setMobileView(current.switchView);
     }
 
@@ -170,13 +316,13 @@ export default function TourGuide({ onComplete, setMobileView }: TourGuideProps)
     const timer = setTimeout(() => {
       updateRect();
       setVisible(true);
-    }, current.switchView ? 350 : 50);
+    }, current.switchView && current.switchView !== currentView ? 350 : 50);
 
     return () => {
       clearTimeout(timer);
       cancelAnimationFrame(rafRef.current);
     };
-  }, [step, current.switchView, setMobileView, updateRect]);
+  }, [current, currentView, setMobileView, updateRect]);
 
   // Fade in on mount
   useEffect(() => {
@@ -185,23 +331,71 @@ export default function TourGuide({ onComplete, setMobileView }: TourGuideProps)
   }, []);
 
   const goNext = useCallback(() => {
-    if (step < STEPS.length - 1) {
+    if (!current) {
+      onComplete();
+      return;
+    }
+    const idx = eligibleSteps.findIndex((s) => s.id === current.id);
+    // Find the next eligible unseen step. We compare seen ids so a
+    // mid-tour view switch can surface previously-deferred steps.
+    let nextStep: TourStep | undefined;
+    for (let i = idx + 1; i < eligibleSteps.length; i++) {
+      if (!seenIdsRef.current.has(eligibleSteps[i].id)) {
+        nextStep = eligibleSteps[i];
+        break;
+      }
+    }
+    // If nothing later in the eligible list is unseen, scan the entire
+    // eligible list (defensive — covers cases where a view switch added a
+    // step earlier in the order than the current one).
+    if (!nextStep) {
+      nextStep = eligibleSteps.find((s) => !seenIdsRef.current.has(s.id));
+    }
+
+    if (nextStep) {
       setVisible(false);
       setTimeout(() => {
-        setStep((s) => s + 1);
+        setActiveId(nextStep!.id);
       }, 200);
     } else {
       onComplete();
     }
-  }, [step, onComplete]);
+  }, [current, eligibleSteps, onComplete]);
 
   const skip = useCallback(() => {
     onComplete();
   }, [onComplete]);
 
+  // No eligible steps at all (shouldn't happen — `welcome` is always
+  // eligible) — bail rather than render an empty overlay.
+  if (!current) return null;
+
+  // Compute step counter using "seen + pending" instead of raw STEPS index,
+  // because eligibility changes between mobile and desktop.
+  const stepNumber = seenIdsRef.current.size; // 1-based via the +0 since add() runs in effect
+  // The `seenIdsRef` is updated in an effect, so on the first render of a
+  // step it may not yet include the current one. Floor to 1.
+  const displayStepNumber = Math.max(1, stepNumber);
+  const totalSteps = Math.max(
+    eligibleSteps.length,
+    seenIdsRef.current.size + (current ? 1 : 0),
+  );
+
   const isModal = !current.target || !targetRect;
-  const isLastStep = step === STEPS.length - 1;
-  const isFirstStep = step === 0;
+  const isLastEligible = (() => {
+    const idx = eligibleSteps.findIndex((s) => s.id === current.id);
+    if (idx === -1) return false;
+    for (let i = idx + 1; i < eligibleSteps.length; i++) {
+      if (!seenIdsRef.current.has(eligibleSteps[i].id)) return false;
+    }
+    // Also check earlier indices for any unseen step (view switch may have
+    // added one before current).
+    for (let i = 0; i < idx; i++) {
+      if (!seenIdsRef.current.has(eligibleSteps[i].id)) return false;
+    }
+    return true;
+  })();
+  const isFirstStep = current.id === 'welcome';
 
   // Overlay SVG with spotlight cutout
   const overlay = (
@@ -267,6 +461,8 @@ export default function TourGuide({ onComplete, setMobileView }: TourGuideProps)
   // Tooltip content
   const tooltip = (
     <div
+      data-tour-tooltip
+      data-tour-step-id={current.id}
       style={
         isModal
           ? {
@@ -300,7 +496,7 @@ export default function TourGuide({ onComplete, setMobileView }: TourGuideProps)
               fontWeight: 500,
             }}
           >
-            {step + 1} of {STEPS.length}
+            {displayStepNumber} of {totalSteps}
           </div>
         )}
 
@@ -342,7 +538,7 @@ export default function TourGuide({ onComplete, setMobileView }: TourGuideProps)
           {isModal ? (
             // Full-screen modals: single centered button
             <PrimaryButton onClick={goNext} variant="accent">
-              {isFirstStep ? "Let's go" : isLastStep ? 'Start exploring' : 'Next'}
+              {isFirstStep ? "Let's go" : isLastEligible ? 'Start exploring' : 'Next'}
             </PrimaryButton>
           ) : (
             // Targeted steps: Skip + Next
@@ -358,7 +554,7 @@ export default function TourGuide({ onComplete, setMobileView }: TourGuideProps)
         </div>
 
         {/* Step counter for modals */}
-        {isModal && !isFirstStep && !isLastStep && (
+        {isModal && !isFirstStep && !isLastEligible && (
           <div
             style={{
               color: '#8b949e',
@@ -368,7 +564,7 @@ export default function TourGuide({ onComplete, setMobileView }: TourGuideProps)
               fontWeight: 500,
             }}
           >
-            {step + 1} of {STEPS.length}
+            {displayStepNumber} of {totalSteps}
           </div>
         )}
       </div>

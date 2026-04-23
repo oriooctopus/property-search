@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { createPortal } from 'react-dom';
-import { PrimaryButton, TextButton } from '@/components/ui';
+import { TextButton } from '@/components/ui';
 import { X, RotateCcw, Heart } from 'lucide-react';
 import SwipeCard, { type HoveredStation, getClosestStations, walkMinFromMiles } from './SwipeCard';
 import type { ViewportBounds } from './MapInner';
@@ -86,6 +86,69 @@ interface UndoEntry {
   listingId: number;
   action: 'left' | 'right' | 'down';
   wishlistId?: string;  // which wishlist was used for right-swipe
+}
+
+/**
+ * Shared empty-state panel for the mobile SwipeView.
+ *
+ * Two paths converged here so the "no listings" and "swiped through
+ * everything" states can never silently drift apart again:
+ *  - Both states show the same shell (centered card, identical bg/border).
+ *  - Both states offer the SAME CTAs: a primary "Find nearest" rendered
+ *    via `extra` (parent supplies <GoToNearestMatch variant="primary" />),
+ *    and a secondary "Clear filters" rendered when `onClearFilters` is
+ *    given. The "swiped through" branch additionally shows a "Reset" link
+ *    so the user can replay the deck.
+ *
+ * The legacy "Switch to list view" CTA is GONE from both branches. On
+ * mobile users want to fix filters / find a nearby match in place rather
+ * than bounce out of swipe mode. Adding it back means the user has to make
+ * the same change in TWO places — that bug is what produced the second
+ * "Switch to list" sighting after commit fda31dc.
+ */
+function MobileSwipeEmptyState({
+  title,
+  subtitle,
+  emoji,
+  extra,
+  onClearFilters,
+  onReset,
+}: {
+  title: string;
+  subtitle: string;
+  emoji?: string;
+  extra?: React.ReactNode;
+  onClearFilters?: () => void;
+  onReset?: () => void;
+}) {
+  return (
+    <div
+      className="flex-1 flex flex-col items-center justify-center gap-4 text-center m-3 rounded-xl"
+      style={{
+        backgroundColor: 'rgba(28, 32, 40, 0.97)',
+        border: '1px solid #2d333b',
+      }}
+    >
+      {emoji && <div className="text-4xl select-none">{emoji}</div>}
+      <div className="text-white text-lg font-semibold">{title}</div>
+      <div className="text-sm" style={{ color: '#8b949e' }}>
+        {subtitle}
+      </div>
+      <div className="flex flex-col items-center gap-2">
+        {extra}
+        {onClearFilters && (
+          <TextButton variant="muted" onClick={onClearFilters}>
+            Clear filters
+          </TextButton>
+        )}
+        {onReset && (
+          <TextButton variant="muted" onClick={onReset}>
+            Reset deck
+          </TextButton>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function SwipeActionButton({ buttonRef, onClick, tooltip, children }: {
@@ -875,6 +938,7 @@ export default function SwipeView({
           aria-label="Open filters"
           title="Filters"
           data-testid="swipe-filters-pill"
+          data-tour="filters-mobile"
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b949e" strokeWidth="2.5" strokeLinecap="round">
             <line x1="4" y1="6" x2="20" y2="6" />
@@ -1249,6 +1313,7 @@ export default function SwipeView({
               <div
                 ref={mobileActionPillRef}
                 data-testid="action-pill"
+                data-tour="swipe-action-pill"
                 className="fixed left-1/2 -translate-x-1/2 min-[600px]:hidden"
                 style={{
                   bottom: 'calc(env(safe-area-inset-bottom) + 12px)',
@@ -1410,64 +1475,31 @@ export default function SwipeView({
             </div>
           </div>
         ) : listings.length === 0 ? (
-          /* No results for current filters.
-             CTAs:
-              - Primary "Find nearest" — pans the map to the closest listing
-                that still matches the active filters (rendered via the
-                `emptyStateExtra` slot, which the parent passes a styled
-                <GoToNearestMatch /> into).
-              - Secondary "Clear filters" — resets all filters to defaults so
-                the visible viewport repopulates immediately.
-             The legacy "Switch to list view" button is intentionally removed
-             from this state — on mobile users prefer to fix filters in place
-             rather than bounce out of swipe mode. */
-          <div
-            className="flex-1 flex flex-col items-center justify-center gap-4 text-center m-3 rounded-xl"
-            style={{
-              backgroundColor: 'rgba(28, 32, 40, 0.97)',
-              border: '1px solid #2d333b',
-            }}
-          >
-            <div className="text-white text-lg font-semibold">
-              No listings found
-            </div>
-            <div className="text-sm" style={{ color: '#8b949e' }}>
-              Try adjusting your filters or moving the map.
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              {emptyStateExtra}
-              {onClearFilters && (
-                <TextButton variant="muted" onClick={onClearFilters}>
-                  Clear filters
-                </TextButton>
-              )}
-            </div>
-          </div>
+          /* No results for current filters. See <MobileSwipeEmptyState>
+             docstring — both this branch and the "swiped through
+             everything" branch below render the SAME component so they
+             can't silently diverge (which is exactly how "Switch to list"
+             leaked back into the swiped-through state after commit
+             fda31dc). */
+          <MobileSwipeEmptyState
+            title="No listings found"
+            subtitle="Try adjusting your filters or moving the map."
+            extra={emptyStateExtra}
+            onClearFilters={onClearFilters}
+          />
         ) : (
-          /* Empty state — user has swiped through everything */
-          <div
-            className="flex-1 flex flex-col items-center justify-center gap-4 text-center m-3 rounded-xl"
-            style={{
-              backgroundColor: 'rgba(28, 32, 40, 0.97)',
-              border: '1px solid #2d333b',
-            }}
-          >
-            <div className="text-4xl select-none">🎉</div>
-            <div className="text-white text-lg font-semibold">
-              You&apos;ve seen all listings!
-            </div>
-            <div className="text-sm" style={{ color: '#8b949e' }}>
-              Come back later for new ones, or reset to start over.
-            </div>
-            <div className="flex gap-3 mt-2">
-              <PrimaryButton onClick={handleReset}>Reset</PrimaryButton>
-              {onSwitchView && (
-                <PrimaryButton onClick={onSwitchView}>
-                  Switch to list view
-                </PrimaryButton>
-              )}
-            </div>
-          </div>
+          /* Empty state — user has swiped through every card in the
+             current deck. Same CTAs as the no-results branch (Find
+             nearest + Clear filters), plus a "Reset deck" link to
+             replay the cards we already filtered/viewed. */
+          <MobileSwipeEmptyState
+            emoji="🎉"
+            title="You've seen all listings!"
+            subtitle="Find another nearby, clear your filters, or reset the deck."
+            extra={emptyStateExtra}
+            onClearFilters={onClearFilters}
+            onReset={handleReset}
+          />
         )}
       </div>
 
