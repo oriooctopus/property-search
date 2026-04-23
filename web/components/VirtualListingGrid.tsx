@@ -10,6 +10,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Database } from '@/lib/types';
@@ -61,6 +62,9 @@ interface VirtualListingGridProps {
   containerClassName?: string;
   // Suppress the "No listings" empty-state (when an outer loader is showing)
   suppressEmptyState?: boolean;
+  /** Optional content rendered inside the empty state (e.g. a
+   *  "Go to nearest match" button). Falls below the default copy. */
+  emptyStateExtra?: ReactNode;
   // ---- Infinite scroll ----
   // Whether more pages are available from the server.
   hasMore?: boolean;
@@ -131,6 +135,7 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
       hasMore,
       isLoadingMore,
       onLoadMore,
+      emptyStateExtra,
     },
     ref,
   ) {
@@ -443,10 +448,11 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
           )}
           {rowCount === 0 && !suppressEmptyState && (
             <div
-              className="flex items-center justify-center min-h-[200px] text-center text-sm"
+              className="flex flex-col items-center justify-center gap-3 min-h-[200px] text-center text-sm px-4"
               style={{ color: '#8b949e' }}
             >
-              No listings match your filters.
+              <div>No listings match your filters.</div>
+              {emptyStateExtra}
             </div>
           )}
         </div>

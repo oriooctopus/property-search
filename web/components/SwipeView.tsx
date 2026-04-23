@@ -73,6 +73,9 @@ export interface SwipeViewProps {
       <Filters> props pipeline can be reused without threading every prop
       through SwipeView. */
   onOpenFilters?: () => void;
+  /** Optional content rendered inside the "No listings found" empty state
+   *  (e.g. a "Go to nearest match" button). */
+  emptyStateExtra?: React.ReactNode;
 }
 
 interface UndoEntry {
@@ -130,6 +133,7 @@ export default function SwipeView({
   wishlistedIds,
   topInset = 0,
   onOpenFilters,
+  emptyStateExtra,
 }: SwipeViewProps) {
   // Don't persist swipedIds across refreshes — start fresh each session.
   // The localStorage was causing "You've seen all listings" on every refresh.
@@ -1397,6 +1401,7 @@ export default function SwipeView({
             <div className="text-sm" style={{ color: '#8b949e' }}>
               Try adjusting your filters or moving the map.
             </div>
+            {emptyStateExtra}
             {onSwitchView && (
               <PrimaryButton onClick={onSwitchView}>
                 Switch to list view
