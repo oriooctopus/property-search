@@ -1885,6 +1885,10 @@ function HomeInner() {
             await leaveSharedWishlist.mutateAsync({ wishlistId, email });
             if (selectedWishlist === wishlistId) setSelectedWishlist(null);
           }}
+          onView={(wishlistId) => {
+            setSelectedWishlist(wishlistId);
+            setManageWishlistsOpen(false);
+          }}
         />
       )}
 

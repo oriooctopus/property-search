@@ -16,6 +16,7 @@ interface ManageWishlistsModalProps {
   onRemoveShare: (shareId: number) => Promise<void>;
   onUpdateSharePermission: (shareId: number, permission: 'viewer' | 'editor') => Promise<void>;
   onLeave: (wishlistId: string, email: string) => Promise<void>;
+  onView: (wishlistId: string) => void;
 }
 
 export default function ManageWishlistsModal({
@@ -30,6 +31,7 @@ export default function ManageWishlistsModal({
   onRemoveShare,
   onUpdateSharePermission,
   onLeave,
+  onView,
 }: ManageWishlistsModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const [newName, setNewName] = useState('');
@@ -221,6 +223,7 @@ export default function ManageWishlistsModal({
                   onRemoveShare={onRemoveShare}
                   onUpdateSharePermission={onUpdateSharePermission}
                   onLeave={onLeave}
+                  onView={onView}
                   currentUserEmail={currentUserEmail}
                 />
               ))}
@@ -252,6 +255,7 @@ export default function ManageWishlistsModal({
                   onRemoveShare={onRemoveShare}
                   onUpdateSharePermission={onUpdateSharePermission}
                   onLeave={onLeave}
+                  onView={onView}
                   currentUserEmail={currentUserEmail}
                 />
               ))}
@@ -324,6 +328,7 @@ interface WishlistRowProps {
   onRemoveShare: (shareId: number) => Promise<void>;
   onUpdateSharePermission: (shareId: number, permission: 'viewer' | 'editor') => Promise<void>;
   onLeave: (wishlistId: string, email: string) => Promise<void>;
+  onView: (wishlistId: string) => void;
 }
 
 function WishlistRow({
@@ -346,6 +351,7 @@ function WishlistRow({
   onRemoveShare,
   onUpdateSharePermission,
   onLeave,
+  onView,
 }: WishlistRowProps) {
   const [inviteEmail, setInviteEmail] = useState('');
   const [invitePermission, setInvitePermission] = useState<'viewer' | 'editor'>('editor');
@@ -451,6 +457,13 @@ function WishlistRow({
 
         {/* Actions */}
         <div className="flex items-center gap-1 flex-shrink-0">
+          <ActionButton active={false} onClick={() => onView(wishlist.id)} activeColor="#7ee787">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            View
+          </ActionButton>
           {isOwner ? (
             <>
               <ActionButton active={isRenaming} onClick={onStartRename} activeColor="#58a6ff">
