@@ -240,8 +240,11 @@ function HomeInner() {
     }
   }, [manageWishlistsOpen]);
 
-  // Viewport loading state (map pan/zoom queries)
-  const [viewportLoading, setViewportLoading] = useState(false);
+  // Viewport loading state (map pan/zoom queries).
+  // Default true so the initial render (before the first bounds query fires)
+  // shows the spinner instead of flashing the "No listings found" empty state.
+  // Flipped to false once the first query completes in loadForViewport().
+  const [viewportLoading, setViewportLoading] = useState(true);
   const [viewportCount, setViewportCount] = useState<number | null>(null);
   const viewportRequestRef = useRef(0);
   const hasInitialViewportLoad = useRef(false);
