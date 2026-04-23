@@ -2,8 +2,14 @@ name: Ingest (new pipeline, soak)
 
 on:
   schedule:
-    # Once daily at noon ET (16:00 UTC, 17:00 UTC during EST)
+    # Full pipeline: once daily at noon ET (16:00 UTC, 17:00 UTC during EST)
     - cron: "0 16 * * *"
+    # Verify-only pass: 6 hours offset from the main run (22:00 UTC = 6pm ET).
+    # The full daily pipeline can only chew through ~3000 stale candidates per
+    # day (per-source quota in verify-stale), so for a backlog like Craigslist's
+    # ~970-row queue it'd take days to drain. Adding this second pass doubles
+    # throughput without re-running scrape/normalize/upsert/enrich.
+    - cron: "0 22 * * *"
   workflow_dispatch:
     inputs:
       sources:
@@ -12,6 +18,10 @@ on:
         default: ""
       dry_run:
         description: "Dry-run (no DB writes)"
+        required: false
+        default: "false"
+      verify_only:
+        description: "Run only the verify-stale phase (skip scrape/normalize/ingest/enrich)"
         required: false
         default: "false"
 
@@ -48,8 +58,18 @@ jobs:
           REFRESH_STALE_HOURS: "24"
           INPUT_SOURCES: ${{ github.event.inputs.sources }}
           INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
+          INPUT_VERIFY_ONLY: ${{ github.event.inputs.verify_only }}
+          # The 22:00 UTC cron is the verify-only pass; the 16:00 UTC cron and
+          # any manual dispatch run the full pipeline (unless verify_only=true).
+          SCHEDULED_CRON: ${{ github.event.schedule }}
         run: |
-          ARGS="--fetch-strategy=staleness-gated"
+          if [ "$SCHEDULED_CRON" = "0 22 * * *" ] || [ "$INPUT_VERIFY_ONLY" = "true" ]; then
+            ARGS="--fetch-strategy=staleness-gated --only-phase=verify-stale"
+            echo "Mode: VERIFY-ONLY (catch-up pass for stale-detection backlog)"
+          else
+            ARGS="--fetch-strategy=staleness-gated"
+            echo "Mode: FULL pipeline"
+          fi
           if [ -n "$INPUT_SOURCES" ]; then
             ARGS="$ARGS --sources=$INPUT_SOURCES"
           fi
