@@ -57,6 +57,15 @@ interface GoToNearestMatchProps {
    */
   compact?: boolean;
   className?: string;
+  /** Override the default "Go to nearest match" label. */
+  label?: string;
+  /**
+   * Visual variant. `default` keeps the existing translucent-blue look used
+   * by the desktop sidebar empty state. `primary` renders a solid accent
+   * button matching <PrimaryButton variant="accent" /> — used by the mobile
+   * swipe-view empty state where this is the only foreground CTA.
+   */
+  variant?: 'default' | 'primary';
 }
 
 function formatDistance(meters: number): string {
@@ -74,6 +83,8 @@ export default function GoToNearestMatch({
   onBeforePan,
   compact = false,
   className = '',
+  label,
+  variant = 'default',
 }: GoToNearestMatchProps) {
   const map = useLeafletMap();
   const [loading, setLoading] = useState(false);
@@ -145,11 +156,39 @@ export default function GoToNearestMatch({
 
   const disabled = loading || !map || noMatchAnywhere;
 
+  const idleLabel = label ?? 'Go to nearest match';
   const labelMain = noMatchAnywhere
     ? 'No matches anywhere'
     : loading
       ? 'Finding nearest…'
-      : 'Go to nearest match';
+      : idleLabel;
+
+  // Variant styling. `default` matches the original translucent-blue chip;
+  // `primary` mirrors PrimaryButton (solid accent) so the mobile swipe empty
+  // state can render this as the primary CTA without rebuilding it from
+  // scratch.
+  const variantStyle =
+    variant === 'primary'
+      ? {
+          className: disabled
+            ? 'cursor-not-allowed opacity-60'
+            : 'cursor-pointer hover:bg-[#4c8fdf]',
+          style: {
+            backgroundColor: '#58a6ff',
+            color: '#0f1117',
+            border: '1px solid transparent',
+          } as React.CSSProperties,
+        }
+      : {
+          className: disabled
+            ? 'cursor-not-allowed opacity-60'
+            : 'cursor-pointer hover:bg-[rgba(88,166,255,0.18)]',
+          style: {
+            backgroundColor: disabled ? 'rgba(88,166,255,0.08)' : 'rgba(88,166,255,0.12)',
+            color: '#58a6ff',
+            border: '1px solid rgba(88,166,255,0.35)',
+          } as React.CSSProperties,
+        };
 
   const button = (
     <button
@@ -157,16 +196,8 @@ export default function GoToNearestMatch({
       onClick={onClick}
       disabled={disabled}
       data-testid="go-to-nearest-match"
-      className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
-        disabled
-          ? 'cursor-not-allowed opacity-60'
-          : 'cursor-pointer hover:bg-[rgba(88,166,255,0.18)]'
-      }`}
-      style={{
-        backgroundColor: disabled ? 'rgba(88,166,255,0.08)' : 'rgba(88,166,255,0.12)',
-        color: '#58a6ff',
-        border: '1px solid rgba(88,166,255,0.35)',
-      }}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${variantStyle.className}`}
+      style={variantStyle.style}
     >
       {/* compass-target glyph */}
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

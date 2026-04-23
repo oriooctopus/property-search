@@ -431,15 +431,26 @@ export default function SwipeCard({
           </div>
           <div className="flex items-baseline gap-2">
             <span style={{ fontSize: 22, fontWeight: 700, color: '#7ee787' }}>${listing.price.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 400, color: '#8b949e' }}>/mo</span></span>
+            {compactMobile && destination && (
+              <span className="ml-auto min-[600px]:hidden">
+                <DestinationChip
+                  listing={{ id: listing.id, lat: listing.lat ?? null, lon: listing.lon ?? null }}
+                  destination={destination}
+                  commute={destinationCommute ?? undefined}
+                />
+              </span>
+            )}
           </div>
           {listDateFormatted && <div className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>Listed {listDateFormatted}</div>}
           <div className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>{availabilityLabel}</div>
           {destination && (
-            <DestinationChip
-              listing={{ id: listing.id, lat: listing.lat ?? null, lon: listing.lon ?? null }}
-              destination={destination}
-              commute={destinationCommute ?? undefined}
-            />
+            <div className={compactMobile ? 'hidden min-[600px]:block' : ''}>
+              <DestinationChip
+                listing={{ id: listing.id, lat: listing.lat ?? null, lon: listing.lon ?? null }}
+                destination={destination}
+                commute={destinationCommute ?? undefined}
+              />
+            </div>
           )}
           <div
             className={compactMobile ? 'hidden min-[600px]:block' : ''}
@@ -787,12 +798,22 @@ export default function SwipeCard({
               </div>
             </div>
 
-            {/* Price */}
+            {/* Price (with inline destination chip on mobile compact layout so
+                the chip is visible above the fold without scrolling) */}
             <div className="flex items-baseline gap-2">
               <span style={{ fontSize: 22, fontWeight: 700, color: '#7ee787' }}>
                 ${listing.price.toLocaleString()}
                 <span style={{ fontSize: 14, fontWeight: 400, color: '#8b949e' }}>/mo</span>
               </span>
+              {compactMobile && destination && (
+                <span className="ml-auto min-[600px]:hidden">
+                  <DestinationChip
+                    listing={{ id: listing.id, lat: listing.lat ?? null, lon: listing.lon ?? null }}
+                    destination={destination}
+                    commute={destinationCommute ?? undefined}
+                  />
+                </span>
+              )}
             </div>
 
             {/* Listed date */}
@@ -807,13 +828,17 @@ export default function SwipeCard({
               {availabilityLabel}
             </div>
 
-            {/* Preferred-destination chip — only renders when user has saved one. */}
+            {/* Preferred-destination chip — only renders when user has saved one.
+                Hidden on mobile compact layout (rendered inline next to the price
+                instead, so it sits above the fold). Desktop unchanged. */}
             {destination && (
-              <DestinationChip
-                listing={{ id: listing.id, lat: listing.lat ?? null, lon: listing.lon ?? null }}
-                destination={destination}
-                commute={destinationCommute ?? undefined}
-              />
+              <div className={compactMobile ? 'hidden min-[600px]:block' : ''}>
+                <DestinationChip
+                  listing={{ id: listing.id, lat: listing.lat ?? null, lon: listing.lon ?? null }}
+                  destination={destination}
+                  commute={destinationCommute ?? undefined}
+                />
+              </div>
             )}
 
             {/* Divider: price/address section → stats. Hidden on mobile

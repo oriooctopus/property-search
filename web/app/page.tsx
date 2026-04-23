@@ -1140,6 +1140,44 @@ function HomeInner() {
     />
   );
 
+  // Mobile-swipe variant: shorter "Find nearest" label and primary-button
+  // styling so it reads as the foreground CTA in the swipe empty state.
+  const swipeNearestEmptyExtra = (
+    <GoToNearestMatch
+      getFiltersPayload={getNearestSearchPayload}
+      onMatchSelected={handleNearestMatchSelected}
+      label="Find nearest"
+      variant="primary"
+    />
+  );
+
+  // Reset all filters back to defaults. Used by the swipe-view empty-state
+  // "Clear filters" CTA. Default values mirror DEFAULT_FILTERS in
+  // useConversation so the two reset paths stay aligned.
+  const handleClearAllFilters = useCallback(() => {
+    setFilters({
+      sort: 'price',
+      selectedBeds: null,
+      minBaths: null,
+      includeNaBaths: false,
+      minRent: null,
+      maxRent: null,
+      priceMode: 'total',
+      maxListingAge: null,
+      photosFirst: false,
+      selectedSources: null,
+      minYearBuilt: null,
+      maxYearBuilt: null,
+      minSqft: null,
+      maxSqft: null,
+      excludeNoSqft: false,
+      minAvailableDate: null,
+      maxAvailableDate: null,
+      includeNaAvailableDate: false,
+      commuteRules: [],
+    });
+  }, []);
+
   // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
@@ -1633,7 +1671,8 @@ function HomeInner() {
             showHidden={showHidden}
             isLoading={viewportLoading}
             wishlistedIds={wishlistedIds}
-            emptyStateExtra={goToNearestEmptyExtra}
+            emptyStateExtra={swipeNearestEmptyExtra}
+            onClearFilters={handleClearAllFilters}
           />
 
           {/* Loading spinner overlay for swipe mode */}

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { createPortal } from 'react-dom';
-import { PrimaryButton } from '@/components/ui';
+import { PrimaryButton, TextButton } from '@/components/ui';
 import { X, RotateCcw, Heart } from 'lucide-react';
 import SwipeCard, { type HoveredStation, getClosestStations, walkMinFromMiles } from './SwipeCard';
 import type { ViewportBounds } from './MapInner';
@@ -76,6 +76,9 @@ export interface SwipeViewProps {
   /** Optional content rendered inside the "No listings found" empty state
    *  (e.g. a "Go to nearest match" button). */
   emptyStateExtra?: React.ReactNode;
+  /** Resets all filters to their defaults. When provided, the "no listings
+   *  found" empty state shows a "Clear filters" secondary CTA. */
+  onClearFilters?: () => void;
 }
 
 interface UndoEntry {
@@ -134,6 +137,7 @@ export default function SwipeView({
   topInset = 0,
   onOpenFilters,
   emptyStateExtra,
+  onClearFilters,
 }: SwipeViewProps) {
   // Don't persist swipedIds across refreshes — start fresh each session.
   // The localStorage was causing "You've seen all listings" on every refresh.
@@ -346,14 +350,15 @@ export default function SwipeView({
     prevShowHidden.current = showHidden;
   }, [showHidden]);
 
-  // Track current listing by ID so we can restore position after re-sorts
+  // Track current listing by ID so we can restore position after re-sorts.
+  // Listing ids are globally unique primary keys, so a tracked id appearing
+  // in a freshly-rebuilt deck means it really IS the same listing — keep it
+  // selected. We do NOT clear this on deck-reference changes; doing so was
+  // the cause of the "selection swaps even though same listing is still in
+  // viewport" bug. The find-first-visible fallback below only runs when the
+  // tracked id is genuinely absent from the new deck (filter excluded it,
+  // or it scrolled out of the result set entirely).
   const currentListingIdRef = useRef<number | null>(null);
-  // Blocker 1 fix: track the deck ARRAY IDENTITY so we can detect "this is
-  // a fresh deck build" (new listings from a fresh-area pan) and reset the
-  // tracked-id before running the find-by-id step. Without this, an old id
-  // may coincidentally match a listing in the new deck (returning ≥ 0 from
-  // `findIndex`), silently short-circuiting the find-first-visible-pin scan.
-  const prevDeckRef = useRef<SwipeListing[] | null>(null);
 
   // Geo-sort when listings change
   const geoSorted = useMemo(() => {
@@ -378,17 +383,13 @@ export default function SwipeView({
   // exists, the deck stays at the chosen index and the user must pan/swipe
   // themselves (per the no-autoscroll hard rule).
   useEffect(() => {
-    // Blocker 1 fix: when the deck array ITSELF is a new object (different
-    // reference from the previous render), treat the tracked-id as stale.
-    // This guarantees the find-visible-pin scan runs after any fresh-area
-    // pan even if an id from the previous deck happens to appear in the new
-    // one. Without this, `findIndex` could return ≥ 0 by coincidence and
-    // silently short-circuit the scan.
-    if (prevDeckRef.current !== null && prevDeckRef.current !== deck) {
-      currentListingIdRef.current = null;
-    }
-    prevDeckRef.current = deck;
-
+    // Selection-stability rule: if the previously-selected listing is still
+    // in the freshly-built deck (e.g. the user panned but the same listing
+    // is still in the new viewport's results), KEEP it selected. Listing
+    // ids are unique primary keys so a match here is not coincidental — it
+    // really is the same listing. We only fall through to the find-visible
+    // fallback when the tracked listing is genuinely gone from the deck
+    // (filter excluded it, or it left the queried area entirely).
     const trackedId = currentListingIdRef.current;
     const trackedIdx = trackedId === null ? -1 : deck.findIndex((l) => l.id === trackedId);
 
@@ -419,10 +420,13 @@ export default function SwipeView({
       }
     }
 
-    // No visible candidate (or map not ready / desktop) — clamp index.
+    // No visible candidate (or map not ready / desktop). Either we're on
+    // initial load (trackedId === null) or the previously-selected listing
+    // is genuinely gone from the deck — in both cases reset to index 0
+    // (clamping if the deck is shorter than the current index).
     if (currentIndex >= deck.length && deck.length > 0) {
       setCurrentIndex(deck.length - 1);
-    } else if (trackedId === null && currentIndex !== 0 && deck.length > 0) {
+    } else if (currentIndex !== 0 && deck.length > 0) {
       setCurrentIndex(0);
     }
   }, [deck, leafletMap]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1406,7 +1410,17 @@ export default function SwipeView({
             </div>
           </div>
         ) : listings.length === 0 ? (
-          /* No results for current filters */
+          /* No results for current filters.
+             CTAs:
+              - Primary "Find nearest" — pans the map to the closest listing
+                that still matches the active filters (rendered via the
+                `emptyStateExtra` slot, which the parent passes a styled
+                <GoToNearestMatch /> into).
+              - Secondary "Clear filters" — resets all filters to defaults so
+                the visible viewport repopulates immediately.
+             The legacy "Switch to list view" button is intentionally removed
+             from this state — on mobile users prefer to fix filters in place
+             rather than bounce out of swipe mode. */
           <div
             className="flex-1 flex flex-col items-center justify-center gap-4 text-center m-3 rounded-xl"
             style={{
@@ -1420,12 +1434,14 @@ export default function SwipeView({
             <div className="text-sm" style={{ color: '#8b949e' }}>
               Try adjusting your filters or moving the map.
             </div>
-            {emptyStateExtra}
-            {onSwitchView && (
-              <PrimaryButton onClick={onSwitchView}>
-                Switch to list view
-              </PrimaryButton>
-            )}
+            <div className="flex flex-col items-center gap-2">
+              {emptyStateExtra}
+              {onClearFilters && (
+                <TextButton variant="muted" onClick={onClearFilters}>
+                  Clear filters
+                </TextButton>
+              )}
+            </div>
           </div>
         ) : (
           /* Empty state — user has swiped through everything */
