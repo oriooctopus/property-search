@@ -12,7 +12,7 @@ import type { CommuteInfo } from './ListingCard';
 import type { HoveredStation } from './SwipeCard';
 import { useOccluders } from '@/lib/viewport/OccluderRegistry';
 import { useLeafletMapSetter } from '@/lib/viewport/LeafletMapContext';
-import { isPinVisible, findVisiblePosition, MIN_CLEARANCE_PX, projectPinToViewport, getVisibleMapRect } from '@/lib/viewport/occlusion';
+import { getVisibleMapRect } from '@/lib/viewport/occlusion';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -422,170 +422,19 @@ function InvalidateSize({ visible }: { visible: boolean }) {
   return null;
 }
 
-// NOTE: The former `FlyToSelected` component has been removed. The map must
-// NEVER pan/zoom/flyTo/setView in response to state changes (search results
-// loading, active swipe card changing, etc.) — only direct user gestures
-// (drag, scroll-wheel, pinch, explicit "locate me" / "reset view" buttons)
-// are allowed to move the viewport. The currently-selected listing is still
-// visually emphasized in the marker layer below (larger radius, white ring)
-// via the `isSelected` derived flag — no map movement required.
+// NOTE: The former `FlyToSelected` and `EnsurePinVisibleOnMobile` components
+// have both been removed. The map must NEVER pan/zoom/flyTo/setView in
+// response to state changes (search results loading, active swipe card
+// changing, active pin being occluded by the floating card, etc.) — only
+// direct user gestures (drag, scroll-wheel, pinch, tapping a cluster to
+// zoom in) are allowed to move the viewport. The currently-selected
+// listing is still visually emphasized in the marker layer below (larger
+// radius, white ring) via the `isSelected` derived flag — no map movement
+// required.
 //
-// EXCEPTION: On mobile Option-D layout the floating swipe card covers the
-// bottom ~60% of the viewport. If the active listing's pin falls under the
-// card, the user can't see it. `EnsurePinVisibleOnMobile` below is the one
-// sanctioned exception — it pans (but never zooms) just enough to surface an
-// occluded pin in the top map bleed, and ONLY when the active listing id
-// changes (never on search/bounds/other state changes). The pan is gated by
-// `suppressBoundsRef` so the move does NOT trigger a listings re-query.
-
-/**
- * Mobile-only: when the active listing changes, if its pin is occluded by the
- * floating swipe card, pan the map so the pin appears above the card.
- *
- * - Skips on desktop / when activeListingId or card bounds are missing.
- * - Runs ONLY on activeListingId change (ref-based dedupe). Re-renders,
- *   bounds changes, and search completions do not trigger.
- * - Uses the caller-supplied `suppressBoundsRef` to prevent BoundsWatcher
- *   from issuing a listings re-query in response to the programmatic pan.
- * - Keeps zoom constant; only pans.
- */
-function EnsurePinVisibleOnMobile({
-  activeListingId,
-  activeLatLon,
-  mobile,
-  suppressBoundsRef,
-  isPanningRef,
-}: {
-  activeListingId: number | null;
-  activeLatLon: { lat: number; lon: number } | null;
-  mobile: boolean;
-  suppressBoundsRef: React.MutableRefObject<boolean>;
-  isPanningRef?: React.MutableRefObject<boolean>;
-}) {
-  const map = useMap();
-  const occluderRegistry = useOccluders();
-  // Track the most recent inputs in refs so the moveend listener (bound
-  // once) always sees the freshest values without re-binding on every render.
-  const activeIdRef = useRef<number | null>(activeListingId);
-  const activeLatLonRef = useRef<{ lat: number; lon: number } | null>(activeLatLon);
-  useEffect(() => {
-    activeIdRef.current = activeListingId;
-    activeLatLonRef.current = activeLatLon;
-  }, [activeListingId, activeLatLon]);
-
-  // Blocker 2 fix: when the user is mid-gesture we can't evaluate (the map
-  // is still settling). Previously we just early-returned and hoped the
-  // next `moveend` would re-trigger — but if the caller's own `moveend`
-  // listener fires while `isPanningRef === true` (a common race during
-  // overlapping user pans + auto-pans) we drop the evaluation and never
-  // re-schedule. This ref guards a single `map.once('moveend', ...)`
-  // re-eval so we never stack listeners if evaluate() re-enters.
-  const pendingReevalRef = useRef(false);
-
-  // Single re-evaluation function: invoked both on activeListingId change
-  // (the original trigger) AND on every map `moveend` (so user-initiated
-  // pans that move the active pin under the card / pill auto-correct).
-  // Idempotent: if the current pin is already visible OR no visible band
-  // exists in its column, returns early without state change.
-  //
-  // Loop safety:
-  //  - We never run while the user is mid-gesture (isPanningRef).
-  //  - We never run while suppressBoundsRef is true (which is set to true
-  //    by THIS function for the duration of its own programmatic pan).
-  //    That gates re-entry on the moveend that ends our own pan.
-  const evaluate = useCallback(() => {
-    if (!mobile) return;
-    const id = activeIdRef.current;
-    const latLon = activeLatLonRef.current;
-    if (!id || !latLon) return;
-    // Blocker 2 fix: while the user is mid-pan, the map is still settling
-    // and any pin position we read is stale. Defer until the gesture ends
-    // by registering a one-shot `moveend` re-eval. Idempotent: the
-    // `pendingReevalRef` guard prevents stacking duplicates if evaluate()
-    // re-enters during the same gesture.
-    if (isPanningRef?.current) {
-      if (!pendingReevalRef.current) {
-        pendingReevalRef.current = true;
-        map.once('moveend', () => {
-          pendingReevalRef.current = false;
-          evaluate();
-        });
-      }
-      return;
-    }
-    if (suppressBoundsRef.current) return;
-
-    const containerEl = map.getContainer();
-    const mapRect = containerEl.getBoundingClientRect();
-
-    const pinViewport = projectPinToViewport(map, latLon.lat, latLon.lon);
-    if (!pinViewport) return;
-
-    const occluders = occluderRegistry?.getAll() ?? [];
-
-    const visibility = isPinVisible(pinViewport, mapRect, occluders);
-    if (visibility.visible) return;
-
-    const target = findVisiblePosition(pinViewport, mapRect, occluders);
-    if (target.target === null || target.deltaY === null) return;
-
-    // Only pan vertically — lateral pans for occlusion would be jarring
-    // and aren't required (the action pill and card span the full width
-    // in practice). Skip if the pan is sub-pixel.
-    const deltaY = target.deltaY;
-    if (Math.abs(deltaY) < Math.max(4, MIN_CLEARANCE_PX / 4)) return;
-
-    // Compute the new center in container-pixel space, then convert back
-    // to LatLng. We move the *map center* by the OPPOSITE of deltaY (to
-    // shift the pin down, the camera must move up — i.e. center.y += -deltaY
-    // in container space). Wait — actually: if pin needs to move from
-    // currentY → currentY + deltaY (deltaY positive = down), we shift
-    // the map's center by the same amount in the SAME direction (because
-    // moving the camera down moves all on-screen points up). Standard
-    // Leaflet semantics: setView(newCenter) recenters the viewport so
-    // the new center occupies the middle pixel of the container. If we
-    // want a point that was at y=200 to now appear at y=400, the map's
-    // top-left edge must shift up by 200px — equivalent to moving the
-    // center DOWN by 200px in the world. In container-pixel terms we
-    // add deltaY to the center point's y, then convert back.
-    const currentCenterPoint = map.latLngToContainerPoint(map.getCenter());
-    const newCenterPoint = L.point(currentCenterPoint.x, currentCenterPoint.y - deltaY);
-    const newCenterLatLng = map.containerPointToLatLng(newCenterPoint);
-
-    // Suppress the bounds-watcher so the programmatic pan does NOT re-query.
-    suppressBoundsRef.current = true;
-    const clear = () => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          suppressBoundsRef.current = false;
-        });
-      });
-    };
-    map.once('moveend', clear);
-
-    map.setView(newCenterLatLng, map.getZoom(), { animate: true, duration: 0.4 });
-  }, [mobile, map, suppressBoundsRef, occluderRegistry, isPanningRef]);
-
-  // Trigger 1: active-listing-id change (existing behavior).
-  useEffect(() => {
-    evaluate();
-  }, [activeListingId, activeLatLon, evaluate]);
-
-  // Trigger 2: map `moveend` (Bug A fix). When the user pans, the active
-  // pin's viewport position changes — re-check visibility and auto-pan if
-  // it's now occluded. The `evaluate()` function's own guards
-  // (suppressBoundsRef + isPanningRef) prevent self-triggering loops.
-  useEffect(() => {
-    if (!mobile) return;
-    const handler = () => evaluate();
-    map.on('moveend', handler);
-    return () => {
-      map.off('moveend', handler);
-    };
-  }, [mobile, map, evaluate]);
-
-  return null;
-}
+// If the active pin happens to fall under the floating card on mobile,
+// that's an empty state for the visible region — the user can pan the
+// map themselves to see other listings. We do NOT auto-pan to surface it.
 
 export interface ViewportBounds {
   latMin: number;
@@ -620,13 +469,6 @@ export interface MapProps {
   commuteInfoMap?: Map<number, CommuteInfo>;
   /** Hovered subway station from SwipeCard — renders a pulsing marker */
   hoveredStation?: HoveredStation | null;
-  /** Mobile-only: when true, the map may auto-shift so the active listing
-   *  pin is not occluded by registered occluders (swipe card, action pill,
-   *  etc.). Reads from the OccluderProvider in the page tree. No-op on
-   *  desktop. The legacy `getMobileCardBounds` prop has been replaced by
-   *  the registry — chrome components self-register via
-   *  `useRegisterOccluder`. See `web/lib/viewport/`. */
-  autoShiftActivePinMobile?: boolean;
   /** Mobile swipe context: when true, pin taps fire `onMarkerClick` only
    *  (for selecting the listing as the active swipe card) and suppress the
    *  desktop-style popup/tooltip. Cluster taps zoom in instead of opening
@@ -644,8 +486,8 @@ export interface MapProps {
 /*  trigger is aborted by the caller (loadForViewport AbortController */
 /*  in web/app/page.tsx) when a new bounds change fires.              */
 /*                                                                    */
-/*  isPanningRef is exposed so components like EnsurePinVisibleOnMobile*/
-/*  can defer / skip work while the user is actively dragging the map.*/
+/*  isPanningRef is exposed so components in the page tree can defer or */
+/*  skip work while the user is actively dragging the map.              */
 /* ------------------------------------------------------------------ */
 const BOUNDS_DEBOUNCE_MS = 1000;
 
@@ -1126,7 +968,7 @@ function SubwayLinesLayer({ enabled }: SubwayLinesLayerProps) {
   );
 }
 
-export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, isPanningRef: isPanningRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, hoveredStation, autoShiftActivePinMobile, swipeSelectMode = false }: MapProps) {
+export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, isPanningRef: isPanningRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, hoveredStation, swipeSelectMode = false }: MapProps) {
   // Fall back to a local ref if the caller doesn't provide one
   const localSuppressBoundsRef = useRef(false);
   const suppressBoundsRef = suppressBoundsRefProp ?? localSuppressBoundsRef;
@@ -1456,19 +1298,6 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
         <InvalidateSize visible={visible} />
         <InjectPopupStyles />
         {onBoundsChange && <BoundsWatcher onBoundsChange={onBoundsChange} onMapMove={onMapMove} suppressBoundsRef={suppressBoundsRef} isPanningRef={isPanningRef} />}
-        {autoShiftActivePinMobile && (
-          <EnsurePinVisibleOnMobile
-            activeListingId={selectedId}
-            activeLatLon={(() => {
-              if (selectedId == null) return null;
-              const sel = validListings.find((l) => l.id === selectedId);
-              return sel ? { lat: sel.lat, lon: sel.lon } : null;
-            })()}
-            mobile={autoShiftActivePinMobile}
-            suppressBoundsRef={suppressBoundsRef}
-            isPanningRef={isPanningRef}
-          />
-        )}
 
         {renderGroups.map(({ key, listings: groupListings, isCluster }) => {
           if (isCluster) {

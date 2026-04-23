@@ -160,11 +160,14 @@ export default function SwipeView({
   const laterBtnRef = useRef<HTMLButtonElement>(null);
   const saveBtnRef = useRef<HTMLButtonElement>(null);
   const photoBtnRef = useRef<HTMLButtonElement>(null);
-  // Refs for the viewport-occlusion model. The mobile pin visibility checks
-  // (in MapInner's EnsurePinVisibleOnMobile and the deck-skip predicate
-  // below) compare the pin's bounding circle against every registered
-  // occluder. Both are mobile-only; on desktop the registrations are
-  // disabled so the model sees an empty list and never trips.
+  // Refs for the viewport-occlusion model. The remaining mobile pin
+  // visibility check (the fresh-deck first-visible-pin scan in the
+  // restore-position effect below, plus the visible-rect bounds shrink
+  // in MapInner's BoundsWatcher) compares the pin's bounding circle
+  // against every registered occluder. All occlusion uses are mobile-only;
+  // on desktop the registrations are disabled so the model sees an empty
+  // list and never trips. None of these uses move the map — they only
+  // affect which deck index is selected and which bbox is queried.
   const mobileSwipeCardRef = useRef<HTMLDivElement>(null);
   const mobileActionPillRef = useRef<HTMLDivElement>(null);
   const occluderRegistry = useOccluders();
@@ -357,12 +360,13 @@ export default function SwipeView({
   // search result for a brand-new viewport), pick the first deck item whose
   // pin is currently visible per the occlusion model. This prevents Bug B:
   // "panned to a new area, deck initialized at index 0, that pin happened to
-  // be hidden behind the swipe card, then EnsurePinVisible auto-panned."
+  // be hidden behind the swipe card, so the user landed on an invisible card."
   //
   // Falls back to index 0 if no candidate is visible, OR if we can't sample
-  // the map yet (Leaflet not mounted on SSR / first paint). The subsequent
-  // EnsurePinVisible auto-pan will then take over as before — same behavior
-  // as today, but only as a true last resort.
+  // the map yet (Leaflet not mounted on SSR / first paint). The map is NEVER
+  // moved here — only `setCurrentIndex` is called. If no visible candidate
+  // exists, the deck stays at the chosen index and the user must pan/swipe
+  // themselves (per the no-autoscroll hard rule).
   useEffect(() => {
     // Blocker 1 fix: when the deck array ITSELF is a new object (different
     // reference from the previous render), treat the tracked-id as stale.
@@ -488,102 +492,16 @@ export default function SwipeView({
   }, [deck]);
 
   // ---------------------------------------------------------------------
-  // Map-pan tick: bumped on every Leaflet `moveend`. The deck-skip effect
-  // below re-runs on every bump so visibility is re-evaluated after the
-  // user pans the map even when the active listing id hasn't changed.
-  // Without this, Bug A surfaces: the user pans so the active pin slides
-  // under the card, but no swap fires because nothing tells us to look.
-  //
-  // Blocker 3 fix: binds via the LeafletMapContext (`leafletMap`) instead
-  // of polling `window.__leafletMap` every 200ms. The context re-runs this
-  // effect whenever the map mounts/unmounts — no polling, no max-retries
-  // needed, and teardown on remount is automatic.
+  // NOTE: Auto-advance-on-pan (the previous "if the user pans the active
+  // pin under the card, swap to a visible deck card") has been removed.
+  // The hard rule is: the active deck card NEVER changes without a direct
+  // user gesture (a swipe or a pin tap). If the user pans so the active
+  // pin is occluded, the deck stays put — they can swipe or tap a visible
+  // pin to move forward. The deck-rebuild first-visible scan above (in the
+  // restore-position effect) is the ONLY remaining "auto-pick" and runs
+  // only on a fresh deck (e.g. brand-new fresh-area pan with no tracked
+  // id), and only ever calls `setCurrentIndex` — it never moves the map.
   // ---------------------------------------------------------------------
-  const [mapMoveTick, setMapMoveTick] = useState(0);
-  useEffect(() => {
-    if (isMobileViewport !== true) return;
-    if (!leafletMap) return;
-    const onMoveEnd = () => {
-      setMapMoveTick((t) => t + 1);
-    };
-    leafletMap.on('moveend', onMoveEnd);
-    return () => {
-      leafletMap.off('moveend', onMoveEnd);
-    };
-  }, [isMobileViewport, leafletMap]);
-
-  // ---------------------------------------------------------------------
-  // Prefer-visible-above-card: re-evaluate the active pin's visibility
-  // whenever the active listing changes OR the map finishes panning. If
-  // the active pin is occluded (under card / pill / off-map), search the
-  // deck for an already-visible candidate and swap to it. If none, leave
-  // the index alone — MapInner's EnsurePinVisibleOnMobile will pan as
-  // the last resort.
-  //
-  // Idempotency: the predicate's "is current already visible" early-return
-  // (below) is the natural debounce — once we land on a visible pin, the
-  // effect short-circuits on every subsequent run with no state changes,
-  // so it can't loop. We deliberately do NOT use a `lastCheckedIdRef`
-  // dedupe because that would prevent re-checks after a map pan changed
-  // the visibility of the same listing (Bug A's root cause).
-  //
-  // Safety guards:
-  // - Only runs on mobile viewports.
-  // - Only runs when Leaflet's map instance is measurable.
-  // - Never runs during an active pan gesture (isPanningRef).
-  // ---------------------------------------------------------------------
-  useEffect(() => {
-    if (isMobileViewport !== true) return;
-    if (!currentListing || !currentListing.lat || !currentListing.lon) return;
-    if (isPanningRef?.current) return;
-    if (!leafletMap) return;
-
-    const mapRect = leafletMap.getContainer().getBoundingClientRect();
-
-    // Sample all occluders ONCE per evaluation so every predicate call
-    // below sees the same frame's geometry (no async waits between reads).
-    const occluders = occluderRegistry?.getAll() ?? [];
-
-    // Predicate: is the given lat/lon visible by the new occlusion model?
-    // Treats the pin as a circle (PIN_RADIUS_PX), enforces MIN_CLEARANCE_PX
-    // hysteresis, and checks against EVERY registered occluder — not just
-    // the swipe card. (Previously this only checked card-top, missing pins
-    // that peeked out from under the action pill at the bottom.)
-    const isPinFullyVisible = (lat: number, lon: number): boolean => {
-      const vp = projectPinToViewport(leafletMap, lat, lon);
-      if (!vp) return false;
-      return isPinVisible(vp, mapRect, occluders).visible;
-    };
-
-    // Is the CURRENT active pin already visible? If yes, no swap needed.
-    // (This early-return is what makes the effect idempotent across
-    // re-runs from `mapMoveTick`: once visible, subsequent ticks no-op.)
-    if (isPinFullyVisible(currentListing.lat, currentListing.lon)) {
-      return;
-    }
-
-    // Search forward in the deck for a listing whose pin is visible
-    // (clear of card AND pill AND map bounds, with hysteresis). Cap the
-    // search so we don't scan the entire deck (O(n) per swipe is fine
-    // for n ≤ ~500, but capping protects against huge result sets).
-    const SEARCH_CAP = 40;
-    const start = currentIndex + 1;
-    const end = Math.min(deck.length, start + SEARCH_CAP);
-    for (let i = start; i < end; i++) {
-      const candidate = deck[i];
-      if (!candidate || candidate.lat == null || candidate.lon == null) continue;
-      if (isPinFullyVisible(candidate.lat, candidate.lon)) {
-        // Swap: advance index to the candidate. The previously-active (occluded)
-        // listing remains in the deck for a future visit.
-        currentListingIdRef.current = candidate.id;
-        setCurrentIndex(i);
-        return;
-      }
-    }
-
-    // No forward candidate found; let MapInner's auto-shift handle it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentListing?.id, isMobileViewport, deck, currentIndex, isPanningRef, occluderRegistry, mapMoveTick, leafletMap]);
 
   // ---------------------------------------------------------------------------
   // Swipe handler
@@ -804,19 +722,21 @@ export default function SwipeView({
     return merged;
   }, [savedIds, wishlistedIds]);
 
-  // Mobile backdrop map now renders the FULL listing set (same as desktop)
+  // Mobile backdrop map renders the FULL listing set (same as desktop)
   // plus all saved-listing pins — giving the user spatial context for every
-  // result, not just the active card. Subway pins remain as-is (controlled
-  // via the subway overlay toggle inside MapInner). The single-listing
-  // `mobileMapListings` mini-map behavior has been retired; the active
-  // listing is still visually emphasized via the selectedId ring, and is
-  // now auto-shifted into view when occluded by the floating card (see
-  // `EnsurePinVisibleOnMobile` in MapInner).
+  // result. Subway pins remain as-is (controlled via the subway overlay
+  // toggle inside MapInner). The active listing is visually emphasized via
+  // the selectedId ring. The map NEVER auto-pans/zooms — if the active
+  // pin is occluded by the floating card, the user pans themselves or
+  // taps a different visible pin. Per the no-autoscroll hard rule.
 
-  // Note: the swipe card's bounding rect used to be threaded down to
-  // MapInner via `getMobileCardBounds`. It now self-registers via
-  // `useRegisterOccluder('swipe-card', ...)` above, and MapInner reads
-  // the registry directly. See `web/lib/viewport/`.
+  // Note: occluder registrations (swipe card, action pill) still flow into
+  // the OccluderRegistry, but they're consumed only by:
+  //   1. BoundsWatcher.fireBounds (to shrink the queried bbox to the
+  //      visible region — does NOT move the map)
+  //   2. The fresh-deck first-visible-pin scan in the deck-restore effect
+  //      above (only calls setCurrentIndex — does NOT move the map)
+  // No code path uses occluders to pan/zoom the map.
 
   return (
     <div className="relative flex-1 min-h-0 flex overflow-hidden" style={{ height: '100%' }}>
@@ -861,12 +781,13 @@ export default function SwipeView({
         >
           {hasOpenedMap && (
             <MapComponent
-              // Full-bleed mobile map now renders the full listing set
-              // (same as the desktop backdrop) plus saved-listing pins, so
-              // the user sees every result in spatial context — not just
-              // the active card. The active card's pin is still highlighted
-              // via selectedId, and is auto-shifted into view when occluded
-              // by the floating card (see autoShiftActivePinMobile below).
+              // Full-bleed mobile map renders the full listing set (same as
+              // desktop) plus saved-listing pins, so the user sees every
+              // result in spatial context. The active card's pin is
+              // highlighted via selectedId. The map NEVER auto-pans/zooms
+              // for any reason — if the active pin is occluded by the
+              // floating card, the user can pan themselves or tap a
+              // visible pin to swap to it.
               listings={mapListings as unknown as Database['public']['Tables']['listings']['Row'][]}
               selectedId={currentListing?.id ?? null}
               onMarkerClick={handleMarkerClick}
@@ -875,17 +796,10 @@ export default function SwipeView({
               onHideListing={() => {}}
               // Wire bounds/move callbacks so user-initiated pan/zoom on the
               // full-bleed map re-queries listings for the new viewport.
-              // Auto-shift for occluded pins is gated by suppressBoundsRef,
-              // so it never triggers a re-query.
               onBoundsChange={onBoundsChange}
               onMapMove={(center, zoom) => { mapCenterRef.current = center; onMapMove?.(center, zoom); }}
               suppressBoundsRef={suppressBoundsRef}
               isPanningRef={isPanningRef}
-              // Opt-in: only on mobile, only when the active listing
-              // changes, pan (never zoom) so the active pin isn't hidden
-              // under the floating card. See EnsurePinVisibleOnMobile in
-              // MapInner for the full rules + guardrails.
-              autoShiftActivePinMobile={true}
               visible={true}
               commuteInfoMap={commuteInfoMap}
               initialCenter={currentListing?.lat && currentListing?.lon ? [currentListing.lat, currentListing.lon] : initialCenter}

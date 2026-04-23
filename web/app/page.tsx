@@ -251,8 +251,9 @@ function HomeInner() {
   // guard if a future "locate me" / "reset view" button is added.
   const suppressBoundsRef = useRef(false);
   // Tracks whether the user is currently actively dragging/panning the map.
-  // Threaded into MapInner via BoundsWatcher's `isPanningRef` so components
-  // like `EnsurePinVisibleOnMobile` can defer their work mid-gesture.
+  // Threaded into MapInner via BoundsWatcher's `isPanningRef` so consumers
+  // can defer side effects mid-gesture (e.g. avoid running deck-pick logic
+  // off a stale projection while the camera is still settling).
   const isPanningRef = useRef(false);
   // AbortController for the CURRENT in-flight /api/listings/search call
   // triggered by a viewport change. A new pan aborts the previous request so
