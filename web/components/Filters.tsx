@@ -2318,6 +2318,157 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
               />
     ) : null;
 
+  // Shared render helper for the saved-search tabs (used by both the always-visible
+  // top bar and the mobile filter bottom sheet). Keeping this inline preserves
+  // access to the local state (activeSearchId, editingSearchId, editingName,
+  // editInputRef) without prop-drilling through a standalone sub-component.
+  // `variant` controls layout: 'topbar' keeps the horizontal scroll treatment,
+  // 'sheet' wraps and includes a short empty-state when there are no saves yet.
+  const renderSavedSearchTabsContent = (variant: 'topbar' | 'sheet') => (
+    <>
+      {/* "All" tab — always first; long-press shows build info */}
+      <div className="relative group shrink-0">
+        <button
+          onClick={() => setActiveSearchId(null)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            const raw = document.querySelector('footer')?.textContent?.replace('Built ', '').trim() || '';
+            const d = new Date(raw);
+            const buildInfo = isNaN(d.getTime()) ? 'Build info unavailable' : `Built ${d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}`;
+            alert(buildInfo);
+          }}
+          onTouchStart={(e) => {
+            const el = e.currentTarget as HTMLElement;
+            el.dataset.lptFired = '0';
+            const t = setTimeout(() => {
+              el.dataset.lptFired = '1';
+              const raw = document.querySelector('footer')?.textContent?.replace('Built ', '').trim() || '';
+              const d = new Date(raw);
+              const msg = isNaN(d.getTime()) ? 'Build info unavailable' : `Built ${d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}`;
+              alert(msg);
+            }, 500);
+            el.dataset.lpt = String(t);
+          }}
+          onTouchEnd={(e) => {
+            const el = e.currentTarget as HTMLElement;
+            const t = el.dataset.lpt;
+            if (t) clearTimeout(Number(t));
+            if (el.dataset.lptFired === '1') e.preventDefault();
+          }}
+          className={cn(
+            'relative flex items-center h-8 pl-0 pr-2.5 sm:px-2.5 text-[11px] whitespace-nowrap cursor-pointer transition-colors duration-150',
+            activeSearchId === null ? 'text-[#e1e4e8]' : 'text-[#8b949e] hover:text-[#c0d6f5]',
+          )}
+        >
+          All
+          {activeSearchId === null && (
+            <span
+              className="absolute bottom-0 left-0 right-2.5 sm:left-2.5 h-0.5 rounded-sm"
+              style={{ backgroundColor: '#58a6ff' }}
+            />
+          )}
+        </button>
+      </div>
+
+      {/* Saved search tabs */}
+      {savedSearches?.map((s) => {
+        const active = activeSearchId === s.id;
+        const isEditing = editingSearchId === s.id;
+        return (
+          <div key={s.id} className="relative group shrink-0">
+            {isEditing ? (
+              <div className="flex items-center h-8 px-1">
+                <input
+                  ref={editInputRef}
+                  type="text"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && editingName.trim()) {
+                      onUpdateSearch?.(s.id, editingName.trim());
+                      setEditingSearchId(null);
+                    }
+                    if (e.key === 'Escape') setEditingSearchId(null);
+                  }}
+                  onBlur={() => {
+                    if (editingName.trim()) {
+                      onUpdateSearch?.(s.id, editingName.trim());
+                    }
+                    setEditingSearchId(null);
+                  }}
+                  className="h-6 px-1.5 text-[11px] rounded outline-none"
+                  style={{ backgroundColor: '#0f1117', border: '1px solid #58a6ff', color: '#e1e4e8', width: `${Math.max(editingName.length, 4) * 7 + 16}px`, maxWidth: '150px' }}
+                />
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  setActiveSearchId(s.id);
+                  onLoadSearch?.(s.filters as unknown as FiltersState);
+                }}
+                className={cn(
+                  'relative flex items-center gap-1 h-8 px-2.5 text-[11px] whitespace-nowrap cursor-pointer transition-colors duration-150',
+                  active ? 'text-[#e1e4e8]' : 'text-[#8b949e] hover:text-[#c0d6f5]',
+                )}
+              >
+                {s.name}
+                {active && (
+                  <span
+                    className="absolute bottom-0 left-2.5 right-2.5 h-0.5 rounded-sm"
+                    style={{ backgroundColor: '#58a6ff' }}
+                  />
+                )}
+                {/* Edit/delete icons — hover on desktop, always visible in
+                    mobile sheet so touch users can rename/delete. */}
+                <span
+                  className={cn(
+                    'items-center gap-0.5 ml-0.5',
+                    variant === 'sheet' ? 'flex' : 'hidden group-hover:flex',
+                  )}
+                >
+                  <span
+                    role="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingSearchId(s.id);
+                      setEditingName(s.name);
+                      setTimeout(() => editInputRef.current?.focus(), 50);
+                    }}
+                    className="w-4 h-4 rounded flex items-center justify-center text-[#484f58] hover:text-[#58a6ff] hover:bg-[#58a6ff]/10 cursor-pointer transition-colors"
+                  >
+                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M8.5 1.5l2 2L4 10H2v-2z" />
+                    </svg>
+                  </span>
+                  <span
+                    role="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (activeSearchId === s.id) setActiveSearchId(null);
+                      onDeleteSearch?.(s.id);
+                    }}
+                    className="w-4 h-4 rounded flex items-center justify-center text-[#484f58] hover:text-red-400 hover:bg-red-400/10 cursor-pointer transition-colors"
+                  >
+                    <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                      <path d="M2 2L8 8M8 2L2 8" />
+                    </svg>
+                  </span>
+                </span>
+              </button>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Empty state — only in the mobile sheet variant. */}
+      {variant === 'sheet' && (!savedSearches || savedSearches.length === 0) && (
+        <div className="italic text-[11px] py-1" style={{ color: '#6e7681' }}>
+          No saved searches yet. Save the current filters from the Save button.
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div
       ref={containerRef}
@@ -2333,133 +2484,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
         >
           <style dangerouslySetInnerHTML={{ __html: `.area-tabs-scroll::-webkit-scrollbar { display: none; }` }} />
           <div className="area-tabs-scroll flex items-center overflow-x-auto" style={{ scrollbarWidth: 'none' } as React.CSSProperties}>
-            {/* "All" tab — always first; long-press shows build info */}
-            <div className="relative group shrink-0">
-              <button
-                onClick={() => setActiveSearchId(null)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  const raw = document.querySelector('footer')?.textContent?.replace('Built ', '').trim() || '';
-                  const d = new Date(raw);
-                  const buildInfo = isNaN(d.getTime()) ? 'Build info unavailable' : `Built ${d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}`;
-                  alert(buildInfo);
-                }}
-                onTouchStart={(e) => {
-                  const el = e.currentTarget as HTMLElement;
-                  el.dataset.lptFired = '0';
-                  const t = setTimeout(() => {
-                    el.dataset.lptFired = '1';
-                    const raw = document.querySelector('footer')?.textContent?.replace('Built ', '').trim() || '';
-                    const d = new Date(raw);
-                    const msg = isNaN(d.getTime()) ? 'Build info unavailable' : `Built ${d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}`;
-                    alert(msg);
-                  }, 500);
-                  el.dataset.lpt = String(t);
-                }}
-                onTouchEnd={(e) => {
-                  const el = e.currentTarget as HTMLElement;
-                  const t = el.dataset.lpt;
-                  if (t) clearTimeout(Number(t));
-                  if (el.dataset.lptFired === '1') e.preventDefault();
-                }}
-                className={cn(
-                  'relative flex items-center h-8 pl-0 pr-2.5 sm:px-2.5 text-[11px] whitespace-nowrap cursor-pointer transition-colors duration-150',
-                  activeSearchId === null ? 'text-[#e1e4e8]' : 'text-[#8b949e] hover:text-[#c0d6f5]',
-                )}
-              >
-                All
-                {activeSearchId === null && (
-                  <span
-                    className="absolute bottom-0 left-0 right-2.5 sm:left-2.5 h-0.5 rounded-sm"
-                    style={{ backgroundColor: '#58a6ff' }}
-                  />
-                )}
-              </button>
-            </div>
-
-            {/* Saved search tabs */}
-            {savedSearches?.map((s) => {
-              const active = activeSearchId === s.id;
-              const isEditing = editingSearchId === s.id;
-              return (
-                <div key={s.id} className="relative group shrink-0">
-                  {isEditing ? (
-                    <div className="flex items-center h-8 px-1">
-                      <input
-                        ref={editInputRef}
-                        type="text"
-                        value={editingName}
-                        onChange={(e) => setEditingName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && editingName.trim()) {
-                            onUpdateSearch?.(s.id, editingName.trim());
-                            setEditingSearchId(null);
-                          }
-                          if (e.key === 'Escape') setEditingSearchId(null);
-                        }}
-                        onBlur={() => {
-                          if (editingName.trim()) {
-                            onUpdateSearch?.(s.id, editingName.trim());
-                          }
-                          setEditingSearchId(null);
-                        }}
-                        className="h-6 px-1.5 text-[11px] rounded outline-none"
-                        style={{ backgroundColor: '#0f1117', border: '1px solid #58a6ff', color: '#e1e4e8', width: `${Math.max(editingName.length, 4) * 7 + 16}px`, maxWidth: '150px' }}
-                      />
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setActiveSearchId(s.id);
-                        onLoadSearch?.(s.filters as unknown as FiltersState);
-                      }}
-                      className={cn(
-                        'relative flex items-center gap-1 h-8 px-2.5 text-[11px] whitespace-nowrap cursor-pointer transition-colors duration-150',
-                        active ? 'text-[#e1e4e8]' : 'text-[#8b949e] hover:text-[#c0d6f5]',
-                      )}
-                    >
-                      {s.name}
-                      {active && (
-                        <span
-                          className="absolute bottom-0 left-2.5 right-2.5 h-0.5 rounded-sm"
-                          style={{ backgroundColor: '#58a6ff' }}
-                        />
-                      )}
-                      {/* Edit/delete icons on hover */}
-                      <span className="hidden group-hover:flex items-center gap-0.5 ml-0.5">
-                        <span
-                          role="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingSearchId(s.id);
-                            setEditingName(s.name);
-                            setTimeout(() => editInputRef.current?.focus(), 50);
-                          }}
-                          className="w-4 h-4 rounded flex items-center justify-center text-[#484f58] hover:text-[#58a6ff] hover:bg-[#58a6ff]/10 cursor-pointer transition-colors"
-                        >
-                          <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M8.5 1.5l2 2L4 10H2v-2z" />
-                          </svg>
-                        </span>
-                        <span
-                          role="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (activeSearchId === s.id) setActiveSearchId(null);
-                            onDeleteSearch?.(s.id);
-                          }}
-                          className="w-4 h-4 rounded flex items-center justify-center text-[#484f58] hover:text-red-400 hover:bg-red-400/10 cursor-pointer transition-colors"
-                        >
-                          <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                            <path d="M2 2L8 8M8 2L2 8" />
-                          </svg>
-                        </span>
-                      </span>
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+            {renderSavedSearchTabsContent('topbar')}
           </div>
         </div>
 
@@ -2635,6 +2660,16 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                     {opt.label}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* My searches section — mirrors the top-bar saved-search tabs so
+                the mobile filter sheet (used in swipe view where the top bar
+                is hidden) can still reach them. */}
+            <div className="px-4 py-4" data-testid="mobile-filters-saved-searches" style={{ borderBottom: '1px solid #2d333b' }}>
+              <div className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: '#8b949e' }}>My searches</div>
+              <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
+                {renderSavedSearchTabsContent('sheet')}
               </div>
             </div>
 
