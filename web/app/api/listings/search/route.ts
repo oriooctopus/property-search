@@ -251,7 +251,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as SearchRequest;
     const filters: SearchFilters = body.filters ?? {};
-    const bounds = body.bounds ?? null;
     const limit = Math.min(
       Math.max(body.limit ?? DEFAULT_PAGE_LIMIT, 1),
       MAX_PAGE_LIMIT,
@@ -260,6 +259,16 @@ export async function POST(request: NextRequest) {
     const commuteRules = body.commuteRules ?? null;
     const wishlistIds = body.wishlistIds ?? null;
     const nearestTo = body.nearestTo ?? null;
+    // When a wishlist filter is active, ignore the viewport bounds. The user
+    // wants to see every listing they saved to that wishlist, regardless of
+    // where the map is currently panned. (The map pins will then sit wherever
+    // those listings actually are; the user can pan to find them.) Without
+    // this, the AND of `bounds ∩ wishlistIds` silently hides every saved
+    // listing that doesn't happen to fall inside the current viewport — which
+    // is the bug this comment is preventing the next person from
+    // reintroducing.
+    const wishlistActive = wishlistIds !== null && wishlistIds.length > 0;
+    const bounds = wishlistActive ? null : (body.bounds ?? null);
 
     const supabase = getClient();
 
