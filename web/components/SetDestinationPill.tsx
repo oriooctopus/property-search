@@ -142,6 +142,7 @@ export default function SetDestinationPill() {
                 rule={draft}
                 onChange={setDraft}
                 onDelete={() => setDraft(createDefaultRule())}
+                hideMaxMinutes
               />
             </div>
             <div
