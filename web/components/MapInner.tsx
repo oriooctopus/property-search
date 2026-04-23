@@ -122,6 +122,32 @@ const POPUP_STYLES = `
     border: 1px solid #2d333b;
     box-shadow: none;
   }
+  /* Edge-aware popup placements. Default Leaflet renders popups ABOVE
+     the marker (the .leaflet-popup container is positioned by
+     _updatePosition via inline transform: translate3d(...)). We layer
+     OUR shift on the INNER wrapper / tip-container — those have no
+     transform from Leaflet, so our transform sticks across pan/zoom.
+     The popup tip is hidden for non-"top" placements because a centered
+     tip pointing in one direction is misleading once the popup is to
+     the side / below the marker. */
+  .leaflet-popup.dw-popup-shifted .leaflet-popup-content-wrapper {
+    transform: translate(var(--dw-popup-shift-x, 0px), var(--dw-popup-shift-y, 0px));
+  }
+  .leaflet-popup.dw-popup-shifted .leaflet-popup-tip-container {
+    display: none;
+  }
+  /* "Top" placement: tighten the wrapper-to-marker gap by nudging the
+     wrapper + tip down toward the pin. The shift is shared via the
+     same CSS variable; the tip stays visible and moves WITH the
+     wrapper so the arrow still points at the marker. */
+  .leaflet-popup.dw-popup-tightened .leaflet-popup-content-wrapper {
+    transform: translateY(var(--dw-popup-shift-y, 0px));
+  }
+  .leaflet-popup.dw-popup-tightened .leaflet-popup-tip-container {
+    /* tip-container is already horizontally centered via Leaflet's
+       left: 50% + margin-left: -20px — only nudge it vertically. */
+    transform: translateY(var(--dw-popup-shift-y, 0px));
+  }
   .dark-popup .leaflet-popup-close-button {
     color: #8b949e !important;
     font-size: 18px;
@@ -360,6 +386,212 @@ function InjectPopupStyles() {
     };
   }, []);
   return null;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Edge-aware popup positioning                                       */
+/*                                                                    */
+/*  Leaflet popups default to ABOVE the marker. When a marker sits    */
+/*  near the top edge of the visible map rect, the popup gets clipped */
+/*  by the map container (or worse, by the top nav). We measure the   */
+/*  popup container after open, then choose the placement (top /      */
+/*  bottom / left / right) that keeps the entire popup inside the     */
+/*  visible map rect (computed via `getVisibleMapRect` so swipe-card  */
+/*  / pill / nav occluders are respected).                             */
+/*                                                                    */
+/*  Default = top (matches Leaflet's native behavior for centered     */
+/*  pins). We only deviate when top would clip.                       */
+/* ------------------------------------------------------------------ */
+
+type PopupDirection = 'top' | 'bottom' | 'left' | 'right';
+
+/** Pixel gap between the marker and the popup wrapper, per direction. */
+const POPUP_PIN_GAP_PX = 5;
+
+/**
+ * Decide which side of the marker the popup should render on, given:
+ *   - the marker's viewport-space (x, y) center,
+ *   - the popup container's measured size,
+ *   - the visible map rect (already trimmed for nav/pill/swipe-card).
+ *
+ * Returns the first direction (in priority order top → bottom → right →
+ * left) whose resulting popup rect fits inside `visibleRect`. If no
+ * direction fits, returns 'top' (Leaflet default) and lets the popup
+ * partially clip — better than picking an arbitrary side that's also
+ * clipped.
+ */
+function pickPopupDirection(
+  pinViewportX: number,
+  pinViewportY: number,
+  popupWidth: number,
+  popupHeight: number,
+  pinRadius: number,
+  visibleRect: DOMRect,
+): PopupDirection {
+  const gap = POPUP_PIN_GAP_PX;
+  const halfW = popupWidth / 2;
+  const halfH = popupHeight / 2;
+
+  // For each candidate, compute the popup's center, then derive its rect
+  // and check containment within `visibleRect`.
+  const candidates: Array<{ dir: PopupDirection; cx: number; cy: number }> = [
+    // top: popup sits ABOVE marker, horizontally centered on marker.
+    { dir: 'top', cx: pinViewportX, cy: pinViewportY - pinRadius - gap - halfH },
+    // bottom: popup sits BELOW marker.
+    { dir: 'bottom', cx: pinViewportX, cy: pinViewportY + pinRadius + gap + halfH },
+    // right: popup sits to the RIGHT of marker.
+    { dir: 'right', cx: pinViewportX + pinRadius + gap + halfW, cy: pinViewportY },
+    // left: popup sits to the LEFT of marker.
+    { dir: 'left', cx: pinViewportX - pinRadius - gap - halfW, cy: pinViewportY },
+  ];
+
+  for (const c of candidates) {
+    const left = c.cx - halfW;
+    const right = c.cx + halfW;
+    const top = c.cy - halfH;
+    const bottom = c.cy + halfH;
+    if (
+      left >= visibleRect.left &&
+      right <= visibleRect.right &&
+      top >= visibleRect.top &&
+      bottom <= visibleRect.bottom
+    ) {
+      return c.dir;
+    }
+  }
+  return 'top';
+}
+
+/**
+ * Apply the chosen direction to a Leaflet popup by layering a CSS
+ * transform on top of Leaflet's native positioning. We don't mutate
+ * Leaflet's `offset` option because that's tightly coupled with tip
+ * positioning and marginBottom — using a CSS transform on the popup
+ * root keeps the math local to this function.
+ *
+ * `nativeGapPx` is the measured distance between the wrapper's BOTTOM
+ * edge and the marker's CENTER (positive = wrapper is above marker).
+ * We compute it dynamically by reading the wrapper's bounding rect and
+ * comparing against the marker's viewport position; this naturally
+ * accounts for icon `popupAnchor` (e.g. cluster icons offset the popup
+ * up by `size/2`) without requiring per-marker constants.
+ */
+function applyPopupDirection(
+  popup: L.Popup,
+  direction: PopupDirection,
+  popupWidth: number,
+  popupHeight: number,
+  pinRadius: number,
+  nativeGapPx: number,
+): void {
+  const container = popup.getElement?.();
+  if (!container) return;
+
+  const targetGap = POPUP_PIN_GAP_PX + pinRadius; // distance from marker CENTER
+
+  let shiftX = 0;
+  let shiftY = 0;
+  switch (direction) {
+    case 'top':
+      // Pull popup DOWN toward marker by (nativeGap - targetGap).
+      // If positive, popup gets closer; if negative (target gap larger
+      // than native), we'd push popup further from marker which is fine.
+      shiftY = nativeGapPx - targetGap;
+      break;
+    case 'bottom':
+      // Wrapper natively sits with BOTTOM at (marker_center - nativeGap).
+      // We want wrapper TOP at (marker_center + targetGap), so wrapper
+      // BOTTOM needs to be at (marker_center + targetGap + popupHeight).
+      // Required shift = nativeGap + targetGap + popupHeight.
+      shiftY = nativeGapPx + targetGap + popupHeight;
+      break;
+    case 'right':
+      // Shift right so wrapper LEFT edge sits `targetGap` from marker
+      // center: wrapper centered laterally → halfW + targetGap.
+      // Vertically: wrapper natively sits ABOVE marker center; we want
+      // it CENTERED on marker → shift down by (nativeGap + halfH).
+      shiftX = popupWidth / 2 + targetGap;
+      shiftY = nativeGapPx + popupHeight / 2;
+      break;
+    case 'left':
+      shiftX = -(popupWidth / 2 + targetGap);
+      shiftY = nativeGapPx + popupHeight / 2;
+      break;
+  }
+
+  container.style.setProperty('--dw-popup-shift-x', `${shiftX}px`);
+  container.style.setProperty('--dw-popup-shift-y', `${shiftY}px`);
+  if (direction === 'top') {
+    // Tighten only — wrapper + tip move together (toward marker).
+    container.classList.remove('dw-popup-shifted');
+    container.classList.add('dw-popup-tightened');
+  } else {
+    // Side / bottom: shift the wrapper, hide the tip.
+    container.classList.remove('dw-popup-tightened');
+    container.classList.add('dw-popup-shifted');
+  }
+}
+
+/**
+ * After a popup opens, measure it and reposition to the best side of
+ * the marker. Idempotent — safe to call multiple times.
+ *
+ * Also resets any prior shift before measuring so the "native" gap is
+ * computed from Leaflet's untransformed position; otherwise repeated
+ * calls (rAF + image-load) would chase a moving wrapper.
+ */
+function repositionPopupForViewport(
+  popup: L.Popup,
+  marker: L.CircleMarker | L.Marker,
+  pinRadius: number,
+  occluders: ReturnType<typeof useOccluders> | { getAll: () => Array<{ id: string; getRect: () => DOMRect | null }> } | null,
+): void {
+  const container = popup.getElement?.();
+  if (!container) return;
+
+  // Reset any prior shift so the wrapper's bounding rect reflects
+  // Leaflet's NATIVE position (before our transform). Otherwise the
+  // measured `nativeGap` drifts on every call.
+  container.classList.remove('dw-popup-shifted', 'dw-popup-tightened');
+  container.style.removeProperty('--dw-popup-shift-x');
+  container.style.removeProperty('--dw-popup-shift-y');
+
+  const wrapper = container.querySelector('.leaflet-popup-content-wrapper') as HTMLElement | null;
+  if (!wrapper) return;
+
+  // Force a layout flush so the post-reset measurements are accurate.
+  // (Reading offsetHeight has the same effect; we use the wrapper's
+  // bounding rect anyway.)
+  const popupRect = wrapper.getBoundingClientRect();
+  if (popupRect.width <= 0 || popupRect.height <= 0) return;
+
+  const map = (marker as unknown as { _map?: L.Map })._map;
+  if (!map) return;
+  const latLng = (marker as L.CircleMarker).getLatLng();
+  const containerPoint = map.latLngToContainerPoint(latLng);
+  const mapRect = map.getContainer().getBoundingClientRect();
+  const pinViewportX = mapRect.left + containerPoint.x;
+  const pinViewportY = mapRect.top + containerPoint.y;
+
+  // Native gap: distance from wrapper BOTTOM (in viewport coords) to
+  // marker CENTER. Positive when wrapper is above marker (the only
+  // configuration Leaflet renders by default). Used to compute the
+  // shift needed to flip the popup to other sides.
+  const nativeGapPx = pinViewportY - popupRect.bottom;
+
+  const occluderList = occluders?.getAll?.() ?? [];
+  const visibleRect = getVisibleMapRect(mapRect, occluderList) ?? mapRect;
+
+  const direction = pickPopupDirection(
+    pinViewportX,
+    pinViewportY,
+    popupRect.width,
+    popupRect.height,
+    pinRadius,
+    visibleRect,
+  );
+
+  applyPopupDirection(popup, direction, popupRect.width, popupRect.height, pinRadius, nativeGapPx);
 }
 
 function InvalidateSize({ visible }: { visible: boolean }) {
@@ -1034,6 +1266,12 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
   const closeTimerRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   // Track popup elements by listing id so we can detect mouse-over-popup
   const popupElRef = useRef<Map<number, HTMLElement>>(new Map());
+  // Occluder registry — used by edge-aware popup positioning to keep
+  // popups inside the visible map rect (i.e. not behind the swipe-card,
+  // action-pill, or top nav).
+  const popupOcclusionRegistry = useOccluders();
+  const popupOcclusionRegistryRef = useRef(popupOcclusionRegistry);
+  popupOcclusionRegistryRef.current = popupOcclusionRegistry;
 
   // Keep stable refs for the toggle callbacks so popupopen handlers always see latest
   const onToggleFavoriteRef = useRef(onToggleFavorite);
@@ -1073,6 +1311,33 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
 
       // Track popup element for hover detection
       popupElRef.current.set(listing.id, container);
+
+      // Edge-aware positioning. The popup defaults to ABOVE the marker;
+      // if that would clip against the visible map rect, flip to bottom
+      // / right / left as needed. We re-measure on the NEXT frame because
+      // the DOM is laid out but image loads can change height; we also
+      // listen for image `load` events on the popup's hero photo and
+      // recompute then so the final measurement is accurate.
+      const marker = e.target as L.CircleMarker;
+      const pinRadius = (marker.getRadius?.() as number | undefined) ?? 8;
+      const reposition = () => {
+        try {
+          repositionPopupForViewport(popup, marker, pinRadius, popupOcclusionRegistryRef.current);
+        } catch (err) {
+          console.warn(`[popup] repositionPopupForViewport failed for #${listing.id}`, err);
+        }
+      };
+      // First pass: now (uses current measured size — works when image
+      // is cached). Second pass: next animation frame (after layout
+      // settles). Third pass: when the hero image loads (height may
+      // change once the photo decodes).
+      reposition();
+      requestAnimationFrame(reposition);
+      const heroImg = container.querySelector('[data-photo-img]') as HTMLImageElement | null;
+      if (heroImg && !heroImg.complete) {
+        heroImg.addEventListener('load', reposition, { once: true });
+        heroImg.addEventListener('error', reposition, { once: true });
+      }
 
       // When the mouse enters the popup, cancel any pending close timer
       const onPopupMouseEnter = () => {
@@ -1371,7 +1636,33 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
                   popupopen: (e) => {
                     const popup = (e as unknown as { popup: L.Popup }).popup;
                     const container = popup?.getElement?.();
-                    if (!container || container.getAttribute('data-cluster-delegated')) return;
+                    if (!container) return;
+
+                    // Edge-aware positioning for cluster popups too. The
+                    // cluster icon is a circle ~size/2 in radius (size in
+                    // {30, 36, 44}); pass half the icon size as the
+                    // approximate "pin radius" for collision math.
+                    const clusterMarker = e.target as L.Marker;
+                    const iconOptions = (clusterMarker.options.icon?.options ?? null) as
+                      | { iconSize?: [number, number] | L.Point }
+                      | null;
+                    let clusterRadius = 18;
+                    if (iconOptions?.iconSize) {
+                      const sz = iconOptions.iconSize as unknown as [number, number] | { x: number; y: number };
+                      const w = Array.isArray(sz) ? sz[0] : sz.x;
+                      clusterRadius = Math.max(12, w / 2);
+                    }
+                    const reposition = () => {
+                      try {
+                        repositionPopupForViewport(popup, clusterMarker, clusterRadius, popupOcclusionRegistryRef.current);
+                      } catch (err) {
+                        console.warn('[popup] cluster repositionPopupForViewport failed', err);
+                      }
+                    };
+                    reposition();
+                    requestAnimationFrame(reposition);
+
+                    if (container.getAttribute('data-cluster-delegated')) return;
                     container.setAttribute('data-cluster-delegated', '1');
                     L.DomEvent.disableClickPropagation(container);
                     container.addEventListener('click', (ev) => {
