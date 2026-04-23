@@ -482,7 +482,7 @@ export interface MapProps {
 /* ------------------------------------------------------------------ */
 /*  Viewport bounds watcher — fires onBoundsChange after idle period  */
 /*                                                                    */
-/*  1000ms debounce so users can pan/zoom across several regions      */
+/*  750ms debounce so users can pan/zoom across several regions       */
 /*  without every intermediate idle triggering a new search. The TTL  */
 /*  resets on every moveend, and any in-flight fetch from a previous  */
 /*  trigger is aborted by the caller (loadForViewport AbortController */
@@ -491,7 +491,7 @@ export interface MapProps {
 /*  isPanningRef is exposed so components in the page tree can defer or */
 /*  skip work while the user is actively dragging the map.              */
 /* ------------------------------------------------------------------ */
-const BOUNDS_DEBOUNCE_MS = 1000;
+const BOUNDS_DEBOUNCE_MS = 750;
 
 function BoundsWatcher({
   onBoundsChange,
