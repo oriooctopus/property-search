@@ -423,7 +423,7 @@ export async function POST(request: NextRequest) {
 
       const trimmed = {
         ...bestRow,
-        photo_urls: (bestRow.photo_urls ?? []).slice(0, 3),
+        photo_urls: (bestRow.photo_urls ?? []).slice(0, 10),
       };
 
       // Include commute meta for the returned listing if commute rules were
@@ -610,11 +610,11 @@ export async function POST(request: NextRequest) {
     // ---- 3. Apply the JS-side filters (perRoom pricing, scam filter).
     rows = applyJsFilters(rows, filters);
 
-    // ---- 4. Trim photo_urls to max 3 per listing to reduce payload size.
+    // ---- 4. Trim photo_urls to max 10 per listing to reduce payload size.
     //         Full photo set is only needed in ListingDetail (fetched separately).
     const trimmedRows = rows.map((r) => ({
       ...r,
-      photo_urls: (r.photo_urls ?? []).slice(0, 3),
+      photo_urls: (r.photo_urls ?? []).slice(0, 10),
     }));
 
     // ---- 5. Build commute-info map restricted to the returned listings.
