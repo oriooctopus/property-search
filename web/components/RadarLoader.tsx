@@ -15,13 +15,13 @@ export default function RadarLoader() {
   // single keyframe regardless of actual path length.
   const paths = [
     // NW → center
-    { d: 'M 8 24 H 40 V 56 H 80', delay: 0 },
+    { d: 'M 8 24 H 40 V 80 H 80', delay: 0 },
     // NE → center
-    { d: 'M 152 40 H 112 V 72 H 80', delay: 0.08 },
+    { d: 'M 152 40 H 112 V 80 H 80', delay: 0.08 },
     // SE → center
-    { d: 'M 152 136 H 104 V 96 H 80', delay: 0.16 },
+    { d: 'M 152 136 H 104 V 80 H 80', delay: 0.16 },
     // SW → center
-    { d: 'M 8 112 H 56 V 88 H 80', delay: 0.24 },
+    { d: 'M 8 112 H 56 V 80 H 80', delay: 0.24 },
   ];
 
   const TOTAL = 1.3; // seconds per loop
