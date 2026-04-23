@@ -26,6 +26,18 @@ Agents must check for these layout issues after any UI change:
 
 After every implementation agent completes, spawn the `verify` agent before reporting results to the user. Pass it a description of what the task was supposed to accomplish. Do not tell the user something is done until the verifier confirms it.
 
+## BLOCKING: Verify Agents Must Use Playwright Headless + a Dedicated Test Account
+
+When spawning the verify agent (or any agent that logs in to the app), the prompt MUST explicitly instruct:
+
+1. **Use Playwright in headless mode** for browser automation. Do NOT use Claude-in-Chrome MCP (which logs into whatever Chrome session the user has open — that's the user's real account). Do NOT default to whatever credentials happen to be in `web/.env.local` without checking who they belong to.
+2. **NEVER use `oliverullman@gmail.com` as the login.** That is the user's real personal account. Any data the verify agent saves (wishlist items, saved searches, hidden listings, preferred destination) will pollute the user's real account. It is the wrong audience.
+3. Use a **dedicated test account** — credentials must be a separate, sacrificial account whose data the user doesn't care about. As of this writing, `web/.env.local` has `TEST_USER_EMAIL=oliverullman@gmail.com` which is wrong and needs to be updated to a real test account before more verify runs that touch saved state.
+4. If the verify agent ONLY needs to read public state (no login required to test the change), skip login entirely.
+5. If a verify agent needs to mutate data to demonstrate something (e.g. favorite a listing, add a wishlist item), it MUST clean up after itself in the same run. No leftover test rows.
+
+This applies to every verify-agent spawn, every project. Repeat the rule explicitly in the spawn prompt — don't assume the agent will infer it.
+
 ## MANDATORY: Status Table on Every Response
 
 Every response must end with a compact status table of active work items. Done items drop off. Format:
