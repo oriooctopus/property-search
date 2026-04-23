@@ -1446,7 +1446,7 @@ function HomeInner() {
 
         {/* Preferred-destination pill — informational chip on every card,
             tap-to-popup with full transit breakdown. Doesn't filter results. */}
-        <div className={`flex items-center gap-2 px-4 py-2 ${isSwipeView ? '' : ''}`} style={{ borderBottom: '1px solid #2d333b' }}>
+        <div className="flex items-center gap-2 px-4 py-2" style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}>
           <SetDestinationPill />
         </div>
 
