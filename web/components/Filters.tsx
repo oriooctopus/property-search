@@ -105,6 +105,10 @@ interface FiltersProps {
   onChange: (filters: FiltersState) => void;
   listingCount?: number;
   viewToggle?: React.ReactNode;
+  /** Inline slot rendered as the FIRST child of Row 1 (left of saved-search tabs).
+   *  Used by the parent to drop the SetDestinationPill into the filters top bar
+   *  so it doesn't need its own dedicated row. */
+  destinationSlot?: React.ReactNode;
   userId?: string | null;
   savedSearches?: SavedSearchEntry[];
   onSaveSearch?: (name: string) => Promise<SavedSearchEntry | null>;
@@ -1256,7 +1260,7 @@ function FilterToggleButton({
   );
 }
 
-const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ filters, onChange, listingCount, viewToggle, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onLoginRequired, showHidden, onToggleShowHidden, myWishlists = [], sharedWishlists = [], selectedWishlist = null, onSelectWishlist, onCreateWishlist, onOpenWishlistManager }, ref) {
+const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ filters, onChange, listingCount, viewToggle, destinationSlot, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onLoginRequired, showHidden, onToggleShowHidden, myWishlists = [], sharedWishlists = [], selectedWishlist = null, onSelectWishlist, onCreateWishlist, onOpenWishlistManager }, ref) {
   const [openChip, setOpenChip] = useState<ChipId | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
@@ -2475,8 +2479,14 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
       className="pl-3 pr-2 sm:px-2 relative z-[1200]"
       style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}
     >
-      {/* Row 1 (always visible): Area tabs + listing count + Filters button + Sort + View toggle */}
+      {/* Row 1 (always visible): Destination pill + Area tabs + listing count + Filters button + Sort + View toggle */}
       <div className="flex items-center min-h-[36px] gap-1.5 sm:gap-3 overflow-visible">
+        {/* Inline destination pill — first child so it sits to the left of the
+            saved-search tabs scroll area. shrink-0 keeps it from collapsing. */}
+        {destinationSlot && (
+          <div className="shrink-0 flex items-center">{destinationSlot}</div>
+        )}
+
         {/* Saved search tabs — horizontally scrollable, hidden scrollbar */}
         <div
           className="flex items-center flex-1 min-w-0 overflow-x-auto"
@@ -2639,6 +2649,16 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                 </button>
               </div>
             </div>
+
+            {/* Destination section — mirrors the inline destination pill in
+                the top bar so the mobile filter sheet (used in swipe view where
+                the top bar is hidden) can still set/edit a preferred destination. */}
+            {destinationSlot && (
+              <div className="px-4 pb-4" data-testid="mobile-filters-destination" style={{ borderBottom: '1px solid #2d333b' }}>
+                <div className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: '#8b949e' }}>Destination</div>
+                <div className="flex flex-wrap items-center gap-2">{destinationSlot}</div>
+              </div>
+            )}
 
             {/* Sort section */}
             <div className="px-4 pb-4" style={{ borderBottom: '1px solid #2d333b' }}>
