@@ -537,6 +537,7 @@ export default function SwipeView({
         name: station.name,
         lines: station.lines,
         walkMin: walkMinFromMiles(distMi),
+        distMi,
       })));
     } else {
       setHoveredStations(null);
@@ -556,6 +557,7 @@ export default function SwipeView({
         name: station.name,
         lines: station.lines,
         walkMin: walkMinFromMiles(distMi),
+        distMi,
       })));
     }
   }, [showMobileMap, currentListing?.id, currentListing?.lat, currentListing?.lon]);
