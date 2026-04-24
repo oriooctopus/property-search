@@ -404,7 +404,7 @@ export default function SwipeCard({
     ? new Date(listing.list_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : null;
 
-  // Move-in / availability copy. Always renders — null → "Move-in TBD",
+  // Move-in / availability copy. Always renders — null → "Move-in unknown",
   // past-or-today → "Available now", future → "Available <date>".
   // See web/lib/format-date.ts for canonical formatting.
   const availabilityLabel = formatAvailabilityDate(listing.availability_date);
@@ -825,7 +825,7 @@ export default function SwipeCard({
               </div>
             )}
 
-            {/* Move-in / availability date — always renders ("Move-in TBD" if unknown) */}
+            {/* Move-in / availability date — always renders ("Move-in unknown" if not set) */}
             <div className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
               {availabilityLabel}
             </div>
