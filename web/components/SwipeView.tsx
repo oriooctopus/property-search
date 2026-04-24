@@ -620,30 +620,35 @@ export default function SwipeView({
         }
         setSavedIds((prev) => { const next = new Set(prev); next.add(listing.id); return next; });
       }
-      // 'down' = pass — move to back of queue, no persistent action
+      // 'down' = pass / "later" — in-session only, no persistent action.
+      // Treated the same as left/right for deck purposes: the listing is
+      // added to swipedIds so it won't reappear later in the session. This
+      // fixes the "last card before empty state is a repeat" bug where a
+      // 'down'-swiped card could resurface when the user finished the deck
+      // and the restore-position effect clamped currentIndex back into the
+      // (still-larger) geoSorted set. Until filters change or the page
+      // reloads, a card the user has swiped on never shows up again.
 
-      if (direction === 'down') {
-        // Just advance index, listing stays in deck (will appear at end via looping)
-        setUndoStack((prev) => [
-          ...prev.slice(-9),
-          { index: currentIndex, listingId: listing.id, action: direction },
-        ]);
-        setCurrentIndex((prev) => prev + 1);
-      } else {
-        // Track as swiped — don't increment currentIndex because removing
-        // the item from swipedIds causes the deck to recompute, shifting the
-        // next item into the current index position automatically.
-        setSwipedIds((prev) => {
-          const next = new Set(prev);
-          next.add(listing.id);
-          return next;
-        });
+      // Track as swiped — don't increment currentIndex because removing
+      // the item from swipedIds causes the deck to recompute, shifting the
+      // next item into the current index position automatically. When the
+      // user swipes the LAST remaining card the deck shrinks to length 0,
+      // currentListing becomes null, and the empty state renders.
+      setSwipedIds((prev) => {
+        const next = new Set(prev);
+        next.add(listing.id);
+        return next;
+      });
 
-        setUndoStack((prev) => [
-          ...prev.slice(-9),
-          { index: currentIndex, listingId: listing.id, action: direction, wishlistId: direction === 'right' ? (resolvedWishlistId ?? undefined) : undefined },
-        ]);
-      }
+      setUndoStack((prev) => [
+        ...prev.slice(-9),
+        {
+          index: currentIndex,
+          listingId: listing.id,
+          action: direction,
+          wishlistId: direction === 'right' ? (resolvedWishlistId ?? undefined) : undefined,
+        },
+      ]);
     },
     [currentIndex, deck, userId, onHideListing, resolvedWishlistId, addToWishlist, onLoginRequired],
   );
@@ -655,37 +660,33 @@ export default function SwipeView({
     if (undoStack.length === 0) return;
     const last = undoStack[undoStack.length - 1];
 
-    // Reverse: remove from swiped set if it was hidden/saved
-    if (last.action !== 'down') {
-      setSwipedIds((prev) => {
-        const next = new Set(prev);
-        next.delete(last.listingId);
-        return next;
-      });
+    // Reverse: remove from swipedIds for ALL actions (left/right/down).
+    // 'down' now also adds to swipedIds (see handleSwipe) so undoing it
+    // must symmetrically remove the id, otherwise the card stays gone.
+    setSwipedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(last.listingId);
+      return next;
+    });
 
-      if (last.action === 'left') {
-        onUnhideListing?.(last.listingId);
-      }
-
-      if (last.action === 'right') {
-        setSavedIds((prev) => { const next = new Set(prev); next.delete(last.listingId); return next; });
-        // Remove from the wishlist that was used at save time
-        const wlId = last.wishlistId ?? resolvedWishlistId;
-        if (wlId) {
-          removeFromWishlist.mutate({ wishlistId: wlId, listingId: last.listingId });
-        }
-      }
-      // After removing from swipedIds the deck recomputes; find the re-inserted
-      // item's new index and restore currentIndex to it.
-      pendingUndoId.current = last.listingId;
+    if (last.action === 'left') {
+      onUnhideListing?.(last.listingId);
     }
+
+    if (last.action === 'right') {
+      setSavedIds((prev) => { const next = new Set(prev); next.delete(last.listingId); return next; });
+      // Remove from the wishlist that was used at save time
+      const wlId = last.wishlistId ?? resolvedWishlistId;
+      if (wlId) {
+        removeFromWishlist.mutate({ wishlistId: wlId, listingId: last.listingId });
+      }
+    }
+    // After removing from swipedIds the deck recomputes; find the re-inserted
+    // item's new index and restore currentIndex to it. This applies to all
+    // three swipe directions now that 'down' also tracks via swipedIds.
+    pendingUndoId.current = last.listingId;
 
     setUndoStack((prev) => prev.slice(0, -1));
-    // Only decrement index for 'down' (pass) — for left/right the deck
-    // recomputes to re-insert the item at the same position.
-    if (last.action === 'down') {
-      setCurrentIndex((prev) => Math.max(0, prev - 1));
-    }
   }, [undoStack, onUnhideListing, resolvedWishlistId, removeFromWishlist]);
 
   // ---------------------------------------------------------------------------
