@@ -1881,11 +1881,11 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
                 permanent
                 direction="top"
                 // Positive y pulls the tooltip DOWN toward the dot
-                // (direction="top" places it above; we want it tight, ~3px
-                // gap between pill bottom and dot top edge). Combined with
+                // (direction="top" places it above; we want ~8px gap between
+                // pill bottom and dot top edge). Combined with
                 // tooltipAnchor=[0,-10] in makeStationPulseIcon and zeroed
                 // Leaflet margins in STATION_PULSE_STYLES.
-                offset={[0, 4]}
+                offset={[0, -4]}
                 className="station-hover-tooltip"
               >
                 {typeof station.distMi === 'number' && (
