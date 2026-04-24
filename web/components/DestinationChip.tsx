@@ -234,20 +234,41 @@ function CommutePopup({ listing, destinations, onClose }: PopupProps) {
   );
 }
 
+/**
+ * Two-destination color palette (matches mockup Option A exactly).
+ * Index aligns with the destination index — destination 0 is green,
+ * destination 1 is amber.
+ */
+const DUAL_PALETTE = [
+  {
+    bg: 'rgba(126,231,135,0.08)',
+    border: 'rgba(126,231,135,0.3)',
+    text: '#7ee787',
+  },
+  {
+    bg: 'rgba(240,184,120,0.08)',
+    border: 'rgba(240,184,120,0.3)',
+    text: '#f0b878',
+  },
+] as const;
+
 export default function DestinationChip({
   listing,
   destinations,
   commutes,
   className,
 }: DestinationChipProps) {
-  const [popupOpen, setPopupOpen] = useState(false);
+  // `popupIndex` tracks which destination's popup is open, or null when closed.
+  // For single-destination it's always 0 when open. For two-destinations it
+  // mirrors the pill the user tapped so the popup focuses on that destination.
+  const [popupIndex, setPopupIndex] = useState<number | null>(null);
 
   if (destinations.length === 0) return null;
 
-  const handleClick = (e: React.MouseEvent) => {
+  const openPopup = (index: number) => (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    setPopupOpen(true);
+    setPopupIndex(index);
   };
 
   // Single-destination layout — preserved exactly as the previous version
@@ -265,7 +286,7 @@ export default function DestinationChip({
           onClick={(e) => e.stopPropagation()}
         >
           <ButtonBase
-            onClick={handleClick}
+            onClick={openPopup(0)}
             className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium border whitespace-nowrap"
             style={{
               backgroundColor: 'rgba(255,255,255,0.04)',
@@ -281,66 +302,69 @@ export default function DestinationChip({
             <span>{label}</span>
           </ButtonBase>
         </div>
-        {popupOpen && (
-          <CommutePopup listing={listing} destinations={destinations} onClose={() => setPopupOpen(false)} />
+        {popupIndex !== null && (
+          <CommutePopup listing={listing} destinations={destinations} onClose={() => setPopupIndex(null)} />
         )}
       </>
     );
   }
 
-  // Two-destination layout — both commutes inside one chip, separated by a
-  // thin divider. Each segment has its own mode icon + minutes ("12m / 18m").
-  const ariaParts = destinations.map((d, i) => {
-    const c = commutes[i];
-    const mode = (c?.mode ?? d.mode) as 'walk' | 'transit' | 'bike';
-    return `${singleChipText(c, mode)} to ${destinationShortName(d, 32)}`;
-  });
-  const ariaLabel = `Commute: ${ariaParts.join('; ')}. Tap for details.`;
+  // Two-destination layout — Option A: two stacked color-coded pills, each
+  // showing destination name + mode icon + time. Tapping a pill opens the
+  // commute popup focused on that destination.
+  const popupDestinations =
+    popupIndex !== null && popupIndex >= 0 && popupIndex < destinations.length
+      ? [destinations[popupIndex]]
+      : destinations;
 
   return (
     <>
       <div
-        className={`flex items-center gap-1.5 ${className ?? ''}`}
+        className={`flex flex-col items-start gap-1 ${className ?? ''}`}
         style={{ marginTop: 1 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <ButtonBase
-          onClick={handleClick}
-          className="inline-flex items-center rounded-full border whitespace-nowrap"
-          style={{
-            backgroundColor: 'rgba(255,255,255,0.04)',
-            borderColor: '#2d333b',
-            color: '#c9d1d9',
-            lineHeight: 1.2,
-          }}
-          aria-label={ariaLabel}
-        >
-          {destinations.map((d, i) => {
-            const c = commutes[i];
-            const mode = (c?.mode ?? d.mode) as 'walk' | 'transit' | 'bike';
-            const minutes = dualMinutesText(c);
-            const isFirst = i === 0;
-            return (
-              <span
-                key={i}
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium"
-                style={
-                  isFirst
-                    ? undefined
-                    : { borderLeft: '1px solid #2d333b' }
-                }
-              >
-                <span className="inline-flex items-center justify-center" style={{ color: '#8b949e' }}>
-                  {modeIcon(mode)}
-                </span>
-                <span>{minutes}</span>
+        {destinations.map((d, i) => {
+          const c = commutes[i];
+          const mode = (c?.mode ?? d.mode) as 'walk' | 'transit' | 'bike';
+          const minutes = dualMinutesText(c);
+          const palette = DUAL_PALETTE[i] ?? DUAL_PALETTE[0];
+          const destName = destinationShortName(d, 12);
+          const ariaText = `Commute to ${destinationShortName(d, 32)}: ${singleChipText(c, mode)}`;
+          return (
+            <ButtonBase
+              key={i}
+              onClick={openPopup(i)}
+              className="inline-flex items-center gap-1.5 rounded-full border whitespace-nowrap"
+              style={{
+                backgroundColor: palette.bg,
+                borderColor: palette.border,
+                color: palette.text,
+                paddingLeft: 8,
+                paddingRight: 8,
+                paddingTop: 1,
+                paddingBottom: 1,
+                fontSize: 11,
+                fontWeight: 500,
+                lineHeight: 1.2,
+              }}
+              aria-label={`${ariaText}. Tap for details.`}
+            >
+              <span className="inline-flex items-center justify-center" style={{ opacity: 0.85 }}>
+                {modeIcon(mode)}
               </span>
-            );
-          })}
-        </ButtonBase>
+              <span style={{ fontWeight: 600 }}>{destName}</span>
+              <span style={{ opacity: 0.9 }}>{minutes}</span>
+            </ButtonBase>
+          );
+        })}
       </div>
-      {popupOpen && (
-        <CommutePopup listing={listing} destinations={destinations} onClose={() => setPopupOpen(false)} />
+      {popupIndex !== null && (
+        <CommutePopup
+          listing={listing}
+          destinations={popupDestinations}
+          onClose={() => setPopupIndex(null)}
+        />
       )}
     </>
   );
