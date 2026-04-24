@@ -213,17 +213,12 @@ body[data-swipe-mobile="1"] [data-swipe-sidebar="1"] {
   }
 }
 
-/* Mobile (<600px) — hide the global Navbar across ALL views (list, map,
-   swipe). The merged MobileMenuPill (top-right) replaces the navbar's
-   avatar/login affordance, and the sidebar Filters bar above the listing
-   grid still hosts the Filters/sort/view-toggle row in list view. Without
-   this rule, list view on mobile would render BOTH the navbar avatar AND
-   the merged pill — duplicate UI. Desktop is unaffected. */
-@media (max-width: 599px) {
-  nav[data-global-nav="1"] {
-    display: none !important;
-  }
-}
+/* Mobile list view keeps the global Navbar (it's the only path to Profile /
+   wishlists / sign-out there). The merged MobileMenuPill is also conditionally
+   unmounted on list view in page.tsx so we don't double-render the avatar.
+   Swipe view continues to hide the nav via the body[data-swipe-mobile="1"]
+   rule above — the merged pill takes over in that mode. Desktop is
+   unaffected by either rule. */
 
 /* Lock the viewport when mobile swipe view is active.
    Prevents the user from vertically scrolling the whole page (which would

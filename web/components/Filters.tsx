@@ -367,7 +367,7 @@ const NYC_PARKS = [
   { name: 'Madison Square Park', borough: 'Manhattan' },
 ];
 
-function commuteLabel(rules: CommuteRule[]): string {
+export function commuteLabel(rules: CommuteRule[]): string {
   if (rules.length === 0) return 'Commute';
   if (rules.length === 1) {
     const r = rules[0];

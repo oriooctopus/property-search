@@ -47,8 +47,6 @@ export interface SwipeViewProps {
   onUnhideListing?: (id: number) => void;
   onExpandDetail?: (listing: SwipeListing) => void;
   onSwitchView?: () => void;
-  /** Called when the user taps the map icon in the mobile unified bottom pill */
-  onSwitchToMap?: () => void;
   // Map props passthrough
   onBoundsChange?: (bounds: ViewportBounds) => void;
   onMapMove?: (center: { lat: number; lng: number }, zoom: number) => void;
@@ -90,20 +88,20 @@ interface UndoEntry {
 /**
  * Shared empty-state panel for the mobile SwipeView.
  *
- * Two paths converged here so the "no listings" and "swiped through
- * everything" states can never silently drift apart again:
- *  - Both states show the same shell (centered card, identical bg/border).
- *  - Both states offer the SAME CTAs: a primary "Find nearest" rendered
- *    via `extra` (parent supplies <GoToNearestMatch variant="primary" />),
- *    and a secondary "Clear filters" rendered when `onClearFilters` is
- *    given. The "swiped through" branch additionally shows a "Reset" link
- *    so the user can replay the deck.
+ * Both the "no listings" and "swiped through everything" states render
+ * the same shell (centered card, identical bg/border) and the same CTAs:
+ *  - "Find nearest" + "Unhide hidden listings" rendered via `extra`
+ *    (parent supplies the two pill buttons).
+ *  - Secondary "Clear filters" link below, rendered when `onClearFilters`
+ *    is given.
  *
- * The legacy "Switch to list view" CTA is GONE from both branches. On
- * mobile users want to fix filters / find a nearby match in place rather
- * than bounce out of swipe mode. Adding it back means the user has to make
- * the same change in TWO places — that bug is what produced the second
- * "Switch to list" sighting after commit fda31dc.
+ * The legacy "Switch to list view" CTA is GONE from both branches — on
+ * mobile users fix filters / find a nearby match in place. The legacy
+ * "Reset deck" link is also gone (it duplicates "Unhide listings").
+ *
+ * Layout is intentionally compact so it fits the smallest mobile
+ * viewport (iPhone SE, 375x667) without scroll/overflow: emoji + title
+ * + 1 line of subtext + a single horizontal row of CTA buttons.
  */
 function MobileSwipeEmptyState({
   title,
@@ -111,41 +109,32 @@ function MobileSwipeEmptyState({
   emoji,
   extra,
   onClearFilters,
-  onReset,
 }: {
   title: string;
   subtitle: string;
   emoji?: string;
   extra?: React.ReactNode;
   onClearFilters?: () => void;
-  onReset?: () => void;
 }) {
   return (
     <div
-      className="flex-1 flex flex-col items-center justify-center gap-4 text-center m-3 rounded-xl"
+      className="flex-1 flex flex-col items-center justify-center gap-2 text-center m-3 px-4 py-5 rounded-xl"
       style={{
         backgroundColor: 'rgba(28, 32, 40, 0.97)',
         border: '1px solid #2d333b',
       }}
     >
-      {emoji && <div className="text-4xl select-none">{emoji}</div>}
-      <div className="text-white text-lg font-semibold">{title}</div>
-      <div className="text-sm" style={{ color: '#8b949e' }}>
+      {emoji && <div className="text-3xl select-none leading-none">{emoji}</div>}
+      <div className="text-white text-base font-semibold">{title}</div>
+      <div className="text-xs" style={{ color: '#8b949e' }}>
         {subtitle}
       </div>
-      <div className="flex flex-col items-center gap-2">
-        {extra}
-        {onClearFilters && (
-          <TextButton variant="muted" onClick={onClearFilters}>
-            Clear filters
-          </TextButton>
-        )}
-        {onReset && (
-          <TextButton variant="muted" onClick={onReset}>
-            Reset deck
-          </TextButton>
-        )}
-      </div>
+      {extra}
+      {onClearFilters && (
+        <TextButton variant="muted" onClick={onClearFilters}>
+          Clear filters
+        </TextButton>
+      )}
     </div>
   );
 }
@@ -184,7 +173,6 @@ export default function SwipeView({
   onUnhideListing,
   onExpandDetail,
   onSwitchView,
-  onSwitchToMap,
   onBoundsChange,
   onMapMove,
   suppressBoundsRef,
@@ -699,15 +687,6 @@ export default function SwipeView({
       setCurrentIndex((prev) => Math.max(0, prev - 1));
     }
   }, [undoStack, onUnhideListing, resolvedWishlistId, removeFromWishlist]);
-
-  // ---------------------------------------------------------------------------
-  // Reset
-  // ---------------------------------------------------------------------------
-  const handleReset = () => {
-    setSwipedIds(new Set());
-    setCurrentIndex(0);
-    setUndoStack([]);
-  };
 
   // ---------------------------------------------------------------------------
   // Keyboard shortcuts
@@ -1370,27 +1349,6 @@ export default function SwipeView({
                     <Heart size={21} strokeWidth={2.2} color="#ec4899" />
                   </button>
 
-                  <div style={{ width: 1, height: 28, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
-
-                  {/* Map icon (edge, right) — switch to map view */}
-                  <button
-                    onClick={() => onSwitchToMap?.()}
-                    aria-label="Map view"
-                    className="flex items-center justify-center cursor-pointer transition-colors"
-                    style={{
-                      width: 60,
-                      height: 52,
-                      background: 'none',
-                      border: 'none',
-                      color: '#8b949e',
-                    }}
-                  >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6" />
-                      <line x1="8" y1="2" x2="8" y2="18" />
-                      <line x1="16" y1="6" x2="16" y2="22" />
-                    </svg>
-                  </button>
                 </div>
               </div>,
               document.body,
@@ -1454,15 +1412,13 @@ export default function SwipeView({
         ) : (
           /* Empty state — user has swiped through every card in the
              current deck. Same CTAs as the no-results branch (Find
-             nearest + Clear filters), plus a "Reset deck" link to
-             replay the cards we already filtered/viewed. */
+             nearest, Unhide listings, Clear filters). */
           <MobileSwipeEmptyState
             emoji="🎉"
             title="You've seen all listings!"
-            subtitle="Find another nearby, clear your filters, or reset the deck."
+            subtitle="Find another nearby or unhide listings to keep browsing."
             extra={emptyStateExtra}
             onClearFilters={onClearFilters}
-            onReset={handleReset}
           />
         )}
       </div>

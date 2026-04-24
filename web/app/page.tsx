@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase-browser';
 import type { Database } from '@/lib/types';
 import Map from '@/components/Map';
-import Filters, { type FiltersState, type FiltersHandle, type SortField, type MaxListingAge } from '@/components/Filters';
+import Filters, { type FiltersState, type FiltersHandle, type SortField, type MaxListingAge, commuteLabel } from '@/components/Filters';
 import { type CommuteInfo } from '@/components/ListingCard';
 import VirtualListingGrid, { type VirtualListingGridHandle } from '@/components/VirtualListingGrid';
 import ListingDetail from '@/components/ListingDetail';
@@ -686,7 +686,17 @@ function HomeInner() {
   const [detailListing, setDetailListing] = useState<Listing | null>(null);
   const [mobileView, setMobileView] = useState<'list' | 'map' | 'swipe'>(() => {
     const v = searchParams.get('view');
-    if (v && VALID_VIEWS.has(v)) return v as 'list' | 'map' | 'swipe';
+    if (v && VALID_VIEWS.has(v)) {
+      // Mobile no longer exposes a 'map' view — swipe IS effectively the map
+      // view on mobile (full-screen Leaflet underneath the swipe card). If a
+      // shared link or stale URL still carries ?view=map on a narrow viewport,
+      // promote it to 'swipe' so the user lands on the right surface and the
+      // bottom-nav highlight matches.
+      if (v === 'map' && typeof window !== 'undefined' && window.innerWidth < 600) {
+        return 'swipe';
+      }
+      return v as 'list' | 'map' | 'swipe';
+    }
     // Mobile users land on the swipe view by default — it's the better
     // mobile experience. Desktop continues to default to the list view.
     // SSR-safe: `window` is undefined on the server, so default to 'list'
@@ -702,14 +712,22 @@ function HomeInner() {
   // ?view= param was supplied, switch the default to swipe. This handles the
   // SSR case where window is unavailable on the server and we initially
   // returned 'list'. We only run on first mount.
+  // ALSO normalises ?view=map on mobile to ?view=swipe — the SSR pass cannot
+  // measure the viewport, so a server-rendered tree may briefly land on 'map'
+  // if the URL specifies it; this effect demotes it to 'swipe' on hydrate.
   const didDefaultMobileViewRef = useRef(false);
   useEffect(() => {
     if (didDefaultMobileViewRef.current) return;
     didDefaultMobileViewRef.current = true;
     if (typeof window === 'undefined') return;
-    const hasExplicitView = !!searchParams.get('view');
-    if (hasExplicitView) return;
-    if (window.innerWidth < 600) {
+    const isNarrow = window.innerWidth < 600;
+    const explicitView = searchParams.get('view');
+    if (isNarrow && explicitView === 'map') {
+      setMobileView('swipe');
+      return;
+    }
+    if (explicitView) return;
+    if (isNarrow) {
       setMobileView('swipe');
     }
     // We intentionally read searchParams once at mount; the `view` param is
@@ -1185,8 +1203,11 @@ function HomeInner() {
 
   // Mobile-swipe variant: shorter "Find nearest" label and primary-button
   // styling so it reads as the foreground CTA in the swipe empty state.
+  // Two CTAs sit side-by-side on a single row (with flex-wrap as a safety
+  // net for narrow viewports) so the empty-state card stays compact on
+  // iPhone SE (375x667) without horizontal scroll.
   const swipeNearestEmptyExtra = (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-row flex-wrap items-center justify-center gap-2">
       <GoToNearestMatch
         getFiltersPayload={getNearestSearchPayload}
         onMatchSelected={handleNearestMatchSelected}
@@ -1225,6 +1246,14 @@ function HomeInner() {
       includeNaAvailableDate: false,
       commuteRules: [],
     });
+  }, []);
+
+  // Clears ONLY the GPS / location-based filter (commute rules). Used by the
+  // list-view banner that surfaces when a commute rule is narrowing the
+  // result set — gives the user a one-click escape hatch without losing
+  // their other filters (price/beds/sqft/etc).
+  const handleClearGpsFilters = useCallback(() => {
+    setFilters((prev) => ({ ...prev, commuteRules: [] }));
   }, []);
 
   // -----------------------------------------------------------------------
@@ -1564,6 +1593,51 @@ function HomeInner() {
           />
         </div>
 
+        {/* GPS-filter banner — list view only.
+            Surfaces an explicit explanation that results are being narrowed
+            by a commute rule (the only true GPS filter today; preferred
+            destinations alone don't filter, they just chip the destination).
+            Includes a Clear button that wipes ONLY the commute rules so the
+            user keeps their other filters (price/beds/etc) intact. Hidden on
+            swipe + map views since those surfaces don't need a banner: swipe
+            already shows match counts inline, and map view shows the
+            commuted zone visually. */}
+        {!isSwipeView && !isMapView && filters.commuteRules.length > 0 && (
+          <div
+            data-testid="gps-filter-banner"
+            className="flex items-center gap-2 px-3 py-2 text-xs"
+            style={{
+              backgroundColor: 'rgba(88, 166, 255, 0.08)',
+              borderBottom: '1px solid rgba(88, 166, 255, 0.18)',
+              color: '#c9d1d9',
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}>
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            <span className="flex-1 min-w-0 truncate">
+              Filtered by commute time to{' '}
+              <span style={{ color: '#e1e4e8', fontWeight: 600 }}>
+                {commuteLabel(filters.commuteRules)}
+              </span>
+            </span>
+            <button
+              type="button"
+              onClick={handleClearGpsFilters}
+              data-testid="gps-filter-banner-clear"
+              className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap transition-colors duration-150 cursor-pointer"
+              style={{
+                background: 'rgba(255,255,255,0.06)',
+                color: '#58a6ff',
+                border: '1px solid rgba(88,166,255,0.3)',
+              }}
+            >
+              Clear
+            </button>
+          </div>
+        )}
+
         <div className="relative flex-1 min-h-0 flex flex-col">
           {!isSwipeView && (
             <>
@@ -1706,7 +1780,6 @@ function HomeInner() {
             onUnhideListing={(id) => unhideMutation.mutate(id)}
             onExpandDetail={(listing) => { setSelectedId(listing.id); setDetailListing(activeFilteredListings.find(l => l.id === listing.id) ?? null); }}
             onSwitchView={() => switchMobileView('list')}
-            onSwitchToMap={() => switchMobileView('map')}
             topInset={sidebarHeight}
             onBoundsChange={handleBoundsChange}
             onMapMove={handleMapMove}
@@ -1723,9 +1796,22 @@ function HomeInner() {
             onClearFilters={handleClearAllFilters}
           />
 
-          {/* Loading spinner overlay for swipe mode */}
+          {/* Loading spinner overlay for swipe mode.
+              Anchored to the same `top` as the merged MobileMenuPill
+              (env(safe-area-inset-top) + 12px) and given a matching 36px
+              min-height so its vertical centerline lines up with the pill on
+              the right. Without this, the chip used `top-3` (12px) inside the
+              swipe panel — which sits a few pixels lower than the page-level
+              MobileMenuPill on notched devices because the pill's `top`
+              already includes safe-area-inset-top. */}
           {(viewportLoading || commuteLoading) && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[500] pointer-events-none">
+            <div
+              className="absolute left-1/2 -translate-x-1/2 z-[500] pointer-events-none flex items-center"
+              style={{
+                top: 'calc(env(safe-area-inset-top) + 12px)',
+                minHeight: 36,
+              }}
+            >
               <div
                 className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
                 style={{
@@ -1753,20 +1839,31 @@ function HomeInner() {
       {/* Toast */}
       {toastEl}
 
-      {/* Merged "Filters | Avatar" pill (top-right, mobile-only).
+      {/* Merged "Filters | Avatar" pill (top-right, mobile swipe view only).
           Replaces the standalone floating Filters pill that used to live
-          inside SwipeView. Renders on mobile in BOTH list and swipe views
-          because the global Navbar is hidden on mobile — so the avatar half
-          is the only path to Profile / wishlists / sign-out at <600px.
-          See globals.css `body.mobile-merged-pill` rule for nav hiding. */}
-      <MobileMenuPill
-        userId={userId}
-        userEmail={userEmail}
-        onOpenFilters={() => filtersHandleRef.current?.openMobileSheet()}
-        onOpenManageWishlists={() => setManageWishlistsOpen(true)}
-      />
+          inside SwipeView. Mounted only when `isSwipeView` is true because
+          the global Navbar is hidden in swipe view (see globals.css
+          `body[data-swipe-mobile="1"] nav` rule) — the avatar half is the
+          only path to Profile / wishlists / sign-out there. In list view on
+          mobile the navbar comes back, so this pill would just duplicate the
+          avatar; we unmount it instead of relying on CSS to hide it so a
+          stale dropdown can't linger across view switches. The component
+          itself hides on desktop via its own `min-[600px]:hidden`. */}
+      {isSwipeView && (
+        <MobileMenuPill
+          userId={userId}
+          userEmail={userEmail}
+          onOpenFilters={() => filtersHandleRef.current?.openMobileSheet()}
+          onOpenManageWishlists={() => setManageWishlistsOpen(true)}
+        />
+      )}
 
-      {/* Mobile bottom nav — view mode toggle (list/swipe/map).
+      {/* Mobile bottom nav — view mode toggle (list/swipe).
+          Map is intentionally absent on mobile: the swipe view IS effectively
+          the map view (full-screen Leaflet underneath the swipe card), so a
+          dedicated map mode would just duplicate that surface with a less
+          useful empty top. Desktop still keeps all 3 modes (list/swipe/map)
+          via the SegmentedControl in the Filters bar.
           Hidden in swipe view: SwipeView renders its own unified pill that
           combines the view-mode toggle with the X/undo/heart swipe actions. */}
       <div
@@ -1799,16 +1896,6 @@ function HomeInner() {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="2" y="4" width="14" height="18" rx="2" />
                   <rect x="8" y="2" width="14" height="18" rx="2" />
-                </svg>
-              ),
-            },
-            {
-              value: 'map' as const,
-              label: 'Map',
-              icon: (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
-                  <circle cx="12" cy="10" r="3" />
                 </svg>
               ),
             },
