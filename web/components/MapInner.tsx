@@ -199,71 +199,82 @@ const STATION_PULSE_STYLES = `
 `;
 
 /* ------------------------------------------------------------------ */
-/*  Active-pin hero styles — dominant, multi-layer, gentle breathing   */
+/*  Active-pin hero styles — teardrop pin (Option B from mockup)       */
 /* ------------------------------------------------------------------ */
 // Design goals (see CLAUDE.md layout checks + feedback commit):
 //   - Active pin must be the unmistakable hero of the map, dominating
 //     numbered cluster bubbles (~30–44px) which otherwise outweigh it.
-//   - Three visual layers: outer soft halo, middle colored ring, inner
-//     solid dot — reads as a "target lock" rather than a radius.
-//   - Hot saturated color (#00ff88 neon green) chosen for maximum
-//     contrast against dark CARTO tiles AND the cluster bubbles (which
-//     are dark-fill / gray-border). Green also aligns with brand accent.
-//   - Gentle "breathing" pulse on OUTER halo ONLY — opacity 0.35 → 0.6
-//     and scale 1 → 1.15, 2.4s cycle. Explicitly non-blinking. User
+//   - Two visual layers: outer soft halo around the bulb + classic
+//     teardrop silhouette (Maps-style "place" pin) for differentiation
+//     from round MTA subway dots. Even when the brand green color is
+//     close to a transit color (e.g. G train #6CBE45), the SHAPE alone
+//     signals "map pin, not transit stop."
+//   - Brand green (#7ee787) per the mockup — replaces the hotter
+//     #00ff88 neon. Subtle dark outline on the SVG path provides
+//     separation from light backgrounds; outer drop-shadow glow keeps
+//     the pin readable on dark CARTO tiles.
+//   - Gentle "breathing" pulse on OUTER halo ONLY — opacity 0.40 → 0.65
+//     and scale 1 → 1.12, 2.4s cycle. Explicitly non-blinking. User
 //     feedback said they dislike blinking; breathe must be subtle.
+//   - Geographic anchor is the POINT of the teardrop (bottom tip), not
+//     the center of the bulb. iconAnchor is set accordingly so the
+//     listing's lat/lon sits exactly under the tip.
+//   - Halo stays centered on the bulb (upper round portion), not on
+//     the geographic anchor — that's why the halo offset is shifted up
+//     from container center.
 //   - Rendered in markerPane (via divIcon Marker) with zIndexOffset
 //     so it always beats cluster bubbles in z-order.
 const ACTIVE_PIN_STYLES = `
   @keyframes dw-active-pin-breathe {
     0%, 100% {
       opacity: 0.40;
-      transform: scale(1);
+      transform: translate(-50%, -50%) scale(1);
     }
     50% {
       opacity: 0.65;
-      transform: scale(1.12);
+      transform: translate(-50%, -50%) scale(1.12);
     }
   }
   .dw-active-hero {
     pointer-events: none;
   }
+  /* Halo centered around the BULB (top of teardrop), not the container
+     center. Container is 64×64 with iconAnchor at (32, 52); the bulb
+     center sits at container coords (32, 26), so the halo's center
+     needs to be at (32, 26) — i.e. top:26px, left:32px. We use
+     top/left in px (relative to the 64×64 container) and the inline
+     transform translate to center, which composes with the keyframe
+     scale via the keyframe's own translate. */
   .dw-active-hero__halo {
     position: absolute;
-    top: 50%;
-    left: 50%;
+    top: 26px;
+    left: 32px;
     width: 64px;
     height: 64px;
-    margin: -32px 0 0 -32px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(0,255,136,0.55) 0%, rgba(0,255,136,0.25) 45%, rgba(0,255,136,0) 75%);
+    background: radial-gradient(circle, rgba(126,231,135,0.55) 0%, rgba(126,231,135,0.25) 45%, rgba(126,231,135,0) 75%);
+    transform: translate(-50%, -50%);
     animation: dw-active-pin-breathe 2.4s ease-in-out infinite;
     will-change: opacity, transform;
   }
-  .dw-active-hero__ring {
+  /* Teardrop SVG positioned so its point (SVG coord 14,40) sits at the
+     container's anchor point (32, 52). SVG is 28w × 40h, so top-left
+     of the SVG goes at container (18, 12). */
+  .dw-active-hero__pin {
     position: absolute;
-    top: 50%;
-    left: 50%;
+    top: 12px;
+    left: 18px;
     width: 28px;
-    height: 28px;
-    margin: -14px 0 0 -14px;
-    border-radius: 50%;
-    /* Solid green dot — no inner core, no inner stroke. The previous
-       design had a translucent green fill + 3px green border + a white
-       (or blue when saved) inner dot. User feedback: the inner dot read
-       as a separate "blue center" against the green ring, which looked
-       like a target reticle rather than a single selected pin. Now the
-       selected pin is a single filled green circle. */
-    background: #00ff88;
-    border: 0;
-    box-shadow:
-      0 0 0 1px rgba(0, 0, 0, 0.45),
-      0 0 12px 2px rgba(0, 255, 136, 0.65);
+    height: 40px;
+    display: block;
+    filter: drop-shadow(0 0 12px rgba(126, 231, 135, 0.55))
+            drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
   }
   @media (prefers-reduced-motion: reduce) {
     .dw-active-hero__halo {
       animation: none;
       opacity: 0.55;
+      transform: translate(-50%, -50%);
     }
   }
 `;
@@ -338,17 +349,24 @@ function makeActivePinHeroIcon(_saved: boolean): L.DivIcon {
   // call sites in the marker layer can stay symmetric and so the
   // "saved-and-active" branch can be reintroduced (e.g. with a heart
   // glyph overlay) without changing the icon factory's API.
-  const size = 64; // matches .dw-active-hero__halo dimensions
+  const size = 64; // 64×64 container — sized to fit halo + teardrop
+  // Geographic anchor = the POINT of the teardrop (bottom tip), not
+  // the container center. With the SVG positioned at top:12px and
+  // height 40px, its tip lives at container y=52. x stays centered.
+  const anchorX = size / 2; // 32
+  const anchorY = 52;
   return L.divIcon({
     className: '',
     html: `
       <div class="dw-active-hero" style="position:relative;width:${size}px;height:${size}px;">
         <div class="dw-active-hero__halo"></div>
-        <div class="dw-active-hero__ring"></div>
+        <svg class="dw-active-hero__pin" viewBox="0 0 28 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <path d="M14 0.5C6.544 0.5 0.5 6.544 0.5 14C0.5 24.5 14 39.5 14 39.5C14 39.5 27.5 24.5 27.5 14C27.5 6.544 21.456 0.5 14 0.5Z" fill="#7ee787" stroke="rgba(0,0,0,0.45)" stroke-width="1"/>
+        </svg>
       </div>
     `,
     iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
+    iconAnchor: [anchorX, anchorY],
   });
 }
 
