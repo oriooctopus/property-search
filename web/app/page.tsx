@@ -1796,38 +1796,44 @@ function HomeInner() {
             onClearFilters={handleClearAllFilters}
           />
 
-          {/* Loading spinner overlay for swipe mode.
-              Anchored to the same `top` as the merged MobileMenuPill
-              (env(safe-area-inset-top) + 12px) and given a matching 36px
-              min-height so its vertical centerline lines up with the pill on
-              the right. Without this, the chip used `top-3` (12px) inside the
-              swipe panel — which sits a few pixels lower than the page-level
-              MobileMenuPill on notched devices because the pill's `top`
-              already includes safe-area-inset-top. */}
+          {/* Loading indicator for swipe mode (mobile-only).
+              Icon-only spinning magnifier in the TOP-LEFT corner. We dropped
+              the "Searching..." chip + matching pill alignment because the
+              chip kept feeling cramped against the right edge, and we don't
+              need word-level feedback on a touch surface — a small animated
+              search glyph reads as "loading" without competing with the
+              MobileMenuPill on the opposite corner. Anchored with
+              env(safe-area-inset-top) so it stays clear of the notch. */}
           {(viewportLoading || commuteLoading) && (
             <div
-              className="absolute left-1/2 -translate-x-1/2 z-[500] pointer-events-none flex items-center"
+              className="absolute z-[500] pointer-events-none flex items-center justify-center"
+              data-testid="swipe-searching-spinner"
               style={{
                 top: 'calc(env(safe-area-inset-top) + 12px)',
-                minHeight: 36,
+                left: 12,
+                width: 36,
+                height: 36,
+                borderRadius: 9999,
+                backgroundColor: 'rgba(28, 32, 40, 0.85)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
               }}
             >
-              <div
-                className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
-                style={{
-                  backgroundColor: '#1c2028',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#8b949e',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-                }}
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#38bdf8"
+                strokeWidth="2.25"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ animation: 'spin 1s linear infinite' }}
+                aria-label="Searching"
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" strokeLinecap="round"
-                  style={{ animation: 'spin 0.7s linear infinite', flexShrink: 0 }}>
-                  <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.12)" strokeWidth="2.5" />
-                  <path d="M21 12a9 9 0 1 1-6.219-8.56" stroke="#38bdf8" strokeWidth="2.5" />
-                </svg>
-                Searching...
-              </div>
+                <circle cx="11" cy="11" r="7" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
             </div>
           )}
         </div>
