@@ -141,6 +141,12 @@ interface SwipeCardProps {
 const SWIPE_X_THRESHOLD = 70;
 const SWIPE_Y_THRESHOLD = 70; // down only
 const STAMP_FADE_RATIO = 0.5;
+// Photo-area horizontal swipe threshold (mobile). Below SWIPE_X_THRESHOLD we
+// treat the gesture as carousel navigation; at/above it we hand off to the
+// card-level swipe (save/skip). Lowered from 30 → 20 to make the photo
+// carousel feel responsive to short flicks without hijacking the larger
+// "swipe to save" gesture.
+const PHOTO_SWIPE_THRESHOLD = 20;
 
 export default function SwipeCard({
   listing,
@@ -299,12 +305,25 @@ export default function SwipeCard({
       if (scrollingContent.current) return;
 
       if (touchInPhoto.current) {
-        if (!down && Math.abs(mx) > 30) {
-          if (mx < 0) {
-            setPhotoIndex((i) => (i + 1) % totalPhotos);
-          } else {
-            setPhotoIndex((i) => (i - 1 + totalPhotos) % totalPhotos);
+        if (!down) {
+          const absMx = Math.abs(mx);
+          // Long horizontal swipe → hand off to card swipe (save/skip).
+          // Short horizontal swipe → carousel navigation. Anything below
+          // PHOTO_SWIPE_THRESHOLD is a tap or a too-tiny drag — ignore.
+          if (absMx >= SWIPE_X_THRESHOLD) {
+            commitSwipe(mx < 0 ? 'left' : 'right');
+          } else if (absMx > PHOTO_SWIPE_THRESHOLD) {
+            if (mx < 0) {
+              setPhotoIndex((i) => (i + 1) % totalPhotos);
+            } else {
+              setPhotoIndex((i) => (i - 1 + totalPhotos) % totalPhotos);
+            }
           }
+          if (notifiedDragging.current) {
+            notifiedDragging.current = false;
+            onDragStateChange?.(false);
+          }
+          setTimeout(() => { isDragging.current = false; }, 50);
         }
         return;
       }
@@ -687,26 +706,71 @@ export default function SwipeCard({
                   })}
                 </div>
 
-                {/* Arrow buttons */}
+                {/* Arrow buttons.
+                    The visible chip is the inner 32x32 dark circle with the
+                    14px chevron — unchanged. The OUTER button is a 48x48
+                    transparent tap target so the hit area is comfortable on
+                    touch devices and forgiving on desktop hover. We deliberately
+                    keep the hitbox to ~48px (not the full card edge) so the
+                    surrounding swipe-card drag gesture still receives most of
+                    the photo area and only the corners belong to the carousel
+                    arrows. `cursor-pointer` lives on the wrapper since the
+                    inner div is purely decorative. */}
                 {totalPhotos > 1 && (
                   <>
                     <button
                       onClick={prevPhoto}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer"
-                      style={{ backgroundColor: 'rgba(0,0,0,0.5)', color: '#fff' }}
+                      aria-label="Previous photo"
+                      data-testid="photo-prev-button"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center justify-center cursor-pointer"
+                      style={{
+                        width: 48,
+                        height: 48,
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 0,
+                      }}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="15 18 9 12 15 6" />
-                      </svg>
+                      <span
+                        className="flex items-center justify-center rounded-full transition-colors"
+                        style={{
+                          width: 32,
+                          height: 32,
+                          backgroundColor: 'rgba(0,0,0,0.5)',
+                          color: '#fff',
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="15 18 9 12 15 6" />
+                        </svg>
+                      </span>
                     </button>
                     <button
                       onClick={nextPhoto}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer"
-                      style={{ backgroundColor: 'rgba(0,0,0,0.5)', color: '#fff' }}
+                      aria-label="Next photo"
+                      data-testid="photo-next-button"
+                      className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center justify-center cursor-pointer"
+                      style={{
+                        width: 48,
+                        height: 48,
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 0,
+                      }}
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
+                      <span
+                        className="flex items-center justify-center rounded-full transition-colors"
+                        style={{
+                          width: 32,
+                          height: 32,
+                          backgroundColor: 'rgba(0,0,0,0.5)',
+                          color: '#fff',
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="9 18 15 12 9 6" />
+                        </svg>
+                      </span>
                     </button>
                   </>
                 )}
