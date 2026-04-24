@@ -208,10 +208,15 @@ export default function Navbar() {
                   <button
                     onClick={() => {
                       setDropdownOpen(false);
+                      // Always re-trigger the tour: navigate to / with ?tour=1
+                      // so the home page's effect re-mounts TourGuide (which
+                      // resets its internal seen-set). If we're already on /,
+                      // router.push won't unmount the page, but the useEffect
+                      // watching tourParam will re-fire setShowTour(true).
                       router.push("/?tour=1");
                     }}
                     className="block w-full px-4 py-2 text-left text-sm transition-colors hover:opacity-80 cursor-pointer"
-                    style={{ color: "#8b949e" }}
+                    style={{ color: "#e1e4e8", background: "transparent", border: "none" }}
                   >
                     Take a tour
                   </button>

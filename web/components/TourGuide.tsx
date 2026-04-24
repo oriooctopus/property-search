@@ -59,20 +59,24 @@ interface TourGuideProps {
 // steps surface near the start.
 
 const STEPS: TourStep[] = [
-  {
-    id: 'welcome',
-    target: null,
-    title: 'Welcome to Dwelligence!',
-    body: "Let's take a quick tour of the features that will help you find your next apartment.",
-  },
-
   // ---- Swipe-mode-specific steps ----
+  // Desktop swipe: includes "up for next photo" hint + arrow keys
   {
-    id: 'swipe-card',
+    id: 'swipe-card-desktop',
     target: 'swipe-card',
     requireView: 'swipe',
-    title: 'Swipe Mode',
-    body: 'Swipe right to save, left to skip, up for "would live there", or down for later. On desktop you can also use arrow keys.',
+    requireDesktop: true,
+    title: 'Swipe to decide',
+    body: 'Swipe right to save, left to skip, up for the next photo. Arrow keys work too.',
+  },
+  // Mobile swipe: no "up = photos" mention (mobile doesn't have that)
+  {
+    id: 'swipe-card-mobile',
+    target: 'swipe-card',
+    requireView: 'swipe',
+    requireMobile: true,
+    title: 'Swipe to decide',
+    body: 'Swipe right to save, left to skip.',
   },
   {
     id: 'swipe-action-pill',
@@ -308,15 +312,28 @@ export default function TourGuide({ onComplete, setMobileView, currentView }: To
   // When step changes, switch view if needed, then start tracking
   useEffect(() => {
     if (!current) return;
-    if (current.switchView && current.switchView !== currentView) {
+    const needsViewSwitch =
+      !!current.switchView && current.switchView !== currentView;
+    if (needsViewSwitch && current.switchView) {
       setMobileView(current.switchView);
     }
 
-    // Small delay to let the DOM settle after view switch
+    // No-view-switch transitions are instant: position the spotlight on the
+    // same frame and fade the tooltip in immediately so clicking Next has no
+    // perceptible pause. Only when we actually need a view switch do we
+    // briefly wait for the DOM to settle.
+    if (!needsViewSwitch) {
+      updateRect();
+      setVisible(true);
+      return () => {
+        cancelAnimationFrame(rafRef.current);
+      };
+    }
+
     const timer = setTimeout(() => {
       updateRect();
       setVisible(true);
-    }, current.switchView && current.switchView !== currentView ? 350 : 50);
+    }, 350);
 
     return () => {
       clearTimeout(timer);
@@ -353,10 +370,11 @@ export default function TourGuide({ onComplete, setMobileView, currentView }: To
     }
 
     if (nextStep) {
+      // Move to the next step synchronously so the spotlight repositions on
+      // the same frame as the click. The fade-in opacity is reset to 0 first
+      // so the new tooltip CSS-transitions back in.
       setVisible(false);
-      setTimeout(() => {
-        setActiveId(nextStep!.id);
-      }, 200);
+      setActiveId(nextStep.id);
     } else {
       onComplete();
     }
@@ -395,7 +413,7 @@ export default function TourGuide({ onComplete, setMobileView, currentView }: To
     }
     return true;
   })();
-  const isFirstStep = current.id === 'welcome';
+  const isFirstStep = displayStepNumber === 1;
 
   // Overlay SVG with spotlight cutout
   const overlay = (
@@ -404,7 +422,7 @@ export default function TourGuide({ onComplete, setMobileView, currentView }: To
         position: 'fixed',
         inset: 0,
         zIndex: 2000,
-        transition: 'opacity 200ms ease',
+        transition: 'opacity 120ms ease',
         opacity: visible ? 1 : 0,
         pointerEvents: visible ? 'auto' : 'none',
       }}
@@ -451,7 +469,7 @@ export default function TourGuide({ onComplete, setMobileView, currentView }: To
             boxShadow: '0 0 20px rgba(88, 166, 255, 0.15)',
             pointerEvents: 'none',
             zIndex: 2001,
-            transition: 'all 300ms ease',
+            transition: 'all 150ms ease',
           }}
         />
       )}
