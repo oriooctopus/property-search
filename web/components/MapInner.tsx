@@ -206,9 +206,21 @@ const STATION_PULSE_STYLES = `
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
+    margin: 0 !important;
   }
-  .station-hover-tooltip::before {
+  /* Leaflet's default .leaflet-tooltip-top adds margin-bottom: 6px AND a
+     ::before triangular arrow (~6px) — both push our pill visibly upward
+     away from the subway dot. We use a custom dark pill, no arrow, so zero
+     them out to keep the pill snug against the marker. */
+  .leaflet-tooltip-top.station-hover-tooltip {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+  }
+  .station-hover-tooltip::before,
+  .leaflet-tooltip-top.station-hover-tooltip::before {
     display: none !important;
+    border: none !important;
+    content: none !important;
   }
 `;
 
@@ -331,7 +343,11 @@ function makeStationPulseIcon(color: string): L.DivIcon {
     `,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
-    tooltipAnchor: [0, -(size / 2) - 4],
+    // Anchor sits just above the top of the inner 14px dot (dot extends ~7px
+    // above marker center). -10 leaves a tight ~3px visual gap between the
+    // pill bottom and the dot's top edge once Leaflet's default margins are
+    // zeroed (see .station-hover-tooltip CSS).
+    tooltipAnchor: [0, -10],
   });
 }
 
@@ -1864,7 +1880,12 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
               <Tooltip
                 permanent
                 direction="top"
-                offset={[0, -10]}
+                // Positive y pulls the tooltip DOWN toward the dot
+                // (direction="top" places it above; we want it tight, ~3px
+                // gap between pill bottom and dot top edge). Combined with
+                // tooltipAnchor=[0,-10] in makeStationPulseIcon and zeroed
+                // Leaflet margins in STATION_PULSE_STYLES.
+                offset={[0, 4]}
                 className="station-hover-tooltip"
               >
                 {typeof station.distMi === 'number' && (
