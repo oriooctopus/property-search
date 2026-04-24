@@ -1172,9 +1172,10 @@ export default function SwipeView({
               <button
                 onClick={handleUndo}
                 disabled={undoStack.length === 0}
-                className="absolute left-5 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed"
+                aria-disabled={undoStack.length === 0}
+                className="absolute left-5 flex items-center gap-1.5 transition-colors cursor-pointer enabled:hover:opacity-100 disabled:opacity-20 disabled:cursor-not-allowed"
                 style={{
-                  color: '#8b949e',
+                  color: undoStack.length === 0 ? '#484f58' : '#8b949e',
                   background: 'none',
                   border: 'none',
                   padding: 0,
@@ -1187,7 +1188,12 @@ export default function SwipeView({
                   <path d="M3 7v6h6" />
                   <path d="M3 13a9 9 0 0 1 15.36-6.36L21 9" />
                 </svg>
-                <span className="text-[12px]" style={{ color: '#6e7681' }}>Undo · <span style={{ color: '#8b949e' }}>Z</span></span>
+                <span
+                  className="text-[12px]"
+                  style={{ color: undoStack.length === 0 ? '#3a4048' : '#6e7681' }}
+                >
+                  Undo · <span style={{ color: undoStack.length === 0 ? '#484f58' : '#8b949e' }}>Z</span>
+                </span>
               </button>
 
               {/* Center: 4-circle arrow cluster with tooltips */}
@@ -1323,8 +1329,9 @@ export default function SwipeView({
                   <button
                     onClick={handleUndo}
                     disabled={undoStack.length === 0}
+                    aria-disabled={undoStack.length === 0}
                     aria-label="Undo"
-                    className="flex items-center justify-center cursor-pointer transition-colors active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="flex items-center justify-center cursor-pointer transition-colors active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed"
                     style={{
                       width: 62,
                       height: 52,
@@ -1332,7 +1339,11 @@ export default function SwipeView({
                       border: 'none',
                     }}
                   >
-                    <RotateCcw size={20} strokeWidth={2} color="#8b949e" />
+                    <RotateCcw
+                      size={20}
+                      strokeWidth={2}
+                      color={undoStack.length === 0 ? '#484f58' : '#8b949e'}
+                    />
                   </button>
 
                   <div style={{ width: 1, height: 24, background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} />

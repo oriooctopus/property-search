@@ -310,12 +310,11 @@ export default function SwipeCard({
       if (touchInPhoto.current) {
         if (!down) {
           const absMx = Math.abs(mx);
-          // Long horizontal swipe → hand off to card swipe (save/skip).
-          // Short horizontal swipe → carousel navigation. Anything below
-          // PHOTO_SWIPE_THRESHOLD is a tap or a too-tiny drag — ignore.
-          if (absMx >= SWIPE_X_THRESHOLD) {
-            commitSwipe(mx < 0 ? 'left' : 'right');
-          } else if (absMx > PHOTO_SWIPE_THRESHOLD) {
+          // Photo-area horizontal swipes are ALWAYS carousel navigation,
+          // never card-level save/skip. Save/skip is exclusively triggered
+          // by swipes that START outside the photo area. Below
+          // PHOTO_SWIPE_THRESHOLD is a tap or jitter — ignore.
+          if (absMx > PHOTO_SWIPE_THRESHOLD) {
             if (mx < 0) {
               setPhotoIndex((i) => (i + 1) % totalPhotos);
             } else {
