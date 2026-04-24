@@ -6,7 +6,11 @@
  * stroke-dashoffset. Right-angle bends mimic the real NYC subway diagram, which
  * echoes the rest of the app's map-first aesthetic.
  *
- * Monochromatic (soft white `#e1e4e8` on dark `#0f1117`). 1.3s loop.
+ * Monochromatic (soft white `#e1e4e8` on dark `#0f1117`). ~2.1s loop with a
+ * gentler reverse: forward draw uses Material standard easing, the fully-drawn
+ * state holds for ~588ms (50% longer than the previous ~390ms hold), and the
+ * reverse stroke takes ~1.5x as long as the forward draw with a softer
+ * ease-in-out.
  */
 export default function RadarLoader() {
   // Each path terminates at the center station (80, 80). Paths use only
@@ -24,7 +28,9 @@ export default function RadarLoader() {
     { d: 'M 8 112 H 56 V 80 H 80', delay: 0.24 },
   ];
 
-  const TOTAL = 1.3; // seconds per loop
+  // Total cycle = 2.1s: ~0.609s forward draw, ~0.588s hold (50% longer than
+  // before), ~0.903s reverse draw (~1.5x the forward draw).
+  const TOTAL = 2.1;
 
   return (
     <div
@@ -52,7 +58,9 @@ export default function RadarLoader() {
               style={{
                 strokeDasharray: 1,
                 strokeDashoffset: 1,
-                animation: `loaderSnake ${TOTAL}s cubic-bezier(0.65, 0, 0.35, 1) ${p.delay}s infinite`,
+                // Per-segment easing is set inside the @keyframes via
+                // animation-timing-function, so the wrapper uses linear here.
+                animation: `loaderSnake ${TOTAL}s linear ${p.delay}s infinite`,
               }}
             />
           ))}
@@ -67,7 +75,7 @@ export default function RadarLoader() {
             fill="none"
             style={{
               transformOrigin: '80px 80px',
-              animation: `loaderStationRing ${TOTAL}s ease-out infinite`,
+              animation: `loaderStationRing ${TOTAL}s linear infinite`,
             }}
           />
           <circle
@@ -77,7 +85,7 @@ export default function RadarLoader() {
             fill="#e1e4e8"
             style={{
               transformOrigin: '80px 80px',
-              animation: `loaderStationCore ${TOTAL}s ease-out infinite`,
+              animation: `loaderStationCore ${TOTAL}s linear infinite`,
             }}
           />
         </svg>
@@ -96,23 +104,84 @@ export default function RadarLoader() {
       </p>
 
       <style>{`
+        /*
+         * Cycle (TOTAL = 2.1s):
+         *   0%  → 29%  forward draw   (~609ms, Material standard ease-out)
+         *   29% → 57%  hold           (~588ms, 50% longer than the previous
+         *                              ~390ms hold; linear, no movement)
+         *   57% → 100% reverse draw   (~903ms, ~1.5x the forward draw,
+         *                              gentler cubic-bezier(0.4, 0, 0.6, 1))
+         */
         @keyframes loaderSnake {
-          0%   { stroke-dashoffset: 1;   opacity: 0.9; }
-          55%  { stroke-dashoffset: 0;   opacity: 0.9; }
-          75%  { stroke-dashoffset: 0;   opacity: 0.9; }
-          100% { stroke-dashoffset: -1;  opacity: 0;   }
+          0% {
+            stroke-dashoffset: 1;
+            opacity: 0.9;
+            animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+          }
+          29% {
+            stroke-dashoffset: 0;
+            opacity: 0.9;
+            animation-timing-function: linear;
+          }
+          57% {
+            stroke-dashoffset: 0;
+            opacity: 0.9;
+            animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+          }
+          100% {
+            stroke-dashoffset: -1;
+            opacity: 0;
+          }
         }
         @keyframes loaderStationRing {
-          0%, 50%  { transform: scale(0.6); opacity: 0; }
-          65%      { transform: scale(1);   opacity: 1; }
-          80%      { transform: scale(1);   opacity: 1; }
-          100%     { transform: scale(1.1); opacity: 0; }
+          0%, 25% {
+            transform: scale(0.6);
+            opacity: 0;
+            animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+          }
+          37% {
+            transform: scale(1);
+            opacity: 1;
+            animation-timing-function: linear;
+          }
+          57% {
+            transform: scale(1);
+            opacity: 1;
+            animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+          }
+          80% {
+            transform: scale(1.1);
+            opacity: 0;
+          }
+          100% {
+            transform: scale(1.1);
+            opacity: 0;
+          }
         }
         @keyframes loaderStationCore {
-          0%, 50%  { transform: scale(0);   opacity: 0; }
-          65%      { transform: scale(1);   opacity: 1; }
-          80%      { transform: scale(1);   opacity: 1; }
-          100%     { transform: scale(0.9); opacity: 0; }
+          0%, 25% {
+            transform: scale(0);
+            opacity: 0;
+            animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+          }
+          37% {
+            transform: scale(1);
+            opacity: 1;
+            animation-timing-function: linear;
+          }
+          57% {
+            transform: scale(1);
+            opacity: 1;
+            animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+          }
+          80% {
+            transform: scale(0.9);
+            opacity: 0;
+          }
+          100% {
+            transform: scale(0.9);
+            opacity: 0;
+          }
         }
         @keyframes radarTextPulse {
           0%, 100% { opacity: 0.4; }
