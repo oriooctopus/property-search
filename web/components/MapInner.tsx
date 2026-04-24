@@ -1853,24 +1853,63 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
                 offset={[0, -10]}
                 className="station-hover-tooltip"
               >
-                <span style={{
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: '#e1e4e8',
-                  backgroundColor: '#1c2028',
-                  border: '1px solid #2d333b',
-                  borderRadius: 6,
-                  padding: '3px 8px',
-                  whiteSpace: 'nowrap',
-                  display: 'block',
-                }}>
-                  {typeof station.walkMin === 'number' && (
-                    <span style={{ fontWeight: 500, color: '#8b949e' }}>
-                      {station.walkMin} min walk
+                {typeof station.walkMin === 'number' && (
+                  <span style={{
+                    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: '#e1e4e8',
+                    backgroundColor: '#1c2028',
+                    border: '1px solid #2d333b',
+                    borderRadius: 6,
+                    padding: '3px 8px',
+                    whiteSpace: 'nowrap',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    position: 'relative',
+                    lineHeight: 1,
+                  }}>
+                    {/* Clock icon — signals "duration" */}
+                    <svg
+                      width="11"
+                      height="11"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      style={{ display: 'block', flexShrink: 0 }}
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="9" stroke="#8b949e" strokeWidth="1.8" />
+                      <path d="M12 7 L12 12 L15.5 14.5" stroke="#8b949e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span>{station.walkMin}</span>
+                    {/* Foot micro-dot at top-right corner — signals "walking" */}
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: -3,
+                        right: -3,
+                        width: 8,
+                        height: 8,
+                        backgroundColor: '#1c2028',
+                        borderRadius: '50%',
+                        border: '1px solid #2d333b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      aria-hidden="true"
+                    >
+                      <svg width="5" height="5" viewBox="0 0 12 12" fill="none" style={{ display: 'block' }}>
+                        <ellipse cx="6" cy="7" rx="3.5" ry="4" fill="#7ee787" opacity="0.9" />
+                        <ellipse cx="3.5" cy="3.5" rx="1.4" ry="1.8" fill="#7ee787" opacity="0.9" />
+                        <ellipse cx="6.5" cy="2.8" rx="1.3" ry="1.6" fill="#7ee787" opacity="0.9" />
+                        <ellipse cx="9" cy="3.5" rx="1.2" ry="1.5" fill="#7ee787" opacity="0.9" />
+                      </svg>
                     </span>
-                  )}
-                </span>
+                  </span>
+                )}
               </Tooltip>
             </Marker>
           );
