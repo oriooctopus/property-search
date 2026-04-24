@@ -133,16 +133,17 @@ export default function Navbar() {
 
       <div className="flex items-center gap-2 sm:gap-4 flex-shrink min-w-0">
         {loading ? (
-          <div className="h-8 w-8" />
+          <div className="h-10 w-10 sm:h-8 sm:w-8" />
         ) : user ? (
           <>
             <div className="relative" ref={dropdownRef}>
               {profileLoading ? (
-                <div className="h-8 w-8 rounded-full" style={{ backgroundColor: "#2d333b" }} />
+                <div className="h-10 w-10 sm:h-8 sm:w-8 rounded-full" style={{ backgroundColor: "#2d333b" }} />
               ) : (
               <button
                 onClick={() => setDropdownOpen((prev) => !prev)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-medium transition-opacity hover:opacity-80 cursor-pointer overflow-hidden"
+                aria-label="Open user menu"
+                className="flex h-10 w-10 sm:h-8 sm:w-8 items-center justify-center rounded-full text-sm font-medium transition-opacity hover:opacity-80 cursor-pointer overflow-hidden"
                 style={{ backgroundColor: "#58a6ff", color: "#0f1117" }}
                 title={user.email ?? ""}
               >
@@ -150,9 +151,9 @@ export default function Navbar() {
                   <Image
                     src={avatarUrl}
                     alt="Avatar"
-                    width={32}
-                    height={32}
-                    sizes="32px"
+                    width={40}
+                    height={40}
+                    sizes="(min-width: 640px) 32px, 40px"
                     quality={80}
                     className="h-full w-full object-cover"
                   />

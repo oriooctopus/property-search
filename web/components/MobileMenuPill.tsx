@@ -92,7 +92,7 @@ export default function MobileMenuPill({
       {/* Merged pill */}
       <div
         style={{
-          height: 36,
+          height: 44,
           background: "rgba(28,32,40,0.88)",
           backdropFilter: "blur(14px)",
           WebkitBackdropFilter: "blur(14px)",
@@ -146,9 +146,9 @@ export default function MobileMenuPill({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              padding: "0 10px",
+              padding: "0 14px",
               height: "100%",
-              minWidth: 42,
+              minWidth: 48,
               background: dropdownOpen ? "rgba(88,166,255,0.1)" : "transparent",
               border: "none",
             }}
@@ -160,12 +160,12 @@ export default function MobileMenuPill({
           >
             <span
               style={{
-                width: 22,
-                height: 22,
+                width: 26,
+                height: 26,
                 borderRadius: "50%",
                 background: "#58a6ff",
                 color: "#0f1117",
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: 700,
                 display: "flex",
                 alignItems: "center",
@@ -177,9 +177,9 @@ export default function MobileMenuPill({
                 <Image
                   src={avatarUrl}
                   alt="Avatar"
-                  width={22}
-                  height={22}
-                  sizes="22px"
+                  width={26}
+                  height={26}
+                  sizes="26px"
                   quality={80}
                   className="h-full w-full object-cover"
                 />
@@ -196,9 +196,9 @@ export default function MobileMenuPill({
               display: "flex",
               alignItems: "center",
               gap: 4,
-              padding: "0 12px",
-              height: 36,
-              minWidth: 40,
+              padding: "0 14px",
+              height: "100%",
+              minWidth: 48,
               color: "#58a6ff",
               fontSize: 11,
               fontWeight: 500,
@@ -223,7 +223,7 @@ export default function MobileMenuPill({
           role="menu"
           className="absolute"
           style={{
-            top: 44,
+            top: 52,
             right: 0,
             width: 220,
             background: "#1c2028",
