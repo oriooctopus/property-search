@@ -60,7 +60,7 @@ export default function Navbar() {
   return (
     <nav
       data-global-nav="1"
-      className="relative lg:fixed top-0 left-0 right-0 z-[1200] flex items-center justify-between px-3 sm:px-6"
+      className="relative lg:fixed top-0 left-0 right-0 z-[1200] flex items-center justify-between pl-3 sm:pl-2 pr-3 sm:pr-6"
       style={{
         backgroundColor: "#0f1117",
         borderBottom: "1px solid #2d333b",
@@ -76,7 +76,7 @@ export default function Navbar() {
         <span className="relative inline-flex items-center justify-center" style={{ width: 30, height: 30 }}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 48 48"
+            viewBox="2 2 44 44"
             fill="none"
             width={30}
             height={30}
