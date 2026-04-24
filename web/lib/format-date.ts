@@ -37,7 +37,7 @@ export function formatListedDate(dateStr: string): string {
 
 /**
  * Formats an availability / move-in date.
- *   - null / unparseable → "Move-in TBD"
+ *   - null / unparseable → "Move-in unknown"
  *   - on-or-before today → "Available now"
  *   - future → "Available Mar 15" (current year) or "Available Mar 15, 2026"
  *
@@ -47,9 +47,9 @@ export function formatListedDate(dateStr: string): string {
 export function formatAvailabilityDate(
   dateStr: string | null | undefined,
 ): string {
-  if (!dateStr) return 'Move-in TBD';
+  if (!dateStr) return 'Move-in unknown';
   const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return 'Move-in TBD';
+  if (isNaN(d.getTime())) return 'Move-in unknown';
   const todayUtc = new Date();
   todayUtc.setUTCHours(0, 0, 0, 0);
   if (d.getTime() <= todayUtc.getTime()) return 'Available now';
