@@ -103,6 +103,9 @@ export interface HoveredStation {
   /** Walking time in whole minutes (3 mph). Optional for back-compat; used by
    *  the map tooltip on mobile swipe to show "~N min walk". */
   walkMin?: number;
+  /** Straight-line distance in miles from the listing to this station. Used by
+   *  the map tooltip to display physical distance (e.g. "0.2 mi" / "500 ft"). */
+  distMi?: number;
 }
 
 // Walking-speed conversion: 3 mph → 20 min per mile.

@@ -47,6 +47,20 @@ function escapeHtml(str: string): string {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
+/**
+ * Format a straight-line distance in miles for the subway-station tooltip.
+ * Under 0.1 mi → feet rounded to nearest 50 ("500 ft"). Otherwise one decimal
+ * with no trailing zero ("0.2 mi", "0.3 mi"). The unit suffix disambiguates
+ * from MTA line bullets (no train is called "500 ft").
+ */
+function formatStationDistance(distMi: number): string {
+  if (distMi < 0.1) {
+    const feet = Math.round((distMi * 5280) / 50) * 50;
+    return `${feet} ft`;
+  }
+  return `${distMi.toFixed(1)} mi`;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Subway overlay — translucent MTA-colored lines                     */
 /* ------------------------------------------------------------------ */
@@ -1853,7 +1867,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
                 offset={[0, -10]}
                 className="station-hover-tooltip"
               >
-                {typeof station.walkMin === 'number' && (
+                {typeof station.distMi === 'number' && (
                   <span style={{
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
                     fontSize: 12,
@@ -1866,48 +1880,9 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
                     whiteSpace: 'nowrap',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 4,
-                    position: 'relative',
                     lineHeight: 1,
                   }}>
-                    {/* Clock icon — signals "duration" */}
-                    <svg
-                      width="11"
-                      height="11"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                      style={{ display: 'block', flexShrink: 0 }}
-                      aria-hidden="true"
-                    >
-                      <circle cx="12" cy="12" r="9" stroke="#8b949e" strokeWidth="1.8" />
-                      <path d="M12 7 L12 12 L15.5 14.5" stroke="#8b949e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                    <span>{station.walkMin}</span>
-                    {/* Foot micro-dot at top-right corner — signals "walking" */}
-                    <span
-                      style={{
-                        position: 'absolute',
-                        top: -3,
-                        right: -3,
-                        width: 8,
-                        height: 8,
-                        backgroundColor: '#1c2028',
-                        borderRadius: '50%',
-                        border: '1px solid #2d333b',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                      aria-hidden="true"
-                    >
-                      <svg width="5" height="5" viewBox="0 0 12 12" fill="none" style={{ display: 'block' }}>
-                        <ellipse cx="6" cy="7" rx="3.5" ry="4" fill="#7ee787" opacity="0.9" />
-                        <ellipse cx="3.5" cy="3.5" rx="1.4" ry="1.8" fill="#7ee787" opacity="0.9" />
-                        <ellipse cx="6.5" cy="2.8" rx="1.3" ry="1.6" fill="#7ee787" opacity="0.9" />
-                        <ellipse cx="9" cy="3.5" rx="1.2" ry="1.5" fill="#7ee787" opacity="0.9" />
-                      </svg>
-                    </span>
+                    <span>{formatStationDistance(station.distMi)}</span>
                   </span>
                 )}
               </Tooltip>
