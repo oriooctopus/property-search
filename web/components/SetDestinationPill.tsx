@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CommuteRuleEditor, createDefaultRule, type CommuteRule } from '@/components/Filters';
 import { ButtonBase, PrimaryButton, TextButton } from '@/components/ui';
@@ -25,6 +25,12 @@ import {
 export default function SetDestinationPill() {
   const { destinations, setDestinations, clearDestination } = useSavedDestination();
   const [open, setOpen] = useState(false);
+  // Tracks whether the next/current modal-open should pre-append an empty
+  // draft so the user lands directly in the "add a second destination" flow
+  // (driven by the "+" discoverability chip rendered next to the saved
+  // destination chip). Stored in a ref so toggling it doesn't retrigger the
+  // re-seed effect mid-open and clobber the extra draft.
+  const openWithExtraDraftRef = useRef(false);
   const [drafts, setDrafts] = useState<CommuteRule[]>(() =>
     destinations.length > 0 ? destinations : [createDefaultRule()],
   );
@@ -32,7 +38,15 @@ export default function SetDestinationPill() {
   // Re-seed drafts whenever the modal opens with the latest saved destinations
   useEffect(() => {
     if (open) {
-      setDrafts(destinations.length > 0 ? destinations : [createDefaultRule()]);
+      const base = destinations.length > 0 ? destinations : [createDefaultRule()];
+      if (openWithExtraDraftRef.current && base.length < MAX_DESTINATIONS) {
+        setDrafts([...base, createDefaultRule()]);
+      } else {
+        setDrafts(base);
+      }
+      // Consume the flag so a subsequent open (e.g. tapping the destination
+      // chip itself) doesn't also auto-add a draft.
+      openWithExtraDraftRef.current = false;
     }
   }, [open, destinations]);
 
@@ -91,9 +105,17 @@ export default function SetDestinationPill() {
     ? `Edit destinations: ${destinations.map((d) => destinationShortName(d, 32)).join(' and ')}`
     : 'Set a preferred destination';
 
+  const canAddSecond = destinations.length === 1;
+  const handleOpenAddSecond = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    openWithExtraDraftRef.current = true;
+    setOpen(true);
+  };
+
   return (
     <>
       {destinations.length > 0 ? (
+        <span className="inline-flex items-center gap-1">
         <ButtonBase
           onClick={() => setOpen(true)}
           aria-label={ariaLabel}
@@ -136,6 +158,25 @@ export default function SetDestinationPill() {
             </svg>
           </span>
         </ButtonBase>
+        {canAddSecond && (
+          <ButtonBase
+            onClick={handleOpenAddSecond}
+            aria-label="Add a second destination"
+            data-testid="add-second-destination-chip"
+            className="inline-flex items-center justify-center rounded-full border h-7 w-7 whitespace-nowrap"
+            style={{
+              backgroundColor: 'transparent',
+              borderColor: '#3a3f4a',
+              borderStyle: 'dashed',
+              color: '#8b949e',
+            }}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </ButtonBase>
+        )}
+        </span>
       ) : (
         <ButtonBase
           onClick={() => setOpen(true)}

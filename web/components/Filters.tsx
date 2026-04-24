@@ -2678,7 +2678,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
             )}
 
             {/* Sort section */}
-            <div className="px-4 pb-4" style={{ borderBottom: '1px solid #2d333b' }}>
+            <div className="px-4 pt-5 pb-4" style={{ borderBottom: '1px solid #2d333b' }}>
               <div className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: '#8b949e' }}>Sort by</div>
               <div className="flex flex-wrap gap-2">
                 {SORT_OPTIONS.map((opt) => (
