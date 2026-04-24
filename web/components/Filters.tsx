@@ -2137,57 +2137,58 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           </div>
         )}
     
-        {/* Divider + dual-purpose Save / Wishlist chip */}
-        <>
-          {/* Vertical divider */}
-          <div className="h-4 w-px shrink-0" style={{ backgroundColor: '#2d333b' }} />
-    
-          {/* Dual chip: left = Save search, right = Filter by wishlist */}
-          <div className="relative shrink-0" ref={saveDropdownRef}>
-            <div
-              className={cn(
-                'inline-flex items-center rounded-[20px] overflow-hidden border h-[30px] font-medium whitespace-nowrap',
-                saveOpen
-                  ? 'border-[#58a6ff]'
-                  : 'border-[#2d333b] hover:border-[#58a6ff]/60',
-              )}
-              style={{ background: 'transparent' }}
-            >
-              <ButtonBase
-                onClick={() => {
-                  if (!userId) {
-                    onLoginRequired?.();
-                    return;
-                  }
-                  setOpenChip(null);
-                  setSaveName(suggestSearchName(filters));
-                  // If already open on this tab → close. Otherwise open this tab.
-                  if (saveOpen && savePanelTab === 'save-search') {
-                    setSaveOpen(false);
-                  } else {
-                    setSavePanelTab('save-search');
-                    setSaveOpen(true);
-                    setTimeout(() => saveInputRef.current?.focus(), 50);
-                  }
-                }}
-                className="flex items-center gap-1.5 px-3 h-full text-[12px]"
-                style={{
-                  color:
-                    saveOpen && savePanelTab === 'save-search'
-                      ? '#58a6ff'
-                      : '#e1e4e8',
-                  borderRight: '1px solid #2d333b',
-                  background:
-                    saveOpen && savePanelTab === 'save-search'
-                      ? 'rgba(88,166,255,0.08)'
-                      : 'rgba(88,166,255,0.06)',
-                }}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-                </svg>
-                Save
-              </ButtonBase>
+        {/* Save chip + Wishlist chip — two separate chips, each with its own
+            border and click target. Wrapped in a single ref'd container so
+            SaveWishlistPanel still anchors correctly. */}
+        <div className="relative flex items-center gap-1.5 shrink-0" ref={saveDropdownRef}>
+          {/* Save chip */}
+          <ButtonBase
+            onClick={() => {
+              if (!userId) {
+                onLoginRequired?.();
+                return;
+              }
+              setOpenChip(null);
+              setSaveName(suggestSearchName(filters));
+              // If already open on this tab → close. Otherwise open this tab.
+              if (saveOpen && savePanelTab === 'save-search') {
+                setSaveOpen(false);
+              } else {
+                setSavePanelTab('save-search');
+                setSaveOpen(true);
+                setTimeout(() => saveInputRef.current?.focus(), 50);
+              }
+            }}
+            className={cn(
+              'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border text-[12px] font-medium whitespace-nowrap transition-colors',
+              saveOpen && savePanelTab === 'save-search'
+                ? 'border-[#58a6ff] bg-[rgba(88,166,255,0.08)] text-[#58a6ff]'
+                : 'border-[#2d333b] hover:border-[rgba(88,166,255,0.6)] bg-transparent text-[#e1e4e8]',
+            )}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+            </svg>
+            Save
+          </ButtonBase>
+
+          {/* Wishlist chip */}
+          {(() => {
+            const allWishlists = [...(myWishlists || []), ...(sharedWishlists || [])];
+            const selectedWishlistObj =
+              selectedWishlist && selectedWishlist !== 'all-saved'
+                ? allWishlists.find((w) => w.id === selectedWishlist)
+                : null;
+            const wishlistLabel = selectedWishlist === 'all-saved'
+              ? 'All saved'
+              : selectedWishlistObj
+                ? (selectedWishlistObj.name.length > 16
+                    ? selectedWishlistObj.name.slice(0, 16) + '…'
+                    : selectedWishlistObj.name)
+                : 'Wishlist';
+            const hasSelection = !!selectedWishlist;
+            const isOpen = saveOpen && savePanelTab === 'wishlist';
+            return (
               <ButtonBase
                 onClick={() => {
                   if (!userId) {
@@ -2203,32 +2204,39 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                   }
                 }}
                 aria-label="Filter by wishlist"
-                className="flex items-center gap-1 px-2.5 h-full text-[12px]"
+                className={cn(
+                  'inline-flex items-center gap-1 h-7 px-2.5 rounded-full border text-[12px] font-medium whitespace-nowrap transition-colors',
+                  isOpen
+                    ? 'border-[#58a6ff] text-[#58a6ff]'
+                    : hasSelection
+                      ? 'border-[#2d333b] hover:border-[rgba(88,166,255,0.6)] text-[#e1e4e8]'
+                      : 'border-[#2d333b] hover:border-[rgba(88,166,255,0.6)] text-[#8b949e]',
+                )}
                 style={{
-                  color: saveOpen && savePanelTab === 'wishlist' ? '#58a6ff' : '#e1e4e8',
-                  background: selectedWishlist ? 'rgba(126,231,135,0.1)' : 'transparent',
+                  background: hasSelection ? 'rgba(126,231,135,0.1)' : 'transparent',
                 }}
               >
                 <svg
                   width="12"
                   height="12"
                   viewBox="0 0 24 24"
-                  fill={selectedWishlist ? '#7ee787' : 'none'}
-                  stroke={selectedWishlist ? '#7ee787' : 'currentColor'}
+                  fill={hasSelection ? '#7ee787' : 'none'}
+                  stroke={hasSelection ? '#7ee787' : 'currentColor'}
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  style={{ opacity: selectedWishlist ? 1 : 0.6 }}
+                  style={{ opacity: hasSelection ? 1 : 0.6 }}
                 >
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                 </svg>
+                <span>{wishlistLabel}</span>
                 <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.6 }}>
                   <path d="M2 3.5L5 6.5L8 3.5" />
                 </svg>
               </ButtonBase>
-            </div>
-          </div>
-        </>
+            );
+          })()}
+        </div>
     </>
   );
 
@@ -2347,8 +2355,16 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
   // 'sheet' wraps and includes a short empty-state when there are no saves yet.
   const renderSavedSearchTabsContent = (variant: 'topbar' | 'sheet') => (
     <>
-      {/* "All" tab — always first; long-press shows build info */}
-      <div className="relative group shrink-0">
+      {/* Single segmented control wrapping the "All" tab + every named saved-search
+          tab. One outer rounded-full border, vertical interior dividers between
+          segments, blue-tint bg for the active segment. We avoid `overflow-hidden`
+          on the wrapper so the inner content can be horizontally scrolled by the
+          parent without being clipped. Border radius is applied per-segment via
+          first/last classes so the active blue-tint bg follows the rounded shape. */}
+      <div
+        className="inline-flex items-center h-7 rounded-full border border-[#2d333b] bg-transparent whitespace-nowrap shrink-0"
+      >
+        {/* "All" segment — always first; long-press shows build info */}
         <button
           onClick={() => setActiveSearchId(null)}
           onContextMenu={(e) => {
@@ -2377,109 +2393,109 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
             if (el.dataset.lptFired === '1') e.preventDefault();
           }}
           className={cn(
-            'relative flex items-center h-8 pl-0 pr-2.5 sm:px-2.5 text-[11px] whitespace-nowrap cursor-pointer transition-colors duration-150',
-            activeSearchId === null ? 'text-[#e1e4e8]' : 'text-[#8b949e] hover:text-[#c0d6f5]',
+            'flex items-center h-full px-2.5 text-[11px] whitespace-nowrap cursor-pointer transition-colors duration-150 rounded-l-full',
+            !savedSearches?.length && 'rounded-r-full',
+            activeSearchId === null
+              ? 'bg-[rgba(88,166,255,0.1)] text-[#58a6ff]'
+              : 'bg-transparent text-[#8b949e] hover:text-[#c0d6f5]',
           )}
         >
           All
-          {activeSearchId === null && (
-            <span
-              className="absolute bottom-0 left-0 right-2.5 sm:left-2.5 h-0.5 rounded-sm"
-              style={{ backgroundColor: '#58a6ff' }}
-            />
-          )}
         </button>
-      </div>
 
-      {/* Saved search tabs */}
-      {savedSearches?.map((s) => {
-        const active = activeSearchId === s.id;
-        const isEditing = editingSearchId === s.id;
-        return (
-          <div key={s.id} className="relative group shrink-0">
-            {isEditing ? (
-              <div className="flex items-center h-8 px-1">
-                <input
-                  ref={editInputRef}
-                  type="text"
-                  value={editingName}
-                  onChange={(e) => setEditingName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && editingName.trim()) {
-                      onUpdateSearch?.(s.id, editingName.trim());
+        {/* Saved-search segments */}
+        {savedSearches?.map((s, idx) => {
+          const active = activeSearchId === s.id;
+          const isEditing = editingSearchId === s.id;
+          const isLast = idx === (savedSearches.length - 1);
+          return (
+            <div
+              key={s.id}
+              className={cn(
+                'relative group flex items-center h-full border-l border-[#2d333b]',
+                isLast && 'rounded-r-full overflow-hidden',
+              )}
+            >
+              {isEditing ? (
+                <div className="flex items-center h-full px-1">
+                  <input
+                    ref={editInputRef}
+                    type="text"
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && editingName.trim()) {
+                        onUpdateSearch?.(s.id, editingName.trim());
+                        setEditingSearchId(null);
+                      }
+                      if (e.key === 'Escape') setEditingSearchId(null);
+                    }}
+                    onBlur={() => {
+                      if (editingName.trim()) {
+                        onUpdateSearch?.(s.id, editingName.trim());
+                      }
                       setEditingSearchId(null);
-                    }
-                    if (e.key === 'Escape') setEditingSearchId(null);
-                  }}
-                  onBlur={() => {
-                    if (editingName.trim()) {
-                      onUpdateSearch?.(s.id, editingName.trim());
-                    }
-                    setEditingSearchId(null);
-                  }}
-                  className="h-6 px-1.5 text-[11px] rounded outline-none"
-                  style={{ backgroundColor: '#0f1117', border: '1px solid #58a6ff', color: '#e1e4e8', width: `${Math.max(editingName.length, 4) * 7 + 16}px`, maxWidth: '150px' }}
-                />
-              </div>
-            ) : (
-              <button
-                onClick={() => {
-                  setActiveSearchId(s.id);
-                  onLoadSearch?.(s.filters as unknown as FiltersState);
-                }}
-                className={cn(
-                  'relative flex items-center gap-1 h-8 px-2.5 text-[11px] whitespace-nowrap cursor-pointer transition-colors duration-150',
-                  active ? 'text-[#e1e4e8]' : 'text-[#8b949e] hover:text-[#c0d6f5]',
-                )}
-              >
-                {s.name}
-                {active && (
-                  <span
-                    className="absolute bottom-0 left-2.5 right-2.5 h-0.5 rounded-sm"
-                    style={{ backgroundColor: '#58a6ff' }}
+                    }}
+                    className="h-5 px-1.5 text-[11px] rounded outline-none"
+                    style={{ backgroundColor: '#0f1117', border: '1px solid #58a6ff', color: '#e1e4e8', width: `${Math.max(editingName.length, 4) * 7 + 16}px`, maxWidth: '150px' }}
                   />
-                )}
-                {/* Edit/delete icons — hover on desktop, always visible in
-                    mobile sheet so touch users can rename/delete. */}
-                <span
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setActiveSearchId(s.id);
+                    onLoadSearch?.(s.filters as unknown as FiltersState);
+                  }}
                   className={cn(
-                    'items-center gap-0.5 ml-0.5',
-                    variant === 'sheet' ? 'flex' : 'hidden group-hover:flex',
+                    'flex items-center gap-1 h-full px-2.5 text-[11px] whitespace-nowrap cursor-pointer transition-colors duration-150',
+                    active
+                      ? 'bg-[rgba(88,166,255,0.1)] text-[#58a6ff]'
+                      : 'bg-transparent text-[#8b949e] hover:text-[#c0d6f5]',
                   )}
                 >
+                  {s.name}
+                  {/* Edit/delete icons — hover on desktop, always visible in
+                      mobile sheet so touch users can rename/delete. */}
                   <span
-                    role="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingSearchId(s.id);
-                      setEditingName(s.name);
-                      setTimeout(() => editInputRef.current?.focus(), 50);
-                    }}
-                    className="w-4 h-4 rounded flex items-center justify-center text-[#484f58] hover:text-[#58a6ff] hover:bg-[#58a6ff]/10 cursor-pointer transition-colors"
+                    className={cn(
+                      'items-center gap-0.5 ml-0.5',
+                      variant === 'sheet' ? 'flex' : 'hidden group-hover:flex',
+                    )}
                   >
-                    <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M8.5 1.5l2 2L4 10H2v-2z" />
-                    </svg>
+                    <span
+                      role="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingSearchId(s.id);
+                        setEditingName(s.name);
+                        setTimeout(() => editInputRef.current?.focus(), 50);
+                      }}
+                      className="w-4 h-4 rounded flex items-center justify-center text-[#484f58] hover:text-[#58a6ff] hover:bg-[#58a6ff]/10 cursor-pointer transition-colors"
+                    >
+                      <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M8.5 1.5l2 2L4 10H2v-2z" />
+                      </svg>
+                    </span>
+                    <span
+                      role="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (activeSearchId === s.id) setActiveSearchId(null);
+                        onDeleteSearch?.(s.id);
+                      }}
+                      className="w-4 h-4 rounded flex items-center justify-center text-[#484f58] hover:text-red-400 hover:bg-red-400/10 cursor-pointer transition-colors"
+                    >
+                      <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                        <path d="M2 2L8 8M8 2L2 8" />
+                      </svg>
+                    </span>
                   </span>
-                  <span
-                    role="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (activeSearchId === s.id) setActiveSearchId(null);
-                      onDeleteSearch?.(s.id);
-                    }}
-                    className="w-4 h-4 rounded flex items-center justify-center text-[#484f58] hover:text-red-400 hover:bg-red-400/10 cursor-pointer transition-colors"
-                  >
-                    <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                      <path d="M2 2L8 8M8 2L2 8" />
-                    </svg>
-                  </span>
-                </span>
-              </button>
-            )}
-          </div>
-        );
-      })}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       {/* Empty state — only in the mobile sheet variant. */}
       {variant === 'sheet' && (!savedSearches || savedSearches.length === 0) && (
@@ -2493,7 +2509,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
   return (
     <div
       ref={containerRef}
-      className="pl-3 pr-2 sm:px-2 relative z-[1200]"
+      className="pl-4 pr-2 sm:pl-4 sm:pr-2 relative z-[1200]"
       style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}
     >
       {/* Row 1 (always visible): Destination pill + Area tabs + listing count + Filters button + Sort + View toggle */}
