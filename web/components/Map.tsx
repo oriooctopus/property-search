@@ -47,12 +47,14 @@ interface MapProps {
    *  instead of opening the cluster popup. Desktop / list / map views
    *  should leave this false so popup behavior is unchanged. */
   swipeSelectMode?: boolean;
+  /** When true, only render markers for listings whose id is in `favoritedIds`. */
+  favoritesOnly?: boolean;
 }
 
 // Memoized so parent re-renders (e.g. view-switches on mobile) don't force
 // the Leaflet tree to re-run its own render cycle. Stable callback references
 // from the parent are required for the memo to be effective.
-function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, isPanningRef, initialCenter, initialZoom, visible, commuteInfoMap, hoveredStations, swipeSelectMode }: MapProps) {
+function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef, isPanningRef, initialCenter, initialZoom, visible, commuteInfoMap, hoveredStations, swipeSelectMode, favoritesOnly }: MapProps) {
   return (
     <MapInner
       listings={listings}
@@ -74,6 +76,7 @@ function Map({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds
       commuteInfoMap={commuteInfoMap}
       hoveredStations={hoveredStations ?? null}
       swipeSelectMode={swipeSelectMode}
+      favoritesOnly={favoritesOnly}
     />
   );
 }
