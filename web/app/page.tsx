@@ -1824,7 +1824,7 @@ function HomeInner() {
                 height="20"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#38bdf8"
+                stroke="#c9d1d9"
                 strokeWidth="2.25"
                 strokeLinecap="round"
                 strokeLinejoin="round"
