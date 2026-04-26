@@ -1066,6 +1066,14 @@ function HomeInner() {
     startTransition(() => setMobileView(v));
   }, []);
 
+  // When a wishlist filter becomes active, swipe view is no longer offered;
+  // bounce off it to list so the user lands on a valid view.
+  useEffect(() => {
+    if (selectedWishlist != null && mobileView === 'swipe') {
+      switchMobileView('list');
+    }
+  }, [selectedWishlist, mobileView, switchMobileView]);
+
   // Stable handlers for ListingCard so React.memo can skip re-renders when
   // the parent re-renders for unrelated reasons.
   const handleCardSelect = useCallback((id: number) => {
@@ -1272,6 +1280,9 @@ function HomeInner() {
   // render (in the Removed section) instead of a perpetual loader.
   const listingGridLoading = filteredListings.length === 0 && (loading || viewportLoading || commuteLoading);
 
+  // Hide Swipe tab when a wishlist filter is active — swipe-to-decide doesn't
+  // make sense when you're already filtering down to saved listings.
+  const swipeAllowed = selectedWishlist == null;
   const viewToggle = (
     <div data-tour="view-modes" className="flex items-center">
     <SegmentedControl
@@ -1279,7 +1290,9 @@ function HomeInner() {
       onChange={(v) => switchMobileView(v as 'list' | 'map' | 'swipe')}
       options={[
         { value: 'list', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> },
-        { value: 'swipe', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="14" height="18" rx="2"/><rect x="8" y="2" width="14" height="18" rx="2"/></svg> },
+        ...(swipeAllowed
+          ? [{ value: 'swipe', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="14" height="18" rx="2"/><rect x="8" y="2" width="14" height="18" rx="2"/></svg> }]
+          : []),
         { value: 'map', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg> },
       ]}
     />
@@ -1895,16 +1908,19 @@ function HomeInner() {
                 </svg>
               ),
             },
-            {
-              value: 'swipe' as const,
-              label: 'Swipe',
-              icon: (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="4" width="14" height="18" rx="2" />
-                  <rect x="8" y="2" width="14" height="18" rx="2" />
-                </svg>
-              ),
-            },
+            // Hide Swipe when a wishlist filter is active.
+            ...(swipeAllowed
+              ? [{
+                  value: 'swipe' as const,
+                  label: 'Swipe',
+                  icon: (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="4" width="14" height="18" rx="2" />
+                      <rect x="8" y="2" width="14" height="18" rx="2" />
+                    </svg>
+                  ),
+                }]
+              : []),
           ].map((opt) => (
             <button
               key={opt.value}
