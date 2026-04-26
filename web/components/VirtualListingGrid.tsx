@@ -79,7 +79,14 @@ interface VirtualListingGridProps {
 
 const BREAKPOINT_TWO_COL = 640; // Tailwind `sm:`
 const BREAKPOINT_ONE_COL_LG = 1024; // Tailwind `lg:` — back to single column
-const ESTIMATED_ROW_HEIGHT = 580;
+// Card heights measured empirically (delta from card to row container is the
+// 12px paddingBottom in `rowGridStyle`):
+//   desktop 1-col @1280: card ≈481px → row ≈493px
+//   mobile 1-col @390:   card ≈414px → row ≈426px
+// We pick 493 as the estimate so desktop is exact and mobile slightly
+// over-estimates (which is preferable to under-estimating: under-estimating
+// causes scroll-position pop-in as rows grow when measured).
+const ESTIMATED_ROW_HEIGHT = 493;
 const OVERSCAN = 6;
 
 // Hysteresis (dead zone) around breakpoints to prevent scrollbar-toggle
@@ -221,11 +228,22 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
       getItemKey: (index) => `${cols}-${index}`,
     });
 
-    // When listing set or column count changes, invalidate measurements so
-    // height cache isn't stale for a different slice of listings.
+    // When the column count changes, invalidate the measurement cache — the
+    // per-row height genuinely differs between 1-col and 2-col layouts.
+    //
+    // We deliberately do NOT call `virtualizer.measure()` when the `listings`
+    // or `removed` arrays change. `measure()` resets every cached row height
+    // back to the `estimateSize`, and since `measureElement` (via a
+    // ResizeObserver) only re-measures rows that are CURRENTLY MOUNTED, any
+    // row outside the viewport stays at the (wrong) estimate forever. The
+    // visible result is a ~80px gap between every card after a re-render
+    // (e.g. when a new page of listings appends, or when commute info loads
+    // into existing cards). The ResizeObserver wired up by `measureElement`
+    // already catches per-card content changes — we don't need to nuke the
+    // cache to make it work.
     useEffect(() => {
       virtualizer.measure();
-    }, [listings, removed, cols, virtualizer]);
+    }, [cols, virtualizer]);
 
     const scrollToListing = useCallback(
       (id: number) => {
