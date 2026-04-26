@@ -261,28 +261,49 @@ export default function SwipeCard({
     setPhotoIndex(0);
   }, [listing.id]);
 
-  const commitSwipe = useCallback((direction: 'left' | 'right' | 'down') => {
-    const targets = {
-      left: { x: -window.innerWidth * 1.5, y: 0, rotate: -25 },
-      right: { x: window.innerWidth * 1.5, y: 0, rotate: 25 },
-      down: { x: 0, y: window.innerHeight * 1.5, rotate: 0 },
-    };
+  // Tinder-style commit: a fast flick should fly off in the flick direction
+  // even if displacement was small. Slow drag past the displacement threshold
+  // also commits. We pass the user's release velocity into the spring so the
+  // exit (or snap-back) carries natural inertia instead of snapping instantly.
+  const commitSwipe = useCallback(
+    (direction: 'left' | 'right' | 'down', vxPxPerSec = 0, vyPxPerSec = 0) => {
+      const targets = {
+        left: { x: -window.innerWidth * 1.5, y: 0, rotate: -25 },
+        right: { x: window.innerWidth * 1.5, y: 0, rotate: 25 },
+        down: { x: 0, y: window.innerHeight * 1.5, rotate: 0 },
+      };
 
-    const t = targets[direction];
-    const springConfig = { stiffness: 300, damping: 20 };
+      const t = targets[direction];
+      const springConfig = { stiffness: 300, damping: 20 };
 
-    animate(x, t.x, { type: 'spring', ...springConfig });
-    animate(y, t.y, {
-      type: 'spring',
-      ...springConfig,
-      onComplete: () => onSwipe(direction),
-    });
-  }, [onSwipe, x, y]);
+      if (direction === 'down') {
+        animate(x, t.x, { type: 'spring', ...springConfig });
+        animate(y, t.y, {
+          type: 'spring',
+          velocity: vyPxPerSec,
+          ...springConfig,
+          onComplete: () => onSwipe(direction),
+        });
+      } else {
+        animate(x, t.x, {
+          type: 'spring',
+          velocity: vxPxPerSec,
+          ...springConfig,
+          onComplete: () => onSwipe(direction),
+        });
+        animate(y, t.y, { type: 'spring', ...springConfig });
+      }
+    },
+    [onSwipe, x, y]
+  );
 
   const AXIS_LOCK_THRESHOLD = 15;
+  // Velocity threshold (px/sec) for flick-commit. A fast flick below the
+  // displacement threshold still commits in the flick direction.
+  const SWIPE_VELOCITY = 500;
 
   const bind = useDrag(
-    ({ movement: [mx, my], down, first, event }) => {
+    ({ movement: [mx, my], velocity: [vx, vy], direction: [dx, dy], down, first, event }) => {
       if (!isTop) return;
 
       if (first) {
@@ -359,14 +380,43 @@ export default function SwipeCard({
         const absX = Math.abs(mx);
         const curY = y.get();
 
-        if (gestureAxis.current === 'x' && absX > SWIPE_X_THRESHOLD) {
-          commitSwipe(mx < 0 ? 'left' : 'right');
-        } else if (gestureAxis.current === 'y' && curY > SWIPE_Y_THRESHOLD) {
-          commitSwipe('down');
+        // use-gesture exposes `velocity` in px/ms as a non-negative magnitude;
+        // pair with `direction` (sign) to get signed px/sec.
+        const vxPxPerSec = vx * 1000 * (dx || (mx < 0 ? -1 : 1));
+        const vyPxPerSec = vy * 1000 * (dy || (my < 0 ? -1 : 1));
+        const absVx = Math.abs(vxPxPerSec);
+
+        // Horizontal commit: either dragged past threshold OR flicked fast.
+        // Direction prefers velocity sign on flicks (a quick flick that didn't
+        // travel far should still go in the flick direction); falls back to
+        // displacement sign for slow drags.
+        const horizontalCommit =
+          gestureAxis.current === 'x' && (absX > SWIPE_X_THRESHOLD || absVx > SWIPE_VELOCITY);
+        // Vertical (down) commit: must end up moving downward, but allow a
+        // fast downward flick below the displacement threshold.
+        const verticalCommit =
+          gestureAxis.current === 'y' &&
+          curY > 0 &&
+          (curY > SWIPE_Y_THRESHOLD || vyPxPerSec > SWIPE_VELOCITY);
+
+        if (horizontalCommit) {
+          const dir: 'left' | 'right' =
+            absVx > SWIPE_VELOCITY
+              ? vxPxPerSec < 0
+                ? 'left'
+                : 'right'
+              : mx < 0
+                ? 'left'
+                : 'right';
+          commitSwipe(dir, vxPxPerSec);
+        } else if (verticalCommit) {
+          commitSwipe('down', 0, vyPxPerSec);
         } else {
+          // Snap back with velocity so the spring decelerates naturally
+          // instead of yanking instantly back to 0.
           const springBack = { type: 'spring' as const, stiffness: 500, damping: 30 };
-          animate(x, 0, springBack);
-          animate(y, 0, springBack);
+          animate(x, 0, { ...springBack, velocity: vxPxPerSec });
+          animate(y, 0, { ...springBack, velocity: vyPxPerSec });
         }
 
         if (notifiedDragging.current) {
