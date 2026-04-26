@@ -99,16 +99,18 @@ function makeClusterIcon(count: number, hasSaved: boolean): L.DivIcon {
       width:${size}px;
       height:${size}px;
       border-radius:50%;
-      background:rgba(28, 32, 40, 0.75);
+      background:rgba(28, 32, 40, 0.55);
+      backdrop-filter:blur(2px);
+      -webkit-backdrop-filter:blur(2px);
       border:1px solid ${borderColor};
       display:flex;
       align-items:center;
       justify-content:center;
-      color:#fff;
+      color:rgba(255,255,255,0.75);
       font-size:${size <= 22 ? 10 : 12}px;
       font-weight:700;
       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-      box-shadow:0 1px 3px rgba(0,0,0,0.4);
+      box-shadow:0 1px 2px rgba(0,0,0,0.3);
       cursor:pointer;
     ">${count}</div>`,
     iconSize: [size, size],

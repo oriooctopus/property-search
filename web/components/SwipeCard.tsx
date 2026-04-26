@@ -494,7 +494,7 @@ export default function SwipeCard({
     return (
       <div className={`overflow-hidden flex flex-col ${compactMobile ? 'rounded-3xl min-[600px]:rounded-2xl' : 'rounded-2xl'}`} style={{ backgroundColor: 'rgba(28, 32, 40, 0.97)', border: '1px solid #2d333b', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
         <div
-          className={`w-full flex-shrink-0 ${compactMobile ? 'h-[171px] min-[600px]:h-[226px]' : 'h-[226px]'}`}
+          className={`w-full flex-shrink-0 ${compactMobile ? 'h-[179px] min-[600px]:h-[234px]' : 'h-[234px]'}`}
           style={{ backgroundColor: '#0d1117' }}
         />
         <div className="px-5 py-4 flex flex-col gap-3">
@@ -699,7 +699,7 @@ export default function SwipeCard({
           {/* Photo carousel */}
           <div
             ref={photoAreaRef}
-            className={`relative w-full overflow-hidden flex-shrink-0 ${compactMobile ? 'h-[171px] min-[600px]:h-[226px]' : 'h-[226px]'}`}
+            className={`relative w-full overflow-hidden flex-shrink-0 ${compactMobile ? 'h-[179px] min-[600px]:h-[234px]' : 'h-[234px]'}`}
             style={{
               outline: photoFocused ? '2px solid rgba(88,166,255,0.7)' : 'none',
               outlineOffset: '-2px',
