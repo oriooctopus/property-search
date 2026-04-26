@@ -1376,7 +1376,11 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
   const [saveToastVisible, setSaveToastVisible] = useState(false);
   const saveToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveDropdownRef = useRef<HTMLDivElement>(null);
+  const clusterDropdownRef = useRef<HTMLDivElement>(null);
   const saveInputRef = useRef<HTMLInputElement>(null);
+  // Tracks which trigger pill the SaveWishlistPanel should anchor to.
+  // 'cluster' = top-left Saved cluster pill; 'chips' = (legacy) bottom-row chips.
+  const [panelAnchor, setPanelAnchor] = useState<'cluster' | 'chips'>('cluster');
 
   // Saved search tabs state
   const [activeSearchId, setActiveSearchId] = useState<number | null>(null);
@@ -2154,6 +2158,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
               if (saveOpen && savePanelTab === 'save-search') {
                 setSaveOpen(false);
               } else {
+                setPanelAnchor('chips');
                 setSavePanelTab('save-search');
                 setSaveOpen(true);
                 setTimeout(() => saveInputRef.current?.focus(), 50);
@@ -2199,6 +2204,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                   if (saveOpen && savePanelTab === 'wishlist') {
                     setSaveOpen(false);
                   } else {
+                    setPanelAnchor('chips');
                     setSavePanelTab('wishlist');
                     setSaveOpen(true);
                   }
@@ -2246,7 +2252,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
   // render simultaneously, sharing the same anchor ref.
   const saveWishlistPanelEl = saveOpen ? (
     <SaveWishlistPanel
-      anchorRef={saveDropdownRef}
+      anchorRef={panelAnchor === 'cluster' ? clusterDropdownRef : saveDropdownRef}
       initialTab={savePanelTab}
       onClose={() => setSaveOpen(false)}
       myWishlists={myWishlists}
@@ -2512,8 +2518,89 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
       className="pl-4 pr-2 sm:pl-4 sm:pr-2 relative z-[1200]"
       style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}
     >
-      {/* Row 1 (always visible): Destination pill + Area tabs + listing count + Filters button + Sort + View toggle */}
+      {/* Row 1 (always visible): Saved cluster + Destination pill + Area tabs + listing count + Filters button + Sort + View toggle */}
       <div className="flex items-center min-h-[36px] gap-1.5 sm:gap-3 overflow-visible">
+        {/* Saved cluster pill — consolidated entry-point for save-search and
+            wishlist filtering. Anchors the SaveWishlistPanel via clusterDropdownRef. */}
+        {(() => {
+          const allWishlists = [...(myWishlists || []), ...(sharedWishlists || [])];
+          const selectedWishlistObj =
+            selectedWishlist && selectedWishlist !== 'all-saved'
+              ? allWishlists.find((w) => w.id === selectedWishlist)
+              : null;
+          const clusterLabel =
+            selectedWishlist === 'all-saved'
+              ? 'All saved'
+              : selectedWishlistObj
+                ? selectedWishlistObj.name.length > 16
+                  ? selectedWishlistObj.name.slice(0, 16) + '…'
+                  : selectedWishlistObj.name
+                : 'Saved';
+          const hasSelection = !!selectedWishlist;
+          return (
+            <div className="shrink-0 flex items-center" ref={clusterDropdownRef}>
+              <ButtonBase
+                onClick={() => {
+                  if (!userId) {
+                    onLoginRequired?.();
+                    return;
+                  }
+                  setOpenChip(null);
+                  if (saveOpen && panelAnchor === 'cluster') {
+                    setSaveOpen(false);
+                  } else {
+                    setPanelAnchor('cluster');
+                    setSavePanelTab(hasSelection ? 'wishlist' : 'wishlist');
+                    setSaveOpen(true);
+                  }
+                }}
+                aria-label="Saved (filter by wishlist or save current search)"
+                className={cn(
+                  'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border text-[12px] font-medium whitespace-nowrap transition-colors',
+                  hasSelection
+                    ? 'border-[#7ee787] text-[#7ee787]'
+                    : 'border-[#2d333b] hover:border-[rgba(126,231,135,0.6)] text-[#e1e4e8]',
+                )}
+                style={{
+                  background: hasSelection ? 'rgba(126,231,135,0.1)' : 'transparent',
+                }}
+              >
+                {hasSelection ? (
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="#7ee787"
+                    stroke="#7ee787"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                ) : (
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                )}
+                <span>{clusterLabel}</span>
+                <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.7 }}>
+                  <path d="M2 3.5L5 6.5L8 3.5" />
+                </svg>
+              </ButtonBase>
+            </div>
+          );
+        })()}
+
         {/* Inline destination pill — first child so it sits to the left of the
             saved-search tabs scroll area. shrink-0 keeps it from collapsing. */}
         {destinationSlot && (
