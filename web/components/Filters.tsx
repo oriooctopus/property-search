@@ -1378,12 +1378,8 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
   const [saveName, setSaveName] = useState('');
   const [saveToastVisible, setSaveToastVisible] = useState(false);
   const saveToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const saveDropdownRef = useRef<HTMLDivElement>(null);
   const clusterDropdownRef = useRef<HTMLDivElement>(null);
   const saveInputRef = useRef<HTMLInputElement>(null);
-  // Tracks which trigger pill the SaveWishlistPanel should anchor to.
-  // 'cluster' = top-left Saved cluster pill; 'chips' = (legacy) bottom-row chips.
-  const [panelAnchor, setPanelAnchor] = useState<'cluster' | 'chips'>('cluster');
 
   // Saved search tabs state
   const [activeSearchId, setActiveSearchId] = useState<number | null>(null);
@@ -2144,108 +2140,8 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           </div>
         )}
     
-        {/* Save chip + Wishlist chip — two separate chips, each with its own
-            border and click target. Wrapped in a single ref'd container so
-            SaveWishlistPanel still anchors correctly. */}
-        <div className="relative flex items-center gap-1.5 shrink-0" ref={saveDropdownRef}>
-          {/* Save chip */}
-          <ButtonBase
-            onClick={() => {
-              if (!userId) {
-                onLoginRequired?.();
-                return;
-              }
-              setOpenChip(null);
-              setSaveName(suggestSearchName(filters));
-              // If already open on this tab → close. Otherwise open this tab.
-              if (saveOpen && savePanelTab === 'save-search') {
-                setSaveOpen(false);
-              } else {
-                setPanelAnchor('chips');
-                setSavePanelTab('save-search');
-                setSaveOpen(true);
-                setTimeout(() => saveInputRef.current?.focus(), 50);
-              }
-            }}
-            className={cn(
-              'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border text-[12px] font-medium whitespace-nowrap transition-colors',
-              saveOpen && savePanelTab === 'save-search'
-                ? 'border-[#58a6ff] bg-[rgba(88,166,255,0.08)] text-[#58a6ff]'
-                : 'border-[#2d333b] hover:border-[rgba(88,166,255,0.6)] bg-transparent text-[#e1e4e8]',
-            )}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-            </svg>
-            Save
-          </ButtonBase>
-
-          {/* Wishlist chip */}
-          {(() => {
-            const allWishlists = [...(myWishlists || []), ...(sharedWishlists || [])];
-            const selectedWishlistObj =
-              selectedWishlist && selectedWishlist !== 'all-saved'
-                ? allWishlists.find((w) => w.id === selectedWishlist)
-                : null;
-            const wishlistLabel = selectedWishlist === 'all-saved'
-              ? 'All saved'
-              : selectedWishlistObj
-                ? (selectedWishlistObj.name.length > 16
-                    ? selectedWishlistObj.name.slice(0, 16) + '…'
-                    : selectedWishlistObj.name)
-                : 'Wishlist';
-            const hasSelection = !!selectedWishlist;
-            const isOpen = saveOpen && savePanelTab === 'wishlist';
-            return (
-              <ButtonBase
-                onClick={() => {
-                  if (!userId) {
-                    onLoginRequired?.();
-                    return;
-                  }
-                  setOpenChip(null);
-                  if (saveOpen && savePanelTab === 'wishlist') {
-                    setSaveOpen(false);
-                  } else {
-                    setPanelAnchor('chips');
-                    setSavePanelTab('wishlist');
-                    setSaveOpen(true);
-                  }
-                }}
-                aria-label="Filter by wishlist"
-                className={cn(
-                  'inline-flex items-center gap-1 h-7 px-2.5 rounded-full border text-[12px] font-medium whitespace-nowrap transition-colors',
-                  isOpen
-                    ? 'border-[#58a6ff] text-[#58a6ff]'
-                    : hasSelection
-                      ? 'border-[#2d333b] hover:border-[rgba(88,166,255,0.6)] text-[#e1e4e8]'
-                      : 'border-[#2d333b] hover:border-[rgba(88,166,255,0.6)] text-[#8b949e]',
-                )}
-                style={{
-                  background: hasSelection ? 'rgba(126,231,135,0.1)' : 'transparent',
-                }}
-              >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill={hasSelection ? '#7ee787' : 'none'}
-                  stroke={hasSelection ? '#7ee787' : 'currentColor'}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ opacity: hasSelection ? 1 : 0.6 }}
-                >
-                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                </svg>
-                <span>{wishlistLabel}</span>
-                <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.6 }}>
-                  <path d="M2 3.5L5 6.5L8 3.5" />
-                </svg>
-              </ButtonBase>
-            );
-          })()}
-        </div>
+        {/* Save + Wishlist chips were removed — replaced by the top-left
+            Saved cluster pill (anchored via clusterDropdownRef in the topbar). */}
     </>
   );
 
@@ -2255,7 +2151,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
   // render simultaneously, sharing the same anchor ref.
   const saveWishlistPanelEl = saveOpen ? (
     <SaveWishlistPanel
-      anchorRef={panelAnchor === 'cluster' ? clusterDropdownRef : saveDropdownRef}
+      anchorRef={clusterDropdownRef}
       initialTab={savePanelTab}
       onClose={() => { setSaveOpen(false); setStickySaveExpanded(false); }}
       myWishlists={myWishlists}
@@ -2624,11 +2520,10 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                     return;
                   }
                   setOpenChip(null);
-                  if (saveOpen && panelAnchor === 'cluster') {
+                  if (saveOpen) {
                     setSaveOpen(false);
                   } else {
-                    setPanelAnchor('cluster');
-                    setSavePanelTab(hasSelection ? 'wishlist' : 'wishlist');
+                    setSavePanelTab('wishlist');
                     setSaveOpen(true);
                   }
                 }}
