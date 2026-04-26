@@ -10,6 +10,7 @@ import { cn } from '@/lib/cn';
 import { ButtonBase } from './ui/ButtonBase';
 import type { CommuteInfo } from './ListingCard';
 import type { HoveredStation } from './SwipeCard';
+import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
 import { useOccluders } from '@/lib/viewport/OccluderRegistry';
 import { useLeafletMapSetter } from '@/lib/viewport/LeafletMapContext';
 import { getVisibleMapRect } from '@/lib/viewport/occlusion';
@@ -1171,6 +1172,8 @@ function SubwayOverlayChip({ enabled, onToggle }: SubwayOverlayChipProps) {
 /* ------------------------------------------------------------------ */
 interface SubwayLinesLayerProps {
   enabled: boolean;
+  hoveredLine: string | null;
+  onHoverLine: (line: string | null) => void;
 }
 
 // Module-level cache so the geojson is only fetched once per page load,
@@ -1198,7 +1201,7 @@ function loadSubwayLines(): Promise<FeatureCollection<Geometry, GeoJsonPropertie
   return subwayLinesPromise;
 }
 
-function SubwayLinesLayer({ enabled }: SubwayLinesLayerProps) {
+function SubwayLinesLayer({ enabled, hoveredLine, onHoverLine }: SubwayLinesLayerProps) {
   const [data, setData] = useState<FeatureCollection<Geometry, GeoJsonProperties> | null>(
     subwayLinesCache,
   );
@@ -1226,20 +1229,61 @@ function SubwayLinesLayer({ enabled }: SubwayLinesLayerProps) {
       });
   }, [enabled, data]);
 
+  // Keep a ref to the live GeoJSON layer so we can re-apply per-feature
+  // styles imperatively when `hoveredLine` changes — react-leaflet does NOT
+  // re-call the `style` prop after mount.
+  const geoJsonRef = useRef<L.GeoJSON | null>(null);
+
+  // Style the polylines per-feature based on the currently hovered line.
+  // When a line is hovered: it stays full-opacity (slight bump in weight),
+  // all other lines dim to 0.3.
+  const styleFn = useCallback(
+    (feature?: Feature) => {
+      const sym = (feature?.properties as { rt_symbol?: string } | undefined)?.rt_symbol ?? '';
+      const isHovered = hoveredLine !== null && sym === hoveredLine;
+      const isOther = hoveredLine !== null && sym !== hoveredLine;
+      return {
+        color: getSubwayFeatureColor(feature),
+        weight: isHovered ? 3.5 : 2.5,
+        opacity: isHovered ? 0.95 : isOther ? 0.3 : 0.65,
+        fillOpacity: 0,
+      };
+    },
+    [hoveredLine],
+  );
+
+  useEffect(() => {
+    const layer = geoJsonRef.current;
+    if (!layer) return;
+    layer.setStyle(styleFn as L.StyleFunction);
+  }, [styleFn]);
+
   if (!enabled || !data) return null;
 
   return (
     <GeoJSON
       key="subway-lines"
+      ref={(instance) => {
+        geoJsonRef.current = instance;
+      }}
       data={data}
-      // Non-interactive so clicks/hovers pass through to listings underneath
-      interactive={false}
-      style={(feature) => ({
-        color: getSubwayFeatureColor(feature),
-        weight: 2.5,
-        opacity: 0.65,
-        fillOpacity: 0,
-      })}
+      // Interactive so per-feature mouseover/mouseout fire. Listing dots and
+      // other markers live in markerPane (above overlayPane), so their clicks
+      // are not blocked.
+      interactive
+      bubblingMouseEvents={false}
+      style={styleFn}
+      onEachFeature={(feature, layer) => {
+        const sym = (feature?.properties as { rt_symbol?: string } | undefined)?.rt_symbol;
+        layer.on({
+          mouseover: () => {
+            if (sym) onHoverLine(sym);
+          },
+          mouseout: () => {
+            onHoverLine(null);
+          },
+        });
+      }}
       eventHandlers={{
         add: (e) => {
           // Keep the overlay below marker panes (under listing dots).
@@ -1248,6 +1292,43 @@ function SubwayLinesLayer({ enabled }: SubwayLinesLayerProps) {
         },
       }}
     />
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Subway stations on hovered line — fade-in dots                     */
+/* ------------------------------------------------------------------ */
+interface HoveredLineStationsLayerProps {
+  hoveredLine: string | null;
+}
+
+function HoveredLineStationsLayer({ hoveredLine }: HoveredLineStationsLayerProps) {
+  const stations = useMemo(() => {
+    if (!hoveredLine) return [];
+    return SUBWAY_STATIONS.filter((s) => s.lines.includes(hoveredLine));
+  }, [hoveredLine]);
+
+  if (!hoveredLine || stations.length === 0) return null;
+  const fillColor = LINE_COLORS[hoveredLine] ?? '#ffffff';
+
+  return (
+    <>
+      {stations.map((s) => (
+        <CircleMarker
+          key={`hovered-line-station-${s.stopId}`}
+          center={[s.lat, s.lon]}
+          radius={5}
+          pathOptions={{
+            color: '#ffffff',
+            weight: 1,
+            opacity: 0.4,
+            fillColor,
+            fillOpacity: 0.85,
+          }}
+          interactive={false}
+        />
+      ))}
+    </>
   );
 }
 
@@ -1286,6 +1367,10 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
   // Subway overlay toggle — persisted in localStorage (default on).
   // Lazy-init so SSR doesn't touch window.
   const [subwayOverlayEnabled, setSubwayOverlayEnabled] = useState<boolean>(true);
+  // Tracks the rt_symbol of the subway line currently hovered on the map.
+  // When non-null, that line stays full-opacity, others dim, and stations on
+  // that line render as colored dots. See SubwayLinesLayer + HoveredLineStationsLayer.
+  const [hoveredLine, setHoveredLine] = useState<string | null>(null);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -1610,7 +1695,12 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
           attribution='&copy; <a href="https://carto.com/">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
-        <SubwayLinesLayer enabled={subwayOverlayEnabled} />
+        <SubwayLinesLayer
+          enabled={subwayOverlayEnabled}
+          hoveredLine={hoveredLine}
+          onHoverLine={setHoveredLine}
+        />
+        {subwayOverlayEnabled && <HoveredLineStationsLayer hoveredLine={hoveredLine} />}
         <InvalidateSize visible={visible} />
         <InjectPopupStyles />
         {onBoundsChange && <BoundsWatcher onBoundsChange={onBoundsChange} onMapMove={onMapMove} suppressBoundsRef={suppressBoundsRef} isPanningRef={isPanningRef} />}
