@@ -1372,6 +1372,9 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
   // Save search dropdown state
   const [saveOpen, setSaveOpen] = useState(false);
   const [savePanelTab, setSavePanelTab] = useState<'save-search' | 'wishlist'>('save-search');
+  // Sticky-footer "Save current search as…" inline expansion state.
+  const [stickySaveExpanded, setStickySaveExpanded] = useState(false);
+  const stickySaveInputRef = useRef<HTMLInputElement>(null);
   const [saveName, setSaveName] = useState('');
   const [saveToastVisible, setSaveToastVisible] = useState(false);
   const saveToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2254,7 +2257,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
     <SaveWishlistPanel
       anchorRef={panelAnchor === 'cluster' ? clusterDropdownRef : saveDropdownRef}
       initialTab={savePanelTab}
-      onClose={() => setSaveOpen(false)}
+      onClose={() => { setSaveOpen(false); setStickySaveExpanded(false); }}
       myWishlists={myWishlists}
       sharedWishlists={sharedWishlists}
       selected={selectedWishlist}
@@ -2350,6 +2353,81 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                     )}
                   </>
                 )}
+      stickyFooter={
+        <div className="px-4 py-2.5">
+          {stickySaveExpanded ? (
+            activeCount === 0 ? (
+              <div className="text-[12px]" style={{ color: '#8b949e' }}>
+                Add at least one filter to save the current search.
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  ref={stickySaveInputRef}
+                  type="text"
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter' && saveName.trim()) {
+                      const saved = await onSaveSearch?.(saveName.trim());
+                      if (saved) setActiveSearchId(saved.id);
+                      setStickySaveExpanded(false);
+                      setSaveOpen(false);
+                      if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
+                      setSaveToastVisible(true);
+                      saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
+                    }
+                    if (e.key === 'Escape') setStickySaveExpanded(false);
+                  }}
+                  placeholder={suggestSearchName(filters) || 'e.g. Brooklyn 5-bed hunt'}
+                  className="flex-1 rounded-md px-2 py-1 text-xs outline-none"
+                  style={{ backgroundColor: '#0f1117', border: '1px solid #2d333b', color: '#e1e4e8' }}
+                />
+                <PrimaryButton
+                  onClick={async () => {
+                    if (saveName.trim()) {
+                      const saved = await onSaveSearch?.(saveName.trim());
+                      if (saved) setActiveSearchId(saved.id);
+                      setStickySaveExpanded(false);
+                      setSaveOpen(false);
+                      if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
+                      setSaveToastVisible(true);
+                      saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
+                    }
+                  }}
+                  disabled={!saveName.trim()}
+                  className="text-[11px] px-2.5 py-1"
+                >
+                  Save
+                </PrimaryButton>
+                <TextButton
+                  variant="muted"
+                  onClick={() => setStickySaveExpanded(false)}
+                  className="text-[11px]"
+                >
+                  Cancel
+                </TextButton>
+              </div>
+            )
+          ) : (
+            <ButtonBase
+              onClick={() => {
+                setSaveName(suggestSearchName(filters));
+                setStickySaveExpanded(true);
+                setTimeout(() => stickySaveInputRef.current?.focus(), 50);
+              }}
+              className="flex items-center gap-1.5 text-[12px] font-medium"
+              style={{ color: '#58a6ff', background: 'transparent', border: 'none', padding: 0 }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" strokeWidth="2.5">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Save current search as…
+            </ButtonBase>
+          )}
+        </div>
+      }
               />
     ) : null;
 
@@ -2607,16 +2685,10 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           <div className="shrink-0 flex items-center">{destinationSlot}</div>
         )}
 
-        {/* Saved search tabs — horizontally scrollable, hidden scrollbar */}
-        <div
-          className="flex items-center flex-1 min-w-0 overflow-x-auto"
-          style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
-        >
-          <style dangerouslySetInnerHTML={{ __html: `.area-tabs-scroll::-webkit-scrollbar { display: none; }` }} />
-          <div className="area-tabs-scroll flex items-center overflow-x-auto" style={{ scrollbarWidth: 'none' } as React.CSSProperties}>
-            {renderSavedSearchTabsContent('topbar')}
-          </div>
-        </div>
+        {/* Spacer — pushes right-side controls to the right edge.
+            (The saved-search "All | <name>" segmented slider that used to live
+            here was replaced by the top-left Saved cluster pill.) */}
+        <div className="flex-1 min-w-0" />
 
         {/* Right-side controls */}
         <div className="flex items-center gap-1.5 shrink-0 pl-2">
