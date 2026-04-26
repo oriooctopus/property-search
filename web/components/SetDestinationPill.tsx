@@ -178,19 +178,21 @@ export default function SetDestinationPill() {
         )}
         </span>
       ) : (
+        // Collapsed icon-only mode — keeps the topbar narrow. Tapping opens
+        // the full destination modal (which is the "expanded" state).
         <ButtonBase
           onClick={() => setOpen(true)}
-          aria-label="Set a preferred destination"
-          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border h-7 whitespace-nowrap"
+          aria-label="Set destination"
+          title="Set destination"
+          className="inline-flex items-center justify-center rounded-lg border h-8 w-8 shrink-0"
           style={{
             backgroundColor: 'transparent',
             borderColor: '#3a3f4a',
             borderStyle: 'dashed',
-            color: '#8b949e',
+            color: '#58a6ff',
           }}
         >
-          <span aria-hidden style={{ fontSize: 11, lineHeight: 1, color: '#58a6ff' }}>📍</span>
-          <span>Set destination</span>
+          <span aria-hidden style={{ fontSize: 14, lineHeight: 1 }}>📍</span>
         </ButtonBase>
       )}
 
