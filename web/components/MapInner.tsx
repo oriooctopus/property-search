@@ -91,24 +91,24 @@ function coordKey(lat: number, lon: number): string {
 
 /** Returns the cluster DivIcon for a given group size and whether any are saved. */
 function makeClusterIcon(count: number, hasSaved: boolean): L.DivIcon {
-  const size = count <= 3 ? 30 : count <= 9 ? 36 : 44;
-  const borderColor = hasSaved ? '#58a6ff' : '#8b949e';
+  const size = count <= 3 ? 22 : count <= 9 ? 26 : 32;
+  const borderColor = hasSaved ? '#7ee787' : '#484f58';
   return L.divIcon({
     className: '',
     html: `<div style="
       width:${size}px;
       height:${size}px;
       border-radius:50%;
-      background:#1c2028;
-      border:2px solid ${borderColor};
+      background:rgba(28, 32, 40, 0.75);
+      border:1px solid ${borderColor};
       display:flex;
       align-items:center;
       justify-content:center;
       color:#fff;
-      font-size:${size <= 30 ? 11 : 13}px;
+      font-size:${size <= 22 ? 10 : 12}px;
       font-weight:700;
       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-      box-shadow:0 2px 6px rgba(0,0,0,0.5);
+      box-shadow:0 1px 3px rgba(0,0,0,0.4);
       cursor:pointer;
     ">${count}</div>`,
     iconSize: [size, size],
@@ -278,7 +278,7 @@ const ACTIVE_PIN_STYLES = `
     width: 64px;
     height: 64px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(126,231,135,0.55) 0%, rgba(126,231,135,0.25) 45%, rgba(126,231,135,0) 75%);
+    background: radial-gradient(circle, rgba(88,166,255,0.55) 0%, rgba(88,166,255,0.25) 45%, rgba(88,166,255,0) 75%);
     transform: translate(-50%, -50%);
     animation: dw-active-pin-breathe 2.4s ease-in-out infinite;
     will-change: opacity, transform;
@@ -293,7 +293,7 @@ const ACTIVE_PIN_STYLES = `
     width: 28px;
     height: 40px;
     display: block;
-    filter: drop-shadow(0 0 12px rgba(126, 231, 135, 0.55))
+    filter: drop-shadow(0 0 12px rgba(88, 166, 255, 0.55))
             drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
   }
   @media (prefers-reduced-motion: reduce) {
@@ -391,7 +391,7 @@ function makeActivePinHeroIcon(_saved: boolean): L.DivIcon {
       <div class="dw-active-hero" style="position:relative;width:${size}px;height:${size}px;">
         <div class="dw-active-hero__halo"></div>
         <svg class="dw-active-hero__pin" viewBox="0 0 28 40" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <path d="M14 0.5C6.544 0.5 0.5 6.544 0.5 14C0.5 24.5 14 39.5 14 39.5C14 39.5 27.5 24.5 27.5 14C27.5 6.544 21.456 0.5 14 0.5Z" fill="#7ee787" stroke="rgba(0,0,0,0.45)" stroke-width="1"/>
+          <path d="M14 0.5C6.544 0.5 0.5 6.544 0.5 14C0.5 24.5 14 39.5 14 39.5C14 39.5 27.5 24.5 27.5 14C27.5 6.544 21.456 0.5 14 0.5Z" fill="#58a6ff" stroke="rgba(0,0,0,0.45)" stroke-width="1"/>
         </svg>
       </div>
     `,
@@ -1646,7 +1646,7 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
                       font-size:12px;
                     "
                   >
-                    ${isSaved ? `<span style="color:#58a6ff;flex-shrink:0;">&#9733;</span>` : `<span style="color:#8b949e;flex-shrink:0;font-size:10px;">&#9675;</span>`}
+                    ${isSaved ? `<span style="color:#7ee787;flex-shrink:0;">&#9733;</span>` : `<span style="color:#8b949e;flex-shrink:0;font-size:10px;">&#9675;</span>`}
                     <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(l.address)}</span>
                     <span style="color:#3fb950;font-weight:700;flex-shrink:0;">$${l.price.toLocaleString()}</span>
                   </div>`;
@@ -1784,8 +1784,8 @@ export default function MapInner({ listings, selectedId, onMarkerClick, onSelect
           const savedRadius = 10;
           const radius = isSelected ? regularRadius : isSaved ? savedRadius : regularRadius;
 
-          const mainFill = isSaved ? '#58a6ff' : '#4a5568';
-          const mainStroke = isSaved ? '#58a6ff' : '#4a5568';
+          const mainFill = isSaved ? '#7ee787' : '#4a5568';
+          const mainStroke = isSaved ? '#7ee787' : '#4a5568';
           const mainWeight = 1;
           const mainOpacity = isSaved ? 1 : 0.75;
           // When selected, hide the CircleMarker visuals entirely — the
