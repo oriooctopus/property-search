@@ -1334,6 +1334,7 @@ function HomeInner() {
         initialZoom={initialZoom}
         visible={isMapView}
         onMarkerClick={handleMapMarkerClick}
+        favoritesOnly={selectedWishlist != null}
       />
 
       {/* Map overlay: loading spinner */}
