@@ -759,6 +759,9 @@ export interface MapProps {
    *  the cluster popup. Leave false for desktop / list / map views where
    *  the popup is the intended interaction. */
   swipeSelectMode?: boolean;
+  /** When true, the map only renders markers for listings whose id is in
+   *  `favoritedIds` (i.e. when a wishlist filter is active in the topbar). */
+  favoritesOnly?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -1332,7 +1335,14 @@ function HoveredLineStationsLayer({ hoveredLine }: HoveredLineStationsLayerProps
   );
 }
 
-export default function MapInner({ listings, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, isPanningRef: isPanningRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, hoveredStations, swipeSelectMode = false }: MapProps) {
+export default function MapInner({ listings: listingsProp, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, isPanningRef: isPanningRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, hoveredStations, swipeSelectMode = false, favoritesOnly = false }: MapProps) {
+  // When favoritesOnly is true (wishlist filter active in topbar), restrict
+  // the working listings array to favorited listings only so markers, clusters,
+  // popups, and bounds tracking all reflect the filtered set.
+  const listings = useMemo(
+    () => (favoritesOnly ? listingsProp.filter((l) => favoritedIds.has(l.id)) : listingsProp),
+    [listingsProp, favoritesOnly, favoritedIds],
+  );
   // Fall back to a local ref if the caller doesn't provide one
   const localSuppressBoundsRef = useRef(false);
   const suppressBoundsRef = suppressBoundsRefProp ?? localSuppressBoundsRef;

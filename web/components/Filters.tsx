@@ -1372,10 +1372,13 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
   // Save search dropdown state
   const [saveOpen, setSaveOpen] = useState(false);
   const [savePanelTab, setSavePanelTab] = useState<'save-search' | 'wishlist'>('save-search');
+  // Sticky-footer "Save current search as…" inline expansion state.
+  const [stickySaveExpanded, setStickySaveExpanded] = useState(false);
+  const stickySaveInputRef = useRef<HTMLInputElement>(null);
   const [saveName, setSaveName] = useState('');
   const [saveToastVisible, setSaveToastVisible] = useState(false);
   const saveToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const saveDropdownRef = useRef<HTMLDivElement>(null);
+  const clusterDropdownRef = useRef<HTMLDivElement>(null);
   const saveInputRef = useRef<HTMLInputElement>(null);
 
   // Saved search tabs state
@@ -2137,106 +2140,8 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           </div>
         )}
     
-        {/* Save chip + Wishlist chip — two separate chips, each with its own
-            border and click target. Wrapped in a single ref'd container so
-            SaveWishlistPanel still anchors correctly. */}
-        <div className="relative flex items-center gap-1.5 shrink-0" ref={saveDropdownRef}>
-          {/* Save chip */}
-          <ButtonBase
-            onClick={() => {
-              if (!userId) {
-                onLoginRequired?.();
-                return;
-              }
-              setOpenChip(null);
-              setSaveName(suggestSearchName(filters));
-              // If already open on this tab → close. Otherwise open this tab.
-              if (saveOpen && savePanelTab === 'save-search') {
-                setSaveOpen(false);
-              } else {
-                setSavePanelTab('save-search');
-                setSaveOpen(true);
-                setTimeout(() => saveInputRef.current?.focus(), 50);
-              }
-            }}
-            className={cn(
-              'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border text-[12px] font-medium whitespace-nowrap transition-colors',
-              saveOpen && savePanelTab === 'save-search'
-                ? 'border-[#58a6ff] bg-[rgba(88,166,255,0.08)] text-[#58a6ff]'
-                : 'border-[#2d333b] hover:border-[rgba(88,166,255,0.6)] bg-transparent text-[#e1e4e8]',
-            )}
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-            </svg>
-            Save
-          </ButtonBase>
-
-          {/* Wishlist chip */}
-          {(() => {
-            const allWishlists = [...(myWishlists || []), ...(sharedWishlists || [])];
-            const selectedWishlistObj =
-              selectedWishlist && selectedWishlist !== 'all-saved'
-                ? allWishlists.find((w) => w.id === selectedWishlist)
-                : null;
-            const wishlistLabel = selectedWishlist === 'all-saved'
-              ? 'All saved'
-              : selectedWishlistObj
-                ? (selectedWishlistObj.name.length > 16
-                    ? selectedWishlistObj.name.slice(0, 16) + '…'
-                    : selectedWishlistObj.name)
-                : 'Wishlist';
-            const hasSelection = !!selectedWishlist;
-            const isOpen = saveOpen && savePanelTab === 'wishlist';
-            return (
-              <ButtonBase
-                onClick={() => {
-                  if (!userId) {
-                    onLoginRequired?.();
-                    return;
-                  }
-                  setOpenChip(null);
-                  if (saveOpen && savePanelTab === 'wishlist') {
-                    setSaveOpen(false);
-                  } else {
-                    setSavePanelTab('wishlist');
-                    setSaveOpen(true);
-                  }
-                }}
-                aria-label="Filter by wishlist"
-                className={cn(
-                  'inline-flex items-center gap-1 h-7 px-2.5 rounded-full border text-[12px] font-medium whitespace-nowrap transition-colors',
-                  isOpen
-                    ? 'border-[#58a6ff] text-[#58a6ff]'
-                    : hasSelection
-                      ? 'border-[#2d333b] hover:border-[rgba(88,166,255,0.6)] text-[#e1e4e8]'
-                      : 'border-[#2d333b] hover:border-[rgba(88,166,255,0.6)] text-[#8b949e]',
-                )}
-                style={{
-                  background: hasSelection ? 'rgba(126,231,135,0.1)' : 'transparent',
-                }}
-              >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill={hasSelection ? '#7ee787' : 'none'}
-                  stroke={hasSelection ? '#7ee787' : 'currentColor'}
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ opacity: hasSelection ? 1 : 0.6 }}
-                >
-                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                </svg>
-                <span>{wishlistLabel}</span>
-                <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.6 }}>
-                  <path d="M2 3.5L5 6.5L8 3.5" />
-                </svg>
-              </ButtonBase>
-            );
-          })()}
-        </div>
+        {/* Save + Wishlist chips were removed — replaced by the top-left
+            Saved cluster pill (anchored via clusterDropdownRef in the topbar). */}
     </>
   );
 
@@ -2246,9 +2151,9 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
   // render simultaneously, sharing the same anchor ref.
   const saveWishlistPanelEl = saveOpen ? (
     <SaveWishlistPanel
-      anchorRef={saveDropdownRef}
+      anchorRef={clusterDropdownRef}
       initialTab={savePanelTab}
-      onClose={() => setSaveOpen(false)}
+      onClose={() => { setSaveOpen(false); setStickySaveExpanded(false); }}
       myWishlists={myWishlists}
       sharedWishlists={sharedWishlists}
       selected={selectedWishlist}
@@ -2344,6 +2249,81 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                     )}
                   </>
                 )}
+      stickyFooter={
+        <div className="px-4 py-2.5">
+          {stickySaveExpanded ? (
+            activeCount === 0 ? (
+              <div className="text-[12px]" style={{ color: '#8b949e' }}>
+                Add at least one filter to save the current search.
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <input
+                  ref={stickySaveInputRef}
+                  type="text"
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter' && saveName.trim()) {
+                      const saved = await onSaveSearch?.(saveName.trim());
+                      if (saved) setActiveSearchId(saved.id);
+                      setStickySaveExpanded(false);
+                      setSaveOpen(false);
+                      if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
+                      setSaveToastVisible(true);
+                      saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
+                    }
+                    if (e.key === 'Escape') setStickySaveExpanded(false);
+                  }}
+                  placeholder={suggestSearchName(filters) || 'e.g. Brooklyn 5-bed hunt'}
+                  className="flex-1 rounded-md px-2 py-1 text-xs outline-none"
+                  style={{ backgroundColor: '#0f1117', border: '1px solid #2d333b', color: '#e1e4e8' }}
+                />
+                <PrimaryButton
+                  onClick={async () => {
+                    if (saveName.trim()) {
+                      const saved = await onSaveSearch?.(saveName.trim());
+                      if (saved) setActiveSearchId(saved.id);
+                      setStickySaveExpanded(false);
+                      setSaveOpen(false);
+                      if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
+                      setSaveToastVisible(true);
+                      saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
+                    }
+                  }}
+                  disabled={!saveName.trim()}
+                  className="text-[11px] px-2.5 py-1"
+                >
+                  Save
+                </PrimaryButton>
+                <TextButton
+                  variant="muted"
+                  onClick={() => setStickySaveExpanded(false)}
+                  className="text-[11px]"
+                >
+                  Cancel
+                </TextButton>
+              </div>
+            )
+          ) : (
+            <ButtonBase
+              onClick={() => {
+                setSaveName(suggestSearchName(filters));
+                setStickySaveExpanded(true);
+                setTimeout(() => stickySaveInputRef.current?.focus(), 50);
+              }}
+              className="flex items-center gap-1.5 text-[12px] font-medium"
+              style={{ color: '#58a6ff', background: 'transparent', border: 'none', padding: 0 }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" strokeWidth="2.5">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Save current search as…
+            </ButtonBase>
+          )}
+        </div>
+      }
               />
     ) : null;
 
@@ -2512,24 +2492,98 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
       className="pl-4 pr-2 sm:pl-4 sm:pr-2 relative z-[1200]"
       style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}
     >
-      {/* Row 1 (always visible): Destination pill + Area tabs + listing count + Filters button + Sort + View toggle */}
+      {/* Row 1 (always visible): Saved cluster + Destination pill + Area tabs + listing count + Filters button + Sort + View toggle */}
       <div className="flex items-center min-h-[36px] gap-1.5 sm:gap-3 overflow-visible">
+        {/* Saved cluster pill — consolidated entry-point for save-search and
+            wishlist filtering. Anchors the SaveWishlistPanel via clusterDropdownRef. */}
+        {(() => {
+          const allWishlists = [...(myWishlists || []), ...(sharedWishlists || [])];
+          const selectedWishlistObj =
+            selectedWishlist && selectedWishlist !== 'all-saved'
+              ? allWishlists.find((w) => w.id === selectedWishlist)
+              : null;
+          const clusterLabel =
+            selectedWishlist === 'all-saved'
+              ? 'All saved'
+              : selectedWishlistObj
+                ? selectedWishlistObj.name.length > 16
+                  ? selectedWishlistObj.name.slice(0, 16) + '…'
+                  : selectedWishlistObj.name
+                : 'Saved';
+          const hasSelection = !!selectedWishlist;
+          return (
+            <div className="shrink-0 flex items-center" ref={clusterDropdownRef}>
+              <ButtonBase
+                onClick={() => {
+                  if (!userId) {
+                    onLoginRequired?.();
+                    return;
+                  }
+                  setOpenChip(null);
+                  if (saveOpen) {
+                    setSaveOpen(false);
+                  } else {
+                    setSavePanelTab('wishlist');
+                    setSaveOpen(true);
+                  }
+                }}
+                aria-label="Saved (filter by wishlist or save current search)"
+                className={cn(
+                  'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border text-[12px] font-medium whitespace-nowrap transition-colors',
+                  hasSelection
+                    ? 'border-[#7ee787] text-[#7ee787]'
+                    : 'border-[#2d333b] hover:border-[rgba(126,231,135,0.6)] text-[#e1e4e8]',
+                )}
+                style={{
+                  background: hasSelection ? 'rgba(126,231,135,0.1)' : 'transparent',
+                }}
+              >
+                {hasSelection ? (
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="#7ee787"
+                    stroke="#7ee787"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                  </svg>
+                ) : (
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                )}
+                <span>{clusterLabel}</span>
+                <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.7 }}>
+                  <path d="M2 3.5L5 6.5L8 3.5" />
+                </svg>
+              </ButtonBase>
+            </div>
+          );
+        })()}
+
         {/* Inline destination pill — first child so it sits to the left of the
             saved-search tabs scroll area. shrink-0 keeps it from collapsing. */}
         {destinationSlot && (
           <div className="shrink-0 flex items-center">{destinationSlot}</div>
         )}
 
-        {/* Saved search tabs — horizontally scrollable, hidden scrollbar */}
-        <div
-          className="flex items-center flex-1 min-w-0 overflow-x-auto"
-          style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
-        >
-          <style dangerouslySetInnerHTML={{ __html: `.area-tabs-scroll::-webkit-scrollbar { display: none; }` }} />
-          <div className="area-tabs-scroll flex items-center overflow-x-auto" style={{ scrollbarWidth: 'none' } as React.CSSProperties}>
-            {renderSavedSearchTabsContent('topbar')}
-          </div>
-        </div>
+        {/* Spacer — pushes right-side controls to the right edge.
+            (The saved-search "All | <name>" segmented slider that used to live
+            here was replaced by the top-left Saved cluster pill.) */}
+        <div className="flex-1 min-w-0" />
 
         {/* Right-side controls */}
         <div className="flex items-center gap-1.5 shrink-0 pl-2">

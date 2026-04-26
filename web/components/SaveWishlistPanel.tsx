@@ -28,6 +28,10 @@ export interface SaveWishlistPanelProps {
   onSelect: (selection: WishlistFilterSelection) => void;
   onCreateWishlist: (name: string) => Promise<string | null>;
   onOpenManager: () => void;
+
+  // Optional sticky footer rendered at the very bottom of the panel,
+  // visible regardless of which tab is active.
+  stickyFooter?: React.ReactNode;
 }
 
 const AVATAR_COLORS = ['#f97583', '#a78bfa', '#7ee787', '#f0883e', '#58a6ff', '#fcc419'];
@@ -53,6 +57,7 @@ export default function SaveWishlistPanel({
   onSelect,
   onCreateWishlist,
   onOpenManager,
+  stickyFooter,
 }: SaveWishlistPanelProps) {
   const [tab, setTab] = useState<'save-search' | 'wishlist'>(initialTab);
   const [showNewInput, setShowNewInput] = useState(false);
@@ -198,6 +203,8 @@ export default function SaveWishlistPanel({
           {saveSearchContent}
         </div>
       )}
+
+      {/* (sticky footer rendered after both tab bodies — see end of panel) */}
 
       {tab === 'wishlist' && (
         <div
@@ -417,6 +424,15 @@ export default function SaveWishlistPanel({
               </ButtonBase>
             </span>
           </div>
+        </div>
+      )}
+
+      {/* Sticky footer — always visible regardless of active tab. Used to
+          anchor the "+ Save current search as…" inline action so the user
+          never has to switch tabs to save. */}
+      {stickyFooter && (
+        <div className="shrink-0" style={{ borderTop: '1px solid #2d333b' }}>
+          {stickyFooter}
         </div>
       )}
     </div>
