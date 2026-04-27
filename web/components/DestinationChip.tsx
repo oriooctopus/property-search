@@ -217,6 +217,7 @@ function CommutePopup({ listing, destinations, onClose }: PopupProps) {
                   {r.coords.label}
                 </div>
                 <CommuteItinerary
+                  listingId={listing.id}
                   listingLat={listing.lat as number}
                   listingLon={listing.lon as number}
                   destinationLat={r.coords.lat}

@@ -290,6 +290,7 @@ function LegRow({ leg, isLast }: { leg: TripLeg; isLast: boolean }) {
 // ---------------------------------------------------------------------------
 
 interface CommuteItineraryProps {
+  listingId?: number;          // If provided, the API will populate commute_cache.
   listingLat: number;
   listingLon: number;
   destinationLat: number;
@@ -300,6 +301,7 @@ interface CommuteItineraryProps {
 }
 
 export default function CommuteItinerary({
+  listingId,
   listingLat,
   listingLon,
   destinationLat,
@@ -326,6 +328,7 @@ export default function CommuteItinerary({
           toLat: String(destinationLat),
           toLon: String(destinationLon),
           ...(mode ? { mode } : {}),
+          ...(listingId != null ? { listingId: String(listingId) } : {}),
         });
 
         const res = await fetch(`/api/trip-plan?${params}`);
@@ -358,7 +361,7 @@ export default function CommuteItinerary({
 
     fetchTrip();
     return () => { cancelled = true; };
-  }, [listingLat, listingLon, destinationLat, destinationLon, mode]);
+  }, [listingId, listingLat, listingLon, destinationLat, destinationLon, mode]);
 
   return (
     <div className="mb-6">

@@ -599,6 +599,7 @@ export default function ListingDetail({
           {/* Commute itinerary */}
           {commuteDest && listing.lat != null && listing.lon != null && (
             <CommuteItinerary
+              listingId={listing.id}
               listingLat={listing.lat}
               listingLon={listing.lon}
               destinationLat={commuteDest.lat}
