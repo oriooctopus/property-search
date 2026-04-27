@@ -308,6 +308,22 @@ const ACTIVE_PIN_STYLES = `
   }
 `;
 
+// Smooth fade for subway-line hover. Leaflet renders polylines as <path>
+// elements in `.leaflet-overlay-pane`. Default behavior on style updates is
+// instant — adding a CSS transition makes the dim/highlight gradual instead
+// of snapping. Also fades hovered-line station CircleMarkers in/out.
+const SUBWAY_HOVER_STYLES = `
+  .leaflet-overlay-pane svg path {
+    transition: stroke-opacity 220ms ease-out,
+                stroke-width   220ms ease-out;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .leaflet-overlay-pane svg path {
+      transition: none;
+    }
+  }
+`;
+
 // Static "lit" subway station marker: a steady outer glow ring and a filled
 // inner dot in the line's color. Intentionally non-animated (previously used
 // a keyframe-pulse ring which was distracting on the mini-map).
@@ -429,7 +445,7 @@ function InjectPopupStyles() {
     if (document.getElementById(id)) return;
     const style = document.createElement('style');
     style.id = id;
-    style.textContent = POPUP_STYLES + STATION_PULSE_STYLES + ACTIVE_PIN_STYLES;
+    style.textContent = POPUP_STYLES + STATION_PULSE_STYLES + ACTIVE_PIN_STYLES + SUBWAY_HOVER_STYLES;
     document.head.appendChild(style);
     return () => {
       style.remove();
@@ -1403,6 +1419,24 @@ export default function MapInner({ listings: listingsProp, selectedId, onMarkerC
   // When non-null, that line stays full-opacity, others dim, and stations on
   // that line render as colored dots. See SubwayLinesLayer + HoveredLineStationsLayer.
   const [hoveredLine, setHoveredLine] = useState<string | null>(null);
+  // Debounce hover-clear by ~150ms so brushing past a thin polyline gap or
+  // crossing onto another line doesn't snap-flash back to idle. New hovers
+  // cancel a pending clear immediately.
+  const hoverClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const setHoveredLineDebounced = useCallback((next: string | null) => {
+    if (hoverClearTimerRef.current) {
+      clearTimeout(hoverClearTimerRef.current);
+      hoverClearTimerRef.current = null;
+    }
+    if (next === null) {
+      hoverClearTimerRef.current = setTimeout(() => setHoveredLine(null), 150);
+    } else {
+      setHoveredLine(next);
+    }
+  }, []);
+  useEffect(() => () => {
+    if (hoverClearTimerRef.current) clearTimeout(hoverClearTimerRef.current);
+  }, []);
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
@@ -1748,7 +1782,7 @@ export default function MapInner({ listings: listingsProp, selectedId, onMarkerC
         <SubwayLinesLayer
           enabled={subwayOverlayEnabled}
           hoveredLine={hoveredLine}
-          onHoverLine={setHoveredLine}
+          onHoverLine={setHoveredLineDebounced}
         />
         {subwayOverlayEnabled && <HoveredLineStationsLayer hoveredLine={hoveredLine} />}
         <InvalidateSize visible={visible} />
