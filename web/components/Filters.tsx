@@ -118,6 +118,14 @@ interface FiltersProps {
   onLoginRequired?: () => void;
   showHidden?: boolean;
   onToggleShowHidden?: () => void;
+  /** Toggle: when true, delisted listings (those with delisted_at set)
+   *  are surfaced in the wishlist view under the "Removed" section.
+   *  When false (default), they're hidden entirely. */
+  showDelisted?: boolean;
+  onToggleShowDelisted?: () => void;
+  /** Count of delisted listings in the active wishlist. The chip only
+   *  renders when this is > 0 (and a wishlist is active). */
+  delistedCount?: number;
   /** Wishlists the user owns — shown in the "Created by you" section. */
   myWishlists?: Wishlist[];
   /** Wishlists shared with the user — shown in the "Shared with you" section. */
@@ -1277,7 +1285,7 @@ function FilterToggleButton({
   );
 }
 
-const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ filters, onChange, listingCount, viewToggle, destinationSlot, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onLoginRequired, showHidden, onToggleShowHidden, myWishlists = [], sharedWishlists = [], selectedWishlist = null, onSelectWishlist, onCreateWishlist, onOpenWishlistManager }, ref) {
+const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ filters, onChange, listingCount, viewToggle, destinationSlot, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onLoginRequired, showHidden, onToggleShowHidden, showDelisted, onToggleShowDelisted, delistedCount = 0, myWishlists = [], sharedWishlists = [], selectedWishlist = null, onSelectWishlist, onCreateWishlist, onOpenWishlistManager }, ref) {
   const [openChip, setOpenChip] = useState<ChipId | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
@@ -2139,7 +2147,45 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
             </div>
           </div>
         )}
-    
+
+        {/* Show delisted toggle chip — only visible when a wishlist is
+            active AND it contains at least one delisted listing. The
+            count reflects the delisted-in-this-wishlist total, regardless
+            of toggle state, so the user always sees how many are hidden. */}
+        {selectedWishlist != null && delistedCount > 0 && onToggleShowDelisted !== undefined && (
+          <div className="relative group shrink-0">
+            <FilterChip
+              compact
+              label={`${showDelisted ? 'Hide' : 'Show'} delisted (${delistedCount})`}
+              active={showDelisted ?? false}
+              open={false}
+              onToggle={onToggleShowDelisted}
+            />
+            <div
+              className="pointer-events-none absolute left-0 top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-75 z-50"
+            >
+              <div
+                className="absolute -top-1 w-2 h-2 rotate-45"
+                style={{ left: 12, backgroundColor: '#1c2028', border: '1px solid #2d333b', borderRight: 'none', borderBottom: 'none' }}
+              />
+              <div
+                className="rounded-md px-2.5 py-1.5 text-xs"
+                style={{
+                  backgroundColor: '#1c2028',
+                  color: '#e1e4e8',
+                  border: '1px solid #2d333b',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                  maxWidth: 'min(260px, calc(100vw - 32px))',
+                  width: 'max-content',
+                  wordWrap: 'break-word',
+                }}
+              >
+                Show listings in this wishlist that have been taken down by the source
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Save + Wishlist chips were removed — replaced by the top-left
             Saved cluster pill (anchored via clusterDropdownRef in the topbar). */}
     </>

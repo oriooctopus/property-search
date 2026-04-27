@@ -201,9 +201,12 @@ function ListingCard({
           isSelected || peeked
             ? '0 0 0 1px rgba(88, 166, 255, 0.35), 0 8px 24px rgba(0,0,0,0.5)'
             : '0 2px 8px rgba(0,0,0,0.2)',
-        // Removed cards stay clickable (users may want to inspect why it
-        // came down) but are clearly de-emphasized via reduced opacity.
-        opacity: isHiding ? 0 : isRemoved ? 0.6 : 1,
+        // Removed cards stay clickable (users may want to inspect why
+        // they came down). They render at full opacity — the "Removed"
+        // section header at the top of the group is sufficient labeling,
+        // and the prior 60% dim made the cards hard to read without
+        // adding meaningful information.
+        opacity: isHiding ? 0 : 1,
         transform: isHiding ? 'scale(0.95)' : 'scale(1)',
         transition: 'opacity 300ms ease, transform 300ms ease, border-color 150ms ease, box-shadow 150ms ease',
       }}
