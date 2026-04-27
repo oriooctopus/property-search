@@ -319,6 +319,10 @@ function HomeInner() {
   const toastRef = useRef(toast);
   toastRef.current = toast;
   const [showHidden, setShowHidden] = useState(false);
+  // Wishlist mode: hide delisted ("Removed") listings by default. The
+  // "Show delisted (N)" chip toggles them back on. Reset whenever the
+  // user switches wishlists so the default is always "hide".
+  const [showDelisted, setShowDelisted] = useState(false);
 
   // Keep a ref to the latest filters so loadForViewport (stable across
   // renders) always sees the most recent filter state without needing to
@@ -1027,9 +1031,13 @@ function HomeInner() {
   // We only branch on `selectedWishlist` to avoid leaking removed cards into
   // non-wishlist views (where the API filters them out anyway, but a future
   // caller might not — belt and suspenders).
-  const { activeFilteredListings, removedFilteredListings } = useMemo(() => {
+  const { activeFilteredListings, removedFilteredListings, delistedCountInWishlist } = useMemo(() => {
     if (selectedWishlist === null) {
-      return { activeFilteredListings: filteredListings, removedFilteredListings: [] as Listing[] };
+      return {
+        activeFilteredListings: filteredListings,
+        removedFilteredListings: [] as Listing[],
+        delistedCountInWishlist: 0,
+      };
     }
     const active: Listing[] = [];
     const removed: Listing[] = [];
@@ -1037,8 +1045,15 @@ function HomeInner() {
       if (l.delisted_at != null) removed.push(l);
       else active.push(l);
     }
-    return { activeFilteredListings: active, removedFilteredListings: removed };
-  }, [filteredListings, selectedWishlist]);
+    // Default behavior in wishlist mode: hide delisted entirely. The
+    // "Show delisted (N)" chip toggles `showDelisted` to surface them
+    // under the existing "Removed" section header at the bottom.
+    return {
+      activeFilteredListings: active,
+      removedFilteredListings: showDelisted ? removed : ([] as Listing[]),
+      delistedCountInWishlist: removed.length,
+    };
+  }, [filteredListings, selectedWishlist, showDelisted]);
 
   // Keep the ref in sync so the chat hook's getListingCount stays current
   filteredListingsRef.current = filteredListings;
@@ -1073,6 +1088,15 @@ function HomeInner() {
       switchMobileView('list');
     }
   }, [selectedWishlist, mobileView, switchMobileView]);
+
+  // Reset the "Show delisted" toggle whenever the active wishlist
+  // changes (or is cleared) so the default (hidden) is always restored.
+  // Without this the chip state would leak across wishlist switches —
+  // e.g. user expands delisted in wishlist A, then switches to B and
+  // sees its delisted items unexpectedly visible.
+  useEffect(() => {
+    setShowDelisted(false);
+  }, [selectedWishlist]);
 
   // Stable handlers for ListingCard so React.memo can skip re-renders when
   // the parent re-renders for unrelated reasons.
@@ -1591,6 +1615,9 @@ function HomeInner() {
             onLoginRequired={() => setAuthModal('login')}
             showHidden={showHidden}
             onToggleShowHidden={() => setShowHidden((v) => !v)}
+            showDelisted={showDelisted}
+            onToggleShowDelisted={() => setShowDelisted((v) => !v)}
+            delistedCount={delistedCountInWishlist}
             myWishlists={myWishlists}
             sharedWishlists={sharedWishlists}
             selectedWishlist={selectedWishlist}
