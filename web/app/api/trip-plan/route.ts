@@ -204,15 +204,20 @@ async function tryOtpFallback(
   mode: DirectionsMode,
 ): Promise<TripItinerary | null> {
   const date = nextWeekday();
+  // walkSpeed=2.5 calibrates OTP transit estimates against Google ground truth
+  // for NYC routes (see commute-resolver.ts comment + otp-tuning report).
+  const otpMode = googleModeToOtp(mode);
+  const calibratedWalkSpeed = otpMode.includes("TRANSIT") ? "&walkSpeed=2.5" : "";
   const url =
     `${OTP_BASE_URL}/otp/routers/default/plan` +
     `?fromPlace=${fromLat},${fromLon}` +
     `&toPlace=${toLat},${toLon}` +
-    `&mode=${encodeURIComponent(googleModeToOtp(mode))}` +
+    `&mode=${encodeURIComponent(otpMode)}` +
     `&date=${date}` +
     `&time=09:00:00` +
     `&arriveBy=false` +
-    `&numItineraries=3`;
+    `&numItineraries=3` +
+    calibratedWalkSpeed;
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15_000);
