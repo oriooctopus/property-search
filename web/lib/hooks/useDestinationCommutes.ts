@@ -74,6 +74,7 @@ function subscribeKey(key: string, cb: () => void): () => void {
 }
 
 async function fetchOne(
+  listingId: number,
   fromLat: number,
   fromLon: number,
   toLat: number,
@@ -87,6 +88,9 @@ async function fetchOne(
     toLat: String(toLat),
     toLon: String(toLon),
     mode,
+    // Opt into the cached, summary-only path — we only need totalDuration.
+    summary: '1',
+    listingId: String(listingId),
   });
   const res = await fetch(`/api/trip-plan?${params}`, { signal });
   if (!res.ok) return null;
@@ -189,6 +193,7 @@ export function useDestinationCommutes(
         active++;
         const timeoutId = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
         fetchOne(
+          item.listing.id,
           item.listing.lat as number,
           item.listing.lon as number,
           item.destLat,
