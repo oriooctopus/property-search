@@ -1,37 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  getTransitDuration,
+  type DirectionsMode,
+  type GoogleDirectionsStep,
+} from "@/lib/google-directions";
+import { getOrFetchCommute } from "@/lib/commute-cache";
 
 const OTP_BASE_URL = process.env.OTP_BASE_URL ?? "http://localhost:9090";
 
 // ---------------------------------------------------------------------------
-// Types
+// Public response types (kept identical to the prior OTP-based API so the
+// client doesn't need to change).
 // ---------------------------------------------------------------------------
-
-interface OTPLeg {
-  mode: string;
-  from: { name: string; lat: number; lon: number };
-  to: { name: string; lat: number; lon: number };
-  duration: number; // seconds
-  route?: string;
-  routeShortName?: string;
-  routeLongName?: string;
-  routeColor?: string;
-  intermediateStops?: Array<{ name: string; lat: number; lon: number }>;
-  startTime: number;
-  endTime: number;
-  distance?: number; // meters
-}
-
-interface OTPItinerary {
-  duration: number; // seconds
-  legs: OTPLeg[];
-}
-
-interface OTPResponse {
-  plan?: {
-    itineraries: OTPItinerary[];
-  };
-  error?: { message: string };
-}
 
 export interface TripLeg {
   type: "walk" | "transit" | "transfer";
@@ -50,47 +30,160 @@ export interface TripItinerary {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Mode normalization
 // ---------------------------------------------------------------------------
 
-/** Returns the next weekday date string (YYYY-MM-DD). */
+/**
+ * Accepts both the legacy OTP-style mode strings used by existing callers
+ * (`WALK`, `TRANSIT,WALK`, `BICYCLE`, `CAR`) and the new lowercase Google-
+ * style strings (`walking`, `transit`, `bicycling`, `driving`).
+ */
+function normalizeMode(raw: string | null): DirectionsMode {
+  if (!raw) return "transit";
+  const upper = raw.toUpperCase();
+  if (upper === "WALK" || upper === "WALKING") return "walking";
+  if (upper === "BICYCLE" || upper === "BICYCLING" || upper === "BIKE")
+    return "bicycling";
+  if (upper === "CAR" || upper === "DRIVING") return "driving";
+  return "transit";
+}
+
+// ---------------------------------------------------------------------------
+// Google steps → TripLeg[] transformer
+// ---------------------------------------------------------------------------
+
+function stripHtml(s: string | undefined): string {
+  if (!s) return "";
+  return s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function transformGoogleSteps(
+  steps: GoogleDirectionsStep[] | undefined,
+  totalMinutes: number,
+  mode: DirectionsMode,
+): TripLeg[] {
+  if (!steps || steps.length === 0) {
+    return [
+      {
+        type: mode === "transit" ? "transit" : "walk",
+        duration: totalMinutes,
+        from: "Start",
+        to: "Destination",
+      },
+    ];
+  }
+
+  const legs: TripLeg[] = [];
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i];
+    const minutes = Math.max(1, Math.round((s.duration?.value ?? 0) / 60));
+    const distanceMeters = s.distance?.value;
+
+    if (s.travel_mode === "WALKING") {
+      const prevIsTransit =
+        i > 0 && steps[i - 1].travel_mode === "TRANSIT";
+      const nextIsTransit =
+        i < steps.length - 1 && steps[i + 1].travel_mode === "TRANSIT";
+      const isTransfer = prevIsTransit && nextIsTransit;
+      legs.push({
+        type: isTransfer ? "transfer" : "walk",
+        duration: minutes,
+        from: stripHtml(s.html_instructions) || "Walk",
+        to: "",
+        distance: distanceMeters,
+      });
+    } else if (s.travel_mode === "TRANSIT") {
+      const td = s.transit_details;
+      const route = td?.line?.short_name ?? td?.line?.name ?? undefined;
+      const routeColor = td?.line?.color ?? undefined;
+      legs.push({
+        type: "transit",
+        duration: minutes,
+        from: td?.departure_stop?.name ?? "Stop",
+        to: td?.arrival_stop?.name ?? "Stop",
+        route,
+        routeColor,
+        stops: td?.num_stops ? Array(td.num_stops).fill("") : [],
+        distance: distanceMeters,
+      });
+    } else {
+      // Driving / Bicycling — represent as a single timed leg.
+      legs.push({
+        type: "walk",
+        duration: minutes,
+        from: stripHtml(s.html_instructions) || "Travel",
+        to: "",
+        distance: distanceMeters,
+      });
+    }
+  }
+  return legs;
+}
+
+// ---------------------------------------------------------------------------
+// OTP fallback (only used if Google fails completely)
+// ---------------------------------------------------------------------------
+
+interface OTPLeg {
+  mode: string;
+  from: { name: string; lat: number; lon: number };
+  to: { name: string; lat: number; lon: number };
+  duration: number;
+  route?: string;
+  routeShortName?: string;
+  routeLongName?: string;
+  routeColor?: string;
+  intermediateStops?: Array<{ name: string; lat: number; lon: number }>;
+  startTime: number;
+  endTime: number;
+  distance?: number;
+}
+interface OTPItinerary {
+  duration: number;
+  legs: OTPLeg[];
+}
+interface OTPResponse {
+  plan?: { itineraries: OTPItinerary[] };
+  error?: { message: string };
+}
+
 function nextWeekday(): string {
   const d = new Date();
-  // Move to tomorrow first, then skip weekends
   d.setDate(d.getDate() + 1);
   while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
   return d.toISOString().split("T")[0];
 }
 
-function classifyLeg(otp: OTPLeg): TripLeg["type"] {
-  if (otp.mode === "WALK") return "walk";
-  // OTP marks short walks between transit legs — if distance < 200m and
-  // between two transit legs we could call it transfer, but the caller
-  // doesn't give us context. We'll handle that in the transform.
-  return "transit";
+function googleModeToOtp(mode: DirectionsMode): string {
+  switch (mode) {
+    case "walking":
+      return "WALK";
+    case "bicycling":
+      return "BICYCLE";
+    case "driving":
+      return "CAR";
+    case "transit":
+    default:
+      return "TRANSIT,WALK";
+  }
 }
 
-function transformItinerary(otp: OTPItinerary): TripItinerary {
+function transformOtpItinerary(otp: OTPItinerary): TripItinerary {
   const legs: TripLeg[] = [];
-
   for (let i = 0; i < otp.legs.length; i++) {
     const leg = otp.legs[i];
-    const legType = classifyLeg(leg);
-
-    // Mark short walks between transit legs as transfers
-    let finalType = legType;
+    let type: TripLeg["type"] = leg.mode === "WALK" ? "walk" : "transit";
     if (
-      legType === "walk" &&
+      type === "walk" &&
       i > 0 &&
       i < otp.legs.length - 1 &&
-      classifyLeg(otp.legs[i - 1]) === "transit" &&
-      classifyLeg(otp.legs[i + 1]) === "transit"
+      otp.legs[i - 1].mode !== "WALK" &&
+      otp.legs[i + 1].mode !== "WALK"
     ) {
-      finalType = "transfer";
+      type = "transfer";
     }
-
     legs.push({
-      type: finalType,
+      type,
       duration: Math.round(leg.duration / 60),
       from: leg.from.name || "Current location",
       to: leg.to.name || "Destination",
@@ -100,11 +193,48 @@ function transformItinerary(otp: OTPItinerary): TripItinerary {
       distance: leg.distance ? Math.round(leg.distance) : undefined,
     });
   }
+  return { totalDuration: Math.round(otp.duration / 60), legs };
+}
 
-  return {
-    totalDuration: Math.round(otp.duration / 60),
-    legs,
-  };
+async function tryOtpFallback(
+  fromLat: number,
+  fromLon: number,
+  toLat: number,
+  toLon: number,
+  mode: DirectionsMode,
+): Promise<TripItinerary | null> {
+  const date = nextWeekday();
+  const url =
+    `${OTP_BASE_URL}/otp/routers/default/plan` +
+    `?fromPlace=${fromLat},${fromLon}` +
+    `&toPlace=${toLat},${toLon}` +
+    `&mode=${encodeURIComponent(googleModeToOtp(mode))}` +
+    `&date=${date}` +
+    `&time=09:00:00` +
+    `&arriveBy=false` +
+    `&numItineraries=3`;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15_000);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const data: OTPResponse = await res.json();
+    const itins = data.plan?.itineraries ?? [];
+    if (itins.length === 0) return null;
+    const transit = itins.filter((it) =>
+      it.legs.some((l) => l.mode !== "WALK"),
+    );
+    const best = transit.length > 0 ? transit[0] : itins[0];
+    return transformOtpItinerary(best);
+  } catch (err) {
+    console.error(
+      `[trip-plan] OTP fallback failed: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -113,87 +243,128 @@ function transformItinerary(otp: OTPItinerary): TripItinerary {
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
-  const fromLat = params.get("fromLat");
-  const fromLon = params.get("fromLon");
-  const toLat = params.get("toLat");
-  const toLon = params.get("toLon");
-  const mode = params.get("mode") || "TRANSIT,WALK";
+  const fromLatRaw = params.get("fromLat");
+  const fromLonRaw = params.get("fromLon");
+  const toLatRaw = params.get("toLat");
+  const toLonRaw = params.get("toLon");
+  const listingIdRaw = params.get("listingId");
+  const mode = normalizeMode(params.get("mode"));
 
-  if (!fromLat || !fromLon || !toLat || !toLon) {
+  if (!fromLatRaw || !fromLonRaw || !toLatRaw || !toLonRaw) {
     return NextResponse.json(
       { error: "Missing required parameters: fromLat, fromLon, toLat, toLon" },
       { status: 400 },
     );
   }
-
-  const date = nextWeekday();
-  const url =
-    `${OTP_BASE_URL}/otp/routers/default/plan` +
-    `?fromPlace=${fromLat},${fromLon}` +
-    `&toPlace=${toLat},${toLon}` +
-    `&mode=${encodeURIComponent(mode)}` +
-    `&date=${date}` +
-    `&time=09:00:00` +
-    `&arriveBy=false` +
-    `&numItineraries=3`;
-
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 30_000);
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => "(no body)");
-      console.error(`[trip-plan] OTP returned ${response.status}: ${body}`);
-      return NextResponse.json(
-        { error: "Trip planning service unavailable" },
-        { status: 502 },
-      );
-    }
-
-    const data: OTPResponse = await response.json();
-
-    // OTP sometimes returns both an error (e.g. TOO_CLOSE) AND valid itineraries.
-    // Only treat it as a hard failure if there are no itineraries at all.
-    if (data.error && (!data.plan?.itineraries || data.plan.itineraries.length === 0)) {
-      console.error("[trip-plan] OTP error:", data.error.message);
-      return NextResponse.json(
-        { error: data.error.message },
-        { status: 502 },
-      );
-    }
-
-    if (!data.plan || !data.plan.itineraries || data.plan.itineraries.length === 0) {
-      return NextResponse.json(
-        { error: "No itineraries found" },
-        { status: 404 },
-      );
-    }
-
-    // Prefer transit itineraries over walk-only ones
-    const transitItineraries = data.plan.itineraries.filter((it) =>
-      it.legs.some((l) => l.mode !== "WALK"),
+  const fromLat = Number(fromLatRaw);
+  const fromLon = Number(fromLonRaw);
+  const toLat = Number(toLatRaw);
+  const toLon = Number(toLonRaw);
+  const listingId = listingIdRaw ? Number(listingIdRaw) : null;
+  if (
+    !Number.isFinite(fromLat) ||
+    !Number.isFinite(fromLon) ||
+    !Number.isFinite(toLat) ||
+    !Number.isFinite(toLon)
+  ) {
+    return NextResponse.json(
+      { error: "Invalid coordinate values" },
+      { status: 400 },
     );
-    const best =
-      transitItineraries.length > 0
-        ? transitItineraries[0]
-        : data.plan.itineraries[0];
+  }
 
-    const itinerary = transformItinerary(best);
+  // Path A: cached lookup. Only used when caller passes ?summary=1&listingId=N
+  // (useDestinationCommutes only needs totalDuration, so it opts in to keep
+  // cache hits high). Returns a synthetic single-leg itinerary.
+  const summaryOnly = params.get("summary") === "1";
+  if (summaryOnly && listingId != null) {
+    try {
+      const cached = await getOrFetchCommute({
+        listingId,
+        listingLat: fromLat,
+        listingLon: fromLon,
+        destLat: toLat,
+        destLon: toLon,
+        mode,
+      });
+      if (cached) {
+        const itinerary: TripItinerary = {
+          totalDuration: cached.minutes,
+          legs: [
+            {
+              type: mode === "transit" ? "transit" : "walk",
+              duration: cached.minutes,
+              from: "",
+              to: "",
+            },
+          ],
+        };
+        return NextResponse.json(itinerary, {
+          headers: {
+            "Cache-Control":
+              "public, s-maxage=300, stale-while-revalidate=600",
+            "X-Commute-Source": cached.fromCache ? "cache" : "google",
+          },
+        });
+      }
+      // fall through to OTP if Google + cache both failed
+    } catch (err) {
+      console.error(
+        `[trip-plan] cache path failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  } else {
+    // Path B: full itinerary from Google for the rich CommuteItinerary UI.
+    const result = await getTransitDuration({
+      origin: { lat: fromLat, lon: fromLon },
+      destination: { lat: toLat, lon: toLon },
+      mode,
+    });
 
-    return NextResponse.json(itinerary, {
+    if (result) {
+      const itinerary: TripItinerary = {
+        totalDuration: result.minutes,
+        legs: transformGoogleSteps(result.steps, result.minutes, mode),
+      };
+
+      // Best-effort: if listingId supplied, also populate the cache.
+      if (listingId != null) {
+        getOrFetchCommute({
+          listingId,
+          listingLat: fromLat,
+          listingLon: fromLon,
+          destLat: toLat,
+          destLon: toLon,
+          mode,
+        }).catch(() => {
+          /* noop */
+        });
+      }
+
+      return NextResponse.json(itinerary, {
+        headers: {
+          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+          "X-Commute-Source": "google",
+        },
+      });
+    }
+  }
+
+  // Path C: OTP fallback (defensive — should rarely trigger now).
+  const otp = await tryOtpFallback(fromLat, fromLon, toLat, toLon, mode);
+  if (otp) {
+    return NextResponse.json(otp, {
       headers: {
         "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+        "X-Commute-Source": "otp-fallback",
       },
     });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("aborted") || msg.includes("AbortError")) {
-      console.error("[trip-plan] OTP request timed out");
-      return NextResponse.json({ error: "Trip planning request timed out" }, { status: 504 });
-    }
-    console.error("[trip-plan] Error:", msg);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
+
+  return NextResponse.json(
+    { error: "Trip planning unavailable" },
+    { status: 502 },
+  );
 }

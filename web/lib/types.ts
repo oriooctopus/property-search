@@ -533,6 +533,44 @@ export type Database = {
           },
         ];
       };
+      commute_cache: {
+        Row: {
+          listing_id: number;
+          dest_lat: number;
+          dest_lon: number;
+          mode: string;
+          duration_minutes: number;
+          polyline: string | null;
+          fetched_at: string;
+        };
+        Insert: {
+          listing_id: number;
+          dest_lat: number;
+          dest_lon: number;
+          mode: string;
+          duration_minutes: number;
+          polyline?: string | null;
+          fetched_at?: string;
+        };
+        Update: {
+          listing_id?: number;
+          dest_lat?: number;
+          dest_lon?: number;
+          mode?: string;
+          duration_minutes?: number;
+          polyline?: string | null;
+          fetched_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "commute_cache_listing_id_fkey";
+            columns: ["listing_id"];
+            isOneToOne: false;
+            referencedRelation: "listings";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {
