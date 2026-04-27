@@ -980,6 +980,28 @@ function buildPopupContent(listing: Listing, isFavorited: boolean, _isWouldLive:
           <button data-action="photo-prev" data-listing-id="${listing.id}" style="${arrowBtnStyle} left: 4px;">&#8249;</button>
           <button data-action="photo-next" data-listing-id="${listing.id}" style="${arrowBtnStyle} right: 4px;">&#8250;</button>
         ` : ''}
+        <a
+          href="${escapeHtml(listing.url)}"
+          target="_blank"
+          rel="noopener noreferrer"
+          data-action="external-link"
+          title="Open original listing"
+          style="
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.55);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            z-index: 3;
+          "
+        ><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>
         ${totalPhotos > 1 ? `
           <div data-photo-counter style="
             position: absolute;
