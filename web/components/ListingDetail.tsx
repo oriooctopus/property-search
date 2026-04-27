@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import Image from 'next/image';
 import type { Database } from '@/lib/types';
-import { ActionButton, IconButton } from '@/components/ui';
+import { IconButton } from '@/components/ui';
 import { formatShortDate, formatAvailabilityDate } from '@/lib/format-date';
 import { shareListing } from '@/lib/native';
 import DetailMap from './DetailMap';
@@ -219,7 +219,7 @@ export default function ListingDetail({
       >
         {/* Photo carousel */}
         {photos.length > 0 ? (
-          <div className="relative">
+          <div className="relative group/photo">
             <div
               ref={scrollRef}
               className="flex overflow-x-auto snap-x snap-mandatory"
@@ -286,10 +286,103 @@ export default function ListingDetail({
             >
               {photoIndex + 1} / {photos.length}
             </div>
+
+            {/* Top-right action bar — Hide, Save, Share, External link, Close.
+                Secondary buttons fade in on photo hover (desktop) and stay
+                visible on touch devices (where there is no hover). Close
+                stays visible at all times so the modal can always be exited. */}
+            <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+              <div className="flex items-center gap-1.5 opacity-0 transition-opacity duration-200 group-hover/photo:opacity-100 [@media(hover:none)]:opacity-100">
+                <IconButton
+                  variant="overlay"
+                  size="md"
+                  onClick={() => { onHide(); onClose(); }}
+                  className="rounded-md p-1.5"
+                  aria-label="Hide listing"
+                  title="Hide"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                    <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                </IconButton>
+                <IconButton
+                  ref={starButtonRef}
+                  variant="overlay"
+                  size="md"
+                  onClick={handleStarClick}
+                  className="rounded-md p-1.5"
+                  aria-label={isFavorited ? 'Unsave' : 'Save'}
+                  title={isFavorited ? 'Saved' : 'Save'}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill={isFavorited ? '#fbbf24' : 'none'} stroke={isFavorited ? '#fbbf24' : 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                  </svg>
+                </IconButton>
+                <div className="relative">
+                  <IconButton
+                    variant="overlay"
+                    size="md"
+                    onClick={handleShareLink}
+                    className="rounded-md p-1.5"
+                    aria-label="Copy share link"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                    </svg>
+                  </IconButton>
+                  {linkCopied && (
+                    <div
+                      className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium"
+                      style={{
+                        backgroundColor: '#1c2028',
+                        color: '#7ee787',
+                        border: '1px solid #2d333b',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                        animation: 'toast-in 150ms ease-out',
+                      }}
+                    >
+                      Link copied!
+                    </div>
+                  )}
+                </div>
+                {listing.url && (
+                  <IconButton
+                    variant="overlay"
+                    size="md"
+                    onClick={() => window.open(listing.url, '_blank', 'noopener,noreferrer')}
+                    className="rounded-md p-1.5"
+                    aria-label={`View on ${SOURCE_LABELS[listing.source] ?? 'source'}`}
+                    title={`View on ${SOURCE_LABELS[listing.source] ?? 'source'}`}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                  </IconButton>
+                )}
+              </div>
+              <IconButton
+                variant="overlay"
+                size="md"
+                onClick={onClose}
+                className="rounded-md p-1.5"
+                aria-label="Close detail"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </IconButton>
+            </div>
           </div>
         ) : (
           <div
-            className="flex flex-col items-center justify-center gap-2 rounded-t-xl text-sm"
+            className="flex flex-col items-center justify-center gap-2 rounded-t-xl text-sm relative"
             style={{ height: 200, backgroundColor: '#0f1117', color: '#8b949e' }}
           >
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -298,52 +391,20 @@ export default function ListingDetail({
               <polyline points="21 15 16 10 5 21" />
             </svg>
             No photos available
-          </div>
-        )}
-
-        {/* Share + Close buttons */}
-        <div className="absolute top-3 right-3 flex items-center gap-1.5">
-          <div className="relative">
             <IconButton
               variant="overlay"
               size="md"
-              onClick={handleShareLink}
-              className="rounded-md p-1.5"
-              aria-label="Copy share link"
+              onClick={onClose}
+              className="absolute top-3 right-3 rounded-md p-1.5"
+              aria-label="Close detail"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </IconButton>
-            {linkCopied && (
-              <div
-                className="absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium"
-                style={{
-                  backgroundColor: '#1c2028',
-                  color: '#7ee787',
-                  border: '1px solid #2d333b',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-                  animation: 'toast-in 150ms ease-out',
-                }}
-              >
-                Link copied!
-              </div>
-            )}
           </div>
-          <IconButton
-            variant="overlay"
-            size="md"
-            onClick={onClose}
-            className="rounded-md p-1.5"
-            aria-label="Close detail"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </IconButton>
-        </div>
+        )}
 
         <div className="p-4 pb-8 sm:p-6 sm:pb-10">
           {/* Header */}
@@ -533,51 +594,6 @@ export default function ListingDetail({
               </div>
             );
           })()}
-
-          {/* Photos */}
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-xs" style={{ color: '#8b949e' }}>
-              {listing.photos} photos
-            </span>
-          </div>
-
-          {/* Action row — hide, save, and external link all on one row */}
-          <div className="flex items-center gap-1.5 sm:gap-2 mb-6">
-            <ActionButton
-              variant="hide"
-              active={false}
-              onClick={() => {
-                onHide();
-                onClose();
-              }}
-              className="px-2 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm"
-              label="Hide"
-            />
-            <ActionButton
-              ref={starButtonRef}
-              variant="save"
-              active={isFavorited}
-              onClick={handleStarClick}
-              className="px-2 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm"
-              label={isFavorited ? 'Saved' : 'Save'}
-            />
-            {listing.url && (
-              <IconButton
-                variant="overlay"
-                size="md"
-                onClick={() => window.open(listing.url, '_blank', 'noopener,noreferrer')}
-                className="ml-auto rounded-md p-2"
-                aria-label={`View on ${SOURCE_LABELS[listing.source] ?? 'source'}`}
-                title={`View on ${SOURCE_LABELS[listing.source] ?? 'source'}`}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                  <polyline points="15 3 21 3 21 9" />
-                  <line x1="10" y1="14" x2="21" y2="3" />
-                </svg>
-              </IconButton>
-            )}
-          </div>
 
           {/* Source attribution */}
           {listing.source && (
