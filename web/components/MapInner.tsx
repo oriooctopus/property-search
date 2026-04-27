@@ -1668,9 +1668,19 @@ export default function MapInner({ listings: listingsProp, selectedId, onMarkerC
   }, [validListings]);
 
   // Build the set of groups to render. If the selected listing is in a cluster,
-  // split that cluster so the selected dot always shows individually.
+  // split that cluster so the selected dot always shows individually. The
+  // OTHER listings at the same coord are still emitted (so they remain in
+  // the markers list and hit-testable for switching selection), but flagged
+  // `isCoLocatedNonSelected` so the renderer suppresses their visible pin
+  // visuals — otherwise their green saved-pin circle + heart glyph would
+  // peek out from underneath the selected listing's blue teardrop hero.
   const renderGroups = useMemo(() => {
-    const result: Array<{ key: string; listings: typeof validListings; isCluster: boolean }> = [];
+    const result: Array<{
+      key: string;
+      listings: typeof validListings;
+      isCluster: boolean;
+      isCoLocatedNonSelected?: boolean;
+    }> = [];
 
     for (const [key, group] of coordGroups.entries()) {
       if (group.length === 1) {
@@ -1680,9 +1690,17 @@ export default function MapInner({ listings: listingsProp, selectedId, onMarkerC
 
       const hasSelected = group.some((l) => l.id === selectedId);
       if (hasSelected) {
-        // Render each listing individually so the selected dot is visible
+        // Render each listing individually so the selected dot is visible.
+        // Mark non-selected co-located listings so their visuals are hidden;
+        // they remain present (transparent) for click hit-testing.
         for (const listing of group) {
-          result.push({ key: `${key}__${listing.id}`, listings: [listing], isCluster: false });
+          const isSel = listing.id === selectedId;
+          result.push({
+            key: `${key}__${listing.id}`,
+            listings: [listing],
+            isCluster: false,
+            isCoLocatedNonSelected: !isSel,
+          });
         }
       } else {
         result.push({ key, listings: group, isCluster: true });
@@ -1715,7 +1733,7 @@ export default function MapInner({ listings: listingsProp, selectedId, onMarkerC
         <InjectPopupStyles />
         {onBoundsChange && <BoundsWatcher onBoundsChange={onBoundsChange} onMapMove={onMapMove} suppressBoundsRef={suppressBoundsRef} isPanningRef={isPanningRef} />}
 
-        {renderGroups.map(({ key, listings: groupListings, isCluster }) => {
+        {renderGroups.map(({ key, listings: groupListings, isCluster, isCoLocatedNonSelected }) => {
           if (isCluster) {
             // Multi-listing cluster at same coordinates
             const rep = groupListings[0];
@@ -1895,8 +1913,20 @@ export default function MapInner({ listings: listingsProp, selectedId, onMarkerC
           // `dw-active-pin` class) so tests that query it by className still
           // find it, and so click/hover events still fire on the same layer
           // the saved/regular pins use.
-          const pathOpacity = isSelected ? 0 : mainOpacity;
-          const pathFillOpacity = isSelected ? 0 : mainOpacity;
+          //
+          // Same hide-treatment applies when this listing is co-located
+          // with the SELECTED listing at the same lat/lon (cluster-split
+          // branch in `renderGroups`). Without this, the green saved-pin
+          // CircleMarker + white heart-glyph for an OTHER same-coord
+          // listing peeks out from underneath the selected listing's blue
+          // teardrop hero (the heart sits centered on the geographic
+          // anchor while the teardrop bulb sits above it, so the green
+          // circle's bottom half is uncovered). The CircleMarker is kept
+          // in the DOM as a transparent hit-target so the user can still
+          // click it to switch selection.
+          const hideVisuals = isSelected || isCoLocatedNonSelected === true;
+          const pathOpacity = hideVisuals ? 0 : mainOpacity;
+          const pathFillOpacity = hideVisuals ? 0 : mainOpacity;
 
           return (
             <Fragment key={key}>
@@ -1921,7 +1951,7 @@ export default function MapInner({ listings: listingsProp, selectedId, onMarkerC
                   color: mainStroke,
                   fillColor: mainFill,
                   fillOpacity: pathFillOpacity,
-                  weight: isSelected ? 0 : mainWeight,
+                  weight: hideVisuals ? 0 : mainWeight,
                   opacity: pathOpacity,
                   className: isSelected
                     ? 'dw-active-pin'
@@ -1956,7 +1986,7 @@ export default function MapInner({ listings: listingsProp, selectedId, onMarkerC
                   Suppressed when the pin is ALSO active: the hero core
                   flips green in that case to preserve saved-ness identity,
                   and a 14px heart on top of a 14px core is visually muddy. */}
-              {isSaved && !isSelected && (
+              {isSaved && !isSelected && !isCoLocatedNonSelected && (
                 <Marker
                   key={`${key}__heart`}
                   position={[listing.lat, listing.lon]}
