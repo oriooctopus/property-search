@@ -18,17 +18,46 @@ export interface DirectionsResult {
   minutes: number;
   /** Encoded overview polyline (Google's polyline algorithm). */
   polyline?: string;
+  /** First leg's steps, if available — used to render itineraries. */
+  steps?: GoogleDirectionsStep[];
+}
+
+interface GoogleDirectionsStep {
+  travel_mode: "WALKING" | "TRANSIT" | "DRIVING" | "BICYCLING";
+  duration?: { value: number; text: string };
+  distance?: { value: number; text: string };
+  start_location?: { lat: number; lng: number };
+  end_location?: { lat: number; lng: number };
+  html_instructions?: string;
+  transit_details?: {
+    departure_stop?: { name: string };
+    arrival_stop?: { name: string };
+    line?: {
+      short_name?: string;
+      name?: string;
+      color?: string;
+      vehicle?: { type?: string; name?: string };
+    };
+    num_stops?: number;
+  };
 }
 
 interface GoogleDirectionsLeg {
   duration?: { value: number; text: string };
   duration_in_traffic?: { value: number; text: string };
+  start_address?: string;
+  end_address?: string;
+  start_location?: { lat: number; lng: number };
+  end_location?: { lat: number; lng: number };
+  steps?: GoogleDirectionsStep[];
 }
 
 interface GoogleDirectionsRoute {
   legs: GoogleDirectionsLeg[];
   overview_polyline?: { points: string };
 }
+
+export type { GoogleDirectionsLeg, GoogleDirectionsStep, GoogleDirectionsRoute };
 
 interface GoogleDirectionsResponse {
   status: string;
@@ -114,6 +143,7 @@ export async function getTransitDuration(
     return {
       minutes: Math.max(1, Math.round(seconds / 60)),
       polyline: route.overview_polyline?.points,
+      steps: leg.steps,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
