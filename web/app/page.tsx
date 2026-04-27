@@ -1680,47 +1680,6 @@ function HomeInner() {
         )}
 
         <div className="relative flex-1 min-h-0 flex flex-col">
-          {/* Wishlist filter status banner — slim, full-width, with × to clear.
-              Renders above the listings column whenever a wishlist filter is
-              active (in any non-swipe view). */}
-          {selectedWishlist != null && !isSwipeView && (() => {
-            const sel = selectedWishlist;
-            const wl = sel === 'all-saved'
-              ? null
-              : allWishlists.find((w) => w.id === sel);
-            const name = sel === 'all-saved' ? 'All saved' : (wl?.name ?? 'Wishlist');
-            return (
-              <div
-                className="flex items-center justify-between gap-2 px-3"
-                style={{
-                  height: 32,
-                  background: 'rgba(126,231,135,0.1)',
-                  borderLeft: '3px solid #7ee787',
-                  color: '#7ee787',
-                  fontSize: 12,
-                }}
-                data-testid="wishlist-filter-banner"
-              >
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="#7ee787" stroke="#7ee787" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                  </svg>
-                  <span className="truncate">Showing listings from {name}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedWishlist(null)}
-                  aria-label="Clear wishlist filter"
-                  className="inline-flex items-center justify-center rounded-full w-5 h-5 hover:bg-white/10 cursor-pointer transition-colors"
-                  style={{ color: '#7ee787' }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-                    <path d="M2 2L8 8M8 2L2 8" />
-                  </svg>
-                </button>
-              </div>
-            );
-          })()}
           {!isSwipeView && (
             <>
               {/*
