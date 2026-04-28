@@ -2910,55 +2910,165 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
             {/* Editing banner (Option C) — appears below the title bar
                 whenever the user is editing a saved search's filter snapshot.
                 Updates to "Editing · N changes" once the user mutates anything,
-                then the sticky bottom bar surfaces Save changes / Save as new. */}
+                and expands to surface Save as new / Save changes inline. */}
             {editingFiltersSearchId !== null && (
               <div
-                className="mx-4 mb-3 mt-1 p-2.5 rounded-lg flex items-center gap-2.5"
+                className="mx-4 mb-3 mt-1 p-2.5 rounded-lg"
                 data-testid="edit-saved-search-banner"
                 style={{
                   backgroundColor: 'rgba(88, 166, 255, 0.10)',
                   border: '1px solid rgba(88, 166, 255, 0.30)',
                 }}
               >
-                <div
-                  className="w-[22px] h-[22px] rounded-full flex items-center justify-center shrink-0"
-                  style={{ backgroundColor: 'rgba(88, 166, 255, 0.15)', color: '#58a6ff' }}
-                >
-                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M8.5 1.5l2 2L4 10H2v-2z" />
-                  </svg>
-                </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2.5">
                   <div
-                    className="text-[10px] font-bold uppercase"
-                    style={{ color: '#58a6ff', letterSpacing: '0.08em' }}
+                    className="w-[22px] h-[22px] rounded-full flex items-center justify-center shrink-0"
+                    style={{ backgroundColor: 'rgba(88, 166, 255, 0.15)', color: '#58a6ff' }}
                   >
-                    {editingChangedCount > 0
-                      ? `Editing · ${editingChangedCount} change${editingChangedCount === 1 ? '' : 's'}`
-                      : 'Editing'}
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M8.5 1.5l2 2L4 10H2v-2z" />
+                    </svg>
                   </div>
-                  <div
-                    className="text-[13px] font-semibold truncate"
-                    style={{ color: '#e1e4e8', marginTop: '1px' }}
-                    data-testid="edit-saved-search-banner-name"
-                  >
-                    {editingFiltersName}
+                  <div className="flex-1 min-w-0">
+                    <div
+                      className="text-[10px] font-bold uppercase"
+                      style={{ color: '#58a6ff', letterSpacing: '0.08em' }}
+                    >
+                      {editingChangedCount > 0
+                        ? `Editing · ${editingChangedCount} change${editingChangedCount === 1 ? '' : 's'}`
+                        : 'Editing'}
+                    </div>
+                    <div
+                      className="text-[13px] font-semibold truncate"
+                      style={{ color: '#e1e4e8', marginTop: '1px' }}
+                      data-testid="edit-saved-search-banner-name"
+                    >
+                      {editingFiltersName}
+                    </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => exitEditMode(true)}
-                  data-testid="edit-saved-search-cancel"
-                  className="text-[11px] font-medium h-[26px] px-2.5 rounded-md cursor-pointer transition-colors"
-                  style={{
-                    backgroundColor: 'transparent',
-                    border: '1px solid rgba(88, 166, 255, 0.30)',
-                    color: '#58a6ff',
-                  }}
-                >
-                  Cancel
-                </button>
+
+                {/* Action row — Cancel always visible; Save as new / Save
+                    changes appear when the user has mutated at least one
+                    chip. Buttons sit on a single row but wrap to a second
+                    row on narrow viewports. Tap targets are 40px tall. */}
+                <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => exitEditMode(true)}
+                    data-testid="edit-saved-search-cancel"
+                    className="text-[12px] font-medium h-10 px-3 rounded-md cursor-pointer transition-colors"
+                    style={{
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      color: '#58a6ff',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  {editingChangedCount > 0 && (
+                    saveAsNewOpen ? (
+                      <>
+                        <input
+                          ref={saveAsNewInputRef}
+                          type="text"
+                          value={saveAsNewName}
+                          onChange={(e) => setSaveAsNewName(e.target.value)}
+                          placeholder="New search name"
+                          data-testid="edit-saved-search-newname-input"
+                          className="flex-1 min-w-[140px] h-10 px-3 rounded-md text-sm outline-none"
+                          style={{
+                            backgroundColor: '#0d1117',
+                            border: '1px solid #2d333b',
+                            color: '#e1e4e8',
+                          }}
+                          onKeyDown={async (e) => {
+                            if (e.key === 'Enter' && saveAsNewName.trim()) {
+                              const created = await onSaveSearch?.(saveAsNewName.trim());
+                              if (created) {
+                                setActiveSearchId(created.id);
+                                exitEditMode(false);
+                              }
+                            }
+                            if (e.key === 'Escape') {
+                              setSaveAsNewOpen(false);
+                              setSaveAsNewName('');
+                            }
+                          }}
+                        />
+                        <button
+                          data-testid="edit-saved-search-newname-confirm"
+                          disabled={!saveAsNewName.trim()}
+                          onClick={async () => {
+                            if (!saveAsNewName.trim()) return;
+                            const created = await onSaveSearch?.(saveAsNewName.trim());
+                            if (created) {
+                              setActiveSearchId(created.id);
+                              exitEditMode(false);
+                            }
+                          }}
+                          className="h-10 px-4 rounded-md text-[13px] font-semibold cursor-pointer disabled:opacity-50"
+                          style={{ backgroundColor: '#58a6ff', color: '#03111f' }}
+                        >
+                          Create
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          data-testid="edit-saved-search-save-as-new"
+                          onClick={() => {
+                            setSaveAsNewOpen(true);
+                            setSaveAsNewName(`${editingFiltersName} (copy)`);
+                            setTimeout(() => saveAsNewInputRef.current?.select(), 50);
+                          }}
+                          className="h-10 px-3.5 rounded-md text-[13px] font-semibold cursor-pointer transition-colors"
+                          style={{
+                            backgroundColor: 'transparent',
+                            border: '1px solid rgba(88, 166, 255, 0.45)',
+                            color: '#58a6ff',
+                          }}
+                        >
+                          Save as new
+                        </button>
+                        <button
+                          data-testid="edit-saved-search-save-changes"
+                          onClick={async () => {
+                            if (!editingFiltersSearchId) return;
+                            const ok = await onUpdateSearchFilters?.(editingFiltersSearchId, filters);
+                            if (ok) {
+                              // Successful save — exit edit mode without
+                              // reverting (current filters are now the new
+                              // baseline / the persisted snapshot).
+                              setEditingFiltersSearchId(null);
+                              setEditingFiltersName('');
+                              setEditingFiltersSnapshot(null);
+                              setSaveAsNewOpen(false);
+                              setSaveAsNewName('');
+                              setSaveToastVisible(true);
+                              if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
+                              saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 2000);
+                            }
+                          }}
+                          className="h-10 px-4 rounded-md text-[13px] font-semibold cursor-pointer ml-auto"
+                          style={{ backgroundColor: '#58a6ff', color: '#03111f' }}
+                        >
+                          Save changes
+                        </button>
+                      </>
+                    )
+                  )}
+                </div>
               </div>
             )}
+
+            {/* My searches section — first content under the title/banner so
+                the user can swap searches without scrolling past chips. */}
+            <div className="px-4 pt-3 pb-4" data-testid="mobile-filters-saved-searches" style={{ borderBottom: '1px solid #2d333b' }}>
+              <div className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: '#8b949e' }}>My searches</div>
+              <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
+                {renderSavedSearchTabsContent('sheet')}
+              </div>
+            </div>
 
             {/* Destination section — mirrors the inline destination pill in
                 the top bar so the mobile filter sheet (used in swipe view where
@@ -2993,139 +3103,16 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
               </div>
             </div>
 
-            {/* My searches section — mirrors the top-bar saved-search tabs so
-                the mobile filter sheet (used in swipe view where the top bar
-                is hidden) can still reach them. */}
-            <div className="px-4 py-4" data-testid="mobile-filters-saved-searches" style={{ borderBottom: '1px solid #2d333b' }}>
-              <div className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: '#8b949e' }}>My searches</div>
-              <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
-                {renderSavedSearchTabsContent('sheet')}
-              </div>
-            </div>
-
-
             {/* Filter chips */}
             <div
               className="px-4 pt-3 overflow-y-auto flex flex-wrap gap-1.5"
               style={{
                 maxHeight: '60vh',
-                // Pad bottom extra when the sticky save bar is visible so
-                // the last row of chips is never hidden under it.
-                paddingBottom: editingFiltersSearchId !== null && editingChangedCount > 0 ? '88px' : '24px',
+                paddingBottom: '24px',
               }}
             >
               {filterChipsContent}
             </div>
-
-            {/* Sticky save bar (Option C state 3) — slides up the moment the
-                user mutates a chip while editing. Two CTAs: Save as new
-                (secondary) creates a new saved-search row with a
-                user-supplied name; Save changes (primary blue) updates the
-                current saved-search row's filter snapshot in place. */}
-            {editingFiltersSearchId !== null && editingChangedCount > 0 && (
-              <div
-                data-testid="edit-saved-search-actionbar"
-                className="absolute left-0 right-0 bottom-0 flex items-center gap-2 px-3"
-                style={{
-                  height: '64px',
-                  backgroundColor: '#1c2028',
-                  borderTop: '1px solid #2d333b',
-                  paddingBottom: 'env(safe-area-inset-bottom)',
-                  zIndex: 2,
-                }}
-              >
-                {saveAsNewOpen ? (
-                  <>
-                    <input
-                      ref={saveAsNewInputRef}
-                      type="text"
-                      value={saveAsNewName}
-                      onChange={(e) => setSaveAsNewName(e.target.value)}
-                      placeholder="New search name"
-                      data-testid="edit-saved-search-newname-input"
-                      className="flex-1 h-10 px-3 rounded-md text-sm outline-none"
-                      style={{
-                        backgroundColor: '#0d1117',
-                        border: '1px solid #2d333b',
-                        color: '#e1e4e8',
-                      }}
-                      onKeyDown={async (e) => {
-                        if (e.key === 'Enter' && saveAsNewName.trim()) {
-                          const created = await onSaveSearch?.(saveAsNewName.trim());
-                          if (created) {
-                            setActiveSearchId(created.id);
-                            exitEditMode(false);
-                          }
-                        }
-                        if (e.key === 'Escape') {
-                          setSaveAsNewOpen(false);
-                          setSaveAsNewName('');
-                        }
-                      }}
-                    />
-                    <button
-                      data-testid="edit-saved-search-newname-confirm"
-                      disabled={!saveAsNewName.trim()}
-                      onClick={async () => {
-                        if (!saveAsNewName.trim()) return;
-                        const created = await onSaveSearch?.(saveAsNewName.trim());
-                        if (created) {
-                          setActiveSearchId(created.id);
-                          exitEditMode(false);
-                        }
-                      }}
-                      className="h-10 px-4 rounded-md text-[13px] font-semibold cursor-pointer disabled:opacity-50"
-                      style={{ backgroundColor: '#58a6ff', color: '#03111f' }}
-                    >
-                      Create
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      data-testid="edit-saved-search-save-as-new"
-                      onClick={() => {
-                        setSaveAsNewOpen(true);
-                        setSaveAsNewName(`${editingFiltersName} (copy)`);
-                        setTimeout(() => saveAsNewInputRef.current?.select(), 50);
-                      }}
-                      className="h-10 px-4 rounded-md text-[13px] font-semibold cursor-pointer transition-colors shrink-0"
-                      style={{
-                        backgroundColor: 'transparent',
-                        border: '1px solid #2d333b',
-                        color: '#e1e4e8',
-                      }}
-                    >
-                      Save as new
-                    </button>
-                    <button
-                      data-testid="edit-saved-search-save-changes"
-                      onClick={async () => {
-                        if (!editingFiltersSearchId) return;
-                        const ok = await onUpdateSearchFilters?.(editingFiltersSearchId, filters);
-                        if (ok) {
-                          // Successful save — exit edit mode without
-                          // reverting (current filters are now the new
-                          // baseline / the persisted snapshot).
-                          setEditingFiltersSearchId(null);
-                          setEditingFiltersName('');
-                          setEditingFiltersSnapshot(null);
-                          setSaveAsNewOpen(false);
-                          setSaveAsNewName('');
-                          setSaveToastVisible(true);
-                          if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
-                          saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 2000);
-                        }
-                      }}
-                      className="flex-1 h-10 px-4 rounded-md text-[13px] font-semibold cursor-pointer"
-                      style={{ backgroundColor: '#58a6ff', color: '#03111f' }}
-                    >
-                      Save changes
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
           </div>
           <style dangerouslySetInnerHTML={{ __html: `
             @keyframes mobileSheetSlideUp {
