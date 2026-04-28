@@ -187,6 +187,8 @@ export async function runVerifyStalePhase(
     let progressCount = 0;
     const progressTotal = rows.length;
     let sourceUnknown = 0;
+    const sourceStartedAt = Date.now();
+    log.info(`starting parallelMap for ${src} (${rows.length} rows, concurrency=${limit})`);
     await parallelMap(rows, limit, async (row) => {
       let result: VerifyResult;
       try {
@@ -211,6 +213,10 @@ export async function runVerifyStalePhase(
         );
       }
     });
+    const sourceMs = Date.now() - sourceStartedAt;
+    log.info(
+      `${src} parallelMap finished: processed=${progressCount}/${progressTotal} unknown=${sourceUnknown} active=${summary.activeConfirmed} delisted=${summary.delistedConfirmed} errors=${summary.errors} elapsed=${sourceMs}ms`,
+    );
 
     const unknownRatio = rows.length > 0 ? sourceUnknown / rows.length : 0;
     if (

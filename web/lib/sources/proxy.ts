@@ -75,6 +75,20 @@ export function makeProxyFetch(
       let redirectsLeft = maxRedirects;
       let currentUrl = url;
 
+      // Settle the promise exactly once. Without this guard, an `'error'`
+      // event after a partial response (e.g. proxy drops the socket mid-stream)
+      // would race with `'end'` and double-call resolve/reject — or worse,
+      // never call either if the response stream's `'error'` event has no
+      // listener and `'end'` never fires. Either way the awaiter would hang
+      // forever, the underlying socket would close, and Node would silently
+      // exit 0 once enough orphaned promises accumulated.
+      let settled = false;
+      const settle = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
+        fn();
+      };
+
       const request = (target: string) => {
         const req = https.request(
           target,
@@ -97,19 +111,54 @@ export function makeProxyFetch(
             let data = "";
             res.on("data", (c: Buffer) => (data += c));
             res.on("end", () => {
-              const response = new Response(data, {
-                status: statusCode,
-                headers: res.headers as HeadersInit,
+              settle(() => {
+                const response = new Response(data, {
+                  status: statusCode,
+                  headers: res.headers as HeadersInit,
+                });
+                // Expose the final URL after redirects via a non-standard prop;
+                // callers that need it should read it off the wrapper instead
+                // of Response.url (which is read-only).
+                (response as unknown as { __finalUrl: string }).__finalUrl =
+                  currentUrl;
+                resolve(response);
               });
-              // Expose the final URL after redirects via a non-standard prop;
-              // callers that need it should read it off the wrapper instead
-              // of Response.url (which is read-only).
-              (response as unknown as { __finalUrl: string }).__finalUrl = currentUrl;
-              resolve(response);
+            });
+            // Critical: when a proxy drops the socket mid-response (very common
+            // on residential proxies under load), Node emits `'error'` and
+            // `'close'` on the IncomingMessage but NOT `'end'`. Without these
+            // listeners the awaiter would hang forever on a promise that never
+            // settles, the socket would close (releasing its handle), and the
+            // process would silently exit 0 the moment all in-flight requests
+            // ended up in this state. Reject loud + once via `settle`.
+            res.on("error", (err) =>
+              settle(() => reject(err instanceof Error ? err : new Error(String(err)))),
+            );
+            res.on("close", () => {
+              if (!settled) {
+                settle(() =>
+                  reject(
+                    new Error(
+                      `proxy response closed before end (status=${statusCode}, bytes=${data.length})`,
+                    ),
+                  ),
+                );
+              }
             });
           },
         );
-        req.on("error", reject);
+        req.on("error", (err) =>
+          settle(() => reject(err instanceof Error ? err : new Error(String(err)))),
+        );
+        // Belt-and-suspenders: if the request socket is destroyed without
+        // emitting 'error' or 'response', the promise would still hang.
+        req.on("close", () => {
+          if (!settled) {
+            settle(() =>
+              reject(new Error("proxy request socket closed before response")),
+            );
+          }
+        });
         if (bodyStr) req.write(bodyStr);
         req.end();
       };
