@@ -18,6 +18,35 @@ import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
+// Fail loud on async-leaked errors. Without these handlers a Promise that
+// rejected after its awaiter was abandoned (or never awaited) would either
+// silently terminate the process with code 0 once the event loop emptied
+// (the verify-stale-2026-04-28 incident: 1000-row run "completed" in 9s with
+// no progress logs and exit 0), or be swallowed by the lib's `--unhandled-
+// rejections=warn` default in older Nodes. Either way: invisible breakage.
+process.on("unhandledRejection", (reason) => {
+  console.error("FATAL: unhandledRejection", reason);
+  process.exit(1);
+});
+process.on("uncaughtException", (err) => {
+  console.error("FATAL: uncaughtException", err);
+  process.exit(1);
+});
+// `beforeExit` fires when the event loop is idle and we're about to exit
+// naturally. If it fires before main() resolved (and called process.exit(0)
+// itself), something silently abandoned a promise — fail loud rather than
+// declaring success.
+let mainResolved = false;
+process.on("beforeExit", (code) => {
+  if (!mainResolved) {
+    console.error(
+      `FATAL: event loop emptied before main() finished (exit code would be ${code}). ` +
+        `This usually means an awaited Promise was abandoned (e.g. a fetch that never resolves).`,
+    );
+    process.exit(1);
+  }
+});
+
 import { runOrchestrator } from "../lib/ingest/orchestrator";
 import {
   FullBisectionFetch,
@@ -174,6 +203,7 @@ async function main() {
   });
 
   console.log(`\n=== done (runId=${report.runId}) ===`);
+  mainResolved = true;
   process.exit(0);
 }
 
