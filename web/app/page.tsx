@@ -783,7 +783,7 @@ function HomeInner() {
   });
 
   const { conversations, invalidate: invalidateConversations } = useConversations();
-  const { savedSearches, saveSearch: saveSavedSearch, deleteSearch: deleteSavedSearch, updateSearch: updateSavedSearch } = useSavedSearches(userId);
+  const { savedSearches, saveSearch: saveSavedSearch, deleteSearch: deleteSavedSearch, updateSearch: updateSavedSearch, updateSearchFilters: updateSavedSearchFilters } = useSavedSearches(userId);
 
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(chatMode);
@@ -1612,6 +1612,7 @@ function HomeInner() {
             onDeleteSearch={deleteSavedSearch}
             onLoadSearch={setFilters}
             onUpdateSearch={updateSavedSearch}
+            onUpdateSearchFilters={updateSavedSearchFilters}
             onLoginRequired={() => setAuthModal('login')}
             showHidden={showHidden}
             onToggleShowHidden={() => setShowHidden((v) => !v)}

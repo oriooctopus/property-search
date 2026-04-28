@@ -99,15 +99,28 @@ export async function PATCH(
   }
 
   const body = await request.json();
-  const { name } = body;
+  const { name, filters } = body;
 
-  if (!name || typeof name !== "string" || !name.trim()) {
-    return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  // PATCH supports either renaming (name only), updating the filter
+  // snapshot (filters only), or both. Reject the request if neither is
+  // present so we don't issue an empty UPDATE.
+  const hasName = typeof name === "string" && name.trim().length > 0;
+  const hasFilters =
+    filters !== undefined && filters !== null && typeof filters === "object";
+  if (!hasName && !hasFilters) {
+    return NextResponse.json(
+      { error: "Provide name and/or filters" },
+      { status: 400 },
+    );
   }
+
+  const updatePayload: { name?: string; filters?: Record<string, unknown> } = {};
+  if (hasName) updatePayload.name = name.trim();
+  if (hasFilters) updatePayload.filters = filters as Record<string, unknown>;
 
   const { error } = await supabase
     .from("saved_searches")
-    .update({ name: name.trim() })
+    .update(updatePayload)
     .eq("id", numericId)
     .eq("user_id", user.id);
 
