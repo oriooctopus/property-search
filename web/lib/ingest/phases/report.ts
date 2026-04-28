@@ -110,13 +110,29 @@ export async function runReportPhase(
 
   // Persist to ingest_runs (skip in dry-run)
   if (!deps.dryRun) {
+    // Trim phase_results before insert. The `output` field on each phase can
+    // hold the full per-listing payload (normalize phase was ~11 MB on a
+    // single 2026-04-21 run) which makes the INSERT statement timeout. We
+    // only need timing/metrics/warnings/errors for observability — the raw
+    // listings live in the `listings` table. If we ever need the full output
+    // for debugging, re-introduce a separate `ingest_run_phase_outputs` table.
+    const slimPhases = r.phases.map((p) => ({
+      phase: p.phase,
+      startedAt: p.startedAt,
+      finishedAt: p.finishedAt,
+      durationMs: p.durationMs,
+      ok: p.ok,
+      warnings: p.warnings,
+      errors: p.errors,
+      metrics: p.metrics,
+    }));
     const { error: insErr } = await deps.supabase.from("ingest_runs").insert({
       id: r.runId,
       started_at: r.startedAt,
       finished_at: r.finishedAt,
       fetch_strategy: r.fetchStrategy,
       sources: r.sources,
-      phase_results: r.phases as unknown as object,
+      phase_results: slimPhases as unknown as object,
       totals: r.totals as unknown as object,
       warnings: r.warnings,
       exit_code: r.exitCode,
