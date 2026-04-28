@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { createPortal } from 'react-dom';
+import { animate } from 'framer-motion';
 import { TextButton } from '@/components/ui';
 import { X, RotateCcw, Heart } from 'lucide-react';
 import SwipeCard, { type HoveredStation, getClosestStations, walkMinFromMiles } from './SwipeCard';
@@ -356,6 +357,9 @@ export default function SwipeView({
     setMobileCardDragY(0);
   }, []);
 
+  const bouncePlayedRef = useRef(false);
+  const bounceActiveRef = useRef(false);
+
   // Wishlist hooks
   const { data: wishlists = [] } = useWishlists(userId);
   const { addToWishlist, removeFromWishlist, createWishlist } = useWishlistMutations(userId);
@@ -490,6 +494,69 @@ export default function SwipeView({
   useEffect(() => {
     currentListingIdRef.current = currentListing?.id ?? null;
   }, [currentListing?.id]);
+
+  // One-shot pulldown-tray bounce hint. The first time a user sees a swipe
+  // card on this browser, animate the floating mobile card down ~22px and
+  // spring back to telegraph that the tray is draggable. Gated by a
+  // localStorage flag so it only ever runs once. Respects reduce-motion.
+  useEffect(() => {
+    if (bouncePlayedRef.current) return;
+    if (isMobileViewport !== true) return;
+    if (!currentListing) return;
+    if (mobileCardDismissed) return;
+    if (typeof window === 'undefined') return;
+
+    let seen = false;
+    try {
+      seen = window.localStorage.getItem('dwelligence_swipe_tray_hint_seen') === '1';
+    } catch {
+      seen = true;
+    }
+    if (seen) {
+      bouncePlayedRef.current = true;
+      return;
+    }
+
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      bouncePlayedRef.current = true;
+      try { window.localStorage.setItem('dwelligence_swipe_tray_hint_seen', '1'); } catch { /* noop */ }
+      return;
+    }
+
+    bouncePlayedRef.current = true;
+    bounceActiveRef.current = true;
+
+    // Drive `mobileCardDragY` via framer-motion (already in deps). The
+    // wrapper applies translateY(mobileCardDragY)px, so animating the
+    // state directly produces the visible bounce. Down ~22px, then spring
+    // back with a bouncy spring.
+    const controls = animate(0, 22, {
+      duration: 0.18,
+      ease: 'easeOut',
+      onUpdate: (v) => setMobileCardDragY(v),
+      onComplete: () => {
+        const spring = animate(22, 0, {
+          type: 'spring',
+          stiffness: 320,
+          damping: 14,
+          onUpdate: (v) => setMobileCardDragY(v),
+          onComplete: () => {
+            setMobileCardDragY(0);
+            bounceActiveRef.current = false;
+            try {
+              window.localStorage.setItem('dwelligence_swipe_tray_hint_seen', '1');
+            } catch { /* noop */ }
+          },
+        });
+        cleanup = () => spring.stop();
+      },
+    });
+    let cleanup = () => controls.stop();
+    return () => {
+      cleanup();
+      bounceActiveRef.current = false;
+    };
+  }, [isMobileViewport, currentListing, mobileCardDismissed]);
 
   // Mark map as "opened" — the mobile mini-map (Option B2 layout) means the
   // Leaflet map is always visible on mobile too, so we flip this true as soon
@@ -970,7 +1037,7 @@ export default function SwipeView({
           transform: isMobileViewport === true && mobileCardDismissed
             ? 'translateY(100%)'
             : `translateY(${mobileCardDragY}px)`,
-          transition: cardDragActiveRef.current ? 'none' : 'transform 220ms ease-out',
+          transition: cardDragActiveRef.current || bounceActiveRef.current ? 'none' : 'transform 220ms ease-out',
           // Hide from pointer events when fully dismissed so map pins underneath
           // receive taps. The "Show listing" pill renders via a separate overlay.
           pointerEvents: isMobileViewport === true && mobileCardDismissed ? 'none' : undefined,
@@ -989,13 +1056,15 @@ export default function SwipeView({
             onPointerCancel={handleCardPointerUp}
             style={{
               position: 'absolute',
-              top: -24,
+              top: -40,
               left: 0,
               right: 0,
-              height: 24,
+              height: 40,
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
+              gap: 4,
               touchAction: 'none',
               cursor: 'grab',
               zIndex: 11,
@@ -1004,12 +1073,25 @@ export default function SwipeView({
             <div
               style={{
                 width: 44,
-                height: 4,
+                height: 5,
                 borderRadius: 9999,
-                backgroundColor: 'rgba(255,255,255,0.35)',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.4)',
+                backgroundColor: 'rgba(255,255,255,0.65)',
+                boxShadow: '0 0 8px rgba(255,255,255,0.3), 0 1px 3px rgba(0,0,0,0.5)',
               }}
             />
+            <svg
+              width="14"
+              height="8"
+              viewBox="0 0 14 8"
+              fill="none"
+              stroke="rgba(255,255,255,0.65)"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="2 2 7 6 12 2" />
+            </svg>
           </div>
         )}
         {currentListing ? (
