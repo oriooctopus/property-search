@@ -402,15 +402,26 @@ export default function SwipeCard({
         const vyPxPerSec = vy * 1000 * (dy || (my < 0 ? -1 : 1));
         const absVx = Math.abs(vxPxPerSec);
 
+        // pointercancel (palm rejection, system gesture, etc.) must NEVER
+        // commit a swipe — even if movement crossed threshold by then. Force
+        // a clean snap-back to origin.
+        const cancelled = event?.type === 'pointercancel';
+
         // Horizontal commit: either dragged past threshold OR flicked fast.
         // Direction prefers velocity sign on flicks (a quick flick that didn't
         // travel far should still go in the flick direction); falls back to
         // displacement sign for slow drags.
         const horizontalCommit =
+          !cancelled &&
           gestureAxis.current === 'x' && (absX > SWIPE_X_THRESHOLD || absVx > SWIPE_VELOCITY);
         // Vertical (down) commit: must end up moving downward, but allow a
-        // fast downward flick below the displacement threshold.
+        // fast downward flick below the displacement threshold. Photo-area
+        // vertical drags are intentionally a no-op (snap back) — the photo is
+        // not the right surface for a back-of-queue gesture; users who want
+        // dismiss should use the grabber strip above the card.
         const verticalCommit =
+          !cancelled &&
+          !touchInPhoto.current &&
           gestureAxis.current === 'y' &&
           curY > 0 &&
           (curY > SWIPE_Y_THRESHOLD || vyPxPerSec > SWIPE_VELOCITY);
