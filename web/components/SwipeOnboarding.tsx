@@ -1,20 +1,19 @@
 'use client';
 
 interface SwipeOnboardingProps {
-  onDismiss: () => void;
+  /** Reserved — caller dismisses on first card gesture; this overlay is now
+   *  purely visual (pointer-events: none). Kept for API back-compat. */
+  onDismiss?: () => void;
 }
 
-export default function SwipeOnboarding({ onDismiss }: SwipeOnboardingProps) {
-  const handleDismiss = () => {
-    localStorage.setItem('dwelligence_swipe_onboarded', '1');
-    onDismiss();
-  };
-
+export default function SwipeOnboarding(_props: SwipeOnboardingProps) {
+  // Overlay is purely visual. Card-level useDrag receives the user's first
+  // gesture untouched; the parent dismisses this overlay on the first drag
+  // event, persisting `dwelligence_swipe_onboarded` itself.
   return (
     <div
       className="absolute inset-0 flex items-center justify-center"
-      style={{ zIndex: 1300, backgroundColor: 'rgba(0,0,0,0.4)' }}
-      onClick={handleDismiss}
+      style={{ zIndex: 1300, backgroundColor: 'rgba(0,0,0,0.4)', pointerEvents: 'none' }}
     >
       {/* Left edge pill */}
       <div

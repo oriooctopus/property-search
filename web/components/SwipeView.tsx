@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { createPortal } from 'react-dom';
 import { animate } from 'framer-motion';
+import { useDrag } from '@use-gesture/react';
 import { TextButton } from '@/components/ui';
 import { X, RotateCcw, Heart } from 'lucide-react';
 import SwipeCard, { type HoveredStation, getClosestStations, walkMinFromMiles } from './SwipeCard';
@@ -310,47 +311,45 @@ export default function SwipeView({
   const [mobileCardDismissed, setMobileCardDismissed] = useState(false);
   const [mobileCardDragY, setMobileCardDragY] = useState(0);
   const cardDragActiveRef = useRef(false);
-  const cardDragStartYRef = useRef(0);
-  const cardDragStartTimeRef = useRef(0);
   const MOBILE_CARD_DISMISS_DISTANCE_PX = 100;
   const MOBILE_CARD_DISMISS_VELOCITY_PX_PER_MS = 0.5;
 
-  const handleCardPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    cardDragActiveRef.current = true;
-    cardDragStartYRef.current = e.clientY;
-    cardDragStartTimeRef.current = performance.now();
-    try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* noop */ }
-  }, []);
-
-  const handleCardPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!cardDragActiveRef.current) return;
-    const dy = e.clientY - cardDragStartYRef.current;
-    setMobileCardDragY(Math.max(0, dy));
-  }, []);
-
-  const handleCardPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!cardDragActiveRef.current) return;
-    cardDragActiveRef.current = false;
-    const dy = Math.max(0, e.clientY - cardDragStartYRef.current);
-    const elapsed = Math.max(1, performance.now() - cardDragStartTimeRef.current);
-    const velocity = dy / elapsed;
-    const shouldDismiss =
-      dy >= MOBILE_CARD_DISMISS_DISTANCE_PX ||
-      (dy > 25 && velocity >= MOBILE_CARD_DISMISS_VELOCITY_PX_PER_MS);
-    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* noop */ }
-    if (shouldDismiss) {
-      // Slide card fully off-screen, then flip the dismissed flag so it
-      // unmounts and the "Show listing" pill renders.
-      setMobileCardDragY(window.innerHeight);
-      window.setTimeout(() => {
-        setMobileCardDismissed(true);
+  // Grabber drag-to-dismiss: handled via @use-gesture/react. No manual
+  // pointer-capture, no setTimeout debounces — `tap` and `last` flags from
+  // use-gesture replace the previous custom state machine.
+  const grabberBind = useDrag(
+    ({ movement: [, my], velocity: [, vy], down, last, tap }) => {
+      if (tap) {
+        cardDragActiveRef.current = false;
         setMobileCardDragY(0);
-      }, 220);
-    } else {
-      setMobileCardDragY(0);
-    }
-  }, []);
+        return;
+      }
+      if (down) {
+        cardDragActiveRef.current = true;
+        setMobileCardDragY(Math.max(0, my));
+        return;
+      }
+      if (last) {
+        cardDragActiveRef.current = false;
+        const dy = Math.max(0, my);
+        // use-gesture's velocity is px/ms (always non-negative magnitude).
+        const velocity = vy;
+        const shouldDismiss =
+          dy >= MOBILE_CARD_DISMISS_DISTANCE_PX ||
+          (dy > 25 && velocity >= MOBILE_CARD_DISMISS_VELOCITY_PX_PER_MS);
+        if (shouldDismiss) {
+          setMobileCardDragY(window.innerHeight);
+          window.setTimeout(() => {
+            setMobileCardDismissed(true);
+            setMobileCardDragY(0);
+          }, 220);
+        } else {
+          setMobileCardDragY(0);
+        }
+      }
+    },
+    { filterTaps: true, pointer: { touch: true }, axis: 'y' }
+  );
 
   const showCardAgain = useCallback(() => {
     setMobileCardDismissed(false);
@@ -1050,10 +1049,7 @@ export default function SwipeView({
         {isMobileViewport === true && currentListing && !mobileCardDismissed && (
           <div
             data-testid="swipe-card-grabber"
-            onPointerDown={handleCardPointerDown}
-            onPointerMove={handleCardPointerMove}
-            onPointerUp={handleCardPointerUp}
-            onPointerCancel={handleCardPointerUp}
+            {...grabberBind()}
             style={{
               position: 'absolute',
               top: -40,
