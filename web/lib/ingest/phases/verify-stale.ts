@@ -63,7 +63,11 @@ async function loadCandidatesForSource(
     .eq("source", source)
     .is("delisted_at", null)
     .lt("last_seen_at", cutoff)
-    .order("last_seen_at", { ascending: true })
+    // No ORDER BY: sorting the full stale candidate set blew the Postgres
+    // statement-timeout on craigslist. We just need a sample of `limit` rows
+    // per pass — Postgres can return them in whatever order it likes, and
+    // rotating which rows get verified each pass is slightly better than
+    // always picking the same oldest ones anyway.
     .limit(limit);
   if (error) {
     throw new Error(
