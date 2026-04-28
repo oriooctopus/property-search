@@ -8,6 +8,7 @@ import { useDrag } from '@use-gesture/react';
 import { TextButton } from '@/components/ui';
 import { X, RotateCcw, Heart } from 'lucide-react';
 import SwipeCard, { type HoveredStation, getClosestStations, walkMinFromMiles } from './SwipeCard';
+import SwipeOnboarding from './SwipeOnboarding';
 import type { ViewportBounds } from './MapInner';
 import type { CommuteInfo } from './ListingCard';
 import type { Database } from '@/lib/types';
@@ -217,6 +218,24 @@ export default function SwipeView({
   const [hasOpenedMap, setHasOpenedMap] = useState(false);
   const [swipeOverlay, setSwipeOverlay] = useState<'left' | 'right' | 'down' | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  // SwipeOnboarding overlay: pointer-events: none visual hint shown until the
+  // user's first card gesture. Default false to keep SSR output stable; flip
+  // to true on mount only if the localStorage flag isn't set yet.
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && !window.localStorage.getItem('dwelligence_swipe_onboarded')) {
+        setShowOnboarding(true);
+      }
+    } catch { /* noop */ }
+  }, []);
+  const dismissOnboarding = useCallback(() => {
+    setShowOnboarding((prev) => {
+      if (!prev) return prev;
+      try { window.localStorage.setItem('dwelligence_swipe_onboarded', '1'); } catch { /* noop */ }
+      return false;
+    });
+  }, []);
   // Track whether we're on a mobile viewport (<600px) so we can conditionally
   // mount the mini-map on mobile vs the full-screen backdrop map on desktop
   // (avoids mounting both Leaflet instances at once). Starts null on first
@@ -1198,7 +1217,10 @@ export default function SwipeView({
                     enterPhotoFocusRef={enterPhotoFocusRef}
                     exitPhotoFocusRef={exitPhotoFocusRef}
                     onSubwayHover={setHoveredFromHover}
-                    onDragStateChange={setIsDragging}
+                    onDragStateChange={(dragging) => {
+                      setIsDragging(dragging);
+                      if (dragging) dismissOnboarding();
+                    }}
                     resetRef={resetCardRef}
                     footerLeadingSlot={(
                       // Mobile-only "Save to: <wishlist> ▾" inline in card footer.
@@ -1229,6 +1251,7 @@ export default function SwipeView({
                       </button>
                     )}
                   />
+                  {showOnboarding ? <SwipeOnboarding /> : null}
                 </div>
                 {/* Action bar attached to bottom of card — desktop only. Mobile uses
                     the floating glassmorphic dock rendered below the card area. */}
