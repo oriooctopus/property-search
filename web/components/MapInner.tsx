@@ -1410,7 +1410,7 @@ export default function MapInner({ listings: listingsProp, selectedId, onMarkerC
 
   // Use URL-provided initial position if valid, otherwise fall back to listing average
   const center: [number, number] = initialCenter ?? computedCenter;
-  const zoom: number = initialZoom ?? 13;
+  const zoom: number = initialZoom ?? 12;
 
   // Subway overlay toggle — persisted in localStorage (default on).
   // Lazy-init so SSR doesn't touch window.
