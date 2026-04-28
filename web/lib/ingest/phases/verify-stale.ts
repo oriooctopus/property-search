@@ -226,6 +226,16 @@ export async function runVerifyStalePhase(
         `[Dwelligence] verify-stale degraded: ${pct}% unknown for ${src}`,
         `verify-stale phase returned ${sourceUnknown}/${rows.length} (${pct}%) unknown for source=${src}. Zero progress is being made against the stale backlog. Common causes: Apify proxy budget exceeded, PerimeterX tightening, or verifier regex drift. Check https://console.apify.com usage and the ingest_runs table for the latest run id.`,
       ).catch(() => {});
+
+      // Defense-in-depth: if a verifier is fully blocked (100% unknown) AND
+      // RESEND_API_KEY isn't set, the alert email never goes out and the
+      // failure stays invisible. Refuse to silently succeed in that case —
+      // fail the workflow loudly so the missing key gets fixed.
+      if (unknownRatio >= 1.0 && !process.env.RESEND_API_KEY) {
+        const msg = `verify-stale returned 100% unknown for source=${src} AND RESEND_API_KEY is not set — refusing to silently degrade. Set RESEND_API_KEY in GH Actions secrets.`;
+        log.warn(msg);
+        throw new Error(msg);
+      }
     }
   }
 
