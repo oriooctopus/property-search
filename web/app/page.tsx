@@ -759,7 +759,7 @@ function HomeInner() {
     if (latStr == null || lngStr == null) return null;
     const lat = Number(latStr);
     const lng = Number(lngStr);
-    const zoom = zoomStr != null ? Number(zoomStr) : 13;
+    const zoom = zoomStr != null ? Number(zoomStr) : 12;
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
     if (!Number.isFinite(zoom) || zoom < 1 || zoom > 20) return null;
     return { lat, lng, zoom };
