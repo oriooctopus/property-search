@@ -86,5 +86,47 @@ export function useSavedSearches(userId: string | null) {
     }
   }, []);
 
-  return { savedSearches, loading, saveSearch, deleteSearch, updateSearch, refetch: fetchSavedSearches };
+  /**
+   * Replace a saved search's filter snapshot in place. Used by the
+   * "Edit saved search" flow — when the user taps the pencil, modifies
+   * chips in the filter sheet, and taps "Save changes" the new
+   * `FiltersState` is persisted under the same row id (the name is
+   * preserved). Returns true on success so the caller can clear the
+   * editing state and show a confirmation.
+   */
+  const updateSearchFilters = useCallback(
+    async (id: number, filters: FiltersState): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/saved-searches/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filters }),
+        });
+        if (res.ok) {
+          setSavedSearches((prev) =>
+            prev.map((s) =>
+              s.id === id
+                ? { ...s, filters: filters as unknown as Record<string, unknown> }
+                : s,
+            ),
+          );
+          return true;
+        }
+      } catch {
+        // silently ignore
+      }
+      return false;
+    },
+    [],
+  );
+
+  return {
+    savedSearches,
+    loading,
+    saveSearch,
+    deleteSearch,
+    updateSearch,
+    updateSearchFilters,
+    refetch: fetchSavedSearches,
+  };
 }
