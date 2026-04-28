@@ -190,7 +190,9 @@ export default function SwipeCard({
   const rightTint = useTransform(x, [0, SWIPE_X_THRESHOLD], [0, 0.3]);
   const bottomTint = useTransform(y, [0, SWIPE_Y_THRESHOLD], [0, 0.25]);
 
-  const isDragging = useRef(false);
+  // True briefly after a drag commits/snaps so a synthetic click on the
+  // photo area doesn't fire as a tap. Cleared at the next `first`.
+  const dragRecentlyFired = useRef(false);
   const notifiedDragging = useRef(false);
   const touchInPhoto = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -303,12 +305,13 @@ export default function SwipeCard({
   const SWIPE_VELOCITY = 500;
 
   const bind = useDrag(
-    ({ movement: [mx, my], velocity: [vx, vy], direction: [dx, dy], down, first, event }) => {
+    ({ movement: [mx, my], velocity: [vx, vy], direction: [dx, dy], down, first, last, tap, event }) => {
       if (!isTop) return;
 
       if (first) {
         gestureAxis.current = null;
         scrollingContent.current = false;
+        dragRecentlyFired.current = false;
 
         const target = event?.target as HTMLElement | null;
         touchInPhoto.current = !!(
@@ -328,28 +331,8 @@ export default function SwipeCard({
       // Let browser handle scroll when user is inside already-scrolled content
       if (scrollingContent.current) return;
 
-      if (touchInPhoto.current) {
-        if (!down) {
-          const absMx = Math.abs(mx);
-          // Photo-area horizontal swipes are ALWAYS carousel navigation,
-          // never card-level save/skip. Save/skip is exclusively triggered
-          // by swipes that START outside the photo area. Below
-          // PHOTO_SWIPE_THRESHOLD is a tap or jitter — ignore.
-          if (absMx > PHOTO_SWIPE_THRESHOLD) {
-            if (mx < 0) {
-              setPhotoIndex((i) => (i + 1) % totalPhotos);
-            } else {
-              setPhotoIndex((i) => (i - 1 + totalPhotos) % totalPhotos);
-            }
-          }
-          if (notifiedDragging.current) {
-            notifiedDragging.current = false;
-            onDragStateChange?.(false);
-          }
-          setTimeout(() => { isDragging.current = false; }, 50);
-        }
-        return;
-      }
+      // Tap (use-gesture-classified): not a drag — let the click handler run.
+      if (tap) return;
 
       // Lock gesture axis after initial movement exceeds threshold
       if (gestureAxis.current === null) {
@@ -363,20 +346,53 @@ export default function SwipeCard({
       // If axis locked to vertical AND moving upward, let browser handle native scroll
       if (gestureAxis.current === 'y' && my < 0) return;
 
+      // Photo-area horizontal swipes are carousel navigation only, applied on
+      // release. Vertical drags from the photo area (or any axis if user
+      // crosses the threshold) flow into the unified card-level commit path
+      // below.
+      const photoCarouselGesture =
+        touchInPhoto.current && gestureAxis.current === 'x';
+
       if (down) {
+        if (photoCarouselGesture) {
+          // Don't translate the card during a photo-carousel horizontal drag.
+          if (notifiedDragging.current) {
+            notifiedDragging.current = false;
+            onDragStateChange?.(false);
+          }
+          return;
+        }
         // Apply axis lock: zero out the non-locked axis
         const effectiveMx = gestureAxis.current === 'y' ? 0 : mx;
         const effectiveMy = gestureAxis.current === 'x' ? 0 : my;
         const allowedY = effectiveMy > 0 ? effectiveMy : 0;
 
-        isDragging.current = Math.abs(effectiveMx) > 5 || allowedY > 5;
-        if (isDragging.current && !notifiedDragging.current) {
+        const dragging = Math.abs(effectiveMx) > 5 || allowedY > 5;
+        if (dragging && !notifiedDragging.current) {
           notifiedDragging.current = true;
           onDragStateChange?.(true);
         }
         x.set(effectiveMx);
         y.set(allowedY);
-      } else {
+      } else if (last) {
+        dragRecentlyFired.current = true;
+
+        if (photoCarouselGesture) {
+          const absMx = Math.abs(mx);
+          if (absMx > PHOTO_SWIPE_THRESHOLD) {
+            if (mx < 0) {
+              setPhotoIndex((i) => (i + 1) % totalPhotos);
+            } else {
+              setPhotoIndex((i) => (i - 1 + totalPhotos) % totalPhotos);
+            }
+          }
+          if (notifiedDragging.current) {
+            notifiedDragging.current = false;
+            onDragStateChange?.(false);
+          }
+          return;
+        }
+
         const absX = Math.abs(mx);
         const curY = y.get();
 
@@ -423,11 +439,11 @@ export default function SwipeCard({
           notifiedDragging.current = false;
           onDragStateChange?.(false);
         }
-        setTimeout(() => { isDragging.current = false; }, 50);
       }
     },
     {
-      filterTaps: true,
+      filterTaps: false,
+      preventScroll: true,
       pointer: { touch: true },
     }
   );
@@ -449,7 +465,10 @@ export default function SwipeCard({
   const handlePhotoAreaClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation();
     // Don't fire taps after a drag gesture
-    if (isDragging.current) return;
+    if (dragRecentlyFired.current) {
+      dragRecentlyFired.current = false;
+      return;
+    }
     if (totalPhotos <= 1) return;
 
     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
@@ -612,7 +631,7 @@ export default function SwipeCard({
     <div
       {...gestureBindings}
       className="absolute inset-0"
-      style={{ touchAction: 'pan-y' }}
+      style={{ touchAction: 'none' }}
     >
       <motion.div
         style={{
@@ -695,6 +714,7 @@ export default function SwipeCard({
         <div
           ref={panelRef}
           className="relative z-[2] flex-1 overflow-y-auto dark-scrollbar"
+          style={{ touchAction: 'pan-y' }}
         >
           {/* Photo carousel */}
           <div
@@ -704,7 +724,7 @@ export default function SwipeCard({
               outline: photoFocused ? '2px solid rgba(88,166,255,0.7)' : 'none',
               outlineOffset: '-2px',
               cursor: totalPhotos > 1 ? 'pointer' : 'default',
-              touchAction: 'pan-y',
+              touchAction: 'none',
             }}
             onClick={handlePhotoAreaClick}
             title={totalPhotos > 1 && !photoFocused ? 'Tap sides to browse photos' : undefined}
