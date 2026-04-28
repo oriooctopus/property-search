@@ -50,6 +50,7 @@ jobs:
       - name: Run ingest (new pipeline)
         working-directory: web
         env:
+          APIFY_PROXY_URL: ${{ secrets.APIFY_PROXY_URL }}
           APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
