@@ -83,12 +83,27 @@ async function loadCandidates(
   // Fan out one query per source with its own limit. The total processed is
   // bounded by VERIFY_SOURCES.length * perSourceLimit (currently 2 * 1000 = 2000)
   // and no single source can crowd out another regardless of backlog size.
-  const perSource = await Promise.all(
+  // Use allSettled so a transient timeout on one source's query doesn't kill
+  // the entire phase — the working source(s) still get verified, and the
+  // failed source will try again on the next run.
+  const settled = await Promise.allSettled(
     VERIFY_SOURCES.map((source) =>
       loadCandidatesForSource(supabase, source, perSourceLimit, cutoff),
     ),
   );
-  return perSource.flat();
+  const out: Candidate[] = [];
+  for (let i = 0; i < settled.length; i++) {
+    const r = settled[i];
+    if (r.status === "fulfilled") {
+      out.push(...r.value);
+    } else {
+      const reason = r.reason instanceof Error ? r.reason.message : String(r.reason);
+      console.warn(
+        `[verify-stale] candidate query failed for source=${VERIFY_SOURCES[i]} — skipping this source for this run: ${reason}`,
+      );
+    }
+  }
+  return out;
 }
 
 function groupBySource(rows: Candidate[]): Map<string, Candidate[]> {
