@@ -1,3 +1,7 @@
+// Disabled 2026-04-28 — user retired FB Marketplace from active ingest.
+// The adapter is kept for reference; do not call it from the pipeline.
+// FB-Marketplace is excluded from ALL_SOURCES, SCRAPER_SOURCES, and
+// VERIFY_SOURCES. Strategies.ts throws if it's somehow invoked.
 /**
  * Facebook Marketplace adapter via Apify Facebook Marketplace Scraper.
  *
