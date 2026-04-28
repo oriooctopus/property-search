@@ -6,6 +6,13 @@ import { ButtonBase } from './ButtonBase';
 interface FilterChipProps extends Omit<ComponentPropsWithoutRef<'button'>, 'children'> {
   label: string;
   active?: boolean;
+  /**
+   * When true, overrides the active/inactive coloring with an amber
+   * "modified" tint. Used by the edit-saved-search flow to flag chips
+   * whose value differs from the saved snapshot. The chip otherwise
+   * keeps the same shape, height, and weight as the active state.
+   */
+  modified?: boolean;
   open?: boolean;
   compact?: boolean;
   children?: ReactNode;
@@ -33,7 +40,7 @@ function ChevronDown({ className }: { className?: string }) {
 }
 
 export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
-  function FilterChip({ label, active = false, open = false, compact = false, children, onToggle, dropdownAlign = 'left', className, ...rest }, ref) {
+  function FilterChip({ label, active = false, modified = false, open = false, compact = false, children, onToggle, dropdownAlign = 'left', className, ...rest }, ref) {
     const chipRef = useRef<HTMLDivElement>(null);
 
     function getDropdownStyle(): React.CSSProperties {
@@ -100,7 +107,9 @@ export const FilterChip = forwardRef<HTMLButtonElement, FilterChipProps>(
             compact
               ? 'px-2.5 py-0.5 text-[11px] h-[28px]'
               : 'px-3.5 py-1.5 text-sm min-h-[44px] gap-1.5 rounded-full',
-            active
+            modified
+              ? 'bg-[#d29922]/[0.10] text-[#d29922] border-[#d29922] hover:bg-[#d29922]/[0.18]'
+              : active
               ? 'bg-[#58a6ff]/[0.08] text-[#58a6ff] border-[#58a6ff] hover:bg-[#58a6ff]/[0.18]'
               : 'bg-transparent text-[#8b949e] border-[#2d333b] hover:bg-[#58a6ff]/20 hover:text-[#c0d6f5] hover:border-[#58a6ff]/40',
             className,

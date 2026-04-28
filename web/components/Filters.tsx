@@ -1431,6 +1431,23 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
     return n;
   })();
 
+  // === Per-chip "modified vs saved snapshot" flag ===
+  // While in edit mode, each chip lights up amber when ANY of the
+  // FiltersState keys it controls have diverged from the persisted
+  // snapshot. Outside of edit mode (or with no snapshot), every chip
+  // returns false so the styling reverts to the normal active/inactive
+  // treatment. The set of keys-per-chip mirrors what each chip mutates
+  // in its DropdownFooter onDone handler below.
+  const isChipModified = (keys: (keyof FiltersState)[]): boolean => {
+    if (editingFiltersSearchId === null || !editingFiltersSnapshot) return false;
+    for (const k of keys) {
+      if (JSON.stringify(filters[k]) !== JSON.stringify(editingFiltersSnapshot[k])) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   const enterEditMode = useCallback((s: SavedSearchEntry) => {
     // Snapshot the SAVED search's filters as the baseline — we want both
     // the diff (for the change counter) and the cancel-revert to compare
@@ -1569,8 +1586,10 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           compact
           label={priceLabel(filters.minRent, filters.maxRent, filters.priceMode)}
           active={filters.minRent !== null || filters.maxRent !== null}
+          modified={isChipModified(['minRent', 'maxRent', 'priceMode'])}
           open={openChip === 'price'}
           onToggle={() => toggleChip('price')}
+          data-testid="filter-chip-price"
         >
           <SectionTitle>Price</SectionTitle>
           <div className="flex rounded-lg p-0.5 mb-3" style={{ backgroundColor: '#0d1117' }}>
@@ -1636,8 +1655,10 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           compact
           label={bedsBathsLabel(filters.selectedBeds, filters.minBaths)}
           active={filters.selectedBeds !== null || filters.minBaths !== null}
+          modified={isChipModified(['selectedBeds', 'minBaths', 'includeNaBaths'])}
           open={openChip === 'bedsBaths'}
           onToggle={() => toggleChip('bedsBaths')}
+          data-testid="filter-chip-bedsBaths"
         >
           <SectionTitle>Bedrooms</SectionTitle>
           <MultiPillGroup
@@ -1701,8 +1722,10 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           compact
           label={listingAgeLabel(filters.maxListingAge)}
           active={filters.maxListingAge !== null}
+          modified={isChipModified(['maxListingAge'])}
           open={openChip === 'listingAge'}
           onToggle={() => toggleChip('listingAge')}
+          data-testid="filter-chip-listingAge"
         >
           <ListingAgeSlider
             value={draftMaxListingAge}
@@ -1725,6 +1748,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           compact
           label={availableDateLabel(filters.minAvailableDate, filters.maxAvailableDate)}
           active={filters.minAvailableDate !== null || filters.maxAvailableDate !== null}
+          modified={isChipModified(['minAvailableDate', 'maxAvailableDate', 'includeNaAvailableDate'])}
           open={openChip === 'availableDate'}
           onToggle={() => toggleChip('availableDate')}
         >
@@ -1809,6 +1833,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           compact
           label={filters.selectedSources !== null ? `Sources (${filters.selectedSources.length})` : 'Source'}
           active={filters.selectedSources !== null}
+          modified={isChipModified(['selectedSources'])}
           open={openChip === 'source'}
           onToggle={() => toggleChip('source')}
         >
@@ -1857,6 +1882,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           compact
           label={yearBuiltLabel(filters.minYearBuilt, filters.maxYearBuilt)}
           active={filters.minYearBuilt !== null || filters.maxYearBuilt !== null}
+          modified={isChipModified(['minYearBuilt', 'maxYearBuilt'])}
           open={openChip === 'yearBuilt'}
           onToggle={() => toggleChip('yearBuilt')}
         >
@@ -1946,6 +1972,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           compact
           label={sqftLabel(filters.minSqft, filters.maxSqft, filters.excludeNoSqft)}
           active={filters.minSqft !== null || filters.maxSqft !== null || filters.excludeNoSqft}
+          modified={isChipModified(['minSqft', 'maxSqft', 'excludeNoSqft'])}
           open={openChip === 'sqft'}
           onToggle={() => toggleChip('sqft')}
         >
@@ -2043,6 +2070,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           compact
           label={commuteLabel(filters.commuteRules ?? [])}
           active={(filters.commuteRules ?? []).length > 0}
+          modified={isChipModified(['commuteRules'])}
           open={openChip === 'commute'}
           onToggle={() => toggleChip('commute')}
           dropdownAlign="right"
@@ -2174,6 +2202,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
             compact
             label="Photos first"
             active={filters.photosFirst}
+            modified={isChipModified(['photosFirst'])}
             open={false}
             onToggle={() => onChange({ ...filters, photosFirst: !filters.photosFirst })}
           />
@@ -3084,22 +3113,38 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
             <div className="px-4 pt-5 pb-4" style={{ borderBottom: '1px solid #2d333b' }}>
               <div className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: '#8b949e' }}>Sort by</div>
               <div className="flex flex-wrap gap-2">
-                {SORT_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => {
-                      onChange({ ...filters, sort: opt.value });
-                    }}
-                    className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer"
-                    style={{
-                      backgroundColor: filters.sort === opt.value ? 'rgba(88, 166, 255, 0.15)' : '#2d333b',
-                      color: filters.sort === opt.value ? '#58a6ff' : '#8b949e',
-                      border: filters.sort === opt.value ? '1px solid rgba(88, 166, 255, 0.3)' : '1px solid transparent',
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+                {SORT_OPTIONS.map((opt) => {
+                  const isSelected = filters.sort === opt.value;
+                  const sortModified = isChipModified(['sort']);
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => {
+                        onChange({ ...filters, sort: opt.value });
+                      }}
+                      className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer"
+                      style={{
+                        backgroundColor: isSelected
+                          ? sortModified
+                            ? 'rgba(210, 153, 34, 0.15)'
+                            : 'rgba(88, 166, 255, 0.15)'
+                          : '#2d333b',
+                        color: isSelected
+                          ? sortModified
+                            ? '#d29922'
+                            : '#58a6ff'
+                          : '#8b949e',
+                        border: isSelected
+                          ? sortModified
+                            ? '1px solid rgba(210, 153, 34, 0.4)'
+                            : '1px solid rgba(88, 166, 255, 0.3)'
+                          : '1px solid transparent',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
