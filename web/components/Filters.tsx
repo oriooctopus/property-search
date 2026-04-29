@@ -1265,8 +1265,10 @@ function FilterToggleButton({
   return (
     <ButtonBase
       onClick={onClick}
+      aria-label={`Filters${activeCount > 0 ? ` (${activeCount} active)` : ''}`}
+      title="Filters"
       className={cn(
-        'flex items-center gap-1 rounded-md px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap border h-[26px]',
+        'flex items-center gap-1 rounded-md px-1.5 py-0.5 whitespace-nowrap border h-[26px]',
         expanded
           ? 'bg-[#58a6ff]/[0.08] text-[#58a6ff] border-[#58a6ff]'
           : activeCount > 0
@@ -1275,10 +1277,9 @@ function FilterToggleButton({
       )}
     >
       {/* Funnel icon */}
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M1 2h10M3 6h6M5 10h2" />
       </svg>
-      Filters
       {activeCount > 0 && (
         <span className="bg-[#58a6ff] text-[#0f1117] text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
           {activeCount}
