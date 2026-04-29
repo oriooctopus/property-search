@@ -513,6 +513,22 @@ export default function SwipeView({
     currentListingIdRef.current = currentListing?.id ?? null;
   }, [currentListing?.id]);
 
+  // Preload the next two listings' first photos so when the user swipes the
+  // top card off, the new top card's hero photo is already in the browser
+  // cache. Without this there's a half-second blank background between
+  // swipe-off and photo-load.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    for (let offset = 1; offset <= 2; offset++) {
+      const next = deck[currentIndex + offset];
+      const photoUrl = next?.photo_urls?.[0];
+      if (photoUrl) {
+        const img = new window.Image();
+        img.src = photoUrl;
+      }
+    }
+  }, [deck, currentIndex]);
+
   // One-shot pulldown-tray bounce hint. The first time a user sees a swipe
   // card on this browser, animate the floating mobile card down ~22px and
   // spring back to telegraph that the tray is draggable. Gated by a

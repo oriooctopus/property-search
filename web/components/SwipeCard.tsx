@@ -328,9 +328,6 @@ export default function SwipeCard({
         }
       }
 
-      // Let browser handle scroll when user is inside already-scrolled content
-      if (scrollingContent.current) return;
-
       // Tap (use-gesture-classified): not a drag — let the click handler run.
       if (tap) return;
 
@@ -343,25 +340,17 @@ export default function SwipeCard({
         }
       }
 
+      // When the inner panel has been scrolled down, vertical gestures should
+      // continue to scroll the panel (browser handles them via touch-action:
+      // pan-y). Horizontal gestures still commit a card swipe — that was a
+      // regression in earlier impls where the entire gesture was forfeited
+      // once the panel was scrolled.
+      if (scrollingContent.current && gestureAxis.current !== 'x') return;
+
       // If axis locked to vertical AND moving upward, let browser handle native scroll
       if (gestureAxis.current === 'y' && my < 0) return;
 
-      // Photo-area horizontal swipes are carousel navigation only, applied on
-      // release. Vertical drags from the photo area (or any axis if user
-      // crosses the threshold) flow into the unified card-level commit path
-      // below.
-      const photoCarouselGesture =
-        touchInPhoto.current && gestureAxis.current === 'x';
-
       if (down) {
-        if (photoCarouselGesture) {
-          // Don't translate the card during a photo-carousel horizontal drag.
-          if (notifiedDragging.current) {
-            notifiedDragging.current = false;
-            onDragStateChange?.(false);
-          }
-          return;
-        }
         // Apply axis lock: zero out the non-locked axis
         const effectiveMx = gestureAxis.current === 'y' ? 0 : mx;
         const effectiveMy = gestureAxis.current === 'x' ? 0 : my;
@@ -376,22 +365,6 @@ export default function SwipeCard({
         y.set(allowedY);
       } else if (last) {
         dragRecentlyFired.current = true;
-
-        if (photoCarouselGesture) {
-          const absMx = Math.abs(mx);
-          if (absMx > PHOTO_SWIPE_THRESHOLD) {
-            if (mx < 0) {
-              setPhotoIndex((i) => (i + 1) % totalPhotos);
-            } else {
-              setPhotoIndex((i) => (i - 1 + totalPhotos) % totalPhotos);
-            }
-          }
-          if (notifiedDragging.current) {
-            notifiedDragging.current = false;
-            onDragStateChange?.(false);
-          }
-          return;
-        }
 
         const absX = Math.abs(mx);
         const curY = y.get();
