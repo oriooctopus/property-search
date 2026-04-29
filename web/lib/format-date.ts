@@ -55,3 +55,24 @@ export function formatAvailabilityDate(
   if (d.getTime() <= todayUtc.getTime()) return 'Available now';
   return `Available ${formatShortDate(dateStr)}`;
 }
+
+/**
+ * Compact availability for icon+number tile (e.g. "Now", "5/31", or null
+ * when unknown so the caller can omit the tile entirely).
+ *   - null / unparseable → null
+ *   - on-or-before today → "Now"
+ *   - future → "M/D" (e.g. "5/31")
+ *
+ * UTC-compared like formatAvailabilityDate.
+ */
+export function formatAvailabilityCompact(
+  dateStr: string | null | undefined,
+): string | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  const todayUtc = new Date();
+  todayUtc.setUTCHours(0, 0, 0, 0);
+  if (d.getTime() <= todayUtc.getTime()) return 'Now';
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+}

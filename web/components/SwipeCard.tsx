@@ -6,7 +6,7 @@ import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { useDrag } from '@use-gesture/react';
 import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
 import { CompactStats } from '@/components/ui';
-import { formatAvailabilityDate } from '@/lib/format-date';
+import { formatAvailabilityDate, formatAvailabilityCompact } from '@/lib/format-date';
 import DestinationChip from '@/components/DestinationChip';
 import { useSavedDestination } from '@/lib/hooks/useSavedDestination';
 import { useListingDestinationCommutes } from '@/lib/hooks/useDestinationCommutes';
@@ -509,6 +509,7 @@ export default function SwipeCard({
   // past-or-today → "Available now", future → "Available <date>".
   // See web/lib/format-date.ts for canonical formatting.
   const availabilityLabel = formatAvailabilityDate(listing.availability_date);
+  const availabilityCompact = formatAvailabilityCompact(listing.availability_date);
 
   // Preferred-destination chip (informational; does not filter results).
   const { destinations } = useSavedDestination();
@@ -801,14 +802,19 @@ export default function SwipeCard({
                     inner div is purely decorative. */}
                 {totalPhotos > 1 && (
                   <>
+                    {/* Tap targets are full-height columns on the photo's left
+                        and right edges (~52px wide each). The visible 32×32
+                        chevron stays vertically centered. The right column
+                        starts below 48px so the top-right "open listing" link
+                        keeps its corner. Bottom dots indicator is centered so
+                        it doesn't overlap. */}
                     <button
                       onClick={prevPhoto}
                       aria-label="Previous photo"
                       data-testid="photo-prev-button"
-                      className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center justify-center cursor-pointer"
+                      className="absolute left-0 top-0 bottom-0 flex items-center justify-center cursor-pointer"
                       style={{
-                        width: 48,
-                        height: 48,
+                        width: 52,
                         background: 'transparent',
                         border: 'none',
                         padding: 0,
@@ -832,10 +838,10 @@ export default function SwipeCard({
                       onClick={nextPhoto}
                       aria-label="Next photo"
                       data-testid="photo-next-button"
-                      className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center justify-center cursor-pointer"
+                      className="absolute right-0 bottom-0 flex items-center justify-center cursor-pointer"
                       style={{
-                        width: 48,
-                        height: 48,
+                        top: 48,
+                        width: 52,
                         background: 'transparent',
                         border: 'none',
                         padding: 0,
@@ -972,8 +978,13 @@ export default function SwipeCard({
               </div>
             )}
 
-            {/* Move-in / availability date — always renders ("Move-in unknown" if not set) */}
-            <div className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>
+            {/* Move-in / availability date. Mobile compact moves this into
+                the CompactStats row as a calendar+M/D tile (omitted when
+                unknown). Desktop keeps the prose line. */}
+            <div
+              className={`text-xs ${compactMobile ? 'hidden min-[600px]:block' : ''}`}
+              style={{ color: 'rgba(255,255,255,0.55)' }}
+            >
               {availabilityLabel}
             </div>
 
@@ -1003,6 +1014,7 @@ export default function SwipeCard({
               beds={listing.beds}
               baths={listing.baths}
               sqft={listing.sqft}
+              availability={availabilityCompact}
               className="min-[600px]:hidden"
             />
             <div
