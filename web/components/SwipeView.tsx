@@ -1254,7 +1254,9 @@ export default function SwipeView({
                       </button>
                     )}
                   />
-                  {showOnboarding && isMobileViewport === true ? <SwipeOnboarding /> : null}
+                  {showOnboarding && isMobileViewport === true ? (
+                    <SwipeOnboarding onDismiss={dismissOnboarding} />
+                  ) : null}
                 </div>
                 {/* Action bar attached to bottom of card — desktop only. Mobile uses
                     the floating glassmorphic dock rendered below the card area. */}
