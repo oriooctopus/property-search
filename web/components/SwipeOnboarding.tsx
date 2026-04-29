@@ -8,10 +8,10 @@ interface SwipeOnboardingProps {
 }
 
 const ROWS: Array<{ glyph: string; label: string; sub: string }> = [
-  { glyph: '←', label: 'Skip', sub: 'Not for me' },
-  { glyph: '→', label: 'Like', sub: 'Save to wishlist' },
-  { glyph: '↑', label: 'Would live here', sub: 'Top match' },
-  { glyph: '↓', label: 'Back of queue', sub: 'Maybe later' },
+  { glyph: '←', label: 'Pass', sub: 'Not for me' },
+  { glyph: '→', label: 'Save', sub: 'Add to wishlist' },
+  { glyph: '↑', label: 'Would live here', sub: 'Your top picks' },
+  { glyph: '↓', label: 'Later', sub: 'Come back to this one' },
 ];
 
 export default function SwipeOnboarding({ onDismiss }: SwipeOnboardingProps) {
@@ -30,13 +30,13 @@ export default function SwipeOnboarding({ onDismiss }: SwipeOnboardingProps) {
           boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
         }}
       >
-        {/* Header row: title + close button */}
+        {/* Header row: gentle prompt + close button */}
         <div className="flex items-center justify-between mb-3">
           <div
-            className="text-[11px] font-semibold tracking-wider uppercase"
-            style={{ color: '#58a6ff' }}
+            className="text-[14px] font-medium leading-tight"
+            style={{ color: '#e1e4e8' }}
           >
-            How swiping works
+            Swipe to find your place
           </div>
           <button
             type="button"
@@ -50,6 +50,7 @@ export default function SwipeOnboarding({ onDismiss }: SwipeOnboardingProps) {
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
+              flexShrink: 0,
             }}
             onMouseEnter={(e) => { e.currentTarget.style.color = '#e1e4e8'; }}
             onMouseLeave={(e) => { e.currentTarget.style.color = '#8b949e'; }}
@@ -89,7 +90,7 @@ export default function SwipeOnboarding({ onDismiss }: SwipeOnboardingProps) {
           ))}
         </div>
 
-        {/* Got it button */}
+        {/* Start swiping button */}
         <button
           type="button"
           onClick={onDismiss}
@@ -104,8 +105,16 @@ export default function SwipeOnboarding({ onDismiss }: SwipeOnboardingProps) {
           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#79b8ff'; }}
           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#58a6ff'; }}
         >
-          Got it
+          Start swiping
         </button>
+
+        {/* Hint that the card behind is live and the modal isn't a gate */}
+        <div
+          className="text-center mt-2 text-[10px]"
+          style={{ color: '#6e7681' }}
+        >
+          or just swipe — we'll get out of your way
+        </div>
       </div>
     </div>
   );
