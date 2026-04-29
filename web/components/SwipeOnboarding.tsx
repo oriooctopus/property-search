@@ -113,7 +113,7 @@ export default function SwipeOnboarding({ onDismiss }: SwipeOnboardingProps) {
           className="text-center mt-2 text-[10px]"
           style={{ color: '#6e7681' }}
         >
-          or just swipe — we'll get out of your way
+          or just swipe — we&rsquo;ll get out of your way
         </div>
       </div>
     </div>
