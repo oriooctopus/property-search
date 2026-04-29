@@ -677,6 +677,9 @@ export default function SwipeView({
       const listing = deck[currentIndex];
       if (!listing) return;
 
+      // Any swipe action (button or gesture) dismisses the onboarding overlay.
+      dismissOnboarding();
+
       // Auth check — all swipe actions require login (before overlay flash)
       if (!userId) {
         onLoginRequired?.();
@@ -737,7 +740,7 @@ export default function SwipeView({
         },
       ]);
     },
-    [currentIndex, deck, userId, onHideListing, resolvedWishlistId, addToWishlist, onLoginRequired],
+    [currentIndex, deck, userId, onHideListing, resolvedWishlistId, addToWishlist, onLoginRequired, dismissOnboarding],
   );
 
   // ---------------------------------------------------------------------------
@@ -1251,7 +1254,7 @@ export default function SwipeView({
                       </button>
                     )}
                   />
-                  {showOnboarding ? <SwipeOnboarding /> : null}
+                  {showOnboarding && isMobileViewport === true ? <SwipeOnboarding /> : null}
                 </div>
                 {/* Action bar attached to bottom of card — desktop only. Mobile uses
                     the floating glassmorphic dock rendered below the card area. */}
