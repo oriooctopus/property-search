@@ -246,6 +246,8 @@ export default function ListingDetail({
                     priority={i === 0}
                     loading={i === 0 ? undefined : 'lazy'}
                     fetchPriority={i === 0 ? 'high' : i <= photoIndex + 1 ? 'auto' : 'low'}
+                    // Skip Vercel Image Optimization — see ListingCard for rationale.
+                    unoptimized
                     style={{ objectFit: 'cover' }}
                   />
                 </div>

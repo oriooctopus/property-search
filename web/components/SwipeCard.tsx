@@ -776,6 +776,13 @@ export default function SwipeCard({
                               ? 'auto'
                               : 'low'
                           }
+                          // Skip Vercel's Image Optimization pipeline. Listing
+                          // photos come from CDNs (zillowstatic, craigslist)
+                          // already serving webp/jpeg at appropriate sizes;
+                          // re-encoding through /_next/image burns the
+                          // optimizer quota fast and 402s in production once
+                          // exhausted. Originals load directly.
+                          unoptimized
                           style={{ objectFit: 'cover' }}
                           draggable={false}
                         />

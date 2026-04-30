@@ -258,6 +258,11 @@ function ListingCard({
                     priority={isHero}
                     loading={isHero ? undefined : 'lazy'}
                     fetchPriority={isHero ? 'high' : isVisible || isNeighbor ? 'auto' : 'low'}
+                    // Skip Vercel Image Optimization for listing photos —
+                    // they come from CDNs already serving webp at right
+                    // sizes; re-encoding burns the optimizer quota and
+                    // 402s in production once exhausted.
+                    unoptimized
                     style={{ objectFit: 'cover' }}
                     draggable={false}
                   />
