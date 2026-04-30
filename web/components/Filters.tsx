@@ -2514,7 +2514,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           parent without being clipped. Border radius is applied per-segment via
           first/last classes so the active blue-tint bg follows the rounded shape. */}
       <div
-        className="inline-flex items-center h-7 rounded-full border border-[#2d333b] bg-transparent whitespace-nowrap shrink-0"
+        className="inline-flex items-center h-8 rounded-full border border-[#2d333b] bg-transparent whitespace-nowrap shrink-0"
       >
         {/* "All" segment — always first; long-press shows build info */}
         <button
@@ -2600,77 +2600,72 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                   />
                 </div>
               ) : (
-                <button
-                  onClick={() => {
-                    // If we're editing a different saved search, cancel that
-                    // edit before loading this one — banner should always
-                    // describe the currently-loaded search.
-                    if (
-                      variant === 'sheet' &&
-                      editingFiltersSearchId !== null &&
-                      editingFiltersSearchId !== s.id
-                    ) {
-                      exitEditMode(true);
-                    }
-                    setActiveSearchId(s.id);
-                    onLoadSearch?.(s.filters as unknown as FiltersState);
-                  }}
+                <div
                   className={cn(
-                    'flex items-center gap-1 h-full px-2.5 text-[11px] whitespace-nowrap cursor-pointer transition-colors duration-150',
+                    'flex items-center h-full text-[11px] whitespace-nowrap transition-colors duration-150',
                     active
                       ? 'bg-[rgba(88,166,255,0.1)] text-[#58a6ff]'
-                      : 'bg-transparent text-[#8b949e] hover:text-[#c0d6f5]',
+                      : 'bg-transparent text-[#8b949e]',
                   )}
                 >
-                  {s.name}
-                  {/* Edit/delete icons — hover on desktop, always visible in
-                      mobile sheet so touch users can rename/delete. */}
-                  <span
+                  {/* Name = primary tap target. Loads the search. */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (
+                        variant === 'sheet' &&
+                        editingFiltersSearchId !== null &&
+                        editingFiltersSearchId !== s.id
+                      ) {
+                        exitEditMode(true);
+                      }
+                      setActiveSearchId(s.id);
+                      onLoadSearch?.(s.filters as unknown as FiltersState);
+                    }}
                     className={cn(
-                      'items-center gap-0.5 ml-0.5',
-                      variant === 'sheet' ? 'flex' : 'hidden group-hover:flex',
+                      'flex items-center h-full pl-2.5 pr-2 cursor-pointer',
+                      !active && 'hover:text-[#c0d6f5]',
                     )}
                   >
-                    <span
-                      role="button"
-                      data-testid={variant === 'sheet' ? `saved-search-edit-${s.id}` : undefined}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (variant === 'sheet') {
-                          // Sheet variant: pencil enters the EDIT-FILTERS flow
-                          // — load this search's snapshot into the live
-                          // filters, raise the banner, and let the user
-                          // mutate chips. Rename is still available via the
-                          // top-bar pencil on desktop.
-                          enterEditMode(s);
-                        } else {
-                          setEditingSearchId(s.id);
-                          setEditingName(s.name);
-                          setTimeout(() => editInputRef.current?.focus(), 50);
-                        }
-                      }}
-                      className="w-4 h-4 rounded flex items-center justify-center text-[#484f58] hover:text-[#58a6ff] hover:bg-[#58a6ff]/10 cursor-pointer transition-colors"
-                      aria-label={variant === 'sheet' ? `Edit filters for ${s.name}` : `Rename ${s.name}`}
-                    >
-                      <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M8.5 1.5l2 2L4 10H2v-2z" />
-                      </svg>
-                    </span>
-                    <span
-                      role="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (activeSearchId === s.id) setActiveSearchId(null);
-                        onDeleteSearch?.(s.id);
-                      }}
-                      className="w-4 h-4 rounded flex items-center justify-center text-[#484f58] hover:text-red-400 hover:bg-red-400/10 cursor-pointer transition-colors"
-                    >
-                      <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                        <path d="M2 2L8 8M8 2L2 8" />
-                      </svg>
-                    </span>
-                  </span>
-                </button>
+                    {s.name}
+                  </button>
+                  {/* Vertical divider — short (60% chip height) so it reads as
+                      "inside this chip" rather than separating two chips. */}
+                  <span
+                    aria-hidden
+                    className="block w-px"
+                    style={{ height: '60%', backgroundColor: '#2d333b' }}
+                  />
+                  {/* Pencil — the only secondary affordance per chip. Sheet
+                      variant: enters the edit-filters flow. Top-bar variant:
+                      inline rename input. Delete moved into the editing
+                      banner (sheet) or the rename popover (top-bar). */}
+                  <button
+                    type="button"
+                    data-testid={variant === 'sheet' ? `saved-search-edit-${s.id}` : undefined}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (variant === 'sheet') {
+                        enterEditMode(s);
+                      } else {
+                        setEditingSearchId(s.id);
+                        setEditingName(s.name);
+                        setTimeout(() => editInputRef.current?.focus(), 50);
+                      }
+                    }}
+                    aria-label={variant === 'sheet' ? `Edit filters for ${s.name}` : `Rename ${s.name}`}
+                    className={cn(
+                      'flex items-center justify-center h-full w-7 cursor-pointer transition-colors',
+                      active
+                        ? 'text-[#58a6ff] hover:text-[#79b8ff]'
+                        : 'text-[#6e7681] hover:text-[#58a6ff]',
+                    )}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M8.5 1.5l2 2L4 10H2v-2z" />
+                    </svg>
+                  </button>
+                </div>
               )}
             </div>
           );
@@ -2994,6 +2989,32 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                     }}
                   >
                     Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!editingFiltersSearchId) return;
+                      const target = editingFiltersSearchId;
+                      // Exit edit mode without reverting filters — user is
+                      // discarding the saved search itself, not the live
+                      // chip values they may want to keep tweaking.
+                      setEditingFiltersSearchId(null);
+                      setEditingFiltersName('');
+                      setEditingFiltersSnapshot(null);
+                      setSaveAsNewOpen(false);
+                      setSaveAsNewName('');
+                      if (activeSearchId === target) setActiveSearchId(null);
+                      onDeleteSearch?.(target);
+                    }}
+                    data-testid="edit-saved-search-delete"
+                    aria-label={`Delete saved search ${editingFiltersName}`}
+                    className="text-[12px] font-medium h-10 px-3 rounded-md cursor-pointer transition-colors"
+                    style={{
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      color: '#f85149',
+                    }}
+                  >
+                    Delete
                   </button>
                   {editingChangedCount > 0 && (
                     saveAsNewOpen ? (
