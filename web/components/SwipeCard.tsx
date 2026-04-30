@@ -804,16 +804,23 @@ export default function SwipeCard({
                 {totalPhotos > 1 && (
                   <>
                     {/* Tap targets are full-height columns on the photo's left
-                        and right edges (~52px wide each). The visible 32×32
-                        chevron stays vertically centered. The right column
-                        starts below 48px so the top-right "open listing" link
-                        keeps its corner. Bottom dots indicator is centered so
-                        it doesn't overlap. */}
+                        and right edges (~52px wide each). Both buttons go from
+                        top:0 to bottom:0 (full photo height) so their visible
+                        32×32 chevrons land at exactly the same Y center —
+                        previously the right button started at top:48 to clear
+                        the open-listing icon, which made its chevron sit 24px
+                        lower than the left arrow. The chevron is positioned
+                        absolutely at top:50% so its center is identical
+                        regardless of button bounds; the open-listing icon at
+                        top-right has higher z-index and pointer-events: auto
+                        so its corner stays clickable through the larger
+                        right-side hit area. Bottom dots indicator is centered
+                        so it doesn't overlap. */}
                     <button
                       onClick={prevPhoto}
                       aria-label="Previous photo"
                       data-testid="photo-prev-button"
-                      className="absolute left-0 top-0 bottom-0 flex items-center justify-center cursor-pointer"
+                      className="absolute left-0 top-0 bottom-0 cursor-pointer"
                       style={{
                         width: 52,
                         background: 'transparent',
@@ -822,10 +829,11 @@ export default function SwipeCard({
                       }}
                     >
                       <span
-                        className="flex items-center justify-center rounded-full transition-colors"
+                        className="absolute left-1/2 top-1/2 flex items-center justify-center rounded-full transition-colors"
                         style={{
                           width: 32,
                           height: 32,
+                          transform: 'translate(-50%, -50%)',
                           backgroundColor: 'rgba(0,0,0,0.5)',
                           color: '#fff',
                         }}
@@ -839,9 +847,8 @@ export default function SwipeCard({
                       onClick={nextPhoto}
                       aria-label="Next photo"
                       data-testid="photo-next-button"
-                      className="absolute right-0 bottom-0 flex items-center justify-center cursor-pointer"
+                      className="absolute right-0 top-0 bottom-0 cursor-pointer"
                       style={{
-                        top: 48,
                         width: 52,
                         background: 'transparent',
                         border: 'none',
@@ -849,10 +856,11 @@ export default function SwipeCard({
                       }}
                     >
                       <span
-                        className="flex items-center justify-center rounded-full transition-colors"
+                        className="absolute left-1/2 top-1/2 flex items-center justify-center rounded-full transition-colors"
                         style={{
                           width: 32,
                           height: 32,
+                          transform: 'translate(-50%, -50%)',
                           backgroundColor: 'rgba(0,0,0,0.5)',
                           color: '#fff',
                         }}
