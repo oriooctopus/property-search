@@ -426,8 +426,18 @@ export default function SwipeCard({
       }
     },
     {
-      filterTaps: false,
-      preventScroll: true,
+      // filterTaps: true so use-gesture classifies sub-threshold motion as
+      // a tap and skips the drag callbacks. Pairs with the explicit `tap`
+      // short-circuit at the top of the handler — together they prevent
+      // dragRecentlyFired from being set on real taps, which was eating
+      // the next legitimate photo-area click.
+      filterTaps: true,
+      // preventScroll dropped: outer wrapper already has touch-action: none,
+      // so preventScroll is redundant. With it on, iOS Safari attaches a
+      // non-passive touchmove listener and stalls every gesture-start
+      // while it negotiates with the inner panel's touch-action: pan-y.
+      // Synthetic CDP touches bypass this — that's why Playwright passes
+      // but real fingers feel a delay.
       pointer: { touch: true },
     }
   );
@@ -709,7 +719,11 @@ export default function SwipeCard({
               outline: photoFocused ? '2px solid rgba(88,166,255,0.7)' : 'none',
               outlineOffset: '-2px',
               cursor: totalPhotos > 1 ? 'pointer' : 'default',
-              touchAction: 'none',
+              // Inherit pan-y from the parent panel rather than declaring
+              // touch-action: none here. Nesting touch-action regions makes
+              // WebKit do extra boundary work which produces edge-rubber
+              // feel. Photo area only uses onClick (not gestures) so the
+              // override is unnecessary.
             }}
             onClick={handlePhotoAreaClick}
             title={totalPhotos > 1 && !photoFocused ? 'Tap sides to browse photos' : undefined}
