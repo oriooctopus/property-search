@@ -299,7 +299,11 @@ export default function SwipeCard({
     [onSwipe, x, y]
   );
 
-  const AXIS_LOCK_THRESHOLD = 15;
+  // Axis lock kicks in once movement exceeds this in either direction.
+  // 15px was too high — felt unresponsive on slow swipes (the user's
+  // finger had to move noticeably before the card started translating).
+  // 8px feels much closer to Tinder/Hinge.
+  const AXIS_LOCK_THRESHOLD = 8;
   // Velocity threshold (px/sec) for flick-commit. A fast flick below the
   // displacement threshold still commits in the flick direction.
   const SWIPE_VELOCITY = 500;
