@@ -367,6 +367,7 @@ export default function SwipeCard({
         dragRecentlyFired.current = true;
 
         const absX = Math.abs(mx);
+        const absY = Math.abs(my);
         const curY = y.get();
 
         // use-gesture exposes `velocity` in px/ms as a non-negative magnitude;
@@ -380,22 +381,28 @@ export default function SwipeCard({
         // a clean snap-back to origin.
         const cancelled = event?.type === 'pointercancel';
 
-        // Horizontal commit: either dragged past threshold OR flicked fast.
-        // Direction prefers velocity sign on flicks (a quick flick that didn't
-        // travel far should still go in the flick direction); falls back to
-        // displacement sign for slow drags.
+        // Decide commit at touchend by which axis dominates the END state,
+        // independent of which axis got locked during the drag. Earlier
+        // versions required gestureAxis === 'x' for horizontalCommit, which
+        // silently killed photo-area swipes when the user's finger drifted
+        // slightly more vertically than horizontally in the first 15px and
+        // got the lock pointed the wrong way — even if the user then made
+        // a clearly horizontal flick, no commit fired.
+        const horizontalDominant = absX >= absY;
+
         const horizontalCommit =
           !cancelled &&
-          gestureAxis.current === 'x' && (absX > SWIPE_X_THRESHOLD || absVx > SWIPE_VELOCITY);
+          horizontalDominant &&
+          (absX > SWIPE_X_THRESHOLD || absVx > SWIPE_VELOCITY);
         // Vertical (down) commit: must end up moving downward, but allow a
         // fast downward flick below the displacement threshold. Photo-area
-        // vertical drags are intentionally a no-op (snap back) — the photo is
-        // not the right surface for a back-of-queue gesture; users who want
-        // dismiss should use the grabber strip above the card.
+        // vertical drags are intentionally a no-op (snap back) — the photo
+        // is not the right surface for a back-of-queue gesture; users who
+        // want dismiss should use the grabber strip above the card.
         const verticalCommit =
           !cancelled &&
           !touchInPhoto.current &&
-          gestureAxis.current === 'y' &&
+          !horizontalDominant &&
           curY > 0 &&
           (curY > SWIPE_Y_THRESHOLD || vyPxPerSec > SWIPE_VELOCITY);
 
