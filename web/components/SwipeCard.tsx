@@ -380,10 +380,24 @@ export default function SwipeCard({
         const vyPxPerSec = vy * 1000 * (dy || (my < 0 ? -1 : 1));
         const absVx = Math.abs(vxPxPerSec);
 
-        // pointercancel (palm rejection, system gesture, etc.) must NEVER
-        // commit a swipe — even if movement crossed threshold by then. Force
-        // a clean snap-back to origin.
-        const cancelled = event?.type === 'pointercancel';
+        // pointercancel handling — conditional, not absolute. iOS fires
+        // pointercancel when its native-gesture scheduler claims the
+        // gesture (e.g. the browser decides a touch on a pan-y region is
+        // actually a native scroll). If displacement is already past the
+        // commit threshold OR velocity is past the flick threshold, the
+        // user clearly meant to swipe — honor it. Only treat
+        // pointercancel as a hard abort when displacement is still
+        // sub-threshold (i.e. genuine palm rejection / accidental
+        // contact). The earlier blanket-abort rule was killing
+        // legitimate swipes whose first few pixels were claimed by iOS
+        // before the JS handler caught up.
+        const isPointerCancel = event?.type === 'pointercancel';
+        const pastCommit =
+          absX > SWIPE_X_THRESHOLD ||
+          absVx > SWIPE_VELOCITY ||
+          curY > SWIPE_Y_THRESHOLD ||
+          vyPxPerSec > SWIPE_VELOCITY;
+        const cancelled = isPointerCancel && !pastCommit;
 
         // Decide commit at touchend by which axis dominates the END state,
         // independent of which axis got locked during the drag. Earlier
@@ -730,11 +744,23 @@ export default function SwipeCard({
               outline: photoFocused ? '2px solid rgba(88,166,255,0.7)' : 'none',
               outlineOffset: '-2px',
               cursor: totalPhotos > 1 ? 'pointer' : 'default',
-              // Inherit pan-y from the parent panel rather than declaring
-              // touch-action: none here. Nesting touch-action regions makes
-              // WebKit do extra boundary work which produces edge-rubber
-              // feel. Photo area only uses onClick (not gestures) so the
-              // override is unnecessary.
+              // touch-action: none on the photo area is REQUIRED for real
+              // iOS to deliver the gesture stream uninterrupted. Without
+              // this, the photo inherits pan-y from the parent panel; iOS
+              // Safari then claims any vertical motion on the photo as
+              // native scroll and fires pointercancel on the JS gesture
+              // mid-stream — which our pointercancel handler treats as a
+              // clean abort. Net result: a horizontal swipe starting on
+              // the photo with even 5px of natural finger drift never
+              // commits because the gesture is killed before it gains
+              // displacement. CDP synthetic touches don't reproduce this
+              // because they don't trigger the browser's native-gesture
+              // scheduler the same way real fingers do.
+              //
+              // Earlier "edge-rubber" concern from the audit was real but
+              // the wrong tradeoff: a cosmetic gesture-start nuance vs
+              // gestures actually working at all.
+              touchAction: 'none',
             }}
             onClick={handlePhotoAreaClick}
             title={totalPhotos > 1 && !photoFocused ? 'Tap sides to browse photos' : undefined}
