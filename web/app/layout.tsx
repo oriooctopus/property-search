@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import NativeShell from "@/components/NativeShell";
 import Providers from "@/components/Providers";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import PointerDebugger from "@/components/PointerDebugger";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -105,6 +106,10 @@ export default function RootLayout({
           <Navbar />
           <main className="pt-0 lg:pt-[60px] overflow-x-hidden">{children}</main>
           <footer className="hidden" aria-hidden="true">Built {BUILD_TIME}</footer>
+          {/* Pointer-event capture for real-iOS gesture debugging. Only
+              activates when ?ptdebug=1 is in the URL — otherwise renders
+              null. See web/components/PointerDebugger.tsx. */}
+          <PointerDebugger />
         </Providers>
       </body>
     </html>
