@@ -45,31 +45,41 @@ function ProfileInner() {
   // Load user and profile on mount
   useEffect(() => {
     async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (!user) {
-        router.replace("/auth/login");
-        return;
+        if (!user) {
+          router.replace("/auth/login");
+          return;
+        }
+
+        setUserId(user.id);
+
+        // Use maybeSingle so a missing profile row doesn't throw and leave
+        // the page stuck on "Loading…". maybeSingle returns null instead.
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .maybeSingle<Profile>();
+
+        if (error) {
+          console.error("Profile load error:", error);
+        }
+
+        if (data) {
+          setDisplayName(data.display_name ?? "");
+          setBio(data.bio ?? "");
+          setPhone(data.phone ?? "");
+          setAvatarUrl(data.avatar_url);
+        }
+      } catch (err) {
+        console.error("Profile load failed:", err);
+      } finally {
+        setLoading(false);
       }
-
-      setUserId(user.id);
-
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single<Database["public"]["Tables"]["profiles"]["Row"]>();
-
-      if (data) {
-        setDisplayName(data.display_name ?? "");
-        setBio(data.bio ?? "");
-        setPhone(data.phone ?? "");
-        setAvatarUrl(data.avatar_url);
-      }
-
-      setLoading(false);
     }
 
     load();
