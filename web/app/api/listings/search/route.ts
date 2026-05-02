@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { Database } from "@/lib/types";
 import type { CommuteRule } from "@/components/Filters";
 import { resolveCommuteRules, type ListingCommuteMeta } from "@/lib/commute-resolver";
+import { createClient as createServerClient } from "@/lib/supabase-server";
 
 // ---------------------------------------------------------------------------
 // Unified listings search endpoint.
@@ -96,6 +97,82 @@ const MAX_AGE_MS: Record<string, number> = {
   "2w": 1_209_600_000,
   "1m": 2_592_000_000,
 };
+
+/**
+ * Given a list of wishlist IDs requested by the caller, return only the
+ * subset the caller is actually authorized to view. This closes the leak
+ * where an anon caller could pass any wishlist UUID and receive its
+ * listings — even though the wishlist is private — because the rest of the
+ * route uses the service-role key.
+ *
+ * Authorized to view a wishlist iff:
+ *   - is_public = true (anyone), OR
+ *   - caller is the owner (auth.uid() = user_id), OR
+ *   - caller is on the share list (matched by user id or jwt email).
+ *
+ * Returns the filtered subset (preserves order is not important here).
+ */
+async function filterAuthorizedWishlistIds(
+  serviceClient: ReturnType<typeof getClient>,
+  requestedIds: string[],
+): Promise<string[]> {
+  if (requestedIds.length === 0) return [];
+
+  // Resolve the caller's identity (user id + jwt email) via the
+  // anon-cookie-aware server client. If there's no session we'll just check
+  // is_public.
+  let callerId: string | null = null;
+  let callerEmail: string | null = null;
+  try {
+    const supa = await createServerClient();
+    const { data: userData } = await supa.auth.getUser();
+    callerId = userData.user?.id ?? null;
+    callerEmail = userData.user?.email ?? null;
+  } catch {
+    // ignore — treat as anon
+  }
+
+  // Fetch all candidate wishlists by id via service role, then check
+  // visibility client-side. This is the only place the service role lets
+  // us see private wishlists, so we must filter explicitly here.
+  const { data: wls, error } = await serviceClient
+    .from("wishlists")
+    .select("id, user_id, is_public")
+    .in("id", requestedIds);
+  if (error || !wls) return [];
+
+  let shareIds = new Set<string>();
+  if (callerId || callerEmail) {
+    const { data: shares } = await serviceClient
+      .from("wishlist_shares")
+      .select("wishlist_id, shared_with_user_id, shared_with_email")
+      .in("wishlist_id", requestedIds);
+    for (const s of (shares ?? []) as Array<{
+      wishlist_id: string;
+      shared_with_user_id: string | null;
+      shared_with_email: string | null;
+    }>) {
+      if (callerId && s.shared_with_user_id === callerId) {
+        shareIds.add(s.wishlist_id);
+      } else if (
+        callerEmail &&
+        s.shared_with_email &&
+        s.shared_with_email.toLowerCase() === callerEmail.toLowerCase()
+      ) {
+        shareIds.add(s.wishlist_id);
+      }
+    }
+  }
+
+  return wls
+    .filter((w) => {
+      if (w.is_public) return true;
+      if (callerId && w.user_id === callerId) return true;
+      if (shareIds.has(w.id)) return true;
+      return false;
+    })
+    .map((w) => w.id);
+}
 
 function getClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -257,8 +334,17 @@ export async function POST(request: NextRequest) {
     );
     const offset = Math.max(body.offset ?? 0, 0);
     const commuteRules = body.commuteRules ?? null;
-    const wishlistIds = body.wishlistIds ?? null;
+    const rawWishlistIds = body.wishlistIds ?? null;
     const nearestTo = body.nearestTo ?? null;
+
+    // Authorize requested wishlists up-front. Anything the caller is NOT
+    // authorized to see (private wishlist they don't own / aren't shared on)
+    // is silently dropped, preventing the listing leak via this endpoint.
+    let wishlistIds: string[] | null = rawWishlistIds;
+    if (rawWishlistIds !== null && rawWishlistIds.length > 0) {
+      const authClient = getClient();
+      wishlistIds = await filterAuthorizedWishlistIds(authClient, rawWishlistIds);
+    }
     // When a wishlist filter is active, ignore the viewport bounds. The user
     // wants to see every listing they saved to that wishlist, regardless of
     // where the map is currently panned. (The map pins will then sit wherever

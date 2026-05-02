@@ -26,7 +26,7 @@ import { useConversation } from '@/lib/hooks/useConversation';
 import { useConversations } from '@/lib/hooks/useConversations';
 import { useSavedSearches } from '@/lib/hooks/useSavedSearches';
 import { useProfile, PROFILE_QUERY_KEY } from '@/lib/hooks/useProfile';
-import { useWishlists, useWishlistsSplit, useWishlistMutations, useWishlistedListingIds } from '@/lib/hooks/useWishlists';
+import { useWishlists, useWishlistsSplit, useWishlistMutations, useWishlistedListingIds, useWishlistCounts, usePublicWishlist } from '@/lib/hooks/useWishlists';
 import { useHiddenListings, useHiddenMutations } from '@/lib/hooks/useHiddenListings';
 import WishlistPicker from '@/components/WishlistPicker';
 import ManageWishlistsModal from '@/components/ManageWishlistsModal';
@@ -200,7 +200,7 @@ function HomeInner() {
 
   // Wishlist system
   const { data: wishlists } = useWishlists(userId);
-  const { mine: myWishlists, shared: sharedWishlists, all: allWishlists } = useWishlistsSplit(userId, userEmail);
+  const { mine: myWishlistsRaw, shared: sharedWishlistsRaw, all: allWishlistsRaw } = useWishlistsSplit(userId, userEmail);
   const wishlistedIds = useWishlistedListingIds(userId);
   const {
     addToWishlist,
@@ -208,6 +208,7 @@ function HomeInner() {
     createWishlist,
     deleteWishlist,
     renameWishlist,
+    updateWishlistPublic,
     addShare,
     removeShare,
     updateSharePermission,
@@ -225,6 +226,63 @@ function HomeInner() {
   })();
   const [selectedWishlist, setSelectedWishlist] = useState<WishlistFilterSelection>(initialWishlistSelection);
   const [manageWishlistsOpen, setManageWishlistsOpen] = useState<boolean>(() => searchParams.get('manageWishlists') === '1');
+
+  // Anonymous / non-owner resolution of a wishlist URL param. RLS guarantees
+  // this only succeeds when the wishlist is `is_public = true`. We trigger
+  // the lookup whenever the URL points at a wishlist that ISN'T already in
+  // the owned/shared list — covering both logged-out viewers and logged-in
+  // viewers visiting someone else's public link.
+  const publicWishlistTargetId = useMemo(() => {
+    if (typeof selectedWishlist !== 'string' || selectedWishlist === 'all-saved') {
+      return null;
+    }
+    const knownIds = new Set([
+      ...myWishlistsRaw.map((w) => w.id),
+      ...sharedWishlistsRaw.map((w) => w.id),
+    ]);
+    if (knownIds.has(selectedWishlist)) return null;
+    return selectedWishlist;
+  }, [selectedWishlist, myWishlistsRaw, sharedWishlistsRaw]);
+  const { data: publicWishlistData } = usePublicWishlist(publicWishlistTargetId);
+
+  // Merge the public wishlist (if resolved) into the wishlist lists so the
+  // existing chip/name lookup logic finds it. Insert under `shared` so it's
+  // visually grouped as "not yours". For owners it'll already be in `mine`
+  // via the regular query and never resolve via usePublicWishlist (knownIds
+  // includes it).
+  const myWishlists = myWishlistsRaw;
+  const sharedWishlists = useMemo(() => {
+    if (!publicWishlistData) return sharedWishlistsRaw;
+    return [...sharedWishlistsRaw, publicWishlistData];
+  }, [sharedWishlistsRaw, publicWishlistData]);
+  const allWishlists = useMemo(() => {
+    if (!publicWishlistData) return allWishlistsRaw;
+    return [...allWishlistsRaw, publicWishlistData];
+  }, [allWishlistsRaw, publicWishlistData]);
+
+  // If the URL points at a wishlist UUID that resolved to nothing (private +
+  // viewer not authorized) AND the viewer isn't authenticated as a known
+  // owner/shared user, gracefully fall back to no wishlist filter so the
+  // page still renders something instead of "Saved" with zero listings.
+  useEffect(() => {
+    if (publicWishlistTargetId && publicWishlistData === null) {
+      // The query returned (data is explicitly null, not undefined → we know it
+      // ran). Drop the selection.
+      setSelectedWishlist(null);
+    }
+  }, [publicWishlistTargetId, publicWishlistData]);
+
+  // Unfiltered counts for the currently selected wishlist (regardless of any
+  // active price/beds/etc filters). Powers the "Show delisted (N of M)" chip
+  // and the wishlist-total label in the topbar so the user always sees the
+  // full wishlist size, not just what survives the current filter.
+  const wishlistCountsQuery = useWishlistCounts(
+    typeof selectedWishlist === 'string' && selectedWishlist !== 'all-saved'
+      ? selectedWishlist
+      : null,
+  );
+  const wishlistTotalCount = wishlistCountsQuery.data?.total ?? null;
+  const wishlistDelistedTotal = wishlistCountsQuery.data?.delistedTotal ?? null;
 
   // Listen for global "open-wishlist-manager" event (fired from the nav menu).
   useEffect(() => {
@@ -1626,6 +1684,8 @@ function HomeInner() {
             showDelisted={showDelisted}
             onToggleShowDelisted={() => setShowDelisted((v) => !v)}
             delistedCount={delistedCountInWishlist}
+            delistedTotalInWishlist={wishlistDelistedTotal}
+            wishlistTotalCount={wishlistTotalCount}
             myWishlists={myWishlists}
             sharedWishlists={sharedWishlists}
             selectedWishlist={selectedWishlist}
@@ -2038,6 +2098,9 @@ function HomeInner() {
           }}
           onUpdateSharePermission={async (shareId, permission) => {
             await updateSharePermission.mutateAsync({ shareId, permission });
+          }}
+          onUpdatePublic={async (wishlistId, isPublic) => {
+            await updateWishlistPublic.mutateAsync({ id: wishlistId, isPublic });
           }}
           onLeave={async (wishlistId, email) => {
             await leaveSharedWishlist.mutateAsync({ wishlistId, email });

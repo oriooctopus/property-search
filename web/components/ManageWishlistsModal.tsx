@@ -15,6 +15,7 @@ interface ManageWishlistsModalProps {
   onAddShare: (wishlistId: string, email: string, permission: 'viewer' | 'editor') => Promise<void>;
   onRemoveShare: (shareId: number) => Promise<void>;
   onUpdateSharePermission: (shareId: number, permission: 'viewer' | 'editor') => Promise<void>;
+  onUpdatePublic: (wishlistId: string, isPublic: boolean) => Promise<void>;
   onLeave: (wishlistId: string, email: string) => Promise<void>;
   onView: (wishlistId: string) => void;
 }
@@ -30,6 +31,7 @@ export default function ManageWishlistsModal({
   onAddShare,
   onRemoveShare,
   onUpdateSharePermission,
+  onUpdatePublic,
   onLeave,
   onView,
 }: ManageWishlistsModalProps) {
@@ -178,6 +180,7 @@ export default function ManageWishlistsModal({
                   onAddShare={onAddShare}
                   onRemoveShare={onRemoveShare}
                   onUpdateSharePermission={onUpdateSharePermission}
+                  onUpdatePublic={onUpdatePublic}
                   onLeave={onLeave}
                   onView={onView}
                   currentUserEmail={currentUserEmail}
@@ -210,6 +213,7 @@ export default function ManageWishlistsModal({
                   onAddShare={onAddShare}
                   onRemoveShare={onRemoveShare}
                   onUpdateSharePermission={onUpdateSharePermission}
+                  onUpdatePublic={onUpdatePublic}
                   onLeave={onLeave}
                   onView={onView}
                   currentUserEmail={currentUserEmail}
@@ -353,6 +357,7 @@ interface WishlistRowProps {
   onAddShare: (wishlistId: string, email: string, permission: 'viewer' | 'editor') => Promise<void>;
   onRemoveShare: (shareId: number) => Promise<void>;
   onUpdateSharePermission: (shareId: number, permission: 'viewer' | 'editor') => Promise<void>;
+  onUpdatePublic: (wishlistId: string, isPublic: boolean) => Promise<void>;
   onLeave: (wishlistId: string, email: string) => Promise<void>;
   onView: (wishlistId: string) => void;
 }
@@ -376,6 +381,7 @@ function WishlistRow({
   onAddShare,
   onRemoveShare,
   onUpdateSharePermission,
+  onUpdatePublic,
   onLeave,
   onView,
 }: WishlistRowProps) {
@@ -383,6 +389,8 @@ function WishlistRow({
   const [invitePermission, setInvitePermission] = useState<'viewer' | 'editor'>('editor');
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [updatingPublic, setUpdatingPublic] = useState(false);
   const itemCount = wishlist.wishlist_items.length;
   const shareCount = wishlist.wishlist_shares.length;
 
@@ -607,6 +615,96 @@ function WishlistRow({
             padding: '14px 16px 16px',
           }}
         >
+          {/* Public link toggle */}
+          <div
+            data-testid="public-link-toggle-row"
+            className="flex items-center justify-between gap-3 mb-3"
+            style={{
+              padding: '10px 12px',
+              background: '#161b22',
+              border: '1px solid #2d333b',
+              borderRadius: 8,
+            }}
+          >
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] font-semibold" style={{ color: '#e1e4e8' }}>
+                Public link
+              </div>
+              <div className="text-[11px] mt-0.5" style={{ color: '#8b949e' }}>
+                {wishlist.is_public
+                  ? 'Anyone with the link can view this wishlist’s listings.'
+                  : 'Off — only you and people you invite can view it.'}
+              </div>
+            </div>
+            <ButtonBase
+              data-testid="public-link-toggle"
+              role="switch"
+              aria-checked={wishlist.is_public}
+              aria-label={wishlist.is_public ? 'Disable public link' : 'Enable public link'}
+              disabled={updatingPublic}
+              onClick={async () => {
+                setUpdatingPublic(true);
+                try {
+                  await onUpdatePublic(wishlist.id, !wishlist.is_public);
+                } finally {
+                  setUpdatingPublic(false);
+                }
+              }}
+              className="relative flex-shrink-0"
+              style={{
+                width: 38,
+                height: 22,
+                borderRadius: 11,
+                background: wishlist.is_public ? 'rgba(126,231,135,0.4)' : '#2d333b',
+                border: '1px solid',
+                borderColor: wishlist.is_public ? '#7ee787' : '#30363d',
+                padding: 0,
+                opacity: updatingPublic ? 0.6 : 1,
+              }}
+            >
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 2,
+                  left: wishlist.is_public ? 18 : 2,
+                  width: 16,
+                  height: 16,
+                  borderRadius: '50%',
+                  background: wishlist.is_public ? '#7ee787' : '#8b949e',
+                  transition: 'left 150ms ease, background 150ms ease',
+                }}
+              />
+            </ButtonBase>
+          </div>
+          {wishlist.is_public && (
+            <ButtonBase
+              data-testid="public-link-copy"
+              onClick={async () => {
+                try {
+                  const url = `${window.location.origin}/?wishlist=${wishlist.id}`;
+                  await navigator.clipboard.writeText(url);
+                  setLinkCopied(true);
+                  setTimeout(() => setLinkCopied(false), 1500);
+                } catch {
+                  // ignore — clipboard may be denied in some contexts
+                }
+              }}
+              className="w-full flex items-center justify-center gap-2 text-[12px] font-medium mb-3"
+              style={{
+                padding: '8px 12px',
+                background: 'transparent',
+                border: '1px solid #2d333b',
+                borderRadius: 7,
+                color: linkCopied ? '#7ee787' : '#58a6ff',
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M7.775 3.275a.75.75 0 0 0 1.06 1.06l1.25-1.25a2 2 0 1 1 2.83 2.83l-2.5 2.5a2 2 0 0 1-2.83 0 .75.75 0 0 0-1.06 1.06 3.5 3.5 0 0 0 4.95 0l2.5-2.5a3.5 3.5 0 0 0-4.95-4.95l-1.25 1.25zm-4.69 9.64a2 2 0 0 1 0-2.83l2.5-2.5a2 2 0 0 1 2.83 0 .75.75 0 0 0 1.06-1.06 3.5 3.5 0 0 0-4.95 0l-2.5 2.5a3.5 3.5 0 0 0 4.95 4.95l1.25-1.25a.75.75 0 0 0-1.06-1.06l-1.25 1.25a2 2 0 0 1-2.83 0z" />
+              </svg>
+              {linkCopied ? 'Link copied!' : 'Copy share link'}
+            </ButtonBase>
+          )}
+
           <div
             className="mb-2.5 text-[12px] font-semibold uppercase"
             style={{ color: '#8b949e', letterSpacing: '0.05em' }}

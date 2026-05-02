@@ -11,6 +11,8 @@ export interface Wishlist {
   user_id: string;
   created_at: string;
   updated_at: string;
+  /** When true, anyone with the URL can view this wishlist's listings (read-only). */
+  is_public: boolean;
   wishlist_items: WishlistItem[];
   wishlist_shares: WishlistShare[];
   /** Email address of the wishlist owner (only populated for shared-with-me wishlists). */
@@ -30,7 +32,7 @@ export function useWishlists(userId: string | null) {
       if (!userId) return [];
       const { data, error } = await supabase
         .from('wishlists')
-        .select('id, name, user_id, created_at, updated_at, wishlist_items(listing_id), wishlist_shares(id, shared_with_email, permission)')
+        .select('id, name, user_id, created_at, updated_at, is_public, wishlist_items(listing_id), wishlist_shares(id, shared_with_email, permission)')
         .order('created_at', { ascending: true });
       if (error) throw error;
       return (data ?? []) as unknown as Wishlist[];
@@ -63,7 +65,7 @@ export function useSharedWishlists(userEmail: string | null) {
 
       const { data: wls, error: wlErr } = await supabase
         .from('wishlists')
-        .select('id, name, user_id, created_at, updated_at, wishlist_items(listing_id), wishlist_shares(id, shared_with_email, permission)')
+        .select('id, name, user_id, created_at, updated_at, is_public, wishlist_items(listing_id), wishlist_shares(id, shared_with_email, permission)')
         .in('id', wishlistIds);
       if (wlErr) throw wlErr;
       const rows = (wls ?? []) as unknown as Wishlist[];
@@ -113,6 +115,28 @@ export function useWishlistsSplit(userId: string | null, userEmail: string | nul
       isLoading: mineQ.isLoading || sharedQ.isLoading,
     };
   }, [mineQ.data, sharedQ.data, mineQ.isLoading, sharedQ.isLoading]);
+}
+
+/**
+ * Returns unfiltered counts for a single wishlist:
+ *   - `total`         — total listings in the wishlist (active + delisted)
+ *   - `delistedTotal` — count of those with `delisted_at IS NOT NULL`
+ *
+ * Independent of price/beds/commute filters, so the topbar can show the full
+ * wishlist size (e.g. "Williamsburg (130) — Show delisted (10 of 82)").
+ * Pass `null` (or 'all-saved') to disable the query.
+ */
+export function useWishlistCounts(wishlistId: string | null) {
+  return useQuery<{ total: number; delistedTotal: number }>({
+    queryKey: ['wishlist-counts', wishlistId],
+    queryFn: async () => {
+      const res = await fetch(`/api/wishlists/${wishlistId}/counts`);
+      if (!res.ok) throw new Error(`counts fetch failed: ${res.status}`);
+      return (await res.json()) as { total: number; delistedTotal: number };
+    },
+    enabled: !!wishlistId && wishlistId !== 'all-saved',
+    staleTime: 30_000,
+  });
 }
 
 export function useWishlistMutations(userId: string | null) {
@@ -165,6 +189,17 @@ export function useWishlistMutations(userId: string | null) {
       const { error } = await supabase
         .from('wishlists')
         .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const updateWishlistPublic = useMutation({
+    mutationFn: async ({ id, isPublic }: { id: string; isPublic: boolean }) => {
+      const { error } = await supabase
+        .from('wishlists')
+        .update({ is_public: isPublic, updated_at: new Date().toISOString() })
         .eq('id', id);
       if (error) throw error;
     },
@@ -232,11 +267,44 @@ export function useWishlistMutations(userId: string | null) {
     createWishlist,
     deleteWishlist,
     renameWishlist,
+    updateWishlistPublic,
     addShare,
     removeShare,
     updateSharePermission,
     leaveSharedWishlist,
   };
+}
+
+/**
+ * Anonymous-friendly fetch of a single wishlist by ID. Used when the URL has
+ * `?wishlist=<uuid>` and the viewer is logged out (or not the owner / not on
+ * the share list). RLS will only return the row if the wishlist's
+ * `is_public = true`; otherwise the query yields no rows and `data` is null.
+ *
+ * Pass `null` to disable.
+ */
+export function usePublicWishlist(wishlistId: string | null) {
+  const supabase = createClient();
+  return useQuery<Wishlist | null>({
+    queryKey: ['wishlist-public', wishlistId],
+    queryFn: async () => {
+      if (!wishlistId) return null;
+      const { data, error } = await supabase
+        .from('wishlists')
+        .select('id, name, user_id, created_at, updated_at, is_public, wishlist_items(listing_id), wishlist_shares(id, shared_with_email, permission)')
+        .eq('id', wishlistId)
+        .maybeSingle();
+      if (error) {
+        // Treat as "not visible" rather than throwing — RLS denies look like
+        // a row miss in PostgREST, but other errors should also degrade
+        // gracefully to "no public wishlist".
+        return null;
+      }
+      return (data as unknown as Wishlist) ?? null;
+    },
+    enabled: !!wishlistId,
+    staleTime: 60_000,
+  });
 }
 
 export function useWishlistedListingIds(userId: string | null): Set<number> {
