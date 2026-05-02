@@ -84,6 +84,14 @@ function parseNumOrNull(v: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+// Canonical URL filter param names (for future debugging — DO NOT alias without
+// updating buildQueryString below in lockstep):
+//   sort, maxAge, beds (csv), minBaths, includeNaBaths, minRent, maxRent,
+//   priceMode, photosFirst, sources (csv), minYearBuilt, maxYearBuilt,
+//   minSqft, maxSqft, excludeNoSqft, minAvailableDate, maxAvailableDate,
+//   includeNaAvailableDate, commute (json).
+// Common wrong names that silently no-op: bedsMin, priceMin, priceMax,
+// minBeds — these aren't read here so the filter has no effect.
 function readFiltersFromParams(params: URLSearchParams): FiltersState {
   const sort = params.get('sort');
   const age = params.get('maxAge');
