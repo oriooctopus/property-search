@@ -897,15 +897,21 @@ export default function SwipeCard({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="absolute top-2.5 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer"
-                  style={{ backgroundColor: 'rgba(0,0,0,0.5)', color: '#fff' }}
+                  aria-label="Open listing"
+                  className="absolute top-0 right-0 flex items-center justify-center cursor-pointer"
+                  style={{ width: 48, height: 48, color: '#fff', background: 'transparent' }}
                   title="Open listing"
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                    <polyline points="15 3 21 3 21 9" />
-                    <line x1="10" y1="14" x2="21" y2="3" />
-                  </svg>
+                  <span
+                    className="rounded-full flex items-center justify-center transition-colors"
+                    style={{ width: 32, height: 32, backgroundColor: 'rgba(0,0,0,0.5)' }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                  </span>
                 </a>
               </>
             ) : (
@@ -1133,8 +1139,8 @@ export default function SwipeCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="text-sm font-medium hover:underline cursor-pointer flex-shrink-0"
-                style={{ color: '#58a6ff' }}
+                className="text-sm font-medium hover:underline cursor-pointer flex-shrink-0 inline-flex items-center"
+                style={{ color: '#58a6ff', minHeight: 44, paddingTop: 8, paddingBottom: 8, paddingLeft: 8, marginRight: -8 }}
               >
                 View on {SOURCE_LABELS[listing.source] ?? listing.source} →
               </a>

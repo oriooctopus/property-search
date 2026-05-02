@@ -1260,7 +1260,12 @@ export default function SwipeView({
                           color: '#8b949e',
                           background: 'none',
                           border: 'none',
-                          padding: '2px 0',
+                          // Expand vertical hit area to ≥44px without shifting
+                          // surrounding layout. The negative margin offsets the
+                          // padding so the visible text stays where it was.
+                          padding: '12px 8px',
+                          margin: '-10px -8px',
+                          minHeight: 44,
                           lineHeight: 1.4,
                           maxWidth: '100%',
                         }}

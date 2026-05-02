@@ -378,9 +378,9 @@ function ListingCard({
               aria-pressed={peeked}
               className="absolute top-2 right-2 z-[4] flex items-center justify-center cursor-pointer"
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
+                width: 44,
+                height: 44,
+                borderRadius: 10,
                 background: peeked
                   ? 'rgba(88, 166, 255, 0.2)'
                   : 'rgba(13, 17, 23, 0.75)',
@@ -436,9 +436,9 @@ function ListingCard({
               aria-pressed={peeked}
               className="absolute top-2 right-2 z-[4] flex items-center justify-center cursor-pointer"
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
+                width: 44,
+                height: 44,
+                borderRadius: 10,
                 background: peeked
                   ? 'rgba(88, 166, 255, 0.2)'
                   : 'rgba(13, 17, 23, 0.75)',
@@ -539,13 +539,16 @@ function ListingCard({
             };
             const sourceName = SOURCE_LABELS[listing.source] ?? 'listing';
             return (
-              <span className="p-1.5 rounded-md min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer">
-                <a
-                  href={listing.url}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  onClick={(e) => e.stopPropagation()}
-                  aria-label={`View on ${sourceName}`}
+              <a
+                href={listing.url}
+                target="_blank"
+                rel="noreferrer noopener"
+                onClick={(e) => e.stopPropagation()}
+                aria-label={`View on ${sourceName}`}
+                className="rounded-md flex items-center justify-center cursor-pointer"
+                style={{ minWidth: 44, minHeight: 44, textDecoration: 'none' }}
+              >
+                <span
                   className="source-chip"
                   style={{
                     ['--src-color' as string]: style.color,
@@ -575,8 +578,8 @@ function ListingCard({
                   }}
                 >
                   {style.label}
-                </a>
-              </span>
+                </span>
+              </a>
             );
           })()}
         </div>
