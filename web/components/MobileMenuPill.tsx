@@ -181,6 +181,8 @@ export default function MobileMenuPill({
                   height={26}
                   sizes="26px"
                   quality={80}
+                  // Skip Vercel Image Optimization to avoid quota 402s.
+                  unoptimized
                   className="h-full w-full object-cover"
                 />
               ) : (
@@ -269,6 +271,8 @@ export default function MobileMenuPill({
                   height={30}
                   sizes="30px"
                   quality={80}
+                  // Skip Vercel Image Optimization to avoid quota 402s.
+                  unoptimized
                   className="h-full w-full object-cover"
                 />
               ) : (

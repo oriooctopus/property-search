@@ -155,6 +155,8 @@ export default function Navbar() {
                     height={40}
                     sizes="(min-width: 640px) 32px, 40px"
                     quality={80}
+                    // Skip Vercel Image Optimization to avoid quota 402s.
+                    unoptimized
                     className="h-full w-full object-cover"
                   />
                 ) : (

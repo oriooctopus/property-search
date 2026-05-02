@@ -361,6 +361,8 @@ export default function SearchPage() {
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     quality={70}
                     loading={i < 3 ? undefined : 'lazy'}
+                    // Skip Vercel Image Optimization — see ListingCard for rationale.
+                    unoptimized
                     className="object-cover"
                   />
                 </div>
