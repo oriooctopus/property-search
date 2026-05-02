@@ -2745,10 +2745,18 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
               ? `${clusterLabelBase} (${wishlistTotalCount})`
               : clusterLabelBase;
           const hasSelection = !!selectedWishlist;
+          // For anon viewers of a public wishlist (the only case where an
+          // anon user lands with `selectedWishlist` set), the chip is purely
+          // informational — there's no other wishlist they could switch to,
+          // they can't save here, and tapping should NOT pop a login modal
+          // mid-browse. Render as a non-interactive label in that case
+          // (chevron suppressed, click is a no-op via plain <span>).
+          const isAnonPublicViewer = !userId && hasSelection;
           return (
             <div className="shrink-0 flex items-center" ref={clusterDropdownRef}>
               <ButtonBase
                 onClick={() => {
+                  if (isAnonPublicViewer) return;
                   if (!userId) {
                     onLoginRequired?.();
                     return;
@@ -2761,12 +2769,18 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                     setSaveOpen(true);
                   }
                 }}
-                aria-label="Saved (filter by wishlist or save current search)"
+                aria-label={
+                  isAnonPublicViewer
+                    ? `Viewing shared wishlist ${clusterLabel}`
+                    : 'Saved (filter by wishlist or save current search)'
+                }
+                aria-disabled={isAnonPublicViewer}
                 className={cn(
                   'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border text-[12px] font-medium whitespace-nowrap transition-colors',
                   hasSelection
                     ? 'border-[#7ee787] text-[#7ee787]'
                     : 'border-[#2d333b] hover:border-[rgba(126,231,135,0.6)] text-[#e1e4e8]',
+                  isAnonPublicViewer && 'cursor-default',
                 )}
                 style={{
                   background: hasSelection ? 'rgba(126,231,135,0.1)' : 'transparent',
@@ -2800,9 +2814,11 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                   </svg>
                 )}
                 <span>{clusterLabel}</span>
-                <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.7 }}>
-                  <path d="M2 3.5L5 6.5L8 3.5" />
-                </svg>
+                {!isAnonPublicViewer && (
+                  <svg width="9" height="9" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ opacity: 0.7 }}>
+                    <path d="M2 3.5L5 6.5L8 3.5" />
+                  </svg>
+                )}
               </ButtonBase>
             </div>
           );
