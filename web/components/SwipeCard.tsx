@@ -337,17 +337,49 @@ export default function SwipeCard({
       if (!isTop) return;
       const absX = Math.abs(e.deltaX);
       const absY = Math.abs(e.deltaY);
+
+      const vxPxPerSec = e.vxvy?.[0] ? e.vxvy[0] * 1000 : 0;
+      const vyPxPerSec = e.vxvy?.[1] ? e.vxvy[1] * 1000 : 0;
+
+      // Always snap the visual transform back; carousel + skip use their
+      // own animations. Done before any branch so even commit paths get
+      // a clean origin baseline.
+      const springBack = { type: 'spring' as const, stiffness: 500, damping: 30 };
+
+      // Photo-area horizontal swipes are ALWAYS carousel navigation, never
+      // card-level save/skip. This is the deliberate semantic from
+      // commit 21553b2 (Apr 24): the photo region owns its own gesture
+      // (swipe to next/prev photo), and card-level save/skip is exclusively
+      // triggered by swipes that start OUTSIDE the photo area. Restoring
+      // this after c95e7c3 accidentally reverted it while "fixing" a
+      // different bug.
+      if (touchInPhoto.current) {
+        const horizontalDominant = absX >= absY;
+        if (horizontalDominant && absX > PHOTO_SWIPE_THRESHOLD && totalPhotos > 1) {
+          if (e.deltaX < 0) {
+            setPhotoIndex((i) => (i + 1) % totalPhotos);
+          } else {
+            setPhotoIndex((i) => (i - 1 + totalPhotos) % totalPhotos);
+          }
+        }
+        animate(x, 0, springBack);
+        animate(y, 0, springBack);
+        if (notifiedDragging.current) {
+          notifiedDragging.current = false;
+          onDragStateChange?.(false);
+        }
+        dragRecentlyFired.current = absX > 5 || absY > 5;
+        return;
+      }
+
+      // Non-photo region: card-level save/skip/back-of-queue.
       const horizontalDominant = absX >= absY;
       const horizontalCommit =
         horizontalDominant && (absX > SWIPE_X_THRESHOLD || e.absX > SWIPE_X_THRESHOLD);
       const verticalCommit =
         !horizontalDominant &&
-        !touchInPhoto.current &&
         e.deltaY > 0 &&
         e.deltaY > SWIPE_Y_THRESHOLD;
-
-      const vxPxPerSec = e.vxvy?.[0] ? e.vxvy[0] * 1000 : 0;
-      const vyPxPerSec = e.vxvy?.[1] ? e.vxvy[1] * 1000 : 0;
 
       if (horizontalCommit) {
         const dir: 'left' | 'right' = e.deltaX < 0 ? 'left' : 'right';
@@ -355,8 +387,6 @@ export default function SwipeCard({
       } else if (verticalCommit) {
         commitSwipe('down', 0, vyPxPerSec);
       } else {
-        // Snap back via framer-motion spring
-        const springBack = { type: 'spring' as const, stiffness: 500, damping: 30 };
         animate(x, 0, springBack);
         animate(y, 0, springBack);
       }
