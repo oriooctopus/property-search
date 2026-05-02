@@ -9,7 +9,7 @@
  */
 
 import type { AdapterOutput, SearchParams } from "./types";
-import { resolveApifyProxyUrl, makeProxyFetch } from "./proxy";
+import { resolveApifyProxyUrl, makeProxyFetch, withRotatingSession } from "./proxy";
 import { fetchSliceRecursive, SE_CAP } from "./streeteasy-bisection";
 
 const SE_API_URL = "https://api-v6.streeteasy.com/";
@@ -361,6 +361,7 @@ const SE_403_RETRY_DELAYS = [30_000, 60_000, 120_000]; // exponential backoff fo
  */
 function makeResilientFetch(
   getProxyFetch: () => typeof fetch | null,
+  rotateProxyFetch?: () => void,
 ): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
     for (let attempt = 0; ; attempt++) {
@@ -377,6 +378,7 @@ function makeResilientFetch(
             `[StreetEasy] Bisection request failed (${err instanceof Error ? err.message : err}) — retry ${attempt + 1}/${SE_403_RETRY_DELAYS.length} after ${delayMs / 1000}s`,
           );
           await new Promise((r) => setTimeout(r, delayMs));
+          rotateProxyFetch?.();
           continue;
         }
         throw err;
@@ -384,9 +386,10 @@ function makeResilientFetch(
       if (res.status === 403 && attempt < SE_403_RETRY_DELAYS.length) {
         const delayMs = SE_403_RETRY_DELAYS[attempt];
         console.warn(
-          `[StreetEasy] Bisection request got 403 — retry ${attempt + 1}/${SE_403_RETRY_DELAYS.length} after ${delayMs / 1000}s`,
+          `[StreetEasy] Bisection request got 403 — retry ${attempt + 1}/${SE_403_RETRY_DELAYS.length} after ${delayMs / 1000}s (rotating proxy session)`,
         );
         await new Promise((r) => setTimeout(r, delayMs));
+        rotateProxyFetch?.();
         continue;
       }
       if (res.status === 403) {
@@ -411,14 +414,21 @@ export async function fetchStreetEasyListings(
   const areas = AREA_CODES[cityLower] ?? AREA_CODES["new york"];
   const known = existingUrls ?? new Set<string>();
 
-  // Lazy Apify proxy — only created if needed (costs money)
+  // Lazy Apify proxy — only created if needed (costs money). Wraps with
+  // withRotatingSession so each FRESH agent gets a brand-new residential
+  // IP (groups-RESIDENTIAL,country-US,session-<random>). Callers should
+  // call `rotateProxyFetch()` between 403 retries to force a new IP —
+  // sticky sessions get blacklisted by SE's PerimeterX after a few hits.
   const proxyUrl = resolveApifyProxyUrl();
   let _proxyFetch: typeof fetch | null = null;
   function getProxyFetch(): typeof fetch | null {
     if (!_proxyFetch && proxyUrl) {
-      _proxyFetch = makeProxyFetch(proxyUrl);
+      _proxyFetch = makeProxyFetch(withRotatingSession(proxyUrl));
     }
     return _proxyFetch;
+  }
+  function rotateProxyFetch(): void {
+    _proxyFetch = null; // next getProxyFetch() builds a fresh-rotated agent
   }
 
   const allNodes: SENode[] = [];
@@ -443,9 +453,10 @@ export async function fetchStreetEasyListings(
         if (msg.includes("403") && attempt < SE_403_RETRY_DELAYS.length) {
           const delayMs = SE_403_RETRY_DELAYS[attempt];
           console.warn(
-            `[StreetEasy] ${label} probe got 403 — retry ${attempt + 1}/${SE_403_RETRY_DELAYS.length} after ${delayMs / 1000}s`,
+            `[StreetEasy] ${label} probe got 403 — retry ${attempt + 1}/${SE_403_RETRY_DELAYS.length} after ${delayMs / 1000}s (rotating proxy session)`,
           );
           await new Promise((r) => setTimeout(r, delayMs));
+          rotateProxyFetch();
           continue;
         }
         console.error(`[StreetEasy] ${label} probe failed: ${msg}`);
@@ -505,7 +516,7 @@ export async function fetchStreetEasyListings(
           0,
           allNodes,
           seenFullUrls,
-          makeResilientFetch(getProxyFetch),
+          makeResilientFetch(getProxyFetch, rotateProxyFetch),
           (msg: string) => console.log(`[StreetEasy] ${msg}`),
         );
 
@@ -565,9 +576,10 @@ export async function fetchStreetEasyListings(
           if (res.status === 403 && attempt < SE_403_RETRY_DELAYS.length) {
             const delayMs = SE_403_RETRY_DELAYS[attempt];
             console.warn(
-              `[StreetEasy] ${label} page ${page} got 403 — retry ${attempt + 1}/${SE_403_RETRY_DELAYS.length} after ${delayMs / 1000}s`,
+              `[StreetEasy] ${label} page ${page} got 403 — retry ${attempt + 1}/${SE_403_RETRY_DELAYS.length} after ${delayMs / 1000}s (rotating proxy session)`,
             );
             await new Promise((r) => setTimeout(r, delayMs));
+            rotateProxyFetch();
             continue;
           }
 
