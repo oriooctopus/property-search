@@ -127,20 +127,59 @@ export default function SwipeOnboarding({ onDismiss }: SwipeOnboardingProps) {
         transition: 'opacity 250ms ease-out',
       }}
     >
-      {/* Fake card overlay — positioned to overlay the real top card behind.
-          Uses the same rounded-2xl corners and dark panel bg so the visual
-          grammar matches. The wrapper inset-0 means it sits exactly where
-          the parent placed us (the SwipeView's card-stack container). */}
+      {/* Dim backdrop — softens the real card behind so the fake card reads
+          as "the focus." pointer-events: none everywhere; tap goes through. */}
       <div
         className="absolute inset-0 rounded-3xl min-[600px]:rounded-xl"
         style={{
-          backgroundColor: 'rgba(28, 32, 40, 0.55)',
+          backgroundColor: 'rgba(0, 0, 0, 0.45)',
+        }}
+      />
+      {/* Fake card overlay — opaque so it actually reads as a card, not a
+          glitching real card. Uses the same rounded corners + dark panel bg
+          as the real SwipeCard so the visual grammar matches. */}
+      <div
+        className="absolute inset-0 rounded-3xl min-[600px]:rounded-xl overflow-hidden"
+        style={{
+          backgroundColor: '#1c2028',
           border: '1px solid #2d333b',
           transform: cardTransform,
           transition: cardTransition,
           willChange: 'transform',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
         }}
       >
+        {/* Placeholder photo region — tinted gradient so it reads as a card,
+            not an empty box. Approximates the real card's photo area
+            position. */}
+        <div
+          className="absolute top-0 left-0 right-0"
+          style={{
+            height: '52%',
+            background:
+              'linear-gradient(135deg, #2d333b 0%, #1f2329 50%, #161b22 100%)',
+          }}
+        >
+          {/* Soft house glyph centered in the photo area */}
+          <div
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+            style={{ color: '#3d444d', opacity: 0.7 }}
+          >
+            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9.5L12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <path d="M9 22V12h6v10" />
+            </svg>
+          </div>
+        </div>
+        {/* Placeholder info area below "photo" — fake address + price lines */}
+        <div className="absolute bottom-0 left-0 right-0 px-5 py-4" style={{ height: '48%' }}>
+          <div className="space-y-2">
+            <div className="rounded h-3 w-3/5" style={{ backgroundColor: '#2d333b' }} />
+            <div className="rounded h-3 w-2/5" style={{ backgroundColor: '#21262d' }} />
+            <div className="rounded h-5 w-1/3 mt-3" style={{ backgroundColor: '#2d333b' }} />
+            <div className="rounded h-3 w-1/4 mt-3" style={{ backgroundColor: '#21262d' }} />
+          </div>
+        </div>
         {/* Stamps that fade in/out matching the gesture */}
         <div
           className="absolute top-6 left-5 z-[5]"
@@ -188,30 +227,26 @@ export default function SwipeOnboarding({ onDismiss }: SwipeOnboardingProps) {
         </div>
       </div>
 
-      {/* Caption below the card-stack area. Floats at the bottom of the
-          overlay; uses safe-area inset so it doesn't collide with the
-          floating action dock on mobile. */}
+      {/* Caption pill — sits ABOVE the card with its own backdrop so it
+          never collides with anything underneath. Updates with the
+          current gesture (label + label color from STEPS). */}
       <div
-        className="absolute left-1/2 -translate-x-1/2 text-[13px] font-medium whitespace-nowrap"
+        className="absolute left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full text-[13px] font-medium whitespace-nowrap"
         style={{
-          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 90px)',
-          color: step.label ? (step.labelColor ?? '#e1e4e8') : '#6e7681',
-          opacity: step.label ? 1 : 0.6,
-          transition: 'opacity 200ms, color 200ms',
-          textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+          top: 16,
+          backgroundColor: 'rgba(15, 17, 23, 0.92)',
+          border: '1px solid #2d333b',
+          color: step.label ? (step.labelColor ?? '#e1e4e8') : '#e1e4e8',
+          transition: 'color 200ms',
         }}
       >
         {step.label ?? 'Swipe to find your place'}
       </div>
 
-      {/* Tiny "tap to dismiss" hint, even fainter */}
+      {/* Tiny "tap to dismiss" microhint below the caption pill */}
       <div
         className="absolute left-1/2 -translate-x-1/2 text-[10px]"
-        style={{
-          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 70px)',
-          color: '#6e7681',
-          opacity: 0.7,
-        }}
+        style={{ top: 50, color: '#8b949e' }}
       >
         tap or swipe to start
       </div>
