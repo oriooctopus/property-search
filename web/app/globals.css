@@ -181,7 +181,12 @@ body {
   top: 38vh;
   left: 12px;
   right: 12px;
-  bottom: calc(env(safe-area-inset-bottom) + 88px);
+  /* Shaved 88 → 78 to give the card +10px of vertical room for the
+     info panel — the gap between card-bottom and the action pill
+     (top edge at safe-area + 64) was 24px; now 14px, still readable
+     and most users won't notice. Trades map peek for less in-card
+     scrolling. */
+  bottom: calc(env(safe-area-inset-bottom) + 78px);
   width: auto;
 }
 @media (min-width: 600px) {
