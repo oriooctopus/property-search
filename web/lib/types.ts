@@ -135,6 +135,7 @@ export type Database = {
           name: string;
           created_at: string;
           updated_at: string;
+          is_public: boolean;
         };
         Insert: {
           id?: string;
@@ -142,6 +143,7 @@ export type Database = {
           name: string;
           created_at?: string;
           updated_at?: string;
+          is_public?: boolean;
         };
         Update: {
           id?: string;
@@ -149,6 +151,7 @@ export type Database = {
           name?: string;
           created_at?: string;
           updated_at?: string;
+          is_public?: boolean;
         };
         Relationships: [
           {
