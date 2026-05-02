@@ -117,12 +117,12 @@ export interface ValidatedListing extends RawListing {
 /** All known sources currently ingested by the pipeline. */
 export const ALL_SOURCES: readonly ListingSource[] = [
   "streeteasy",
-  // "craigslist", // disabled 2026-05-02 to cut Apify residential-proxy spend; re-enable when budget allows
+  "craigslist",
   // "facebook-marketplace", // disabled to save Apify costs — re-enable when needed
 ] as const;
 
 /** Sources that extract data from text rather than structured API fields. */
 export const SCRAPER_SOURCES: ReadonlySet<ListingSource> = new Set([
-  // "craigslist", // disabled 2026-05-02 (see above)
+  "craigslist",
   // "facebook-marketplace", // disabled to save Apify costs — re-enable when needed
 ]);
