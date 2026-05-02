@@ -201,7 +201,7 @@ function HomeInner() {
   // Wishlist system
   const { data: wishlists } = useWishlists(userId);
   const { mine: myWishlistsRaw, shared: sharedWishlistsRaw, all: allWishlistsRaw } = useWishlistsSplit(userId, userEmail);
-  const wishlistedIds = useWishlistedListingIds(userId);
+  const wishlistedIdsRaw = useWishlistedListingIds(userId);
   const {
     addToWishlist,
     removeFromWishlist,
@@ -244,6 +244,20 @@ function HomeInner() {
     return selectedWishlist;
   }, [selectedWishlist, myWishlistsRaw, sharedWishlistsRaw]);
   const { data: publicWishlistData } = usePublicWishlist(publicWishlistTargetId);
+
+  // Merge the public wishlist's items into wishlistedIds so anon / non-owner
+  // viewers see the green heart pins on the map for the public wishlist's
+  // listings. Without this, the auth-gated `useWishlistedListingIds` returns
+  // an empty set and the map renders no hearts even though the panel shows
+  // the listings.
+  const wishlistedIds = useMemo(() => {
+    if (!publicWishlistData) return wishlistedIdsRaw;
+    const merged = new Set(wishlistedIdsRaw);
+    for (const item of publicWishlistData.wishlist_items ?? []) {
+      merged.add(item.listing_id);
+    }
+    return merged;
+  }, [wishlistedIdsRaw, publicWishlistData]);
 
   // Merge the public wishlist (if resolved) into the wishlist lists so the
   // existing chip/name lookup logic finds it. Insert under `shared` so it's
