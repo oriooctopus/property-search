@@ -94,7 +94,12 @@ function transformGoogleSteps(
       });
     } else if (s.travel_mode === "TRANSIT") {
       const td = s.transit_details;
-      const route = td?.line?.short_name ?? td?.line?.name ?? undefined;
+      const rawRoute = td?.line?.short_name ?? td?.line?.name ?? undefined;
+      // Strip trailing " Line" / " Train" so the badge shows just the bullet
+      // letter (e.g. "M Line" → "M").
+      const route = rawRoute
+        ? rawRoute.replace(/\s+(line|train)$/i, "").trim()
+        : undefined;
       const routeColor = td?.line?.color ?? undefined;
       legs.push({
         type: "transit",
@@ -187,7 +192,7 @@ function transformOtpItinerary(otp: OTPItinerary): TripItinerary {
       duration: Math.round(leg.duration / 60),
       from: leg.from.name || "Current location",
       to: leg.to.name || "Destination",
-      route: leg.routeShortName || leg.route || undefined,
+      route: (leg.routeShortName || leg.route || undefined)?.replace(/\s+(line|train)$/i, "").trim() || undefined,
       routeColor: leg.routeColor ? `#${leg.routeColor}` : undefined,
       stops: leg.intermediateStops?.map((s) => s.name) ?? [],
       distance: leg.distance ? Math.round(leg.distance) : undefined,

@@ -145,10 +145,22 @@ function Skeleton() {
 // Leg row component
 // ---------------------------------------------------------------------------
 
+function formatDistance(meters: number): string {
+  return meters < 1000
+    ? `${meters} m`
+    : `${(meters / 1000).toFixed(1)} km`;
+}
+
 function LegRow({ leg, isLast }: { leg: TripLeg; isLast: boolean }) {
   const [stopsOpen, setStopsOpen] = useState(false);
   const color = leg.type === 'transit' ? getRouteColor(leg) : undefined;
   const hasStops = leg.type === 'transit' && leg.stops && leg.stops.length > 0;
+  const walkLabel = (() => {
+    if (leg.type !== 'walk') return '';
+    if (leg.to) return `Walk to ${leg.to}`;
+    if (leg.distance != null) return `Walk ${formatDistance(leg.distance)}`;
+    return 'Walk';
+  })();
 
   // Spine styles
   const dotStyle: React.CSSProperties = {
@@ -207,8 +219,8 @@ function LegRow({ leg, isLast }: { leg: TripLeg; isLast: boolean }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold flex-1" style={{ color: '#e1e4e8' }}>
-                {leg.type === 'walk' && `Walk to ${leg.to}`}
-                {leg.type === 'transfer' && `Transfer at ${leg.from}`}
+                {leg.type === 'walk' && walkLabel}
+                {leg.type === 'transfer' && `Transfer at ${(leg.from || '').replace(/^Walk to\s+/i, '').trim() || 'station'}`}
                 {leg.type === 'transit' && (
                   <>
                     {leg.route ? `${leg.route} train` : 'Transit'} to {leg.to}
@@ -223,11 +235,9 @@ function LegRow({ leg, isLast }: { leg: TripLeg; isLast: boolean }) {
             </div>
 
             {/* Sub info */}
-            {leg.type === 'walk' && leg.distance != null && (
+            {leg.type === 'walk' && leg.distance != null && leg.to && (
               <div className="text-xs mt-0.5" style={{ color: '#8b949e' }}>
-                {leg.distance < 1000
-                  ? `${leg.distance} m`
-                  : `${(leg.distance / 1000).toFixed(1)} km`}
+                {formatDistance(leg.distance)}
               </div>
             )}
 
@@ -365,9 +375,6 @@ export default function CommuteItinerary({
 
   return (
     <div className="mb-6">
-      <div className="text-xs font-medium mb-2" style={{ color: '#8b949e' }}>
-        Commute
-      </div>
       <div
         className="rounded-lg overflow-hidden"
         style={{ backgroundColor: '#0f1117', border: '1px solid #2d333b' }}
