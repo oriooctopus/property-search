@@ -122,6 +122,8 @@ export default function HiddenPage() {
                     sizes="(max-width: 640px) 100vw, 144px"
                     quality={65}
                     loading="lazy"
+                    // Skip Vercel Image Optimization — see ListingCard for rationale.
+                    unoptimized
                     className="object-cover"
                   />
                 </div>
