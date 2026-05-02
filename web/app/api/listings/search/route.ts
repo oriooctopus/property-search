@@ -141,7 +141,7 @@ async function filterAuthorizedWishlistIds(
     .in("id", requestedIds);
   if (error || !wls) return [];
 
-  let shareIds = new Set<string>();
+  const shareIds = new Set<string>();
   if (callerId || callerEmail) {
     const { data: shares } = await serviceClient
       .from("wishlist_shares")
