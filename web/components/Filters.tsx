@@ -3125,7 +3125,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                 the top bar so the mobile filter sheet (used in swipe view where
                 the top bar is hidden) can still set/edit a preferred destination. */}
             {destinationSlot && (
-              <div className="px-4 pb-4" data-testid="mobile-filters-destination" style={{ borderBottom: '1px solid #2d333b' }}>
+              <div className="px-4 pt-5 pb-4" data-testid="mobile-filters-destination" style={{ borderBottom: '1px solid #2d333b' }}>
                 <div className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: '#8b949e' }}>Destination</div>
                 <div className="flex flex-wrap items-center gap-2">{destinationSlot}</div>
               </div>
