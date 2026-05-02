@@ -126,9 +126,19 @@ interface FiltersProps {
    *  When false (default), they're hidden entirely. */
   showDelisted?: boolean;
   onToggleShowDelisted?: () => void;
-  /** Count of delisted listings in the active wishlist. The chip only
+  /** Count of delisted listings in the active wishlist that match the
+   *  current filters. Drives the "of N" portion of the chip; the chip only
    *  renders when this is > 0 (and a wishlist is active). */
   delistedCount?: number;
+  /** Unfiltered count of delisted listings in the active wishlist (i.e. the
+   *  total delisted regardless of price/beds/etc). When provided and greater
+   *  than `delistedCount`, the chip renders as "Show delisted (N of M)" so
+   *  the user can see the full delisted total. */
+  delistedTotalInWishlist?: number | null;
+  /** Unfiltered total size of the active wishlist (active + delisted). When
+   *  provided, the saved-cluster pill appends this as a parenthetical so the
+   *  user always sees the full wishlist size. */
+  wishlistTotalCount?: number | null;
   /** Wishlists the user owns — shown in the "Created by you" section. */
   myWishlists?: Wishlist[];
   /** Wishlists shared with the user — shown in the "Shared with you" section. */
@@ -1289,7 +1299,7 @@ function FilterToggleButton({
   );
 }
 
-const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ filters, onChange, listingCount, viewToggle, destinationSlot, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onUpdateSearchFilters, onLoginRequired, showHidden, onToggleShowHidden, showDelisted, onToggleShowDelisted, delistedCount = 0, myWishlists = [], sharedWishlists = [], selectedWishlist = null, onSelectWishlist, onCreateWishlist, onOpenWishlistManager }, ref) {
+const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ filters, onChange, listingCount, viewToggle, destinationSlot, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onUpdateSearchFilters, onLoginRequired, showHidden, onToggleShowHidden, showDelisted, onToggleShowDelisted, delistedCount = 0, delistedTotalInWishlist = null, wishlistTotalCount = null, myWishlists = [], sharedWishlists = [], selectedWishlist = null, onSelectWishlist, onCreateWishlist, onOpenWishlistManager }, ref) {
   const [openChip, setOpenChip] = useState<ChipId | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
@@ -2274,7 +2284,21 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           <div className="relative group shrink-0">
             <FilterChip
               compact
-              label={`${showDelisted ? 'Hide' : 'Show'} delisted (${delistedCount})`}
+              label={(() => {
+                const action = showDelisted ? 'Hide' : 'Show';
+                // Use unfiltered total when available and different from the
+                // filter-narrowed count, so the user sees how many are hidden
+                // by their current filters too. e.g. "Show delisted (10 of 82)"
+                // means "10 match your current filters; 82 are delisted in the
+                // wishlist overall".
+                if (
+                  delistedTotalInWishlist != null &&
+                  delistedTotalInWishlist > delistedCount
+                ) {
+                  return `${action} delisted (${delistedCount} of ${delistedTotalInWishlist})`;
+                }
+                return `${action} delisted (${delistedCount})`;
+              })()}
               active={showDelisted ?? false}
               open={false}
               onToggle={onToggleShowDelisted}
@@ -2687,8 +2711,13 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
       className="pl-4 pr-2 sm:pl-4 sm:pr-2 relative z-[1200]"
       style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}
     >
-      {/* Row 1 (always visible): Saved cluster + Destination pill + Area tabs + listing count + Filters button + Sort + View toggle */}
-      <div className="flex items-center min-h-[36px] gap-1.5 sm:gap-3 overflow-visible">
+      {/* Row 1 (always visible): Saved cluster + Destination pill + Area tabs + listing count + Filters button + Sort + View toggle.
+          `flex-wrap` lets the right-side controls drop to a second line when
+          the panel is narrow (e.g. desktop sidebar at lg:480px with a long
+          wishlist label). Without this the rightmost icons can be clipped by
+          the panel's right edge. `gap-y-1.5` adds vertical breathing room
+          when wrapping kicks in. */}
+      <div className="flex items-center min-h-[36px] gap-1.5 sm:gap-3 gap-y-1.5 flex-wrap overflow-visible">
         {/* Saved cluster pill — consolidated entry-point for save-search and
             wishlist filtering. Anchors the SaveWishlistPanel via clusterDropdownRef. */}
         {(() => {
@@ -2697,7 +2726,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
             selectedWishlist && selectedWishlist !== 'all-saved'
               ? allWishlists.find((w) => w.id === selectedWishlist)
               : null;
-          const clusterLabel =
+          const clusterLabelBase =
             selectedWishlist === 'all-saved'
               ? 'All saved'
               : selectedWishlistObj
@@ -2705,6 +2734,16 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                   ? selectedWishlistObj.name.slice(0, 16) + '…'
                   : selectedWishlistObj.name
                 : 'Saved';
+          // Append the wishlist's full size (active + delisted) as a
+          // parenthetical so the user always sees how many listings the
+          // wishlist holds regardless of current filters or the delisted
+          // toggle. Only shown for a real wishlist (not "Saved" / "All saved").
+          const clusterLabel =
+            selectedWishlistObj &&
+            selectedWishlist !== 'all-saved' &&
+            wishlistTotalCount != null
+              ? `${clusterLabelBase} (${wishlistTotalCount})`
+              : clusterLabelBase;
           const hasSelection = !!selectedWishlist;
           return (
             <div className="shrink-0 flex items-center" ref={clusterDropdownRef}>
