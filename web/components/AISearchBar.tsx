@@ -99,7 +99,7 @@ export default function AISearchBar({ onSearch, isLoading, lastQuery, lastError,
               backgroundColor: input.trim() ? '#58a6ff' : 'transparent',
               color: input.trim() ? '#0f1117' : '#8b949e',
             }}
-            aria-label="Search"
+            aria-label="Send AI search query"
           >
             <SendIcon />
           </button>

@@ -469,7 +469,11 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
               className="flex flex-col items-center justify-center gap-3 min-h-[200px] text-center text-sm px-4"
               style={{ color: '#8b949e' }}
             >
-              <div>No listings match your filters.</div>
+              <div>
+                No listings match these filters.
+                <br />
+                Try widening your search.
+              </div>
               {emptyStateExtra}
             </div>
           )}

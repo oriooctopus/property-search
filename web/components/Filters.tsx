@@ -2864,9 +2864,12 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                 setSortOpen((prev) => !prev);
                 setOpenChip(null);
               }}
+              aria-label={`Sort listings, current sort: ${sortLabel}`}
+              aria-haspopup="menu"
+              aria-expanded={sortOpen}
               className="flex items-center gap-1 text-[11px] text-[#8b949e] hover:text-[#e1e4e8] cursor-pointer whitespace-nowrap px-1 transition-colors duration-150"
             >
-              <span>&#8645;</span>
+              <span aria-hidden="true">&#8645;</span>
               <span className="hidden sm:inline">{sortLabel}</span>
               <span className="sm:hidden">Sort</span>
               <ChevronDown className={`transition-transform ${sortOpen ? 'rotate-180' : ''}`} />
