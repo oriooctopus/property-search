@@ -127,12 +127,16 @@ export default function SwipeOnboarding({ onDismiss }: SwipeOnboardingProps) {
         transition: 'opacity 250ms ease-out',
       }}
     >
-      {/* Dim backdrop — softens the real card behind so the fake card reads
-          as "the focus." pointer-events: none everywhere; tap goes through. */}
+      {/* Opaque mask — covers the real card stack behind so when the fake
+          card translates, what's exposed is THIS solid surface, not the
+          real listing peeking through. Earlier 45% opacity left the real
+          card visible whenever the fake card moved off-center, which read
+          as "screen glitching." Solid panel-bg matches the SwipeView
+          container so it blends seamlessly. */}
       <div
         className="absolute inset-0 rounded-3xl min-[600px]:rounded-xl"
         style={{
-          backgroundColor: 'rgba(0, 0, 0, 0.45)',
+          backgroundColor: '#0d1117',
         }}
       />
       {/* Fake card overlay — opaque so it actually reads as a card, not a
