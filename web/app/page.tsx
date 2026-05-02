@@ -284,7 +284,14 @@ function HomeInner() {
   // splitting the data source would double the network cost of every
   // filter change.
   // -----------------------------------------------------------------------
-  const PAGE_SIZE = 100;
+  // Temporary debug fast-load: ?fast=1 in the URL caps the deck to 3
+  // listings so swipe-iteration cycles aren't gated on a 10s page load.
+  // Remove once swipe debugging is done.
+  const PAGE_SIZE =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('fast') === '1'
+      ? 3
+      : 100;
   const [hasMoreListings, setHasMoreListings] = useState(false);
   const [loadingMoreListings, setLoadingMoreListings] = useState(false);
   // Next offset to request. null = no more to load.

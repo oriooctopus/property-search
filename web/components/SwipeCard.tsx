@@ -322,6 +322,11 @@ export default function SwipeCard({
     },
     onSwiping: (e: SwipeEventData) => {
       if (!isTop) return;
+      // Photo-area gestures don't translate the card visually — they're
+      // carousel-only. Letting the card drag during a photo swipe creates
+      // the visual artifact "I tried to nav photos and the card moved with
+      // my finger then snapped back."
+      if (touchInPhoto.current) return;
       // Live translate during drag — drives framer-motion x/y motion values.
       // deltaX/deltaY are end-relative-to-start.
       const allowedY = e.deltaY > 0 ? e.deltaY : 0;
