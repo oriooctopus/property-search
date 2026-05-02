@@ -1,120 +1,219 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
+
+// ---------------------------------------------------------------------------
+// SwipeOnboarding — Option A: animated demo card.
+//
+// First-time onboarding for the swipe view. Instead of a modal with a list
+// of "← Pass / → Save / ↑ Top match", we render a FAKE listing card on top
+// of the real one and animate it through each swipe direction on loop. The
+// card itself is the lesson — no modal chrome, no prose, no "Got it" button.
+//
+// Dismissal: any pointer/touch interaction anywhere on the document, OR
+// the parent calls onDismiss after first real card gesture. The fake card
+// fades out and the real top card is revealed.
+//
+// pointer-events: none on the wrapper so taps/swipes pass through to the
+// real card, exactly like the previous version.
+// ---------------------------------------------------------------------------
+
 interface SwipeOnboardingProps {
-  /** Tapping "Got it" or the backdrop outside the modal calls this. The
-   *  parent also auto-dismisses when the user starts their first gesture
-   *  (gesture flows through everywhere except the modal card itself). */
   onDismiss?: () => void;
 }
 
-const ROWS: Array<{ glyph: string; label: string; sub: string }> = [
-  { glyph: '←', label: 'Pass', sub: 'Not for me' },
-  { glyph: '→', label: 'Save', sub: 'Add to wishlist' },
-  { glyph: '↑', label: 'Would live here', sub: 'Your top picks' },
-  { glyph: '↓', label: 'Later', sub: 'Come back to this one' },
+type StepAction =
+  | 'idle'
+  | 'swipe-right'
+  | 'swipe-left'
+  | 'swipe-up'
+  | 'return';
+
+interface Step {
+  action: StepAction;
+  label?: string;
+  labelColor?: string;
+  duration: number;
+}
+
+// Loop sequence. Mirrors mockup-tour-guide-redesign-a.html.
+const STEPS: Step[] = [
+  { action: 'idle', duration: 800 },
+  { action: 'swipe-right', label: '→ Save · Add to wishlist', labelColor: '#58a6ff', duration: 700 },
+  { action: 'return', duration: 450 },
+  { action: 'idle', duration: 500 },
+  { action: 'swipe-left', label: '← Pass · Not for me', labelColor: '#8b949e', duration: 700 },
+  { action: 'return', duration: 450 },
+  { action: 'idle', duration: 500 },
+  { action: 'swipe-up', label: '↑ Would live here · Top pick', labelColor: '#7ee787', duration: 700 },
+  { action: 'return', duration: 450 },
+  { action: 'idle', duration: 1000 },
 ];
 
+function transformFor(action: StepAction): string {
+  switch (action) {
+    case 'swipe-right':
+      return 'translateX(100px) rotate(12deg)';
+    case 'swipe-left':
+      return 'translateX(-100px) rotate(-12deg)';
+    case 'swipe-up':
+      return 'translateY(-80px) scale(0.96)';
+    case 'return':
+    case 'idle':
+    default:
+      return 'translateX(0) translateY(0) rotate(0deg) scale(1)';
+  }
+}
+
 export default function SwipeOnboarding({ onDismiss }: SwipeOnboardingProps) {
+  const [stepIdx, setStepIdx] = useState(0);
+  const [fadingOut, setFadingOut] = useState(false);
+  const timerRef = useRef<number | null>(null);
+
+  // Drive the animation loop via setTimeout chained on the current step's duration
+  useEffect(() => {
+    if (fadingOut) return;
+    const step = STEPS[stepIdx % STEPS.length];
+    timerRef.current = window.setTimeout(() => {
+      setStepIdx((i) => (i + 1) % STEPS.length);
+    }, step.duration);
+    return () => {
+      if (timerRef.current != null) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [stepIdx, fadingOut]);
+
+  // First user interaction anywhere triggers fade-out → onDismiss
+  useEffect(() => {
+    const handler = () => {
+      if (fadingOut) return;
+      setFadingOut(true);
+      window.setTimeout(() => {
+        onDismiss?.();
+      }, 250);
+    };
+    // Capture-phase passive listeners so they fire regardless of where the
+    // user taps. We don't preventDefault — the underlying real card should
+    // receive the gesture normally.
+    document.addEventListener('pointerdown', handler, { capture: true, passive: true, once: true });
+    document.addEventListener('touchstart', handler, { capture: true, passive: true, once: true });
+    return () => {
+      document.removeEventListener('pointerdown', handler, { capture: true } as EventListenerOptions);
+      document.removeEventListener('touchstart', handler, { capture: true } as EventListenerOptions);
+    };
+  }, [fadingOut, onDismiss]);
+
+  const step = STEPS[stepIdx % STEPS.length];
+  const cardTransform = transformFor(step.action);
+  const cardTransition =
+    step.action === 'return'
+      ? 'transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)'
+      : 'transform 0.5s cubic-bezier(0.34, 1.1, 0.64, 1)';
+
+  // Stamps fade in on the matching swipe action and out on return/idle
+  const showSave = step.action === 'swipe-right';
+  const showPass = step.action === 'swipe-left';
+  const showTop = step.action === 'swipe-up';
+
   return (
     <div
-      className="absolute inset-0 flex items-end justify-center pb-20"
-      style={{ zIndex: 1300, backgroundColor: 'rgba(0,0,0,0.55)', pointerEvents: 'none' }}
+      className="absolute inset-0"
+      style={{
+        zIndex: 1300,
+        pointerEvents: 'none',
+        opacity: fadingOut ? 0 : 1,
+        transition: 'opacity 250ms ease-out',
+      }}
     >
+      {/* Fake card overlay — positioned to overlay the real top card behind.
+          Uses the same rounded-2xl corners and dark panel bg so the visual
+          grammar matches. The wrapper inset-0 means it sits exactly where
+          the parent placed us (the SwipeView's card-stack container). */}
       <div
-        className="relative w-[88%] max-w-[340px] rounded-2xl"
+        className="absolute inset-0 rounded-3xl min-[600px]:rounded-xl"
         style={{
-          backgroundColor: '#1c2028',
+          backgroundColor: 'rgba(28, 32, 40, 0.55)',
           border: '1px solid #2d333b',
-          padding: '16px 18px 14px',
-          pointerEvents: 'auto',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
+          transform: cardTransform,
+          transition: cardTransition,
+          willChange: 'transform',
         }}
       >
-        {/* Header row: gentle prompt + close button */}
-        <div className="flex items-center justify-between mb-3">
-          <div
-            className="text-[14px] font-medium leading-tight"
-            style={{ color: '#e1e4e8' }}
-          >
-            Swipe to find your place
-          </div>
-          <button
-            type="button"
-            onClick={onDismiss}
-            aria-label="Dismiss"
-            className="flex items-center justify-center rounded-full transition-colors"
-            style={{
-              width: 24,
-              height: 24,
-              color: '#8b949e',
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#e1e4e8'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = '#8b949e'; }}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-              <path d="M3 3l8 8M11 3l-8 8" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Direction rows */}
-        <div className="flex flex-col gap-1.5 mb-3">
-          {ROWS.map((row) => (
-            <div key={row.label} className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center rounded-full text-[15px] font-bold"
-                style={{
-                  width: 28,
-                  height: 28,
-                  backgroundColor: 'rgba(88, 166, 255, 0.10)',
-                  border: '1px solid rgba(88, 166, 255, 0.35)',
-                  color: '#58a6ff',
-                  flexShrink: 0,
-                }}
-              >
-                {row.glyph}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-semibold leading-tight" style={{ color: '#e1e4e8' }}>
-                  {row.label}
-                </div>
-                <div className="text-[11px] leading-tight" style={{ color: '#8b949e' }}>
-                  {row.sub}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Start swiping button */}
-        <button
-          type="button"
-          onClick={onDismiss}
-          className="w-full rounded-md text-[13px] font-semibold transition-colors"
-          style={{
-            height: 36,
-            backgroundColor: '#58a6ff',
-            color: '#0f1117',
-            border: 'none',
-            cursor: 'pointer',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#79b8ff'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#58a6ff'; }}
-        >
-          Start swiping
-        </button>
-
-        {/* Hint that the card behind is live and the modal isn't a gate */}
+        {/* Stamps that fade in/out matching the gesture */}
         <div
-          className="text-center mt-2 text-[10px]"
-          style={{ color: '#6e7681' }}
+          className="absolute top-6 left-5 z-[5]"
+          style={{
+            opacity: showSave ? 1 : 0,
+            transform: 'rotate(12deg)',
+            transition: 'opacity 200ms',
+          }}
         >
-          or just swipe — we&rsquo;ll get out of your way
+          <div
+            className="px-3 py-1.5 text-2xl font-black uppercase tracking-widest"
+            style={{ color: '#58a6ff', border: '3px solid #58a6ff', borderRadius: 6 }}
+          >
+            SAVE
+          </div>
         </div>
+        <div
+          className="absolute top-6 right-5 z-[5]"
+          style={{
+            opacity: showPass ? 1 : 0,
+            transform: 'rotate(-12deg)',
+            transition: 'opacity 200ms',
+          }}
+        >
+          <div
+            className="px-3 py-1.5 text-2xl font-black uppercase tracking-widest"
+            style={{ color: '#8b949e', border: '3px solid #8b949e', borderRadius: 6 }}
+          >
+            PASS
+          </div>
+        </div>
+        <div
+          className="absolute top-6 left-1/2 -translate-x-1/2 z-[5] whitespace-nowrap"
+          style={{
+            opacity: showTop ? 1 : 0,
+            transition: 'opacity 200ms',
+          }}
+        >
+          <div
+            className="px-3 py-1.5 text-base font-black uppercase tracking-widest"
+            style={{ color: '#7ee787', border: '3px solid #7ee787', borderRadius: 6 }}
+          >
+            TOP PICK
+          </div>
+        </div>
+      </div>
+
+      {/* Caption below the card-stack area. Floats at the bottom of the
+          overlay; uses safe-area inset so it doesn't collide with the
+          floating action dock on mobile. */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 text-[13px] font-medium whitespace-nowrap"
+        style={{
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 90px)',
+          color: step.label ? (step.labelColor ?? '#e1e4e8') : '#6e7681',
+          opacity: step.label ? 1 : 0.6,
+          transition: 'opacity 200ms, color 200ms',
+          textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+        }}
+      >
+        {step.label ?? 'Swipe to find your place'}
+      </div>
+
+      {/* Tiny "tap to dismiss" hint, even fainter */}
+      <div
+        className="absolute left-1/2 -translate-x-1/2 text-[10px]"
+        style={{
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 70px)',
+          color: '#6e7681',
+          opacity: 0.7,
+        }}
+      >
+        tap or swipe to start
       </div>
     </div>
   );
