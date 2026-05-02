@@ -36,6 +36,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-leaflet": "^5.0.0",
+    "react-swipeable": "^7.0.2",
     "streeteasy-api": "^0.1.11",
     "tailwind-merge": "^3.5.0",
     "twilio": "^5.13.0"
