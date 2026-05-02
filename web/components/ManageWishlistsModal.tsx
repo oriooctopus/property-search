@@ -747,12 +747,15 @@ function WishlistRow({
                   }}
                   className="outline-none cursor-pointer"
                   style={{
-                    background: '#161b22',
+                    background: "#161b22 url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'><path d='M1 1l4 4 4-4' stroke='%238b949e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>\") no-repeat right 8px center",
                     border: '1px solid #2d333b',
                     color: '#e1e4e8',
                     borderRadius: 6,
-                    padding: '5px 10px',
+                    padding: '5px 22px 5px 10px',
                     fontSize: 12,
+                    appearance: 'none',
+                    WebkitAppearance: 'none',
+                    MozAppearance: 'none',
                   }}
                 >
                   <option value="editor">Editor</option>
@@ -805,12 +808,15 @@ function WishlistRow({
               onChange={(e) => setInvitePermission(e.target.value as 'viewer' | 'editor')}
               className="outline-none cursor-pointer"
               style={{
-                background: '#161b22',
+                background: "#161b22 url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'><path d='M1 1l4 4 4-4' stroke='%238b949e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>\") no-repeat right 10px center",
                 border: '1px solid #2d333b',
                 color: '#e1e4e8',
                 borderRadius: 7,
-                padding: '7px 10px',
-                fontSize: 12,
+                padding: '7px 26px 7px 12px',
+                fontSize: 13,
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                MozAppearance: 'none',
               }}
             >
               <option value="editor">Editor</option>
