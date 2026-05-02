@@ -166,7 +166,7 @@ export default function Navbar() {
               )}
               {dropdownOpen && (
                 <div
-                  className="absolute right-0 mt-2 w-40 rounded-md py-1 shadow-lg"
+                  className="absolute right-0 mt-2 w-40 rounded-md py-1 shadow-lg z-[1300]"
                   style={{
                     backgroundColor: "#1c2028",
                     border: "1px solid #2d333b",
