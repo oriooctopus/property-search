@@ -38,6 +38,8 @@ interface UseConversationOptions {
   onFiltersChange: (filters: FiltersState) => void;
   /** Current total matching listing count (for embedding in assistant messages) */
   getListingCount: () => number;
+  /** Called when an API request returns 401 (e.g. anon user tried to use AI chat) */
+  onAuthRequired?: () => void;
 }
 
 export interface UseConversationReturn {
@@ -56,6 +58,7 @@ export interface UseConversationReturn {
 export function useConversation({
   onFiltersChange,
   getListingCount,
+  onAuthRequired,
 }: UseConversationOptions): UseConversationReturn {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<ChatMessageData[]>([]);
@@ -102,6 +105,18 @@ export function useConversation({
             currentFilters: filters,
           }),
         });
+
+        if (res.status === 401) {
+          const authMsg: ChatMessageData = {
+            id: uid(),
+            role: 'system',
+            content: 'Please log in to use AI search.',
+            timestamp: Date.now(),
+          };
+          addMessage(authMsg);
+          onAuthRequired?.();
+          return false;
+        }
 
         if (!res.ok) {
           throw new Error(`Chat API returned ${res.status}`);
@@ -163,7 +178,7 @@ export function useConversation({
         setIsLoading(false);
       }
     },
-    [conversation, filters, addMessage, setFilters],
+    [conversation, filters, addMessage, setFilters, onAuthRequired],
   );
 
   // ---------------------------------------------------------------------------

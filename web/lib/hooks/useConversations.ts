@@ -25,7 +25,7 @@ async function fetchConversations(): Promise<ConversationSummary[]> {
   }));
 }
 
-export function useConversations() {
+export function useConversations(userId: string | null | undefined) {
   const queryClient = useQueryClient();
 
   const query = useQuery<ConversationSummary[]>({
@@ -33,6 +33,8 @@ export function useConversations() {
     queryFn: fetchConversations,
     staleTime: 30_000,
     refetchOnWindowFocus: true,
+    // Don't poll an auth-gated endpoint for anon users — would 401 on every cold load
+    enabled: Boolean(userId),
   });
 
   /** Manually invalidate the conversation list (e.g. after saving a search) */
