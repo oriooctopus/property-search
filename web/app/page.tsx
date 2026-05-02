@@ -791,6 +791,21 @@ function HomeInner() {
     return 'list';
   });
 
+  // Track desktop vs mobile viewport so we can drop the redundant list option
+  // from the SegmentedControl on desktop (the list panel is always visible in
+  // the fixed split layout). Initialised true (desktop) so SSR matches the
+  // wider-viewport default — the effect below corrects it on hydrate. Using
+  // 600px to match the existing `min-[600px]:flex` breakpoint elsewhere.
+  const [isDesktopViewport, setIsDesktopViewport] = useState<boolean>(true);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mql = window.matchMedia('(min-width: 600px)');
+    const update = () => setIsDesktopViewport(mql.matches);
+    update();
+    mql.addEventListener('change', update);
+    return () => mql.removeEventListener('change', update);
+  }, []);
+
   // After hydration, if the user is on a mobile viewport AND no explicit
   // ?view= param was supplied, switch the default to swipe. This handles the
   // SSR case where window is unavailable on the server and we initially
@@ -1386,13 +1401,20 @@ function HomeInner() {
   // Hide Swipe tab when a wishlist filter is active — swipe-to-decide doesn't
   // make sense when you're already filtering down to saved listings.
   const swipeAllowed = selectedWishlist == null;
+  // The list option in the segmented control is meaningless on desktop because
+  // the list panel is always rendered in the fixed split layout. Hide it for
+  // desktop viewports (>=600px) where the user never needs to "switch back to
+  // list". Mobile keeps all three options because list/map/swipe are mutually
+  // exclusive full-screen surfaces below the breakpoint.
   const viewToggle = (
     <div data-tour="view-modes" className="flex items-center">
     <SegmentedControl
       value={mobileView}
       onChange={(v) => switchMobileView(v as 'list' | 'map' | 'swipe')}
       options={[
-        { value: 'list', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> },
+        ...(isDesktopViewport
+          ? []
+          : [{ value: 'list', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> }]),
         ...(swipeAllowed
           ? [{ value: 'swipe', label: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="14" height="18" rx="2"/><rect x="8" y="2" width="14" height="18" rx="2"/></svg> }]
           : []),
