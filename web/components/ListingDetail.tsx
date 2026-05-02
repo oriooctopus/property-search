@@ -214,6 +214,9 @@ export default function ListingDetail({
       }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="listing-detail-title"
         className="relative rounded-xl w-full max-w-lg mx-4 max-h-[85dvh] overflow-y-auto"
         style={{ backgroundColor: '#1c2028', border: '1px solid #2d333b' }}
       >
@@ -411,7 +414,7 @@ export default function ListingDetail({
         <div className="p-4 pb-8 sm:p-6 sm:pb-10">
           {/* Header */}
           <div className="mb-4">
-            <h2 className="text-lg font-bold" style={{ color: '#e1e4e8' }}>
+            <h2 id="listing-detail-title" className="text-lg font-bold" style={{ color: '#e1e4e8' }}>
               {listing.address}
             </h2>
             <div className="text-sm" style={{ color: '#8b949e' }}>
