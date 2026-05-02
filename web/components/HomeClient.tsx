@@ -903,9 +903,10 @@ function HomeInner() {
       setFilters(newFilters);
     }, []),
     getListingCount: useCallback(() => filteredListingsRef.current.length, []),
+    onAuthRequired: useCallback(() => setAuthModal('login'), []),
   });
 
-  const { conversations, invalidate: invalidateConversations } = useConversations();
+  const { conversations, invalidate: invalidateConversations } = useConversations(userId);
   const { savedSearches, saveSearch: saveSavedSearch, deleteSearch: deleteSavedSearch, updateSearch: updateSavedSearch, updateSearchFilters: updateSavedSearchFilters } = useSavedSearches(userId);
 
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
