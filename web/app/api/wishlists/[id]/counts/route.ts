@@ -15,8 +15,9 @@ import { createClient } from "@/lib/supabase-server";
 // delisted-count next to the "Show delisted (N of M)" toggle, so the user
 // always sees the full wishlist size (not just the filter-narrowed view).
 //
-// Authorization: relies on RLS. The user can only read wishlist_items rows for
-// wishlists they own or have been shared with.
+// Authorization: relies on RLS. Owners and shared-with users see their own
+// wishlists; anon (and any other non-owner) callers see public wishlists
+// (`is_public = true`) — same shape as the listing-search route's auth model.
 // ---------------------------------------------------------------------------
 
 export async function GET(
@@ -29,16 +30,11 @@ export async function GET(
   }
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
   // Pull every wishlist_items row for this wishlist together with the parent
-  // listing's delisted_at via the FK relationship. RLS ensures the user can
-  // only read items from wishlists they own or have shared access to.
+  // listing's delisted_at via the FK relationship. RLS gates which rows are
+  // visible: owned/shared (auth) OR public (is_public=true, anon-friendly).
+  // No app-level auth check needed — RLS does the gating.
   const { data, error } = await supabase
     .from("wishlist_items")
     .select("listing_id, listings!inner(delisted_at)")

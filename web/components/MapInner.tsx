@@ -32,16 +32,19 @@ const LINE_COLORS: Record<string, string> = {
 };
 
 /**
- * Route an external photo URL through Vercel's Image Optimization endpoint
- * (`/_next/image?url=<src>&w=<width>&q=<quality>`) so we benefit from AVIF/WebP
- * negotiation and width-appropriate variants even inside Leaflet popups where
- * next/image's React component can't be used (popup content is `innerHTML`).
+ * Return the photo URL directly without routing through Vercel's Image
+ * Optimization endpoint. The optimization endpoint has a tight per-month
+ * quota on the free Vercel tier and the popup photos were the largest
+ * consumer — when the quota is exhausted, every popup image renders blank.
  *
- * Falls back to the raw URL if rewriting would fail (e.g. non-http URL).
+ * ListingCard previously hit the same problem and switched to
+ * `next/image`'s `unoptimized` prop. Popups can't use `next/image` (they're
+ * built as raw HTML strings injected via Leaflet's `setContent`) so we just
+ * pass the source URL through. Width/quality args are kept for API
+ * compatibility but ignored.
  */
-function optimizedPhotoUrl(src: string, width: number, quality = 70): string {
-  if (!src || !/^https?:\/\//.test(src)) return src;
-  return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=${quality}`;
+function optimizedPhotoUrl(src: string, _width: number, _quality = 70): string {
+  return src;
 }
 
 function escapeHtml(str: string): string {

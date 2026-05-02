@@ -345,16 +345,15 @@ export async function POST(request: NextRequest) {
       const authClient = getClient();
       wishlistIds = await filterAuthorizedWishlistIds(authClient, rawWishlistIds);
     }
-    // When a wishlist filter is active, ignore the viewport bounds. The user
-    // wants to see every listing they saved to that wishlist, regardless of
-    // where the map is currently panned. (The map pins will then sit wherever
-    // those listings actually are; the user can pan to find them.) Without
-    // this, the AND of `bounds ∩ wishlistIds` silently hides every saved
-    // listing that doesn't happen to fall inside the current viewport — which
-    // is the bug this comment is preventing the next person from
-    // reintroducing.
-    const wishlistActive = wishlistIds !== null && wishlistIds.length > 0;
-    const bounds = wishlistActive ? null : (body.bounds ?? null);
+    // Wishlist mode goes through the same pathway as normal search and respects
+    // the viewport bounds. Previously this branch dropped bounds when a
+    // wishlist filter was active so the user could see all their saved
+    // listings without panning — but that diverged from the normal flow and
+    // surfaced wishlist items outside the visible map area. Users zoomed into
+    // Brooklyn would see Manhattan saves in the panel. After this change,
+    // wishlist + bounds compose like every other filter; pan/zoom out to see
+    // saves that fall outside the current viewport.
+    const bounds = body.bounds ?? null;
 
     const supabase = getClient();
 
