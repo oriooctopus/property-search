@@ -63,6 +63,21 @@ const VALID_SORTS = new Set<string>(['price', 'beds', 'listDate']);
 const VALID_LISTING_AGES = new Set<string>(['1h', '3h', '6h', '12h', '1d', '2d', '3d', '1w', '2w', '1m']);
 
 
+// Detect whether the user is logged in via Supabase by checking for an auth
+// cookie synchronously at mount. @supabase/ssr stores the session in cookies
+// named `sb-<project-ref>-auth-token` (or `.0`, `.1` chunks). We just need a
+// best-effort signal — if it's there we assume "probably logged in" so we can
+// land mobile users on the swipe view; if it's missing we keep them on the
+// safer list view to avoid the SwipeOnboarding full-screen overlay as a first
+// impression. The async `supabase.auth.getUser()` call still runs and is the
+// source of truth for `userId` — this helper only gates the initial view.
+function hasSupabaseAuthCookie(): boolean {
+  if (typeof document === 'undefined') return false;
+  // Match any cookie that starts with `sb-` and ends with `-auth-token`
+  // (optionally chunked, e.g. `-auth-token.0`).
+  return /(?:^|;\s*)sb-[^=]+-auth-token(?:\.\d+)?=/.test(document.cookie);
+}
+
 function parseNumOrNull(v: string | null): number | null {
   if (v == null) return null;
   const n = Number(v);
@@ -780,12 +795,15 @@ function HomeInner() {
       }
       return v as 'list' | 'map' | 'swipe';
     }
-    // Mobile users land on the swipe view by default — it's the better
-    // mobile experience. Desktop continues to default to the list view.
-    // SSR-safe: `window` is undefined on the server, so default to 'list'
-    // there; the client effect below upgrades to 'swipe' after hydration
-    // when the viewport is narrow AND no ?view= param was supplied.
-    if (typeof window !== 'undefined' && window.innerWidth < 600) {
+    // Mobile users who are logged in land on the swipe view by default — it's
+    // the better mobile experience for them. Anonymous mobile users land on
+    // 'list' so they don't see the SwipeOnboarding overlay (which fully
+    // covers the screen with an opaque mask) as their first impression.
+    // Desktop continues to default to the list view. SSR-safe: `window` is
+    // undefined on the server, so default to 'list' there; the client effect
+    // below upgrades to 'swipe' after hydration when the viewport is narrow,
+    // an auth cookie is present, AND no ?view= param was supplied.
+    if (typeof window !== 'undefined' && window.innerWidth < 600 && hasSupabaseAuthCookie()) {
       return 'swipe';
     }
     return 'list';
@@ -825,7 +843,10 @@ function HomeInner() {
       return;
     }
     if (explicitView) return;
-    if (isNarrow) {
+    // Only auto-promote anonymous mobile users to swipe view if they have a
+    // Supabase auth cookie. Anon users stay on 'list' to avoid the
+    // SwipeOnboarding full-screen mask as a first impression.
+    if (isNarrow && hasSupabaseAuthCookie()) {
       setMobileView('swipe');
     }
     // We intentionally read searchParams once at mount; the `view` param is
