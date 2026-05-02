@@ -14,7 +14,6 @@ interface TierInfo {
 export default function PricingPage() {
   const [tiers, setTiers] = useState<TierInfo[]>([]);
   const [currentTier, setCurrentTier] = useState<string>("free");
-  const [toast, setToast] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -52,11 +51,6 @@ export default function PricingPage() {
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 3000);
-  };
 
   const tierDescriptions: Record<string, string> = {
     free: "Get started with basic property searches",
@@ -190,25 +184,19 @@ export default function PricingPage() {
                 >
                   {isCurrent ? "Current plan" : "Free"}
                 </button>
-              ) : tier.id === "enterprise" ? (
-                <button
-                  onClick={() => showToast("Coming soon! Contact us at hello@dwelligence.com")}
-                  className="w-full rounded-md px-4 py-2.5 text-sm font-medium transition-colors hover:opacity-90"
-                  style={{
-                    backgroundColor: "transparent",
-                    color: "#58a6ff",
-                    border: "1px solid #58a6ff",
-                  }}
-                >
-                  Contact us
-                </button>
               ) : (
                 <button
-                  onClick={() => showToast("Payment processing coming soon!")}
-                  className="w-full rounded-md px-4 py-2.5 text-sm font-medium transition-colors hover:opacity-90"
-                  style={{ backgroundColor: "#58a6ff", color: "#0f1117" }}
+                  disabled
+                  aria-disabled="true"
+                  title="Paid plans aren't available yet — coming soon"
+                  className="w-full rounded-md px-4 py-2.5 text-sm font-medium opacity-50 cursor-not-allowed"
+                  style={{
+                    backgroundColor: "#2d333b",
+                    color: "#8b949e",
+                    border: "1px solid #2d333b",
+                  }}
                 >
-                  {isCurrent ? "Current plan" : "Upgrade"}
+                  Coming soon
                 </button>
               )}
             </div>
@@ -216,19 +204,6 @@ export default function PricingPage() {
         })}
       </div>
 
-      {/* Toast */}
-      {toast && (
-        <div
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-lg px-6 py-3 text-sm font-medium shadow-lg transition-all"
-          style={{
-            backgroundColor: "#1c2028",
-            border: "1px solid #2d333b",
-            color: "#e1e4e8",
-          }}
-        >
-          {toast}
-        </div>
-      )}
     </div>
   );
 }
