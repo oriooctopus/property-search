@@ -439,9 +439,16 @@ export default function SwipeView({
     const c = mapCenterRef.current;
     return geoSort(listings, c?.lat, c?.lng);
   }, [listings]);
+  // Exclude listings the user has already swiped on THIS session
+  // (swipedIds) AND ones they've already saved to a wishlist (persists
+  // across sessions via Supabase). Without the wishlistedIds check, a
+  // listing the user right-swiped yesterday would reappear in the deck
+  // today because swipedIds is intentionally session-only.
+  // Hidden listings are excluded server-side by /api/listings/search,
+  // so they don't need a client-side filter here.
   const deck = useMemo(
-    () => geoSorted.filter((l) => !swipedIds.has(l.id)),
-    [geoSorted, swipedIds],
+    () => geoSorted.filter((l) => !swipedIds.has(l.id) && !(wishlistedIds?.has(l.id) ?? false)),
+    [geoSorted, swipedIds, wishlistedIds],
   );
 
   // After deck recomputes, restore position to the listing the user was viewing.
