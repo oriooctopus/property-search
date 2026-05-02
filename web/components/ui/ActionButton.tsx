@@ -56,7 +56,7 @@ const fullClasses: Record<ActionVariant, { base: string; active: string; inactiv
 };
 
 export const ActionButton = forwardRef<HTMLButtonElement, ActionButtonProps>(
-  function ActionButton({ variant, active, compact = false, label, className, ...rest }, ref) {
+  function ActionButton({ variant, active, compact = false, label, className, 'aria-label': ariaLabel, ...rest }, ref) {
     const styles = compact ? compactClasses[variant] : fullClasses[variant];
     const iconMap: Record<ActionVariant, typeof StarIcon> = {
       save: StarIcon,
@@ -66,6 +66,15 @@ export const ActionButton = forwardRef<HTMLButtonElement, ActionButtonProps>(
       save: 'Save',
       hide: 'Hide',
     };
+    // Provide an accessible name for icon-only renders. The visible `label`
+    // (when provided) is the source of truth in the labeled (non-compact)
+    // form; otherwise we fall back to a state-aware default that screen
+    // readers will announce.
+    const defaultAriaLabel: Record<ActionVariant, string> = {
+      save: active ? 'Remove from wishlist' : 'Save to wishlist',
+      hide: active ? 'Unhide listing' : 'Hide listing',
+    };
+    const resolvedAriaLabel = ariaLabel ?? defaultAriaLabel[variant];
     const Icon = iconMap[variant];
 
     return (
@@ -73,6 +82,8 @@ export const ActionButton = forwardRef<HTMLButtonElement, ActionButtonProps>(
         ref={ref}
         className={cn(styles.base, active ? styles.active : styles.inactive, className)}
         title={titleMap[variant]}
+        aria-label={resolvedAriaLabel}
+        aria-pressed={active}
         {...rest}
       >
         <Icon active={active} />
