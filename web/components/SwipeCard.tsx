@@ -141,8 +141,14 @@ interface SwipeCardProps {
   compactMobile?: boolean;
 }
 
-const SWIPE_X_THRESHOLD = 70;
-const SWIPE_Y_THRESHOLD = 70; // down only
+// Lowered from 70 → 50 after analyzing real-iOS pointer-event captures
+// (session mooglb9n-lcxi9x). Real-finger swipes naturally arc rather than
+// going dead-straight horizontal — a user who "swipes right" often ends up
+// 50-70px from start by release, not 100+. Tinder uses ~50px. The previous
+// 70px threshold left the user's gesture 9px short of commit even though
+// it was clearly a horizontal swipe intent.
+const SWIPE_X_THRESHOLD = 50;
+const SWIPE_Y_THRESHOLD = 60; // down only
 const STAMP_FADE_RATIO = 0.5;
 // Photo-area horizontal swipe threshold (mobile). Below SWIPE_X_THRESHOLD we
 // treat the gesture as carousel navigation; at/above it we hand off to the
@@ -306,7 +312,8 @@ export default function SwipeCard({
   const AXIS_LOCK_THRESHOLD = 8;
   // Velocity threshold (px/sec) for flick-commit. A fast flick below the
   // displacement threshold still commits in the flick direction.
-  const SWIPE_VELOCITY = 500;
+  // Lowered 500 → 300 to match Tinder-class flick sensitivity.
+  const SWIPE_VELOCITY = 300;
 
   const bind = useDrag(
     ({ movement: [mx, my], velocity: [vx, vy], direction: [dx, dy], down, first, last, tap, event }) => {
