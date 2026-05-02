@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo, type ReactNode } from 'react';
 import Image from 'next/image';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
-import { useDrag } from '@use-gesture/react';
+import { useSwipeable, type SwipeEventData } from 'react-swipeable';
 import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
 import { CompactStats } from '@/components/ui';
 import { formatAvailabilityDate, formatAvailabilityCompact } from '@/lib/format-date';
@@ -202,8 +202,6 @@ export default function SwipeCard({
   const notifiedDragging = useRef(false);
   const touchInPhoto = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
-  const gestureAxis = useRef<null | 'x' | 'y'>(null);
-  const scrollingContent = useRef(false);
 
   // Photo-focus mode: arrow keys cycle photos instead of triggering swipe actions
   const enterPhotoFocus = useCallback(() => {
@@ -305,174 +303,76 @@ export default function SwipeCard({
     [onSwipe, x, y]
   );
 
-  // Axis lock kicks in once movement exceeds this in either direction.
-  // 15px was too high — felt unresponsive on slow swipes (the user's
-  // finger had to move noticeably before the card started translating).
-  // 8px feels much closer to Tinder/Hinge.
-  const AXIS_LOCK_THRESHOLD = 8;
-  // Velocity threshold (px/sec) for flick-commit. A fast flick below the
-  // displacement threshold still commits in the flick direction.
-  // Lowered 500 → 300 to match Tinder-class flick sensitivity.
-  const SWIPE_VELOCITY = 300;
-
-  const bind = useDrag(
-    ({ movement: [mx, my], velocity: [vx, vy], direction: [dx, dy], down, first, last, tap, event }) => {
+  // react-swipeable gesture handlers. Replaces the previous @use-gesture/react
+  // useDrag block. We keep the framer-motion x/y motion values so all the
+  // tint/stamp transforms stay library-agnostic.
+  const swipeHandlers = useSwipeable({
+    onTouchStartOrOnMouseDown: ({ event }) => {
       if (!isTop) return;
+      notifiedDragging.current = false;
+      dragRecentlyFired.current = false;
 
-      if (first) {
-        gestureAxis.current = null;
-        scrollingContent.current = false;
-        dragRecentlyFired.current = false;
+      const target = (event as TouchEvent | MouseEvent).target as HTMLElement | null;
+      touchInPhoto.current = !!(
+        totalPhotos > 1 &&
+        photoAreaRef.current &&
+        target &&
+        photoAreaRef.current.contains(target)
+      );
+    },
+    onSwiping: (e: SwipeEventData) => {
+      if (!isTop) return;
+      // Live translate during drag — drives framer-motion x/y motion values.
+      // deltaX/deltaY are end-relative-to-start.
+      const allowedY = e.deltaY > 0 ? e.deltaY : 0;
+      x.set(e.deltaX);
+      y.set(allowedY);
 
-        const target = event?.target as HTMLElement | null;
-        touchInPhoto.current = !!(
-          totalPhotos > 1 &&
-          photoAreaRef.current &&
-          target &&
-          photoAreaRef.current.contains(target)
-        );
-
-        // Check if touch started inside scrollable content that has been scrolled down
-        const inScrollable = !!(panelRef.current && target && panelRef.current.contains(target));
-        if (inScrollable && (panelRef.current?.scrollTop ?? 0) > 0) {
-          scrollingContent.current = true;
-        }
-      }
-
-      // Tap (use-gesture-classified): not a drag — let the click handler run.
-      if (tap) return;
-
-      // Lock gesture axis after initial movement exceeds threshold
-      if (gestureAxis.current === null) {
-        const absX = Math.abs(mx);
-        const absY = Math.abs(my);
-        if (absX > AXIS_LOCK_THRESHOLD || absY > AXIS_LOCK_THRESHOLD) {
-          gestureAxis.current = absX > absY ? 'x' : 'y';
-        }
-      }
-
-      // When the inner panel has been scrolled down, vertical gestures should
-      // continue to scroll the panel (browser handles them via touch-action:
-      // pan-y). Horizontal gestures still commit a card swipe — that was a
-      // regression in earlier impls where the entire gesture was forfeited
-      // once the panel was scrolled.
-      if (scrollingContent.current && gestureAxis.current !== 'x') return;
-
-      // If axis locked to vertical AND moving upward, let browser handle native scroll
-      if (gestureAxis.current === 'y' && my < 0) return;
-
-      if (down) {
-        // Apply axis lock: zero out the non-locked axis
-        const effectiveMx = gestureAxis.current === 'y' ? 0 : mx;
-        const effectiveMy = gestureAxis.current === 'x' ? 0 : my;
-        const allowedY = effectiveMy > 0 ? effectiveMy : 0;
-
-        const dragging = Math.abs(effectiveMx) > 5 || allowedY > 5;
-        if (dragging && !notifiedDragging.current) {
-          notifiedDragging.current = true;
-          onDragStateChange?.(true);
-        }
-        x.set(effectiveMx);
-        y.set(allowedY);
-      } else if (last) {
-        dragRecentlyFired.current = true;
-
-        const absX = Math.abs(mx);
-        const absY = Math.abs(my);
-        const curY = y.get();
-
-        // use-gesture exposes `velocity` in px/ms as a non-negative magnitude;
-        // pair with `direction` (sign) to get signed px/sec.
-        const vxPxPerSec = vx * 1000 * (dx || (mx < 0 ? -1 : 1));
-        const vyPxPerSec = vy * 1000 * (dy || (my < 0 ? -1 : 1));
-        const absVx = Math.abs(vxPxPerSec);
-
-        // pointercancel handling — conditional, not absolute. iOS fires
-        // pointercancel when its native-gesture scheduler claims the
-        // gesture (e.g. the browser decides a touch on a pan-y region is
-        // actually a native scroll). If displacement is already past the
-        // commit threshold OR velocity is past the flick threshold, the
-        // user clearly meant to swipe — honor it. Only treat
-        // pointercancel as a hard abort when displacement is still
-        // sub-threshold (i.e. genuine palm rejection / accidental
-        // contact). The earlier blanket-abort rule was killing
-        // legitimate swipes whose first few pixels were claimed by iOS
-        // before the JS handler caught up.
-        const isPointerCancel = event?.type === 'pointercancel';
-        const pastCommit =
-          absX > SWIPE_X_THRESHOLD ||
-          absVx > SWIPE_VELOCITY ||
-          curY > SWIPE_Y_THRESHOLD ||
-          vyPxPerSec > SWIPE_VELOCITY;
-        const cancelled = isPointerCancel && !pastCommit;
-
-        // Decide commit at touchend by which axis dominates the END state,
-        // independent of which axis got locked during the drag. Earlier
-        // versions required gestureAxis === 'x' for horizontalCommit, which
-        // silently killed photo-area swipes when the user's finger drifted
-        // slightly more vertically than horizontally in the first 15px and
-        // got the lock pointed the wrong way — even if the user then made
-        // a clearly horizontal flick, no commit fired.
-        const horizontalDominant = absX >= absY;
-
-        const horizontalCommit =
-          !cancelled &&
-          horizontalDominant &&
-          (absX > SWIPE_X_THRESHOLD || absVx > SWIPE_VELOCITY);
-        // Vertical (down) commit: must end up moving downward, but allow a
-        // fast downward flick below the displacement threshold. Photo-area
-        // vertical drags are intentionally a no-op (snap back) — the photo
-        // is not the right surface for a back-of-queue gesture; users who
-        // want dismiss should use the grabber strip above the card.
-        const verticalCommit =
-          !cancelled &&
-          !touchInPhoto.current &&
-          !horizontalDominant &&
-          curY > 0 &&
-          (curY > SWIPE_Y_THRESHOLD || vyPxPerSec > SWIPE_VELOCITY);
-
-        if (horizontalCommit) {
-          const dir: 'left' | 'right' =
-            absVx > SWIPE_VELOCITY
-              ? vxPxPerSec < 0
-                ? 'left'
-                : 'right'
-              : mx < 0
-                ? 'left'
-                : 'right';
-          commitSwipe(dir, vxPxPerSec);
-        } else if (verticalCommit) {
-          commitSwipe('down', 0, vyPxPerSec);
-        } else {
-          // Snap back with velocity so the spring decelerates naturally
-          // instead of yanking instantly back to 0.
-          const springBack = { type: 'spring' as const, stiffness: 500, damping: 30 };
-          animate(x, 0, { ...springBack, velocity: vxPxPerSec });
-          animate(y, 0, { ...springBack, velocity: vyPxPerSec });
-        }
-
-        if (notifiedDragging.current) {
-          notifiedDragging.current = false;
-          onDragStateChange?.(false);
-        }
+      if ((Math.abs(e.deltaX) > 5 || allowedY > 5) && !notifiedDragging.current) {
+        notifiedDragging.current = true;
+        onDragStateChange?.(true);
       }
     },
-    {
-      // filterTaps: true so use-gesture classifies sub-threshold motion as
-      // a tap and skips the drag callbacks. Pairs with the explicit `tap`
-      // short-circuit at the top of the handler — together they prevent
-      // dragRecentlyFired from being set on real taps, which was eating
-      // the next legitimate photo-area click.
-      filterTaps: true,
-      // preventScroll dropped: outer wrapper already has touch-action: none,
-      // so preventScroll is redundant. With it on, iOS Safari attaches a
-      // non-passive touchmove listener and stalls every gesture-start
-      // while it negotiates with the inner panel's touch-action: pan-y.
-      // Synthetic CDP touches bypass this — that's why Playwright passes
-      // but real fingers feel a delay.
-      pointer: { touch: true },
-    }
-  );
+    onSwiped: (e: SwipeEventData) => {
+      if (!isTop) return;
+      const absX = Math.abs(e.deltaX);
+      const absY = Math.abs(e.deltaY);
+      const horizontalDominant = absX >= absY;
+      const horizontalCommit =
+        horizontalDominant && (absX > SWIPE_X_THRESHOLD || e.absX > SWIPE_X_THRESHOLD);
+      const verticalCommit =
+        !horizontalDominant &&
+        !touchInPhoto.current &&
+        e.deltaY > 0 &&
+        e.deltaY > SWIPE_Y_THRESHOLD;
+
+      const vxPxPerSec = e.vxvy?.[0] ? e.vxvy[0] * 1000 : 0;
+      const vyPxPerSec = e.vxvy?.[1] ? e.vxvy[1] * 1000 : 0;
+
+      if (horizontalCommit) {
+        const dir: 'left' | 'right' = e.deltaX < 0 ? 'left' : 'right';
+        commitSwipe(dir, vxPxPerSec);
+      } else if (verticalCommit) {
+        commitSwipe('down', 0, vyPxPerSec);
+      } else {
+        // Snap back via framer-motion spring
+        const springBack = { type: 'spring' as const, stiffness: 500, damping: 30 };
+        animate(x, 0, springBack);
+        animate(y, 0, springBack);
+      }
+
+      if (notifiedDragging.current) {
+        notifiedDragging.current = false;
+        onDragStateChange?.(false);
+      }
+      dragRecentlyFired.current = absX > 5 || absY > 5;
+    },
+    delta: 5,
+    preventScrollOnSwipe: false,
+    trackTouch: true,
+    trackMouse: false,
+    swipeDuration: Infinity,
+  });
 
   // Photo carousel: left/right arrows
   const prevPhoto = useCallback((e: React.MouseEvent) => {
@@ -485,7 +385,7 @@ export default function SwipeCard({
     setPhotoIndex((i) => (i + 1) % totalPhotos);
   }, [totalPhotos]);
 
-  const gestureBindings = isTop ? bind() : {};
+  const gestureBindings = isTop ? swipeHandlers : {};
 
   // Tap-zone photo navigation for mobile: left third = prev, right third = next
   const handlePhotoAreaClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
