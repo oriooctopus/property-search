@@ -73,6 +73,16 @@ function makeSessionId(): string {
   );
 }
 
+// Capture the ?ptdebug=1 flag at MODULE LOAD time (before any React effects
+// run). The page.tsx component does a `window.history.replaceState` early in
+// its mount via buildQueryString, which rewrites the URL and strips
+// ptdebug=1 from window.location.search. If we read the search params in a
+// useEffect, we race that rewrite. Reading at module-load is synchronous
+// and runs before any sibling-component effects.
+const INITIAL_PTDEBUG =
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('ptdebug') === '1';
+
 export default function PointerDebugger() {
   const [enabled, setEnabled] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -83,15 +93,15 @@ export default function PointerDebugger() {
   const startTimeRef = useRef<number>(0);
   const flushingRef = useRef(false);
 
-  // Decide whether to enable on mount based on URL search param
+  // Use the module-load-captured flag, which is immune to URL rewrites that
+  // happen during initial render. Setting state in a useEffect is fine here
+  // because that's the standard "client-only enable" pattern and avoids
+  // hydration mismatches.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('ptdebug') === '1') {
-      setEnabled(true);
-      setSessionId(makeSessionId());
-      startTimeRef.current = performance.now();
-    }
+    if (!INITIAL_PTDEBUG) return;
+    setEnabled(true);
+    setSessionId(makeSessionId());
+    startTimeRef.current = performance.now();
   }, []);
 
   // Attach capture-phase listeners + periodic flush
