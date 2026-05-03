@@ -28,7 +28,11 @@ const STALE_AGE_DAYS = 3;
 // unknown) cannot starve sources B and C of their share of the daily budget.
 // The previous behavior — one global ORDER BY last_seen_at LIMIT 2000 — let
 // whichever source had the oldest backlog dominate the entire batch.
-const PER_SOURCE_LIMIT = 1000;
+//
+// Temporarily reduced 1000 → 500 as a circuit breaker while we validate the
+// new split-workflow + concurrency=6 wall time. Can bump back to 1000 once
+// tomorrow's 16:00 UTC run confirms the verify-stale job fits under 60min.
+const PER_SOURCE_LIMIT = 500;
 // Sources we run verify-stale against. Adding a new source = add it here
 // AND register a verifier in sources/verify/registry.ts.
 // NOTE: facebook-marketplace excluded — verifier is blocked (returns 100% unknown)
@@ -129,6 +133,7 @@ async function applyResult(
   supabase: SupabaseClient,
   applied: AppliedResult,
   dryRun: boolean,
+  phaseCutoff: string,
 ): Promise<"active" | "delisted" | "unknown" | "error"> {
   const { result, candidate } = applied;
   if (result.status === "unknown") return "unknown";
@@ -142,11 +147,18 @@ async function applyResult(
     return error ? "error" : "active";
   }
 
-  // delisted
+  // delisted — gate on `last_seen_at < phaseCutoff` so a parallel fetch job
+  // that just bumped this row to "fresh" wins the race. Without this gate,
+  // verify-stale and fetch can produce the contradictory state
+  // `delisted_at IS NOT NULL AND last_seen_at > delisted_at`. The phase
+  // cutoff is the timestamp we used to load candidates — fetch's bump
+  // would set last_seen_at >= now > phaseCutoff, failing the predicate
+  // and leaving the listing untouched (correctly).
   const { error } = await supabase
     .from("listings")
     .update({ delisted_at: new Date().toISOString() })
-    .eq("id", candidate.id);
+    .eq("id", candidate.id)
+    .lt("last_seen_at", phaseCutoff);
   return error ? "error" : "delisted";
 }
 
@@ -220,6 +232,7 @@ export async function runVerifyStalePhase(
         deps.supabase,
         { result, candidate: row },
         deps.dryRun,
+        startedAt,
       );
       if (outcome === "active") summary.activeConfirmed++;
       else if (outcome === "delisted") summary.delistedConfirmed++;
