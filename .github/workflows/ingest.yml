@@ -2,7 +2,10 @@ name: Ingest (new pipeline, soak)
 
 on:
   schedule:
-    # Full pipeline: once daily at noon ET (16:00 UTC, 17:00 UTC during EST)
+    # Full pipeline: once daily at noon ET (16:00 UTC, 17:00 UTC during EST).
+    # Splits across two parallel jobs (fetch + verify-stale) so neither hits
+    # the 60-min job cap. The 16:00 cron drives both jobs simultaneously;
+    # the 22:00 cron is a verify-only catch-up pass for the verify backlog.
     - cron: "0 16 * * *"
     # Verify-only pass: 6 hours offset from the main run (22:00 UTC = 6pm ET).
     # The full daily pipeline can only chew through ~3000 stale candidates per
@@ -30,7 +33,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  ingest:
+  # Fetch + normalize + upsert + enrichment. Skips verify-stale, which runs
+  # in parallel in the verify-stale job below. Together they replace the old
+  # single-job ingest that was hitting the 60-min cap (verify-stale alone needs
+  # ~67 min at concurrency=4; fetch+normalize+upsert+enrich needs ~45 min).
+  #
+  # Safe to run concurrently with verify-stale: fetch only inserts/upserts new
+  # listings (different rows), verify-stale only updates delisted_at on
+  # existing listings (different rows + different columns) — no DB write
+  # contention.
+  fetch:
+    # Skip the fetch job entirely on the 22:00 verify-only cron — that pass
+    # exists to drain the verify-stale backlog without re-running fetch.
+    if: github.event.schedule != '0 22 * * *' && github.event.inputs.verify_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -47,7 +62,7 @@ jobs:
         working-directory: web
         run: npm ci
 
-      - name: Run ingest (new pipeline)
+      - name: Run ingest (fetch phases — skip verify-stale)
         working-directory: web
         env:
           APIFY_PROXY_URL: ${{ secrets.APIFY_PROXY_URL }}
@@ -60,18 +75,54 @@ jobs:
           REFRESH_STALE_HOURS: "24"
           INPUT_SOURCES: ${{ github.event.inputs.sources }}
           INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
-          INPUT_VERIFY_ONLY: ${{ github.event.inputs.verify_only }}
-          # The 22:00 UTC cron is the verify-only pass; the 16:00 UTC cron and
-          # any manual dispatch run the full pipeline (unless verify_only=true).
-          SCHEDULED_CRON: ${{ github.event.schedule }}
         run: |
-          if [ "$SCHEDULED_CRON" = "0 22 * * *" ] || [ "$INPUT_VERIFY_ONLY" = "true" ]; then
-            ARGS="--fetch-strategy=staleness-gated --only-phase=verify-stale"
-            echo "Mode: VERIFY-ONLY (catch-up pass for stale-detection backlog)"
-          else
-            ARGS="--fetch-strategy=staleness-gated"
-            echo "Mode: FULL pipeline"
+          ARGS="--fetch-strategy=staleness-gated --skip-phase=verify-stale"
+          echo "Mode: FETCH (skip verify-stale; runs in parallel job)"
+          if [ -n "$INPUT_SOURCES" ]; then
+            ARGS="$ARGS --sources=$INPUT_SOURCES"
           fi
+          if [ "$INPUT_DRY_RUN" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          echo "Running: npx tsx scripts/ingest.ts $ARGS"
+          npx tsx scripts/ingest.ts $ARGS
+
+  # Verify-stale only. Runs in parallel with fetch on the 16:00 cron, and is
+  # the sole job on the 22:00 catch-up cron. Updates delisted_at on existing
+  # listings — does not insert new rows.
+  verify-stale:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Run ingest (verify-stale only)
+        working-directory: web
+        env:
+          APIFY_PROXY_URL: ${{ secrets.APIFY_PROXY_URL }}
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          REFRESH_STALE_HOURS: "24"
+          INPUT_SOURCES: ${{ github.event.inputs.sources }}
+          INPUT_DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          ARGS="--fetch-strategy=staleness-gated --only-phase=verify-stale"
+          echo "Mode: VERIFY-STALE only"
           if [ -n "$INPUT_SOURCES" ]; then
             ARGS="$ARGS --sources=$INPUT_SOURCES"
           fi
