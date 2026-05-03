@@ -351,7 +351,10 @@ function nodesToListings(nodes: SENode[], city: string): AdapterOutput[] {
 // Public API
 // ---------------------------------------------------------------------------
 
-const SE_BEDROOM_SLICES = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+// Ordered by user value: 3BR + 4BR run first so if a run is cut short
+// (e.g. by the 60min job cap), the slices the user actually browses have
+// fresh data. Studio/1BR/2BR/5+BR follow.
+const SE_BEDROOM_SLICES = [3, 4, 2, 1, 0, 5, 6, 7, 8];
 const SE_SLICE_DELAY_MS = 5_000; // delay between bedroom slices
 const SE_403_RETRY_DELAYS = [30_000, 60_000, 120_000]; // exponential backoff for 403s
 
