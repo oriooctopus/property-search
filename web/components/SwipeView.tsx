@@ -1159,7 +1159,15 @@ export default function SwipeView({
                 <div className="h-0 min-[600px]:h-24" />
               </div>
 
-              {/* Next card underneath — visible while dragging.
+              {/* Next card underneath — always mounted so it's visible the
+                  instant the top card moves (drag OR fly-out animation).
+                  Previously opacity was gated on `isDragging`, which fades
+                  the next card out the moment a swipe completes — overlapping
+                  with the top card's exit and producing a half-second blank
+                  flash before the new top card mounts at this position. The
+                  opaque top card (`rgba(28,32,40,0.97)` when not dragging)
+                  keeps the next card hidden behind it during idle, so showing
+                  it always doesn't add visual noise.
                   Mobile uses 24px radius (Option D floating card look);
                   desktop keeps 12px to match the original attached-card layout. */}
               {currentIndex + 1 < deck.length && (
@@ -1168,8 +1176,6 @@ export default function SwipeView({
                   style={{
                     zIndex: 1,
                     transform: 'scale(0.97)',
-                    opacity: isDragging ? 1 : 0,
-                    transition: 'opacity 150ms ease-out',
                     pointerEvents: 'none',
                   }}
                 >
