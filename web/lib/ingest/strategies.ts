@@ -46,13 +46,22 @@ async function runAdapter(source: ListingSource, supabase?: SupabaseClient): Pro
     case "facebook-marketplace":
       throw new Error("facebook-marketplace adapter is disabled — re-enable in strategies.ts and types.ts");
     case "streeteasy": {
+      // Fetch boroughs in parallel — they're fully independent (different
+      // SE bisection slices, different proxy sessions when rotated). Saves
+      // ~14min off the daily ingest by overlapping Brooklyn (~14m) and
+      // Manhattan (~16m) instead of running sequentially.
+      const boroughs = ["Brooklyn", "Manhattan"] as const;
+      const results = await Promise.all(
+        boroughs.map((borough) =>
+          fetchStreetEasyListings(
+            { city: borough, stateCode: "NY" },
+            RAPIDAPI_KEY,
+          ).then((res) => ({ borough, res })),
+        ),
+      );
       const out: AdapterOutput[] = [];
       const allWarnings: string[] = [];
-      for (const borough of ["Brooklyn", "Manhattan"]) {
-        const res = await fetchStreetEasyListings(
-          { city: borough, stateCode: "NY" },
-          RAPIDAPI_KEY,
-        );
+      for (const { borough, res } of results) {
         out.push(...res.listings);
         if (res.warnings.length > 0) {
           allWarnings.push(`${borough}: ${res.warnings.join("; ")}`);
