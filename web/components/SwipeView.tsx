@@ -1179,12 +1179,21 @@ export default function SwipeView({
                     pointerEvents: 'none',
                   }}
                 >
-                  {/* Dark overlay to show depth */}
+                  {/* Dark overlay to show depth — only while dragging.
+                      The next card is always mounted now (so the moment the
+                      top card moves there's no fade-in lag), but the dark
+                      tint is a "you're peeking at the card behind" cue that
+                      only makes sense during an active drag. After the swipe
+                      completes, this card is on its way to becoming the new
+                      top card during the fly-out animation; if the dark tint
+                      stuck, you'd see it on the new top card for ~500ms. */}
                   <div
                     className="absolute inset-0 rounded-3xl min-[600px]:rounded-xl"
                     style={{
                       zIndex: 3,
                       backgroundColor: 'rgba(0, 0, 0, 0.12)',
+                      opacity: isDragging ? 1 : 0,
+                      transition: 'opacity 100ms ease-out',
                       pointerEvents: 'none',
                     }}
                   />
