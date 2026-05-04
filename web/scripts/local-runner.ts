@@ -343,6 +343,12 @@ async function runVerifyCycle(
   const verifier = verifiers[source];
   const verifyDeps = {
     apifyToken: process.env.APIFY_TOKEN ?? process.env.APIFY_PROXY_URL ?? "",
+    // Local runner is on a residential IP — try direct first, fall back
+    // to Apify proxy only on 403 / captcha. Without this, every SE verify
+    // call burns Apify residential bandwidth even though our home IP can
+    // usually fetch SE directly. This is THE flag that makes the runner
+    // actually $0 for verify cycles (not just fetch cycles).
+    preferDirect: true,
   };
 
   let active = 0;
