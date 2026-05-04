@@ -70,6 +70,24 @@ export default function Navbar() {
     >
       <Link
         href="/"
+        onClick={(e) => {
+          // Logo click = full reset: clear all filters, wishlist selection,
+          // commute rules, sort, etc., and navigate to bare `/`. We dispatch
+          // a custom event that HomeClient listens for to wipe its in-memory
+          // state, then let the Link navigate. Always navigate even when
+          // already on `/` (router.push('/') will not unmount the page, but
+          // the event handler resets state).
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("dwell-reset-home"));
+            // If we're already on the home route, prevent the default Link
+            // nav (which is a no-op anyway) and replace the URL ourselves so
+            // the query string is cleared even when the path is unchanged.
+            if (window.location.pathname === "/") {
+              e.preventDefault();
+              window.history.replaceState(null, "", "/");
+            }
+          }
+        }}
         className="group flex items-center gap-2 text-base sm:text-lg font-semibold transition-opacity hover:opacity-80 flex-shrink-0"
         style={{ color: "#e1e4e8" }}
       >

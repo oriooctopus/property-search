@@ -1414,6 +1414,22 @@ function HomeInner() {
     setFilters((prev) => ({ ...prev, commuteRules: [] }));
   }, []);
 
+  // Logo click triggers a global "reset home" event from Navbar — wipe ALL
+  // filter state + wishlist selection + map position + AI chat conversation
+  // so the user lands on a bare home view. The Navbar handler also strips
+  // the URL query string. We don't reset the user's preferred destination
+  // (that's a saved profile preference, not a transient filter).
+  useEffect(() => {
+    const handleReset = () => {
+      handleClearAllFilters();
+      setSelectedWishlist(null);
+      setMapPosition(null);
+      chat.newConversation();
+    };
+    window.addEventListener('dwell-reset-home', handleReset);
+    return () => window.removeEventListener('dwell-reset-home', handleReset);
+  }, [handleClearAllFilters, chat]);
+
   // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
