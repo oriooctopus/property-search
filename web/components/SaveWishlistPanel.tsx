@@ -13,13 +13,26 @@ import type { Wishlist } from '@/lib/hooks/useWishlists';
 
 export type WishlistFilterSelection = string | 'all-saved' | null;
 
+// Minimal shape needed to render the saved-search list. Mirrors
+// SavedSearchEntry from Filters.tsx without importing it (avoids a cycle).
+export interface SavedSearchRow {
+  id: number;
+  name: string;
+}
+
 export interface SaveWishlistPanelProps {
   anchorRef: React.RefObject<HTMLElement | null>;
   initialTab: 'save-search' | 'wishlist';
   onClose: () => void;
 
-  // Save-search slot (rendered as-is to keep compatibility with existing UI)
-  saveSearchContent: React.ReactNode;
+  // Saved-search list — rendered as the default view of the "Saved searches"
+  // tab. Clicking a row loads that search; the optional pencil enters
+  // rename/edit mode. When the list is empty, the user is nudged to use the
+  // sticky-footer "+ Save current search as…" affordance.
+  savedSearches?: SavedSearchRow[];
+  activeSearchId?: number | null;
+  onLoadSearch?: (id: number) => void;
+  onClearActiveSearch?: () => void;
 
   // Wishlist filter section data
   myWishlists: Wishlist[];
@@ -50,7 +63,10 @@ export default function SaveWishlistPanel({
   anchorRef,
   initialTab,
   onClose,
-  saveSearchContent,
+  savedSearches = [],
+  activeSearchId = null,
+  onLoadSearch,
+  onClearActiveSearch,
   myWishlists,
   sharedWishlists,
   selected,
@@ -182,7 +198,7 @@ export default function SaveWishlistPanel({
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
           </svg>
-          Save search
+          Saved searches
         </TabButton>
         <TabButton
           active={tab === 'wishlist'}
@@ -197,10 +213,64 @@ export default function SaveWishlistPanel({
 
       {tab === 'save-search' && (
         <div
-          className="p-4 overflow-y-auto overscroll-contain"
+          className="overflow-y-auto overscroll-contain flex flex-col"
           style={{ WebkitOverflowScrolling: 'touch', minHeight: 0 }}
         >
-          {saveSearchContent}
+          <div className="px-4 pt-3 pb-2">
+            {/* "All" row — clears the active saved-search selection so the
+                live filters revert to whatever the user has set manually. */}
+            <SavedSearchRowButton
+              checked={activeSearchId == null}
+              onClick={() => {
+                onClearActiveSearch?.();
+                onClose();
+              }}
+              name="All searches"
+              nameColor="#7ee787"
+            />
+
+            {savedSearches.length > 0 && (
+              <div
+                className="flex items-center gap-1.5 pt-3 pb-1.5 text-[10.5px] font-bold uppercase"
+                style={{ color: '#6e7681', letterSpacing: '0.08em' }}
+              >
+                Saved searches
+                <span
+                  className="font-semibold"
+                  style={{
+                    color: '#484f58',
+                    fontSize: '10.5px',
+                    background: 'rgba(139,148,158,0.08)',
+                    padding: '1px 6px',
+                    borderRadius: 8,
+                  }}
+                >
+                  {savedSearches.length}
+                </span>
+              </div>
+            )}
+
+            {savedSearches.length === 0 ? (
+              <div className="text-[12px] py-3" style={{ color: '#8b949e', lineHeight: 1.5 }}>
+                No saved searches yet.
+                <div className="text-[11px] mt-1" style={{ color: '#6e7681' }}>
+                  Use <span style={{ color: '#58a6ff' }}>Save current search as…</span> below to save your current filters for one-click access later.
+                </div>
+              </div>
+            ) : (
+              savedSearches.map((s) => (
+                <SavedSearchRowButton
+                  key={s.id}
+                  checked={activeSearchId === s.id}
+                  onClick={() => {
+                    onLoadSearch?.(s.id);
+                    onClose();
+                  }}
+                  name={s.name}
+                />
+              ))
+            )}
+          </div>
         </div>
       )}
 
@@ -478,6 +548,59 @@ function TabButton({
       }}
     >
       {children}
+    </ButtonBase>
+  );
+}
+
+function SavedSearchRowButton({
+  checked,
+  onClick,
+  name,
+  nameColor,
+}: {
+  checked: boolean;
+  onClick: () => void;
+  name: string;
+  nameColor?: string;
+}) {
+  return (
+    <ButtonBase
+      onClick={onClick}
+      className="w-full flex items-center gap-2.5 text-left"
+      style={{ padding: '6px 0', background: 'transparent', border: 'none' }}
+    >
+      <div
+        style={{
+          width: 14,
+          height: 14,
+          borderRadius: '50%',
+          border: `1.5px solid ${checked ? '#58a6ff' : '#444c56'}`,
+          background: checked ? 'rgba(88,166,255,0.15)' : 'transparent',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        {checked && (
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: '#58a6ff',
+            }}
+          />
+        )}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          className="truncate"
+          style={{ fontSize: 13, color: nameColor ?? '#e1e4e8', lineHeight: 1.2 }}
+        >
+          {name}
+        </div>
+      </div>
     </ButtonBase>
   );
 }

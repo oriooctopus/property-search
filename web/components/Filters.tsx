@@ -1401,7 +1401,6 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
   const [saveToastVisible, setSaveToastVisible] = useState(false);
   const saveToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clusterDropdownRef = useRef<HTMLDivElement>(null);
-  const saveInputRef = useRef<HTMLInputElement>(null);
 
   // Saved search tabs state
   const [activeSearchId, setActiveSearchId] = useState<number | null>(null);
@@ -2357,86 +2356,17 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
         setSaveOpen(false);
         onOpenWishlistManager?.();
       }}
-      saveSearchContent={(
-                  <>
-                    <div className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: '#8b949e', letterSpacing: '0.05em' }}>
-                      Save Search
-                    </div>
-                    {activeCount === 0 ? (
-                      <div className="text-[12px]" style={{ color: '#8b949e' }}>
-                        Add at least one filter to save a search.
-                      </div>
-                    ) : (
-                      <>
-                        <input
-                          ref={saveInputRef}
-                          type="text"
-                          value={saveName}
-                          onChange={(e) => setSaveName(e.target.value)}
-                          onKeyDown={async (e) => {
-                            if (e.key === 'Enter' && saveName.trim()) {
-                              const saved = await onSaveSearch?.(saveName.trim());
-                              if (saved) setActiveSearchId(saved.id);
-                              setSaveOpen(false);
-                              if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
-                              setSaveToastVisible(true);
-                              saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
-                            }
-                            if (e.key === 'Escape') setSaveOpen(false);
-                          }}
-                          placeholder="e.g. Brooklyn 5-bed hunt"
-                          className="w-full rounded-lg px-3 py-2 text-sm outline-none mb-3"
-                          style={{ backgroundColor: '#0f1117', border: '1px solid #2d333b', color: '#e1e4e8' }}
-                        />
-    
-                        <div className="flex flex-wrap gap-1 mb-4">
-                          {filters.selectedBeds !== null && (
-                            <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
-                              {filters.selectedBeds.slice().sort((a, b) => a - b).map((b) => (b === 7 ? '7+' : String(b))).join(', ')} bed
-                            </span>
-                          )}
-                          {(filters.minRent !== null || filters.maxRent !== null) && (
-                            <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
-                              {priceLabel(filters.minRent, filters.maxRent)}
-                            </span>
-                          )}
-                          {filters.commuteRules && filters.commuteRules.length > 0 && (
-                            <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
-                              {commuteLabel(filters.commuteRules)}
-                            </span>
-                          )}
-                          {filters.selectedSources !== null && (
-                            <span className="inline-flex items-center rounded text-[10px] font-medium px-2 py-0.5" style={{ backgroundColor: '#58a6ff14', color: '#58a6ff', border: '1px solid #58a6ff40' }}>
-                              {filters.selectedSources.length} source{filters.selectedSources.length !== 1 ? 's' : ''}
-                            </span>
-                          )}
-                        </div>
-    
-                        <div className="flex items-center justify-end gap-3">
-                          <TextButton variant="muted" onClick={() => setSaveOpen(false)}>
-                            Cancel
-                          </TextButton>
-                          <PrimaryButton
-                            onClick={async () => {
-                              if (saveName.trim()) {
-                                const saved = await onSaveSearch?.(saveName.trim());
-                                if (saved) setActiveSearchId(saved.id);
-                                setSaveOpen(false);
-                                if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
-                                setSaveToastVisible(true);
-                                saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
-                              }
-                            }}
-                            disabled={!saveName.trim()}
-                            className="h-8 px-5 text-xs font-bold"
-                          >
-                            Save
-                          </PrimaryButton>
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
+      savedSearches={savedSearches?.map((s) => ({ id: s.id, name: s.name })) ?? []}
+      activeSearchId={activeSearchId}
+      onLoadSearch={(id) => {
+        const s = savedSearches?.find((x) => x.id === id);
+        if (!s) return;
+        setActiveSearchId(s.id);
+        onLoadSearch?.(s.filters as unknown as FiltersState);
+      }}
+      onClearActiveSearch={() => {
+        setActiveSearchId(null);
+      }}
       stickyFooter={
         <div className="px-4 py-2.5">
           {stickySaveExpanded ? (
@@ -2765,7 +2695,10 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                   if (saveOpen) {
                     setSaveOpen(false);
                   } else {
-                    setSavePanelTab('wishlist');
+                    // Default to the saved-searches list view — clicking a row
+                    // loads that search. The wishlist tab and the sticky
+                    // "+ Save current search as…" footer remain one tap away.
+                    setSavePanelTab('save-search');
                     setSaveOpen(true);
                   }
                 }}
