@@ -32,6 +32,21 @@ export interface FetchHtmlOptions {
   apifyToken?: string;
   /** Request timeout in ms. Defaults to DEFAULT_TIMEOUT. */
   timeout?: number;
+  /**
+   * When true, try direct fetch first and only fall back to the proxy if the
+   * direct path returns a 403 / captcha block. Used by the local-runner when
+   * running on a residential ISP — direct fetches from a residential IP
+   * succeed for SE most of the time, so paying for Apify proxy bandwidth on
+   * every verify call is wasteful.
+   *
+   * When false (default), behavior is unchanged: proxy-first if useProxy.
+   * The Vercel cron path runs from a datacenter IP that SE always blocks,
+   * so it must keep the proxy-first behavior.
+   *
+   * Only meaningful when useProxy is also true (otherwise the function is
+   * already direct-only).
+   */
+  preferDirect?: boolean;
 }
 
 export interface FetchHtmlResult {
@@ -102,6 +117,22 @@ export async function fetchHtml(
 ): Promise<FetchHtmlResult> {
   const timeout = opts.timeout ?? DEFAULT_TIMEOUT;
   const proxyUrl = opts.useProxy ? resolveApifyProxyUrl(opts.apifyToken) : null;
+
+  // Local-runner path: running on a residential IP, try direct first to
+  // avoid burning $8/GB Apify residential bandwidth on every verify. Fall
+  // back to proxy on 403/captcha. This is the path that makes the
+  // self-hosted runner actually $0 — without it, every verify cycle
+  // shifts cost from "the cron's job" to "the runner's job", same Apify
+  // bill either way.
+  if (opts.useProxy && proxyUrl && opts.preferDirect) {
+    try {
+      const r = await directFetch(url, timeout);
+      if (!isCaptchaBlock(r)) return r;
+      // Direct hit a captcha — fall through to proxy retry loop below.
+    } catch {
+      // Direct network failure — fall through to proxy.
+    }
+  }
 
   // Try proxy first (with retries + session rotation) when requested and
   // available. Rotate on both network errors and PerimeterX captcha blocks.

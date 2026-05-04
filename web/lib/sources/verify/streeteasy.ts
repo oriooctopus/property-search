@@ -25,6 +25,7 @@ export const verifyStreetEasy: Verifier = async (url, deps): Promise<VerifyResul
     useProxy: true,
     apifyToken: deps.apifyToken,
     timeout: deps.fetchTimeout,
+    preferDirect: deps.preferDirect,
   });
   if (status === 0) return { status: "unknown", reason: "fetch failed" };
   if (status === 403 || status >= 500) return { status: "unknown", reason: `http ${status}` };
