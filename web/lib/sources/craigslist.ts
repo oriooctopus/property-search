@@ -185,7 +185,7 @@ async function pageFunction(context) {
     document.querySelectorAll('a.thumb, div.gallery img, img[src*="images.craigslist"]').forEach(el => {
       const src = el.getAttribute('href') || el.getAttribute('src') || '';
       if (src && src.includes('craigslist')) {
-        const fullSize = src.replace(/_\\d+x\\d+\\./, '_600x450.');
+        const fullSize = src.replace(/_\\d+x\\d+\\./, '_1200x900.');
         photos.push(fullSize);
       }
     });
@@ -627,7 +627,7 @@ export async function fetchCraigslistListings(
       sqft: null,
       lat: lat && !isNaN(lat) ? lat : null,
       lon: lon && !isNaN(lon) ? lon : null,
-      photo_urls: (item.pics ?? []).slice(0, 8).map((url: string) => url.replace(/_\d+x\d+\./, '_600x450.')),
+      photo_urls: (item.pics ?? []).slice(0, 8).map((url: string) => url.replace(/_\d+x\d+\./, '_1200x900.')),
       url: item.url,
       list_date: item.datetime ?? null,
       last_update_date: null,
