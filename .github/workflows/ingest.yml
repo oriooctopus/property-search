@@ -1,18 +1,15 @@
 name: Ingest (new pipeline, soak)
 
 on:
-  schedule:
-    # Full pipeline: once daily at noon ET (16:00 UTC, 17:00 UTC during EST).
-    # Splits across two parallel jobs (fetch + verify-stale) so neither hits
-    # the 60-min job cap. The 16:00 cron drives both jobs simultaneously;
-    # the 22:00 cron is a verify-only catch-up pass for the verify backlog.
-    - cron: "0 16 * * *"
-    # Verify-only pass: 6 hours offset from the main run (22:00 UTC = 6pm ET).
-    # The full daily pipeline can only chew through ~3000 stale candidates per
-    # day (per-source quota in verify-stale), so for a backlog like Craigslist's
-    # ~970-row queue it'd take days to drain. Adding this second pass doubles
-    # throughput without re-running scrape/normalize/upsert/enrich.
-    - cron: "0 22 * * *"
+  # Both crons disabled 2026-05-06: at 94% of Apify $90 cap with 19 days left
+  # in cycle. Local runner's Apify-fallback was failing for 36h+ with "socket
+  # closed before response", so the Vercel cron was the sole live path and
+  # burned ~$48 of residential proxy bandwidth in 3 days. Re-enable EITHER
+  # by uncommenting (when budget allows / a new cycle starts) OR after the
+  # local runner's proxy fallback is fixed.
+  # schedule:
+  #   - cron: "0 16 * * *"
+  #   - cron: "0 22 * * *"
   workflow_dispatch:
     inputs:
       sources:
