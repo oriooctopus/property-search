@@ -5,9 +5,11 @@
  * Free tier: 100 emails/day, single API key, no OAuth.
  */
 
-// Resend requires a verified sender domain. dwelligence.ai isn't verified yet,
-// so fall back to Resend's universal onboarding sender when ALERT_FROM isn't
-// set. Override via INGEST_ALERT_FROM once the domain is verified.
+// Resend's universal onboarding sender (onboarding@resend.dev) needs no domain
+// verification but ONLY delivers to the Resend account owner's address. So
+// alerts must go to INGEST_ALERT_EMAIL = that owner address until a domain is
+// verified at resend.com/domains. Once verified, set INGEST_ALERT_FROM to an
+// address on that domain and INGEST_ALERT_EMAIL can be any recipient.
 const ALERT_FROM =
   process.env.INGEST_ALERT_FROM ??
   "Dwelligence Ingest <onboarding@resend.dev>";
