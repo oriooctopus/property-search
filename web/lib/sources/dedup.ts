@@ -198,10 +198,19 @@ function isSameProperty(a: ValidatedListing, b: ValidatedListing): boolean {
   // Skip Facebook entirely — generic titles make matching unreliable
   if (a.source === "facebook-marketplace" || b.source === "facebook-marketplace") return false;
 
+  // Distinct units in the same building are DIFFERENT properties. normalizeAddress
+  // strips the unit, so without this guard tiers 1–2 collapse every unit at one
+  // street address (or one set of coords) into a single listing — silently
+  // dropping ~10% of a building-dense borough like Brooklyn.
+  const unitA = normalizeUnit(a.address, a.url, a.source);
+  const unitB = normalizeUnit(b.address, b.url, b.source);
+  const unitsConflict = !!unitA && !!unitB && unitA !== unitB;
+
   // Tier 1: Exact normalized address (only when both are real street addresses)
   const normA = normalizeAddress(a.address);
   const normB = normalizeAddress(b.address);
   if (
+    !unitsConflict &&
     normA &&
     normB &&
     normA === normB &&
@@ -211,8 +220,15 @@ function isSameProperty(a: ValidatedListing, b: ValidatedListing): boolean {
     return true;
   }
 
-  // Tier 2: Geo proximity + price
+  // Tier 2: Geo proximity + price — CROSS-SOURCE ONLY. Two listings from the
+  // SAME source (esp. StreetEasy, where every urlPath is a canonically-distinct
+  // unit) that happen to sit within 50m at a similar price are different
+  // apartments, not duplicates. Merging them silently dropped ~10% of listings
+  // in building-dense Brooklyn. Geo+price is only a reliable dup signal when
+  // reconciling the SAME place across DIFFERENT sources.
   if (
+    a.source !== b.source &&
+    !unitsConflict &&
     hasValidCoords(a.lat, a.lon) &&
     hasValidCoords(b.lat, b.lon) &&
     a.price > 0 &&
@@ -246,8 +262,12 @@ function isSameProperty(a: ValidatedListing, b: ValidatedListing): boolean {
   // Tier 4: Same source + same beds + price within 3% + same area
   // Catches CL reposts with slightly different titles or minor price changes.
   // Requires beds > 0 to avoid merging unrelated commercial/retail listings.
+  // Excludes StreetEasy: it uses canonical per-unit URLs and never "reposts",
+  // so two distinct SE listings in the same area at a similar price are
+  // different apartments — this tier would wrongly collapse them.
   if (
     a.source === b.source &&
+    a.source !== "streeteasy" &&
     a.beds === b.beds &&
     a.beds > 0 &&
     priceWithinPercent(a.price, b.price, 0.03) &&

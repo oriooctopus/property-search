@@ -1,15 +1,13 @@
 name: Ingest (new pipeline, soak)
 
 on:
-  # Both crons disabled 2026-05-06: at 94% of Apify $90 cap with 19 days left
-  # in cycle. Local runner's Apify-fallback was failing for 36h+ with "socket
-  # closed before response", so the Vercel cron was the sole live path and
-  # burned ~$48 of residential proxy bandwidth in 3 days. Re-enable EITHER
-  # by uncommenting (when budget allows / a new cycle starts) OR after the
-  # local runner's proxy fallback is fixed.
-  # schedule:
-  #   - cron: "0 16 * * *"
-  #   - cron: "0 22 * * *"
+  # Re-enabled 2026-06-29 as a single daily run. The Apify-cost concern that
+  # forced the 2026-05-06 shutdown no longer applies: StreetEasy now fetches
+  # via the FREE direct api-v6 endpoint (single atomic page per bedroom slice,
+  # Apify only as a 403 fallback). Stale detection is the free set-difference
+  # delist-unseen step (see below) instead of the per-listing verify-stale path.
+  schedule:
+    - cron: "0 16 * * *" # daily full refetch of the in-region 2–4BR set
   workflow_dispatch:
     inputs:
       sources:
@@ -83,6 +81,20 @@ jobs:
           fi
           echo "Running: npx tsx scripts/ingest.ts $ARGS"
           npx tsx scripts/ingest.ts $ARGS
+
+      # Free set-difference stale detection for StreetEasy: the fetch above
+      # refreshed last_seen_at for every active in-region 2–4BR listing, so any
+      # that weren't refreshed are gone → delisted. Safety-gated (won't delist
+      # if the fraction is implausibly large, i.e. the fetch was incomplete).
+      # Replaces the paid per-listing verify-stale path for StreetEasy.
+      - name: Delist unseen StreetEasy listings (set-difference)
+        if: github.event.inputs.dry_run != 'true'
+        working-directory: web
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npx tsx scripts/delist-unseen.ts
 
   # Verify-stale only. Runs in parallel with fetch on the 16:00 cron, and is
   # the sole job on the 22:00 catch-up cron. Updates delisted_at on existing

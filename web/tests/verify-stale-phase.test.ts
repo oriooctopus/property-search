@@ -53,17 +53,37 @@ function makeSupabaseMock(candidates: Array<{ id: number; url: string; source: s
   const fromFn = vi.fn((table: string) => {
     if (table !== "listings") throw new Error(`unexpected table ${table}`);
 
+    // Candidate query filters by source via .eq("source", …); the mock honors
+    // that so only the queried source's rows come back (matches real behavior
+    // and lets us assert that excluded sources are never loaded/verified).
+    let sourceFilter: string | null = null;
     const selectBuilder = {
       select: vi.fn(() => selectBuilder),
+      eq: vi.fn((col: string, val: unknown) => {
+        if (col === "source") sourceFilter = val as string;
+        return selectBuilder;
+      }),
       is: vi.fn(() => selectBuilder),
       lt: vi.fn(() => selectBuilder),
-      limit: vi.fn(async () => ({ data: candidates, error: null })),
+      limit: vi.fn(async () => ({
+        data: candidates.filter((c) => sourceFilter == null || c.source === sourceFilter),
+        error: null,
+      })),
     };
 
+    // Active path awaits `.update(set).eq("id", …)`; delisted path awaits
+    // `.update(set).eq("id", …).lt("last_seen_at", …)`. So eq() must be BOTH
+    // awaitable and expose a chainable .lt().
     const updateBuilder = (set: Record<string, unknown>) => ({
-      eq: vi.fn(async (col: string, val: unknown) => {
-        updates.push({ set, eqColumn: col, eqValue: val });
-        return { error: null };
+      eq: vi.fn((col: string, val: unknown) => {
+        const record = () => {
+          updates.push({ set, eqColumn: col, eqValue: val });
+          return { error: null };
+        };
+        return {
+          lt: vi.fn(async () => record()),
+          then: (resolve: (v: { error: null }) => void) => resolve(record()),
+        };
       }),
     });
 
@@ -97,13 +117,16 @@ describe("verify-stale phase", () => {
   });
 
   it("dispatches by source and writes last_seen_at for active", async () => {
+    // craigslist is the only verify-stale source now (StreetEasy uses the free
+    // set-difference delist-unseen step). Override its result to active here.
+    (verifiers.craigslist as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ status: "active" });
     const { client, updates } = makeSupabaseMock([
-      { id: 1, url: "https://streeteasy.com/a", source: "streeteasy", external_id: "se1" },
+      { id: 1, url: "https://cl/a", source: "craigslist", external_id: "cl1" },
     ]);
     const res = await runVerifyStalePhase(makeDeps(client));
     expect(res.output?.activeConfirmed).toBe(1);
     expect(res.output?.delistedConfirmed).toBe(0);
-    expect(verifiers.streeteasy).toHaveBeenCalledOnce();
+    expect(verifiers.craigslist).toHaveBeenCalledOnce();
     expect(updates).toHaveLength(1);
     expect(Object.keys(updates[0].set)).toEqual(["last_seen_at"]);
     expect(updates[0].eqValue).toBe(1);
@@ -120,11 +143,26 @@ describe("verify-stale phase", () => {
   });
 
   it("is a no-op for unknown results", async () => {
+    (verifiers.craigslist as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      status: "unknown",
+      reason: "not implemented",
+    });
     const { client, updates } = makeSupabaseMock([
-      { id: 7, url: "https://fb/y", source: "facebook-marketplace", external_id: null },
+      { id: 7, url: "https://cl/y", source: "craigslist", external_id: null },
     ]);
     const res = await runVerifyStalePhase(makeDeps(client));
     expect(res.output?.unknown).toBe(1);
     expect(updates).toHaveLength(0);
+  });
+
+  it("does NOT verify StreetEasy (handled by set-difference delist-unseen)", async () => {
+    const { client, updates } = makeSupabaseMock([
+      { id: 99, url: "https://streeteasy.com/a", source: "streeteasy", external_id: "se1" },
+    ]);
+    const res = await runVerifyStalePhase(makeDeps(client));
+    expect(verifiers.streeteasy).not.toHaveBeenCalled();
+    expect(updates).toHaveLength(0);
+    expect(res.output?.activeConfirmed).toBe(0);
+    expect(res.output?.delistedConfirmed).toBe(0);
   });
 });

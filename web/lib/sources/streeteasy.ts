@@ -12,8 +12,13 @@ import type { AdapterOutput, SearchParams } from "./types";
 import { resolveApifyProxyUrl, makeProxyFetch, withRotatingSession } from "./proxy";
 import { fetchSliceRecursive, SE_CAP } from "./streeteasy-bisection";
 
-const SE_API_URL = "https://api-v6.streeteasy.com/";
-const SE_PAGE_SIZE = 100;
+export const SE_API_URL = "https://api-v6.streeteasy.com/";
+// 1000 (not 100) so any single bedroom/price slice (always <= SE_CAP=950) is
+// fetched in ONE atomic request. Offset pagination over SE's live, newest-first
+// results silently drops ~10% of listings — items shift across page boundaries
+// mid-crawl. A single page = no boundary = no drift. Slices over SE_CAP still
+// price-bisect into sub-slices, each itself fetched in one page.
+const SE_PAGE_SIZE = 1000;
 const SE_DELAY_MS = 3000; // delay between pages to avoid rate limiting
 
 // Area codes: Manhattan=100, Brooklyn=300
@@ -23,7 +28,7 @@ const AREA_CODES: Record<string, number[]> = {
   "new york": [100],
 };
 
-const SE_HEADERS = {
+export const SE_HEADERS = {
   "Content-Type": "application/json",
   Origin: "https://streeteasy.com",
   Referer: "https://streeteasy.com/",
@@ -36,7 +41,7 @@ const SE_HEADERS = {
   os: "web",
 };
 
-const SE_QUERY = `query GetListingRental($input: SearchRentalsInput!) {
+export const SE_QUERY = `query GetListingRental($input: SearchRentalsInput!) {
   searchRentals(input: $input) {
     search { criteria }
     totalCount
@@ -351,10 +356,13 @@ function nodesToListings(nodes: SENode[], city: string): AdapterOutput[] {
 // Public API
 // ---------------------------------------------------------------------------
 
-// Ordered by user value: 3BR + 4BR run first so if a run is cut short
-// (e.g. by the 60min job cap), the slices the user actually browses have
-// fresh data. Studio/1BR/2BR/5+BR follow.
-const SE_BEDROOM_SLICES = [3, 4, 2, 1, 0, 5, 6, 7, 8];
+// We ONLY want 2–4 bedrooms (enforced everywhere; see the bedroom gate in
+// pipeline.ts). Fetch only those buckets — studios/1BR/5BR+ are never
+// collected. Ordered by user value: 3BR + 4BR first, then 2BR. Override with
+// SE_BEDROOMS (e.g. SE_BEDROOMS=3) to ramp a run to a subset of {2,3,4}.
+const SE_BEDROOM_SLICES = process.env.SE_BEDROOMS
+  ? process.env.SE_BEDROOMS.split(",").map((s) => Number(s.trim()))
+  : [3, 4, 2];
 const SE_SLICE_DELAY_MS = 5_000; // delay between bedroom slices
 const SE_403_RETRY_DELAYS = [30_000, 60_000, 120_000]; // exponential backoff for 403s
 

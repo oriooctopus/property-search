@@ -37,8 +37,11 @@ const PER_SOURCE_LIMIT = 500;
 // AND register a verifier in sources/verify/registry.ts.
 // NOTE: facebook-marketplace excluded — verifier is blocked (returns 100% unknown)
 // and the source is disabled in the scraper registry.
+// StreetEasy is intentionally NOT here: its per-listing verifier hits SE detail
+// pages (PerimeterX → paid Apify proxy). SE stale detection now uses the free
+// set-difference delist-unseen step after each complete fetch. Craigslist stays
+// (no canonical URLs / reposts, so the per-listing verifier is the right tool).
 const VERIFY_SOURCES: ListingSource[] = [
-  "streeteasy",
   "craigslist",
 ];
 // If a source's verify batch returns this fraction of `unknown` or higher AND

@@ -40,6 +40,30 @@ function isInNYC(lat: number, lon: number): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Target search region (gating — applies to EVERY run type)
+// ---------------------------------------------------------------------------
+//
+// All ingestion is restricted to north/NW Brooklyn: north of Prospect Park,
+// up to and including Greenpoint, west of the Myrtle–Wyckoff Avs subway stop.
+// Enforced in this shared normalize chokepoint so daily, full-bisection, and
+// local-runner paths all obey it regardless of run type. Manhattan is ALSO
+// dropped at the fetch sites — lower Manhattan falls inside this box, so the
+// box alone would not exclude it.
+export const REGION_LAT_MIN = 40.672; // north edge of Prospect Park
+export const REGION_LAT_MAX = 40.74; // Greenpoint north tip (Newtown Creek)
+export const REGION_LON_MIN = -74.05; // Brooklyn western harbor edge (no real limit)
+export const REGION_LON_MAX = -73.9116; // Myrtle–Wyckoff Avs station ("west of")
+
+export function isInTargetRegion(lat: number, lon: number): boolean {
+  return (
+    lat >= REGION_LAT_MIN &&
+    lat <= REGION_LAT_MAX &&
+    lon >= REGION_LON_MIN &&
+    lon <= REGION_LON_MAX
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Rejection
 // ---------------------------------------------------------------------------
 
@@ -63,6 +87,17 @@ function rejectReason(raw: AdapterOutput): string | null {
       `[Pipeline] dropped non-NYC listing: source=${raw.source} addr=${raw.address ?? "?"} lat=${raw.lat} lon=${raw.lon}`,
     );
     return "outside NYC bbox";
+  }
+  // Target-region gating: restrict every run type to north/NW Brooklyn (see
+  // isInTargetRegion). Expected to drop many listings, so no per-row warn —
+  // the aggregate rejected count is surfaced by validateAndNormalize.
+  if (hasCoords(raw) && !isInTargetRegion(raw.lat!, raw.lon!)) {
+    return "outside target region";
+  }
+  // Bedroom gating: we ONLY want 2–4 bedrooms, on every run type. Drop
+  // studios/1BR/5BR+, and unknown-bedroom listings (can't confirm 2–4).
+  if (raw.beds == null || raw.beds < 2 || raw.beds > 4) {
+    return "bedrooms outside 2-4";
   }
   return null;
 }
