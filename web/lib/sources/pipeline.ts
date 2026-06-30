@@ -40,19 +40,36 @@ function isInNYC(lat: number, lon: number): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Target search region (gating — applies to EVERY run type)
+// Target search region
 // ---------------------------------------------------------------------------
 //
-// All ingestion is restricted to north/NW Brooklyn: north of Prospect Park,
-// up to and including Greenpoint, west of the Myrtle–Wyckoff Avs subway stop.
-// Enforced in this shared normalize chokepoint so daily, full-bisection, and
-// local-runner paths all obey it regardless of run type. Manhattan is ALSO
-// dropped at the fetch sites — lower Manhattan falls inside this box, so the
-// box alone would not exclude it.
-export const REGION_LAT_MIN = 40.672; // north edge of Prospect Park
+// The region is defined PRECISELY by the StreetEasy neighborhood area codes
+// below — this matches the "DWELLIGENCE NW Bklyn 2-4BR (auto)" saved-search
+// detector exactly. The StreetEasy fetch sites (daily, full-bisection,
+// local-runner) all query these codes, so the server returns only in-region
+// listings; Manhattan and out-of-region Brooklyn (Red Hook, Brooklyn Heights,
+// Downtown Brooklyn, all of south Brooklyn, etc.) are never fetched.
+//
+// north/NW Brooklyn + Crown Heights, 2–4BR:
+//   301 Williamsburg-area · 302 Williamsburg · 304 Greenpoint · 306 Bed-Stuy
+//   307 Bushwick · 310 Fort Greene · 313 Clinton Hill · 319 Prospect Heights
+//   320 Park Slope · 321 Gowanus · 322 Boerum Hill · 325 Crown Heights
+//   326 Cobble Hill · 328 Carroll Gardens · 364 DUMBO/Vinegar Hill cluster
+// (StreetEasy bundles sub-areas: Bed-Stuy carries Ocean Hill + Stuyvesant
+// Heights; Crown Heights carries Weeksville.)
+export const TARGET_AREA_CODES = [
+  301, 302, 304, 306, 307, 310, 313, 319, 320, 321, 322, 325, 326, 328, 364,
+];
+
+// Coarse geographic bound enclosing the area-code region above. This is NOT the
+// precise region (the area codes are) — it's a cheap cross-source sanity net
+// (e.g. for craigslist, which has no SE area codes) and a guard against a SE
+// listing with stray coords. Bounds enclose every in-region listing with a
+// small margin (observed extent: lat 40.660–40.738, lon −74.003 to −73.903).
+export const REGION_LAT_MIN = 40.655; // south edge of Crown Heights / Weeksville
 export const REGION_LAT_MAX = 40.74; // Greenpoint north tip (Newtown Creek)
-export const REGION_LON_MIN = -74.05; // Brooklyn western harbor edge (no real limit)
-export const REGION_LON_MAX = -73.9116; // Myrtle–Wyckoff Avs station ("west of")
+export const REGION_LON_MIN = -74.02; // Columbia St Waterfront western edge
+export const REGION_LON_MAX = -73.895; // eastern Bushwick / Crown Heights edge
 
 export function isInTargetRegion(lat: number, lon: number): boolean {
   return (
