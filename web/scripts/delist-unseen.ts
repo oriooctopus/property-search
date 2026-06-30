@@ -26,11 +26,18 @@ import {
 } from "../lib/sources/pipeline";
 import { sendIngestAlert } from "../lib/ingest/alert";
 
-for (const line of readFileSync(".env.local", "utf8").split("\n")) {
-  if (!line || line.startsWith("#") || !line.includes("=")) continue;
-  const i = line.indexOf("=");
-  const k = line.slice(0, i).trim();
-  if (!process.env[k]) process.env[k] = line.slice(i + 1).trim();
+// .env.local is optional: present locally, absent in CI (env comes from GH
+// Actions secrets there). Mirror scripts/ingest.ts — load it if present, else
+// fall through to the real environment.
+try {
+  for (const line of readFileSync(".env.local", "utf8").split("\n")) {
+    if (!line || line.startsWith("#") || !line.includes("=")) continue;
+    const i = line.indexOf("=");
+    const k = line.slice(0, i).trim();
+    if (!process.env[k]) process.env[k] = line.slice(i + 1).trim();
+  }
+} catch {
+  // env file optional — CI injects vars directly
 }
 
 const num = (name: string, def: number) => {
