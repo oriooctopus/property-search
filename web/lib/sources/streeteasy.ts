@@ -11,6 +11,7 @@
 import type { AdapterOutput, SearchParams } from "./types";
 import { resolveApifyProxyUrl, makeProxyFetch, withRotatingSession } from "./proxy";
 import { fetchSliceRecursive, SE_CAP } from "./streeteasy-bisection";
+import { TARGET_AREA_CODES } from "./pipeline";
 
 export const SE_API_URL = "https://api-v6.streeteasy.com/";
 // 1000 (not 100) so any single bedroom/price slice (always <= SE_CAP=950) is
@@ -21,10 +22,14 @@ export const SE_API_URL = "https://api-v6.streeteasy.com/";
 const SE_PAGE_SIZE = 1000;
 const SE_DELAY_MS = 3000; // delay between pages to avoid rate limiting
 
-// Area codes: Manhattan=100, Brooklyn=300
+// Area codes. "brooklyn" is scoped to the target region's neighborhood codes
+// (TARGET_AREA_CODES in pipeline.ts) — NOT the whole-borough code 300 — so the
+// SE server returns only in-region listings (Crown Heights in; Red Hook,
+// Brooklyn Heights, Downtown Brooklyn, south Brooklyn out). Manhattan=100,
+// whole Brooklyn=300 kept for reference / ad-hoc use.
 const AREA_CODES: Record<string, number[]> = {
   manhattan: [100],
-  brooklyn: [300],
+  brooklyn: TARGET_AREA_CODES,
   "new york": [100],
 };
 

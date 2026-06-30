@@ -46,9 +46,9 @@ async function runAdapter(source: ListingSource, supabase?: SupabaseClient): Pro
     case "facebook-marketplace":
       throw new Error("facebook-marketplace adapter is disabled — re-enable in strategies.ts and types.ts");
     case "streeteasy": {
-      // Brooklyn only — search is restricted to north/NW Brooklyn (see
-      // isInTargetRegion in pipeline.ts). Manhattan is intentionally not
-      // fetched; the region bbox alone would not exclude lower Manhattan.
+      // "Brooklyn" resolves to the target region's neighborhood area codes
+      // (TARGET_AREA_CODES in pipeline.ts), so the SE server returns only
+      // in-region listings. Manhattan is intentionally not fetched.
       const boroughs = ["Brooklyn"] as const;
       const results = await Promise.all(
         boroughs.map((borough) =>

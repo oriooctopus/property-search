@@ -47,7 +47,7 @@ try {
 
 import { nodesToListings, type SENode } from "../lib/sources/streeteasy";
 import { makeProxyFetch, withRotatingSession } from "../lib/sources/proxy";
-import { validateAndNormalize } from "../lib/sources/pipeline";
+import { validateAndNormalize, TARGET_AREA_CODES } from "../lib/sources/pipeline";
 import { toListingRow } from "../lib/sources/row";
 import { upsertListings } from "../lib/sources/upsert";
 import { verifiers } from "../lib/sources/verify/registry";
@@ -109,10 +109,11 @@ const SE_QUERY = `query GetListingRental($input: SearchRentalsInput!) {
   }
 }`;
 
-// Brooklyn only — search is restricted to north/NW Brooklyn (see
-// isInTargetRegion in pipeline.ts). Manhattan is intentionally not fetched.
+// Scoped to the target region's neighborhood area codes (TARGET_AREA_CODES in
+// pipeline.ts), not the whole Brooklyn borough — the SE server returns only
+// in-region listings. Manhattan is intentionally not fetched.
 const BOROUGHS: { name: string; areas: number[] }[] = [
-  { name: "Brooklyn", areas: [300] },
+  { name: "Brooklyn", areas: TARGET_AREA_CODES },
 ];
 
 // Verify sources we sample from. Matches verify-stale registry exclusions

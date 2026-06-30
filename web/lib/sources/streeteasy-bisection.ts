@@ -25,15 +25,17 @@ import {
   type SENode,
 } from "./streeteasy";
 import type { AdapterOutput } from "./types";
+import { TARGET_AREA_CODES } from "./pipeline";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-// Brooklyn only — search is restricted to north/NW Brooklyn (see
-// isInTargetRegion in pipeline.ts). Manhattan is intentionally not fetched.
+// Scoped to the target region's neighborhood area codes (TARGET_AREA_CODES in
+// pipeline.ts), not the whole Brooklyn borough — the SE server returns only
+// in-region listings. Manhattan is intentionally not fetched.
 const BOROUGHS: Array<{ name: string; areas: number[] }> = [
-  { name: "Brooklyn", areas: [300] },
+  { name: "Brooklyn", areas: TARGET_AREA_CODES },
 ];
 
 export const SE_CAP = 950;
