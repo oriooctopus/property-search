@@ -46,11 +46,10 @@ async function runAdapter(source: ListingSource, supabase?: SupabaseClient): Pro
     case "facebook-marketplace":
       throw new Error("facebook-marketplace adapter is disabled — re-enable in strategies.ts and types.ts");
     case "streeteasy": {
-      // Fetch boroughs in parallel — they're fully independent (different
-      // SE bisection slices, different proxy sessions when rotated). Saves
-      // ~14min off the daily ingest by overlapping Brooklyn (~14m) and
-      // Manhattan (~16m) instead of running sequentially.
-      const boroughs = ["Brooklyn", "Manhattan"] as const;
+      // Brooklyn only — search is restricted to north/NW Brooklyn (see
+      // isInTargetRegion in pipeline.ts). Manhattan is intentionally not
+      // fetched; the region bbox alone would not exclude lower Manhattan.
+      const boroughs = ["Brooklyn"] as const;
       const results = await Promise.all(
         boroughs.map((borough) =>
           fetchStreetEasyListings(

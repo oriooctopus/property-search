@@ -109,9 +109,9 @@ const SE_QUERY = `query GetListingRental($input: SearchRentalsInput!) {
   }
 }`;
 
-// Boroughs: rotate so we hit each over time.
+// Brooklyn only — search is restricted to north/NW Brooklyn (see
+// isInTargetRegion in pipeline.ts). Manhattan is intentionally not fetched.
 const BOROUGHS: { name: string; areas: number[] }[] = [
-  { name: "Manhattan", areas: [100] },
   { name: "Brooklyn", areas: [300] },
 ];
 

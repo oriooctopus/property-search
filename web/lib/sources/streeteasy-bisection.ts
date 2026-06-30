@@ -30,8 +30,9 @@ import type { AdapterOutput } from "./types";
 // Constants
 // ---------------------------------------------------------------------------
 
+// Brooklyn only — search is restricted to north/NW Brooklyn (see
+// isInTargetRegion in pipeline.ts). Manhattan is intentionally not fetched.
 const BOROUGHS: Array<{ name: string; areas: number[] }> = [
-  { name: "Manhattan", areas: [100] },
   { name: "Brooklyn", areas: [300] },
 ];
 
@@ -83,38 +84,18 @@ async function discoverBedroomBuckets(
   proxyFetch: typeof fetch,
   log: (msg: string) => void,
 ): Promise<BedroomBucket[]> {
+  // We ONLY want 2–4 bedrooms (enforced everywhere; see the bedroom gate in
+  // pipeline.ts). Fixed closed buckets for 2/3/4 — no studio/1BR, no
+  // open-ended 5BR+ tail.
   const buckets: BedroomBucket[] = [];
-  let consecutiveZeros = 0;
-  let lastNonZero = -1;
-
-  for (let bed = 0; consecutiveZeros < 2; bed++) {
+  for (const bed of [2, 3, 4]) {
     await delay(PROBE_DELAY_MS);
     const filters = buildBaseFilters(areas, { lowerBound: bed, upperBound: bed });
     const count = await probeTotalCount(areas, filters, proxyFetch);
     log(`    bed=${bed}: ${count}`);
-    if (count === 0) {
-      consecutiveZeros++;
-    } else {
-      consecutiveZeros = 0;
-      lastNonZero = bed;
-      buckets.push({
-        lower: bed,
-        upper: bed,
-        label: bed === 0 ? "studio" : `${bed}br`,
-        count,
-      });
+    if (count > 0) {
+      buckets.push({ lower: bed, upper: bed, label: `${bed}br`, count });
     }
-  }
-
-  if (buckets.length > 0) {
-    const last = buckets[buckets.length - 1];
-    await delay(PROBE_DELAY_MS);
-    const openFilters = buildBaseFilters(areas, { lowerBound: lastNonZero });
-    const openCount = await probeTotalCount(areas, openFilters, proxyFetch);
-    last.upper = null;
-    last.label = `${lastNonZero}br+`;
-    last.count = openCount;
-    log(`    bed=${lastNonZero}+ (open-ended): ${openCount}`);
   }
 
   return buckets;
