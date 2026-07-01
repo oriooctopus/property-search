@@ -1181,6 +1181,35 @@ function HomeInner() {
     };
   }, [filteredListings, selectedWishlist, showDelisted]);
 
+  // Keep the currently-selected listing present in the rendered set so a
+  // move/zoom doesn't deselect it while it's still on screen. The bounds query
+  // (/api/listings/search) returns capped pages, so zooming out — where the
+  // result set is larger and "more vague" — can drop the selected listing from
+  // the response even though it's still in view, making its pin vanish. We hold
+  // the full selected object in `detailListing` (it survives re-queries), so if
+  // it's within the last-loaded viewport bounds but missing from the results,
+  // re-inject it. It falls out only when it's truly outside the viewport.
+  const listingsForDisplay = useMemo(() => {
+    const sel = detailListing;
+    if (sel == null) return activeFilteredListings;
+    if (activeFilteredListings.some((l) => l.id === sel.id)) {
+      return activeFilteredListings;
+    }
+    const b = lastLoadedBounds.current;
+    const inView =
+      b != null &&
+      sel.lat != null &&
+      sel.lon != null &&
+      sel.lat >= b.latMin &&
+      sel.lat <= b.latMax &&
+      sel.lon >= b.lonMin &&
+      sel.lon <= b.lonMax;
+    return inView ? [...activeFilteredListings, sel] : activeFilteredListings;
+    // lastLoadedBounds is a ref, refreshed on each viewport load; viewportVersion
+    // bumps when a load completes, so this recomputes with fresh bounds.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFilteredListings, detailListing, viewportVersion]);
+
   // Keep the ref in sync so the chat hook's getListingCount stays current
   filteredListingsRef.current = filteredListings;
 
@@ -1492,7 +1521,7 @@ function HomeInner() {
       style={{ minHeight: 'calc(100vh - 60px - 42px)' }}
     >
       <Map
-        listings={activeFilteredListings}
+        listings={listingsForDisplay}
         selectedId={selectedId}
         favoritedIds={wishlistedIds}
         onHideListing={handleHideListing}
@@ -1851,7 +1880,7 @@ function HomeInner() {
               */}
               <VirtualListingGrid
                 ref={virtualGridRef}
-                listings={activeFilteredListings}
+                listings={listingsForDisplay}
                 removedListings={removedFilteredListings}
                 selectedId={selectedId}
                 wishlistedIds={wishlistedIds}
