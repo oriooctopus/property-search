@@ -377,20 +377,27 @@ export async function fetchCraigslistListings(
   params: SearchParams,
   opts?: { supabase?: SupabaseClient },
 ): Promise<{ listings: AdapterOutput[]; total: number }> {
-  const { bedsMin, priceMax, priceMin } = params;
+  const { bedsMin, bedsMax, priceMax, priceMin } = params;
 
   const token = process.env.APIFY_TOKEN;
   if (!token) {
     throw new Error("APIFY_TOKEN not set — cannot query Craigslist via Apify");
   }
 
-  // Only scrape Manhattan + Brooklyn to save Apify costs (~$15/mo savings).
+  // Brooklyn only — the target region is entirely in Brooklyn, so we don't scan
+  // Manhattan (saves a paid Apify search run; it returned 0 in-region anyway).
   // Full list: ["brk", "mnh", "que", "brx", "stn"]
-  const CL_BOROUGHS = ["brk", "mnh"];
+  const CL_BOROUGHS = ["brk"];
+  // Scope the SEARCH server-side so we detail-scrape far fewer out-of-scope
+  // listings (the detail scrape is the Apify cost). min/max_bedrooms filter to
+  // the 2–4BR band before Phase 2; the pipeline's region gate then trims the
+  // remaining out-of-neighborhood listings (craigslist search has no usable
+  // neighborhood-code filter, and its radius can't fit this region's shape).
   const queryParams = new URLSearchParams();
   if (priceMin != null) queryParams.set("min_price", String(priceMin));
   if (priceMax != null) queryParams.set("max_price", String(priceMax));
   if (bedsMin != null) queryParams.set("min_bedrooms", String(bedsMin));
+  if (bedsMax != null) queryParams.set("max_bedrooms", String(bedsMax));
   queryParams.set("availabilityMode", "0");
 
   const qs = queryParams.toString();
