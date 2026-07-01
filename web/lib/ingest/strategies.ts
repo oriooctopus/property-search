@@ -35,7 +35,12 @@ const NYC_PARAMS: SearchParams = { city: "New York", stateCode: "NY" };
 async function runAdapter(source: ListingSource, supabase?: SupabaseClient): Promise<AdapterOutput[]> {
   switch (source) {
     case "craigslist": {
-      const res = await fetchCraigslistListings(NYC_PARAMS, { supabase });
+      // Scope the craigslist search to the 2–4BR band server-side (matches the
+      // pipeline bedroom gate) so Apify detail-scrapes far fewer listings.
+      const res = await fetchCraigslistListings(
+        { ...NYC_PARAMS, bedsMin: 2, bedsMax: 4 },
+        { supabase },
+      );
       return res.listings;
     }
     // Facebook Marketplace disabled to save Apify costs — re-enable when needed

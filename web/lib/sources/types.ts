@@ -42,6 +42,7 @@ export interface SearchParams {
   city: string;
   stateCode: string;
   bedsMin?: number;
+  bedsMax?: number;
   bathsMin?: number;
   priceMax?: number;
   priceMin?: number;
