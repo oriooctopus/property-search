@@ -180,12 +180,17 @@ async function pageFunction(context) {
       if (ld.numberOfBathroomsTotal != null) ldBaths = String(ld.numberOfBathroomsTotal);
     }
 
-    // Photos
+    // Photos. Normalize every URL to the 1200x900 variant. Craigslist thumbnails
+    // carry a suffix letter (e.g. _50x50c.jpg for "cropped"), so the size token
+    // is _\d+x\d+[a-z]* — without the [a-z]* the c-suffixed thumbnails slip
+    // through un-upgraded and render blurry. The same image is scraped from both
+    // the <a.thumb> href and the thumbnail <img>, so normalizing makes the twins
+    // identical; dedup at the DB-row build.
     const photos = [];
     document.querySelectorAll('a.thumb, div.gallery img, img[src*="images.craigslist"]').forEach(el => {
       const src = el.getAttribute('href') || el.getAttribute('src') || '';
       if (src && src.includes('craigslist')) {
-        const fullSize = src.replace(/_\\d+x\\d+\\./, '_1200x900.');
+        const fullSize = src.replace(/_\\d+x\\d+[a-z]*\\./i, '_1200x900.');
         photos.push(fullSize);
       }
     });
@@ -634,7 +639,17 @@ export async function fetchCraigslistListings(
       sqft: null,
       lat: lat && !isNaN(lat) ? lat : null,
       lon: lon && !isNaN(lon) ? lon : null,
-      photo_urls: (item.pics ?? []).slice(0, 8).map((url: string) => url.replace(/_\d+x\d+\./, '_1200x900.')),
+      // Normalize every pic to the 1200x900 variant (the [a-z]* catches
+      // c-suffixed thumbnails like _50x50c.jpg that otherwise stay blurry),
+      // THEN dedup — the same image is scraped as both a sharp and a thumbnail
+      // URL, which collapse to one after normalization — THEN cap at 8.
+      photo_urls: [
+        ...new Set(
+          (item.pics ?? []).map((url: string) =>
+            url.replace(/_\d+x\d+[a-z]*\./i, '_1200x900.'),
+          ),
+        ),
+      ].slice(0, 8),
       url: item.url,
       list_date: item.datetime ?? null,
       last_update_date: null,
