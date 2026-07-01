@@ -1210,6 +1210,44 @@ function HomeInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFilteredListings, detailListing, viewportVersion]);
 
+  // Once the selected listing leaves the viewport entirely (after a move/zoom),
+  // don't leave an orphaned selection with no pin on the map — switch the
+  // selection to the in-view listing nearest the viewport center. While the
+  // selection is still in view it's preserved (see listingsForDisplay above);
+  // this only fires when it's truly out of bounds. Never moves the map.
+  useEffect(() => {
+    const sel = detailListing;
+    if (sel == null || sel.lat == null || sel.lon == null) return;
+    const b = lastLoadedBounds.current;
+    if (b == null) return;
+    const inView =
+      sel.lat >= b.latMin &&
+      sel.lat <= b.latMax &&
+      sel.lon >= b.lonMin &&
+      sel.lon <= b.lonMax;
+    if (inView) return;
+    // Truly out of view — pick the nearest in-view listing to switch to.
+    if (activeFilteredListings.length === 0) return; // nothing in view; leave as-is
+    const cLat = (b.latMin + b.latMax) / 2;
+    const cLon = (b.lonMin + b.lonMax) / 2;
+    let best: Listing | null = null;
+    let bestD = Infinity;
+    for (const l of activeFilteredListings) {
+      if (l.lat == null || l.lon == null) continue;
+      const d = (l.lat - cLat) ** 2 + (l.lon - cLon) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = l;
+      }
+    }
+    if (best != null && best.id !== sel.id) {
+      setSelectedId(best.id);
+      setDetailListing(best);
+    }
+    // lastLoadedBounds is a ref refreshed on each load; viewportVersion re-triggers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFilteredListings, detailListing, viewportVersion]);
+
   // Keep the ref in sync so the chat hook's getListingCount stays current
   filteredListingsRef.current = filteredListings;
 
