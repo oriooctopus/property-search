@@ -156,6 +156,19 @@ Exceptions (ask first):
 
 Smaller, more frequent deploys are always better than one big push at the end. If multiple fixes are in flight across parallel agents, deploy them as each one lands — don't batch them unless they are genuinely interdependent.
 
+### MANDATORY: Ship every change — "couldn't verify" is NEVER a reason to hold
+
+Every change gets deployed. Do NOT leave a committed change sitting on a branch,
+undeployed, because you couldn't run a behavioral/verify-agent check (e.g. the UI
+can't be driven in automation, a leaflet zoom won't fire headless, no dev creds,
+etc.). In that case: if it's tsc + lint clean, **merge to main and deploy anyway**,
+state the verification caveat plainly to the user, and fix forward if they hit an
+issue. Undeployed committed work is itself a failure mode — worse than shipping an
+unverified low-risk change. The ONLY reasons to hold are the Exceptions listed
+above (user asked to preserve a branch or review a draft; another agent is
+mid-edit). Inability to verify is not one of them; verification gates whether you
+CLAIM it works, never whether you deploy it.
+
 ## Test Credentials
 
 Test account credentials are in `web/.env.local` (not committed). Use these for Playwright-based verification of authenticated features like AI search, favorites, and would-live-there.
