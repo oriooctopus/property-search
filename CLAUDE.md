@@ -95,7 +95,16 @@ The dev server runs on port **8000** (`http://localhost:8000`), NOT the Next.js 
 
 Production URL: **https://dwelligence.vercel.app**
 
-Vercel auto-deploys on push to `main`. Always use this URL when referencing the live site (not the auto-generated `web-seven-chi-63.vercel.app`).
+Vercel auto-deploys on push to `main`. When referencing the live site to the
+user, use **only** `https://dwelligence.vercel.app` — NEVER any auto-generated
+`*.vercel.app` URL. That includes per-build immutable URLs
+(`property-search-<hash>-oliver-ullmans-projects.vercel.app`), the git-branch
+alias (`property-search-git-main-…vercel.app`), and older names
+(`web-seven-chi-63.vercel.app`). These leak out of deployment metadata (the
+GitHub deployment `environment_url`, the Vercel `url`/`inspectorUrl` fields,
+etc.) — when you read a deploy status and get one, translate it to
+`dwelligence.vercel.app` before showing the user. The only time to show a raw
+deploy URL is if the user explicitly asks for that specific build's URL.
 
 ## MANDATORY: Typecheck AND Lint Frequently
 
