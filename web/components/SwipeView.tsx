@@ -710,6 +710,72 @@ export default function SwipeView({
     }
   }, [showMobileMap, currentListing?.id, currentListing?.lat, currentListing?.lon]);
 
+  // ---- Desktop swipe: keep the active card's pin visible BESIDE the card ----
+  // On desktop the detail card is a right-anchored ~440px column floating over
+  // the right edge of the map, so a pin under that column is hidden. Whenever
+  // the active listing changes, pan the map so its pin lands in the visible
+  // strip LEFT of the card — but only if it isn't already comfortably there.
+  // Guarded by `suppressBoundsRef` so the programmatic pan doesn't trigger a
+  // viewport re-query. Desktop-only; the mobile model uses the occluder system.
+  useEffect(() => {
+    if (isMobileViewport !== false) return;
+    const map = leafletMap;
+    const cl = currentListing;
+    if (!map || !cl || cl.lat == null || cl.lon == null) return;
+    if (typeof window === 'undefined') return;
+    const lat = cl.lat;
+    const lon = cl.lon;
+
+    // rAF so the right-anchored card has laid out before we measure it.
+    const raf = window.requestAnimationFrame(() => {
+      const container = map.getContainer?.();
+      if (!container) return;
+      const mapRect = container.getBoundingClientRect();
+      if (mapRect.width <= 0 || mapRect.height <= 0) return;
+
+      const cardRect = getSwipeCardRect();
+      // Card is right-anchored; the visible strip is everything left of it.
+      const cardLeftInMap = cardRect
+        ? Math.min(cardRect.left - mapRect.left, mapRect.width)
+        : mapRect.width;
+
+      // Insets: the floating filter/nav pills sit ~150px down from the top;
+      // keep the pin below them and padded from every visible edge.
+      const padX = 56;
+      const visLeft = padX;
+      const visRight = cardLeftInMap - padX;
+      const visTop = 150;
+      const visBottom = mapRect.height - 72;
+      // Bail if the strip beside the card is too small to aim into.
+      if (visRight - visLeft < 80 || visBottom - visTop < 80) return;
+
+      const p = map.latLngToContainerPoint([lat, lon]);
+      const alreadyVisible =
+        p.x >= visLeft && p.x <= visRight && p.y >= visTop && p.y <= visBottom;
+      if (alreadyVisible) return;
+
+      // Target: center of the visible strip beside the card.
+      const targetX = (visLeft + visRight) / 2;
+      const targetY = (visTop + visBottom) / 2;
+
+      if (suppressBoundsRef) suppressBoundsRef.current = true;
+      map.panBy([Math.round(p.x - targetX), Math.round(p.y - targetY)], {
+        animate: true,
+        duration: 0.35,
+      });
+    });
+
+    // Clear bounds suppression after the pan settles.
+    const clearT = window.setTimeout(() => {
+      if (suppressBoundsRef) suppressBoundsRef.current = false;
+    }, 500);
+
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.clearTimeout(clearT);
+    };
+  }, [currentListing?.id, leafletMap, isMobileViewport, getSwipeCardRect, suppressBoundsRef]);
+
   // After undo-left/right, deck recomputes with the re-inserted item.
   // Find its new position and restore currentIndex to it.
   useEffect(() => {
