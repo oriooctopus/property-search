@@ -2424,29 +2424,75 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
               </div>
             )
           ) : (
-            <ButtonBase
-              onClick={() => {
-                setSaveName(suggestSearchName(filters));
-                setStickySaveExpanded(true);
-                setTimeout(() => stickySaveInputRef.current?.focus(), 50);
-              }}
-              disabled={activeCount === 0}
-              title={activeCount === 0 ? 'Add at least one filter to save the current search.' : undefined}
-              className="flex items-center gap-1.5 text-[12px] font-medium"
-              style={{
-                color: activeCount === 0 ? '#6e7681' : '#58a6ff',
-                background: 'transparent',
-                border: 'none',
-                padding: 0,
-                cursor: activeCount === 0 ? 'not-allowed' : 'pointer',
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={activeCount === 0 ? '#6e7681' : '#58a6ff'} strokeWidth="2.5">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              Save current search as…
-            </ButtonBase>
+            (() => {
+              // When a saved search is loaded (activeSearchId), offer to UPDATE
+              // it in place — not just create a new one. Falls back to the
+              // plain "Save current search as…" when nothing is loaded.
+              const activeSearch =
+                savedSearches?.find((s) => s.id === activeSearchId) ?? null;
+              return (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                  {activeSearch && (
+                    <ButtonBase
+                      onClick={async () => {
+                        const ok = await onUpdateSearchFilters?.(
+                          activeSearch.id,
+                          filters,
+                        );
+                        if (ok) {
+                          setSaveOpen(false);
+                          if (saveToastTimerRef.current)
+                            clearTimeout(saveToastTimerRef.current);
+                          setSaveToastVisible(true);
+                          saveToastTimerRef.current = setTimeout(
+                            () => setSaveToastVisible(false),
+                            3000,
+                          );
+                        }
+                      }}
+                      disabled={activeCount === 0}
+                      title={`Save the current filters to “${activeSearch.name}”`}
+                      className="flex items-center gap-1.5 text-[12px] font-medium"
+                      style={{
+                        color: activeCount === 0 ? '#6e7681' : '#58a6ff',
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 0,
+                        cursor: activeCount === 0 ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={activeCount === 0 ? '#6e7681' : '#58a6ff'} strokeWidth="2.5">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      Update “{activeSearch.name}”
+                    </ButtonBase>
+                  )}
+                  <ButtonBase
+                    onClick={() => {
+                      setSaveName(suggestSearchName(filters));
+                      setStickySaveExpanded(true);
+                      setTimeout(() => stickySaveInputRef.current?.focus(), 50);
+                    }}
+                    disabled={activeCount === 0}
+                    title={activeCount === 0 ? 'Add at least one filter to save the current search.' : undefined}
+                    className="flex items-center gap-1.5 text-[12px] font-medium"
+                    style={{
+                      color: activeCount === 0 ? '#6e7681' : '#58a6ff',
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      cursor: activeCount === 0 ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={activeCount === 0 ? '#6e7681' : '#58a6ff'} strokeWidth="2.5">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    {activeSearch ? 'Save as new' : 'Save current search as…'}
+                  </ButtonBase>
+                </div>
+              );
+            })()
           )}
         </div>
       }
