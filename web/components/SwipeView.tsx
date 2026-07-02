@@ -741,7 +741,12 @@ export default function SwipeView({
 
       // Insets: the floating filter/nav pills sit ~150px down from the top;
       // keep the pin below them and padded from every visible edge.
-      const padX = 56;
+      // padX is a GENEROUS horizontal clearance: a pin merely "peeking out"
+      // just beside the card's left edge still counts as occluded and gets
+      // pulled fully into the open strip. The pan target is the strip's
+      // centre (cardLeft/2), which is independent of padX — so a larger padX
+      // only widens which pins trigger a pan, not where they land.
+      const padX = 130;
       const visLeft = padX;
       const visRight = cardLeftInMap - padX;
       const visTop = 150;
