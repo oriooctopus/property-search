@@ -36,6 +36,24 @@ When spawning the verify agent (or any agent that logs in to the app), the promp
 4. If the verify agent ONLY needs to read public state (no login required to test the change), skip login entirely.
 5. If a verify agent needs to mutate data to demonstrate something (e.g. favorite a listing, add a wishlist item), it MUST clean up after itself in the same run. No leftover test rows.
 
+### MANDATORY: Sync the test account from the real account before user-state runs
+
+The dedicated test account starts empty, so verify/repro runs miss bugs that
+depend on the user's actual data (hidden listings, wishlists, saved searches) —
+e.g. a "still shows swiped listings" bug is invisible on a fresh account. When a
+run reproduces a user-reported issue that could depend on their state, FIRST run:
+
+    cd web && npx tsx scripts/sync-test-account.ts
+
+It read-only-copies oliverullman@gmail.com's DB-backed data into the test account
+(wiping the test account's copy first) — hidden_listings, saved_searches,
+wishlists + items, user_tier. It NEVER writes to the real account and is
+idempotent. Then log in as the test account as usual. Include this step in the
+verify-agent spawn prompt when the behavior under test is user-state-dependent.
+
+Caveat: swipe "pass"/"Later" state is per-device localStorage, not in the DB, so
+it can't be synced — reproduce those in-session.
+
 This applies to every verify-agent spawn, every project. Repeat the rule explicitly in the spawn prompt — don't assume the agent will infer it.
 
 ## MANDATORY: Status Table on Every Response
