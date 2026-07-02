@@ -587,14 +587,16 @@ function HomeInner() {
         nextOffsetRef.current = null;
         setHasMoreListings(false);
       } else {
-        // Empty area (no commute) — keep existing listings, update badge.
-        // Leave pagination state alone; it still reflects the last populated
-        // viewport's cursor.
-        setViewportCount(0);
-        // Bump the version so viewport-dependent effects (e.g. the
-        // clear/reselect-selection effect) still fire when panning into an
-        // empty area — otherwise a stale selection would linger off-screen.
+        // Empty viewport — no listings match here. Clear them so the
+        // "No listings found" empty state shows (swipe deck / list) and the
+        // map reflects the empty region, instead of leaving stale pins/cards
+        // from the previous viewport on screen. The viewportVersion bump also
+        // re-fires the clear/reselect-selection effect.
+        setListings([]);
         setViewportVersion((v) => v + 1);
+        setViewportCount(0);
+        nextOffsetRef.current = null;
+        setHasMoreListings(false);
       }
     } catch (err) {
       // An AbortError is expected whenever the user pans again before the
