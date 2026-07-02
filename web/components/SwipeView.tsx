@@ -112,12 +112,18 @@ function MobileSwipeEmptyState({
   emoji,
   extra,
   onClearFilters,
+  onResetPasses,
 }: {
   title: string;
   subtitle: string;
   emoji?: string;
   extra?: React.ReactNode;
   onClearFilters?: () => void;
+  /** Clears the persisted "passed" (down-swiped) ids so those cards re-deal.
+   *  Only supplied by the swiped-through branch, and only when there are
+   *  passes to clear — the escape hatch that was missing when swipe
+   *  persistence was first attempted. */
+  onResetPasses?: () => void;
 }) {
   return (
     <div
@@ -133,6 +139,11 @@ function MobileSwipeEmptyState({
         {subtitle}
       </div>
       {extra}
+      {onResetPasses && (
+        <TextButton variant="muted" onClick={onResetPasses}>
+          Show passed listings again
+        </TextButton>
+      )}
       {onClearFilters && (
         <TextButton variant="muted" onClick={onClearFilters}>
           Clear filters
@@ -194,11 +205,40 @@ export default function SwipeView({
   emptyStateExtra,
   onClearFilters,
 }: SwipeViewProps) {
-  // Don't persist swipedIds across refreshes — start fresh each session.
-  // The localStorage was causing "You've seen all listings" on every refresh.
+  // Persist "passed" (down-swiped) ids per-user so a reload doesn't re-deal
+  // cards the user already dispositioned. Persistence existed once before and
+  // was removed because "You've seen all listings" appeared on every refresh
+  // with no way out — the missing piece was a RESET affordance, which the
+  // swiped-through empty state now provides ("Show passed listings again").
+  // Left/right swipes already persist server-side (hidden_listings /
+  // wishlists); this only covers the 'down' pass. localStorage is a true
+  // system boundary (throws in private mode), hence the try/catch.
+  const passStorageKey = `dwelligence_passed_v1:${userId ?? 'anon'}`;
   const [swipedIds, setSwipedIds] = useState<Set<number>>(new Set());
   const [savedIds, setSavedIds] = useState<Set<number>>(new Set());
   const [currentIndex, setCurrentIndex] = useState(0);
+  // Hydrate on mount / account switch (union with any in-session swipes).
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(passStorageKey);
+      if (stored) {
+        const ids = JSON.parse(stored) as number[];
+        setSwipedIds((prev) => new Set([...prev, ...ids]));
+      }
+    } catch { /* storage unavailable (private mode) — session-only behavior */ }
+  }, [passStorageKey]);
+  // Write back, capped at the most recent 2000 ids to bound growth.
+  useEffect(() => {
+    try {
+      localStorage.setItem(passStorageKey, JSON.stringify([...swipedIds].slice(-2000)));
+    } catch { /* storage unavailable — session-only behavior */ }
+  }, [swipedIds, passStorageKey]);
+  // Clear all persisted passes — the escape hatch from a fully-swiped deck.
+  const resetPasses = useCallback(() => {
+    try { localStorage.removeItem(passStorageKey); } catch { /* ignore */ }
+    setSwipedIds(new Set());
+    setCurrentIndex(0);
+  }, [passStorageKey]);
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
   const [wishlistDropdownOpen, setWishlistDropdownOpen] = useState(false);
   // Array so we can glow 1 (desktop hover) or 2 (mobile auto) stations.
@@ -733,14 +773,13 @@ export default function SwipeView({
         }
         setSavedIds((prev) => { const next = new Set(prev); next.add(listing.id); return next; });
       }
-      // 'down' = pass / "later" — in-session only, no persistent action.
-      // Treated the same as left/right for deck purposes: the listing is
-      // added to swipedIds so it won't reappear later in the session. This
-      // fixes the "last card before empty state is a repeat" bug where a
-      // 'down'-swiped card could resurface when the user finished the deck
-      // and the restore-position effect clamped currentIndex back into the
-      // (still-larger) geoSorted set. Until filters change or the page
-      // reloads, a card the user has swiped on never shows up again.
+      // 'down' = pass / "later" — no server-side action, but swipedIds is
+      // persisted per-user in localStorage (see passStorageKey above), so a
+      // passed card stays passed across reloads on this device. Adding to
+      // swipedIds also fixes the "last card before empty state is a repeat"
+      // bug where a 'down'-swiped card could resurface when the user finished
+      // the deck and the restore-position effect clamped currentIndex back
+      // into the (still-larger) geoSorted set.
 
       // Track as swiped — don't increment currentIndex because removing
       // the item from swipedIds causes the deck to recompute, shifting the
@@ -1582,6 +1621,7 @@ export default function SwipeView({
             subtitle="Find another nearby or unhide listings to keep browsing."
             extra={emptyStateExtra}
             onClearFilters={onClearFilters}
+            onResetPasses={swipedIds.size > 0 ? resetPasses : undefined}
           />
         )}
       </div>
