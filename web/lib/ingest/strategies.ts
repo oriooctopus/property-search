@@ -35,12 +35,13 @@ const NYC_PARAMS: SearchParams = { city: "New York", stateCode: "NY" };
 async function runAdapter(source: ListingSource, supabase?: SupabaseClient): Promise<AdapterOutput[]> {
   switch (source) {
     case "craigslist": {
-      // Scope the craigslist search to the 2–4BR band server-side (matches the
-      // pipeline bedroom gate) so Apify detail-scrapes far fewer listings.
-      const res = await fetchCraigslistListings(
-        { ...NYC_PARAMS, bedsMin: 2, bedsMax: 4 },
-        { supabase },
-      );
+      // NOTE: do NOT pass bedroom params here. Scoping the craigslist search
+      // with min/max_bedrooms made craigslist return 0 URLs to the Apify
+      // scraper (bot-blocked on the parameterized search from proxy IPs), even
+      // though the same URL works in a normal browser — it broke fetching
+      // entirely. The pipeline's region + 2–4BR gate still filters post-scrape.
+      // Brooklyn-only (Manhattan dropped) is still applied inside the adapter.
+      const res = await fetchCraigslistListings(NYC_PARAMS, { supabase });
       return res.listings;
     }
     // Facebook Marketplace disabled to save Apify costs — re-enable when needed
