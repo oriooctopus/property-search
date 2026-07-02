@@ -591,6 +591,10 @@ function HomeInner() {
         // Leave pagination state alone; it still reflects the last populated
         // viewport's cursor.
         setViewportCount(0);
+        // Bump the version so viewport-dependent effects (e.g. the
+        // clear/reselect-selection effect) still fire when panning into an
+        // empty area — otherwise a stale selection would linger off-screen.
+        setViewportVersion((v) => v + 1);
       }
     } catch (err) {
       // An AbortError is expected whenever the user pans again before the
@@ -1210,13 +1214,18 @@ function HomeInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFilteredListings, detailListing, viewportVersion]);
 
-  // Once the selected listing leaves the viewport entirely (after a move/zoom),
-  // don't leave an orphaned selection with no pin on the map — switch the
-  // selection to the in-view listing nearest the viewport center. While the
-  // selection is still in view it's preserved (see listingsForDisplay above);
-  // this only fires when it's truly out of bounds. Never moves the map.
+  // Keep the selection consistent with what's on the map. When a move/zoom
+  // takes the selected listing out of the current viewport, switch to the
+  // in-bounds listing nearest the viewport center; if NOTHING is in view (e.g.
+  // panning to an empty area, or a wishlist with no pins here), clear the
+  // selection so a detail card isn't shown for a listing you can't see. This
+  // fires only on viewport changes — a fresh user selection (which is always
+  // an in-view list/pin) is never yanked. Never moves the map.
+  const prevSelectedDetailIdRef = useRef<number | null>(null);
   useEffect(() => {
     const sel = detailListing;
+    const prevId = prevSelectedDetailIdRef.current;
+    prevSelectedDetailIdRef.current = sel?.id ?? null;
     if (sel == null || sel.lat == null || sel.lon == null) return;
     const b = lastLoadedBounds.current;
     if (b == null) return;
@@ -1226,21 +1235,37 @@ function HomeInner() {
       sel.lon >= b.lonMin &&
       sel.lon <= b.lonMax;
     if (inView) return;
-    // Truly out of view — pick the nearest in-view listing to switch to.
-    if (activeFilteredListings.length === 0) return; // nothing in view; leave as-is
+    // Out of view. If this run is because the user just picked a new listing,
+    // leave it be — don't yank a fresh explicit selection.
+    if (sel.id !== prevId) return;
+    // Viewport-driven: the selection scrolled off. Reselect the nearest listing
+    // that is actually within the current bounds, or clear if there are none.
+    const inBounds = activeFilteredListings.filter(
+      (l) =>
+        l.lat != null &&
+        l.lon != null &&
+        l.lat >= b.latMin &&
+        l.lat <= b.latMax &&
+        l.lon >= b.lonMin &&
+        l.lon <= b.lonMax,
+    );
+    if (inBounds.length === 0) {
+      setSelectedId(null);
+      setDetailListing(null);
+      return;
+    }
     const cLat = (b.latMin + b.latMax) / 2;
     const cLon = (b.lonMin + b.lonMax) / 2;
-    let best: Listing | null = null;
+    let best = inBounds[0];
     let bestD = Infinity;
-    for (const l of activeFilteredListings) {
-      if (l.lat == null || l.lon == null) continue;
-      const d = (l.lat - cLat) ** 2 + (l.lon - cLon) ** 2;
+    for (const l of inBounds) {
+      const d = (l.lat! - cLat) ** 2 + (l.lon! - cLon) ** 2;
       if (d < bestD) {
         bestD = d;
         best = l;
       }
     }
-    if (best != null && best.id !== sel.id) {
+    if (best.id !== sel.id) {
       setSelectedId(best.id);
       setDetailListing(best);
     }
