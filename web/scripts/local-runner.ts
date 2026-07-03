@@ -237,7 +237,7 @@ async function runFetchCycle(
 
   let upsertedCount = 0;
   if (rows.length > 0) {
-    const result = await upsertListings(supabase, rows, { batchSize: 50 });
+    const result = await upsertListings(supabase, rows, { batchSize: 50, dedupIdentity: true });
     upsertedCount = result.succeeded;
   }
 
