@@ -908,6 +908,14 @@ export default function SwipeView({
     // item's new index and restore currentIndex to it. This applies to all
     // three swipe directions now that 'down' also tracks via swipedIds.
     pendingUndoId.current = last.listingId;
+    // ALSO make the undone listing the tracked selection. The deck-restore
+    // effect runs before the pendingUndo effect and reads currentListingIdRef;
+    // without this it would try to KEEP the card we'd advanced to (the one
+    // after the swipe), racing the undo-restore. Pointing the ref at the
+    // undone id makes both effects agree, so the deck lands on the undone
+    // listing — and the desktop follow-pin effect (keyed on currentListing.id)
+    // then pans the map to its pin, "focusing" the card you just brought back.
+    currentListingIdRef.current = last.listingId;
 
     setUndoStack((prev) => prev.slice(0, -1));
   }, [undoStack, onUnhideListing, resolvedWishlistId, removeFromWishlist]);
