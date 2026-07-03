@@ -1407,6 +1407,10 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
   const [editingSearchId, setEditingSearchId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
+  // Per-chip inline delete confirm — clicking the trash on a saved-search chip
+  // flips that chip into a "Delete? ✓ ✕" state so any search can be removed in
+  // place without digging into its edit banner, but a stray tap can't nuke it.
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   // === Edit-saved-search flow (Option C) ===
   // When the user taps the pencil in the mobile filter sheet's saved-search
@@ -1424,6 +1428,12 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
   const [saveAsNewOpen, setSaveAsNewOpen] = useState(false);
   const [saveAsNewName, setSaveAsNewName] = useState('');
   const saveAsNewInputRef = useRef<HTMLInputElement>(null);
+  // While an "Update / Save changes" request is in flight we flip the button
+  // to an inline "Saving…" state so the click registers immediately. Without
+  // it the only feedback is the success toast that lands a second or two
+  // later, which reads as an unresponsive button. Keyed by the search id so
+  // only the button that was clicked shows the spinner.
+  const [savingUpdateId, setSavingUpdateId] = useState<number | null>(null);
 
   // Stable JSON of the snapshot for cheap diffing inside render.
   const editingSnapshotJson = editingFiltersSnapshot ? JSON.stringify(editingFiltersSnapshot) : null;
@@ -2432,41 +2442,58 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                 savedSearches?.find((s) => s.id === activeSearchId) ?? null;
               return (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                  {activeSearch && (
+                  {activeSearch && (() => {
+                    const saving = savingUpdateId === activeSearch.id;
+                    const disabled = activeCount === 0 || saving;
+                    const tint = disabled ? '#6e7681' : '#58a6ff';
+                    return (
                     <ButtonBase
                       onClick={async () => {
-                        const ok = await onUpdateSearchFilters?.(
-                          activeSearch.id,
-                          filters,
-                        );
-                        if (ok) {
-                          setSaveOpen(false);
-                          if (saveToastTimerRef.current)
-                            clearTimeout(saveToastTimerRef.current);
-                          setSaveToastVisible(true);
-                          saveToastTimerRef.current = setTimeout(
-                            () => setSaveToastVisible(false),
-                            3000,
+                        if (saving || activeCount === 0) return;
+                        setSavingUpdateId(activeSearch.id);
+                        try {
+                          const ok = await onUpdateSearchFilters?.(
+                            activeSearch.id,
+                            filters,
                           );
+                          if (ok) {
+                            setSaveOpen(false);
+                            if (saveToastTimerRef.current)
+                              clearTimeout(saveToastTimerRef.current);
+                            setSaveToastVisible(true);
+                            saveToastTimerRef.current = setTimeout(
+                              () => setSaveToastVisible(false),
+                              3000,
+                            );
+                          }
+                        } finally {
+                          setSavingUpdateId(null);
                         }
                       }}
-                      disabled={activeCount === 0}
+                      disabled={disabled}
                       title={`Save the current filters to “${activeSearch.name}”`}
                       className="flex items-center gap-1.5 text-[12px] font-medium"
                       style={{
-                        color: activeCount === 0 ? '#6e7681' : '#58a6ff',
+                        color: tint,
                         background: 'transparent',
                         border: 'none',
                         padding: 0,
-                        cursor: activeCount === 0 ? 'not-allowed' : 'pointer',
+                        cursor: disabled ? (saving ? 'progress' : 'not-allowed') : 'pointer',
                       }}
                     >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={activeCount === 0 ? '#6e7681' : '#58a6ff'} strokeWidth="2.5">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                      Update “{activeSearch.name}”
+                      {saving ? (
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={tint} strokeWidth="2.5" className="animate-spin">
+                          <path d="M21 12a9 9 0 1 1-6.219-8.56" strokeLinecap="round" />
+                        </svg>
+                      ) : (
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={tint} strokeWidth="2.5">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                      {saving ? 'Saving…' : `Update “${activeSearch.name}”`}
                     </ButtonBase>
-                  )}
+                    );
+                  })()}
                   <ButtonBase
                     onClick={() => {
                       setSaveName(suggestSearchName(filters));
@@ -2599,6 +2626,42 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                     style={{ backgroundColor: '#0f1117', border: '1px solid #58a6ff', color: '#e1e4e8', width: `${Math.max(editingName.length, 4) * 7 + 16}px`, maxWidth: '150px' }}
                   />
                 </div>
+              ) : confirmDeleteId === s.id ? (
+                <div className="flex items-center h-full gap-1 pl-2.5 pr-1 text-[11px] whitespace-nowrap">
+                  <span style={{ color: '#f85149' }}>Delete “{s.name}”?</span>
+                  <button
+                    type="button"
+                    data-testid={`saved-search-delete-confirm-${s.id}`}
+                    aria-label={`Confirm delete ${s.name}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (activeSearchId === s.id) setActiveSearchId(null);
+                      if (editingFiltersSearchId === s.id) exitEditMode(true);
+                      onDeleteSearch?.(s.id);
+                      setConfirmDeleteId(null);
+                    }}
+                    className="flex items-center justify-center h-5 w-6 rounded cursor-pointer transition-colors hover:bg-[rgba(248,81,73,0.12)]"
+                    style={{ color: '#f85149' }}
+                    title="Delete"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Cancel delete ${s.name}`}
+                    onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(null); }}
+                    className="flex items-center justify-center h-5 w-6 rounded cursor-pointer transition-colors hover:text-[#c0d6f5]"
+                    style={{ color: '#8b949e' }}
+                    title="Cancel"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
               ) : (
                 <div
                   className={cn(
@@ -2663,6 +2726,25 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                   >
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M8.5 1.5l2 2L4 10H2v-2z" />
+                    </svg>
+                  </button>
+                  {/* Trash — one-tap delete for ANY saved search. Opens the
+                      inline "Delete? ✓ ✕" confirm above so it can't be nuked by
+                      a stray tap and you don't have to enter the edit banner. */}
+                  <button
+                    type="button"
+                    data-testid={`saved-search-delete-${s.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmDeleteId(s.id);
+                    }}
+                    aria-label={`Delete ${s.name}`}
+                    title={`Delete “${s.name}”`}
+                    className="flex items-center justify-center h-full w-7 cursor-pointer transition-colors text-[#6e7681] hover:text-[#f85149]"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                     </svg>
                   </button>
                 </div>
@@ -3120,27 +3202,44 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                         </button>
                         <button
                           data-testid="edit-saved-search-save-changes"
+                          disabled={savingUpdateId === editingFiltersSearchId}
                           onClick={async () => {
                             if (!editingFiltersSearchId) return;
-                            const ok = await onUpdateSearchFilters?.(editingFiltersSearchId, filters);
-                            if (ok) {
-                              // Successful save — exit edit mode without
-                              // reverting (current filters are now the new
-                              // baseline / the persisted snapshot).
-                              setEditingFiltersSearchId(null);
-                              setEditingFiltersName('');
-                              setEditingFiltersSnapshot(null);
-                              setSaveAsNewOpen(false);
-                              setSaveAsNewName('');
-                              setSaveToastVisible(true);
-                              if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
-                              saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 2000);
+                            if (savingUpdateId === editingFiltersSearchId) return;
+                            const target = editingFiltersSearchId;
+                            setSavingUpdateId(target);
+                            try {
+                              const ok = await onUpdateSearchFilters?.(target, filters);
+                              if (ok) {
+                                // Successful save — exit edit mode without
+                                // reverting (current filters are now the new
+                                // baseline / the persisted snapshot).
+                                setEditingFiltersSearchId(null);
+                                setEditingFiltersName('');
+                                setEditingFiltersSnapshot(null);
+                                setSaveAsNewOpen(false);
+                                setSaveAsNewName('');
+                                setSaveToastVisible(true);
+                                if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
+                                saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 2000);
+                              }
+                            } finally {
+                              setSavingUpdateId(null);
                             }
                           }}
-                          className="h-10 px-4 rounded-md text-[13px] font-semibold cursor-pointer ml-auto"
+                          className="h-10 px-4 rounded-md text-[13px] font-semibold cursor-pointer ml-auto disabled:cursor-progress"
                           style={{ backgroundColor: '#58a6ff', color: '#03111f' }}
                         >
-                          Save changes
+                          {savingUpdateId === editingFiltersSearchId ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#03111f" strokeWidth="2.5" className="animate-spin">
+                                <path d="M21 12a9 9 0 1 1-6.219-8.56" strokeLinecap="round" />
+                              </svg>
+                              Saving…
+                            </span>
+                          ) : (
+                            'Save changes'
+                          )}
                         </button>
                       </>
                     )
