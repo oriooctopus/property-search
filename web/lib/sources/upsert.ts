@@ -12,6 +12,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ListingRow } from "./row";
+import { apartmentIdentityKey } from "./identity";
 
 export interface UpsertOpts {
   batchSize?: number;
@@ -19,6 +20,16 @@ export interface UpsertOpts {
   backoffMs?: number;
   onConflict?: string;
   dryRun?: boolean;
+  /**
+   * Opt-in INGEST-LEVEL identity de-duplication. When true, before upserting we
+   * (1) collapse within-batch duplicates that share an apartment-identity key
+   * (see lib/sources/identity.ts), and (2) redirect any row whose identity
+   * matches an EXISTING active row (same source, DIFFERENT url) onto that row's
+   * `id`, so the upsert UPDATES it in place instead of INSERTing a churned-url
+   * duplicate. Without this, a Craigslist repost / StreetEasy re-list (which
+   * gets a fresh url) inserts a brand-new duplicate row every scrape.
+   */
+  dedupIdentity?: boolean;
 }
 
 export interface UpsertResult {
@@ -29,6 +40,10 @@ export interface UpsertResult {
   splitOn413: number;
   retries: number;
   dedupedInBatch: number;
+  /** Rows dropped because another row in the same batch shared their identity key. */
+  identityDedupedInBatch: number;
+  /** Rows redirected onto an existing active row's id (url churn caught). */
+  identityRedirected: number;
 }
 
 const DEFAULTS: Required<Omit<UpsertOpts, "dryRun">> & { dryRun: boolean } = {
@@ -37,6 +52,7 @@ const DEFAULTS: Required<Omit<UpsertOpts, "dryRun">> & { dryRun: boolean } = {
   backoffMs: 500,
   onConflict: "url",
   dryRun: false,
+  dedupIdentity: false,
 };
 
 // NOTE: toListingRow (lib/sources/row.ts) intentionally OMITS `delisted_at`
@@ -144,6 +160,159 @@ async function upsertOneBatch(
   return { succeeded: 0, failed: batch.length, splitOn413, retries };
 }
 
+/** Minimal shape needed to compute an identity key from an existing DB row. */
+interface ActiveRow {
+  id: number;
+  url: string;
+  address: string;
+  beds: number;
+  price: number;
+  source: string;
+  last_seen_at: string | null;
+}
+
+function rowToIdentity(r: {
+  address?: string | null;
+  beds?: number;
+  price?: number;
+  url: string;
+  source?: string;
+}) {
+  return {
+    address: r.address ?? null,
+    beds: r.beds ?? 0,
+    price: r.price ?? 0,
+    url: r.url,
+    // `source` is NOT NULL on the listings table and is always set by
+    // toListingRow — an undefined here would be an upstream bug, so we don't
+    // paper over it with a fallback string.
+    source: r.source as string,
+  };
+}
+
+/** Prefer the most-recently-seen row (max last_seen_at, tiebreak max id). */
+function moreRecent(a: ActiveRow, b: ActiveRow): boolean {
+  const at = a.last_seen_at ?? "";
+  const bt = b.last_seen_at ?? "";
+  if (at !== bt) return at > bt;
+  return a.id > b.id;
+}
+
+/**
+ * Fetch active rows (delisted_at IS NULL) for the sources present in `rows`,
+ * and index them by apartment-identity key. When several active rows share a
+ * key (an existing duplicate), the most-recently-seen one wins — matching the
+ * "keep newest" rule used by the one-time cleanup script.
+ */
+async function buildIdentityIndex(
+  supabase: SupabaseClient,
+  rows: ListingRow[],
+): Promise<Map<string, { id: number; url: string }>> {
+  const sources = Array.from(new Set(rows.map((r) => r.source as string)));
+  const active: ActiveRow[] = [];
+  const PAGE = 1000;
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await supabase
+      .from("listings")
+      .select("id, url, address, beds, price, source, last_seen_at")
+      .is("delisted_at", null)
+      .in("source", sources)
+      .range(offset, offset + PAGE - 1);
+    if (error) throw new Error(`identity index fetch failed: ${error.message}`);
+    if (!data || data.length === 0) break;
+    active.push(...(data as ActiveRow[]));
+    if (data.length < PAGE) break;
+  }
+
+  const winners = new Map<string, ActiveRow>();
+  for (const r of active) {
+    const k = apartmentIdentityKey(rowToIdentity(r));
+    const prev = winners.get(k);
+    if (!prev || moreRecent(r, prev)) winners.set(k, r);
+  }
+  return new Map(
+    Array.from(winners, ([k, r]) => [k, { id: r.id, url: r.url }]),
+  );
+}
+
+interface GroupOutcome {
+  attempted: number;
+  succeeded: number;
+  failed: number;
+  splitOn413: number;
+  retries: number;
+  deduped: number;
+  errors: UpsertResult["errors"];
+}
+
+/**
+ * De-duplicate `rows` by their conflict key (last-write-wins, prevents
+ * "cannot affect row a second time"), then batch-upsert them with that key as
+ * the ON CONFLICT target.
+ */
+async function upsertConflictGroup(
+  supabase: SupabaseClient,
+  rows: ListingRow[],
+  merged: Required<Omit<UpsertOpts, "dryRun">> & { dryRun: boolean },
+  onConflict: string,
+): Promise<GroupOutcome> {
+  const conflictKey = onConflict as keyof ListingRow;
+  const seen = new Map<string, ListingRow>();
+  for (const row of rows) {
+    const key = row[conflictKey] as unknown as string | number | undefined;
+    if (key != null) seen.set(String(key), row); // last-write wins
+  }
+  const dedupedRows = Array.from(seen.values());
+  const deduped = rows.length - dedupedRows.length;
+  if (deduped > 0) {
+    console.log(
+      `[upsert] deduplicated ${deduped} rows by "${onConflict}" (${rows.length} → ${dedupedRows.length})`,
+    );
+  }
+
+  const outcome: GroupOutcome = {
+    attempted: dedupedRows.length,
+    succeeded: 0,
+    failed: 0,
+    splitOn413: 0,
+    retries: 0,
+    deduped,
+    errors: [],
+  };
+
+  if (merged.dryRun) {
+    console.log(
+      `[upsert] dry-run: would upsert ${dedupedRows.length} rows by "${onConflict}" (no writes)`,
+    );
+    return outcome;
+  }
+  if (dedupedRows.length === 0) return outcome;
+
+  const groupOpts = { ...merged, onConflict };
+  const totalBatches = Math.ceil(dedupedRows.length / merged.batchSize);
+  for (let i = 0, batchIndex = 0; i < dedupedRows.length; i += merged.batchSize, batchIndex++) {
+    const batch = dedupedRows.slice(i, i + merged.batchSize);
+    console.log(
+      `[upsert] batch ${batchIndex + 1}/${totalBatches} (on ${onConflict}): ${batch.length} rows`,
+    );
+
+    const b = await upsertOneBatch(supabase, batch, groupOpts, 0);
+    outcome.succeeded += b.succeeded;
+    outcome.failed += b.failed;
+    outcome.splitOn413 += b.splitOn413;
+    outcome.retries += b.retries;
+
+    if (b.failed > 0) {
+      outcome.errors.push({
+        batchIndex,
+        message: b.errorMessage ?? "partial landing (response shorter than input)",
+        rowUrls: batch.slice(-b.failed).map((r) => r.url),
+      });
+    }
+  }
+  return outcome;
+}
+
 export async function upsertListings(
   supabase: SupabaseClient,
   rows: ListingRow[],
@@ -155,54 +324,80 @@ export async function upsertListings(
     dryRun: opts.dryRun ?? false,
   };
 
-  // Deduplicate by conflict key to prevent "cannot affect row a second time"
-  const conflictKey = merged.onConflict as keyof ListingRow;
-  const seen = new Map<string, ListingRow>();
-  for (const row of rows) {
-    const key = row[conflictKey] as string;
-    if (key) seen.set(key, row); // last-write wins
-  }
-  const dedupedRows = Array.from(seen.values());
-  const dedupedInBatch = rows.length - dedupedRows.length;
-  if (dedupedInBatch > 0) {
-    console.log(`[upsert] deduplicated ${dedupedInBatch} rows by "${merged.onConflict}" (${rows.length} → ${dedupedRows.length})`);
-  }
-
   const result: UpsertResult = {
-    attempted: dedupedRows.length,
+    attempted: 0,
     succeeded: 0,
     failed: 0,
     errors: [],
     splitOn413: 0,
     retries: 0,
-    dedupedInBatch,
+    dedupedInBatch: 0,
+    identityDedupedInBatch: 0,
+    identityRedirected: 0,
   };
 
-  if (merged.dryRun) {
-    console.log(`[upsert] dry-run: would upsert ${dedupedRows.length} rows (no writes)`);
-    return result;
+  let working = rows;
+
+  // ── INGEST-LEVEL identity de-duplication (prevents url-churn duplicates) ──
+  if (merged.dedupIdentity) {
+    // 1. Collapse within-batch duplicates that share an identity key (keep the
+    //    first occurrence). A single scrape can contain two reposts of the same
+    //    apartment under different urls — without this they'd both survive the
+    //    url-dedup below and one would INSERT a fresh duplicate.
+    const seenKeys = new Map<string, ListingRow>();
+    for (const row of rows) {
+      const k = apartmentIdentityKey(rowToIdentity(row));
+      if (!seenKeys.has(k)) seenKeys.set(k, row);
+    }
+    result.identityDedupedInBatch = rows.length - seenKeys.size;
+    working = Array.from(seenKeys.values());
+    if (result.identityDedupedInBatch > 0) {
+      console.log(
+        `[upsert] identity: collapsed ${result.identityDedupedInBatch} within-batch duplicate(s)`,
+      );
+    }
+
+    // 2. Redirect rows whose identity matches an EXISTING active row (different
+    //    url) onto that row's id, so the upsert UPDATES it in place. Read-only
+    //    DB lookup — skipped in dry-run (no writes happen there anyway).
+    if (!merged.dryRun) {
+      const index = await buildIdentityIndex(supabase, working);
+      for (const row of working) {
+        const hit = index.get(apartmentIdentityKey(rowToIdentity(row)));
+        if (hit && hit.url !== row.url) {
+          row.id = hit.id;
+          result.identityRedirected++;
+        }
+      }
+      if (result.identityRedirected > 0) {
+        console.log(
+          `[upsert] identity: redirected ${result.identityRedirected} row(s) onto existing ids (url churn caught)`,
+        );
+      }
+    }
   }
 
-  if (dedupedRows.length === 0) return result;
+  // Rows carrying an `id` (identity-redirected) update in place via ON CONFLICT
+  // "id"; everything else keeps the normal url-based upsert.
+  const idGroup = working.filter((r) => r.id != null);
+  const urlGroup = working.filter((r) => r.id == null);
 
-  const totalBatches = Math.ceil(dedupedRows.length / merged.batchSize);
-  for (let i = 0, batchIndex = 0; i < dedupedRows.length; i += merged.batchSize, batchIndex++) {
-    const batch = dedupedRows.slice(i, i + merged.batchSize);
-    console.log(`[upsert] batch ${batchIndex + 1}/${totalBatches}: ${batch.length} rows`);
+  const groups: Array<GroupOutcome> = [];
+  if (idGroup.length > 0) {
+    groups.push(await upsertConflictGroup(supabase, idGroup, merged, "id"));
+  }
+  if (urlGroup.length > 0) {
+    groups.push(await upsertConflictGroup(supabase, urlGroup, merged, merged.onConflict));
+  }
 
-    const outcome = await upsertOneBatch(supabase, batch, merged, 0);
-    result.succeeded += outcome.succeeded;
-    result.failed += outcome.failed;
-    result.splitOn413 += outcome.splitOn413;
-    result.retries += outcome.retries;
-
-    if (outcome.failed > 0) {
-      result.errors.push({
-        batchIndex,
-        message: outcome.errorMessage ?? "partial landing (response shorter than input)",
-        rowUrls: batch.slice(-outcome.failed).map((r) => r.url),
-      });
-    }
+  for (const g of groups) {
+    result.attempted += g.attempted;
+    result.succeeded += g.succeeded;
+    result.failed += g.failed;
+    result.splitOn413 += g.splitOn413;
+    result.retries += g.retries;
+    result.dedupedInBatch += g.deduped;
+    result.errors.push(...g.errors);
   }
 
   return result;
@@ -216,6 +411,8 @@ export function formatUpsertResult(r: UpsertResult): string {
     `  retries:     ${r.retries}`,
     `  split-on-413: ${r.splitOn413}`,
     `  deduped:     ${r.dedupedInBatch}`,
+    `  identity-deduped: ${r.identityDedupedInBatch}`,
+    `  identity-redirected: ${r.identityRedirected}`,
   ];
   if (r.errors.length > 0) {
     lines.push(`  errors:`);
