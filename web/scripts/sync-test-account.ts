@@ -76,10 +76,14 @@ async function main() {
   console.log(`  saved_searches: ${ss?.length ?? 0}`);
 
   // ---- wishlists + items (remap wishlist ids) ----
-  const { data: wls } = await sb.from("wishlists").select("id, name, is_public").eq("user_id", realId);
+  const { data: wls } = await sb.from("wishlists").select("id, name").eq("user_id", realId);
   let itemCount = 0;
   for (const wl of wls ?? []) {
-    const { data: nw, error } = await sb.from("wishlists").insert({ user_id: testId, name: wl.name, is_public: wl.is_public }).select("id").single();
+    // ALWAYS private: copying is_public from the real wishlist made the test
+    // account's clone publicly visible — it showed up as a duplicate
+    // "Williamsburg" in the real user's own Manage Wishlists UI. The test
+    // copy only needs to be readable by the test account itself.
+    const { data: nw, error } = await sb.from("wishlists").insert({ user_id: testId, name: wl.name, is_public: false }).select("id").single();
     if (error || !nw) { console.log(`  wishlist "${wl.name}" insert failed: ${error?.message}`); continue; }
     const { data: items } = await sb.from("wishlist_items").select("listing_id").eq("wishlist_id", wl.id);
     if (items?.length) {
