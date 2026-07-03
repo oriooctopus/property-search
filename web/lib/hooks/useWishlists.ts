@@ -33,6 +33,10 @@ export function useWishlists(userId: string | null) {
       const { data, error } = await supabase
         .from('wishlists')
         .select('id, name, user_id, created_at, updated_at, is_public, wishlist_items(listing_id), wishlist_shares(id, shared_with_email, permission)')
+        // Only wishlists the user OWNS. Without this filter the query returns
+        // every row RLS lets us read — including OTHER people's public
+        // wishlists — which then show up under "Created by you".
+        .eq('user_id', userId)
         .order('created_at', { ascending: true });
       if (error) throw error;
       return (data ?? []) as unknown as Wishlist[];
