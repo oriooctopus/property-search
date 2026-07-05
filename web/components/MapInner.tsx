@@ -70,6 +70,7 @@ function formatStationDistance(distMi: number): string {
 /* ------------------------------------------------------------------ */
 
 const SUBWAY_OVERLAY_STORAGE_KEY = 'dwelligence.subwayOverlay';
+const SUBWAY_STATIONS_STORAGE_KEY = 'dwelligence.subwayStations';
 const SUBWAY_LINES_URL = '/data/subway-lines.geojson';
 
 function getSubwayFeatureColor(feature: Feature | undefined): string {
@@ -1120,78 +1121,292 @@ function buildPopupContent(listing: Listing, isFavorited: boolean, _isWouldLive:
 }
 
 /* ------------------------------------------------------------------ */
-/*  Subway overlay toggle chip — bottom-left of the map                */
+/*  Subway overlay arc-fan chip — bottom-left of the map               */
+/*                                                                     */
+/*  Hover (desktop) or tap (touch) the circular chip and two frosted-  */
+/*  glass pills fan out diagonally up-right along a dotted arc:        */
+/*  "Lines" (subway lines on/off) and "All stations" (all station      */
+/*  markers always visible vs hover-only). Hover robustness:           */
+/*   - ONE container owns mouseenter/mouseleave (never per-element)    */
+/*   - an invisible bridge covers the chip→arc→pills bounding region   */
+/*     while open, so crossing the diagonal gap never leaves hover     */
+/*   - mouseleave starts a 250ms grace timer, cancelled on re-enter    */
+/*   - the bridge only exists while open, so a closed fan never        */
+/*     blocks map interaction beyond the chip itself                   */
 /* ------------------------------------------------------------------ */
 interface SubwayOverlayChipProps {
-  enabled: boolean;
-  onToggle: () => void;
+  linesEnabled: boolean;
+  onToggleLines: () => void;
+  stationsEnabled: boolean;
+  onToggleStations: () => void;
 }
 
-function SubwayOverlayChip({ enabled, onToggle }: SubwayOverlayChipProps) {
-  const iconColor = enabled ? '#7ee787' : '#ffffff';
+/** Route-with-two-stops glyph: short line with filled dots at endpoints */
+function SubwayLinesGlyph({ size = 18 }: { size?: number }) {
   return (
-    <div
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 18 18"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+      style={{ color: 'currentcolor', display: 'block' }}
+    >
+      <line x1="4" y1="9" x2="14" y2="9" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+      <circle cx="4" cy="9" r="2.25" fill="currentColor" />
+      <circle cx="14" cy="9" r="2.25" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Three-dots glyph for the "All stations" pill */
+function StationDotsGlyph({ size = 14 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 18 18"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+      style={{ color: 'currentcolor', display: 'block' }}
+    >
+      <circle cx="4" cy="9" r="2" fill="currentColor" />
+      <circle cx="9" cy="9" r="2" fill="currentColor" />
+      <circle cx="14" cy="9" r="2" fill="currentColor" />
+    </svg>
+  );
+}
+
+interface FanPillProps {
+  label: string;
+  ariaLabel: string;
+  pressed: boolean;
+  open: boolean;
+  bottom: number;
+  left: number;
+  /** stagger delay (s) applied while opening */
+  delay: number;
+  onClick: () => void;
+  icon: React.ReactNode;
+}
+
+function FanPill({ label, ariaLabel, pressed, open, bottom, left, delay, onClick, icon }: FanPillProps) {
+  return (
+    <ButtonBase
+      type="button"
+      role="button"
+      aria-pressed={pressed}
+      aria-label={ariaLabel}
+      tabIndex={open ? 0 : -1}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className="flex items-center rounded-full whitespace-nowrap"
       style={{
         position: 'absolute',
-        // 16px on mobile, 12px on desktop — plus safe-area inset so it clears
-        // the home indicator / any bottom nav on iPhones.
+        bottom,
+        left,
+        gap: 7,
+        padding: '7px 12px 7px 8px',
+        fontSize: 12.5,
+        color: '#e1e4e8',
+        background: 'rgba(28,32,40,0.88)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
+        border: pressed ? '1px solid #7ee787' : '1px solid #2d333b',
+        boxShadow: pressed
+          ? '0 0 0 2px rgba(126,231,135,0.20), 0 3px 10px rgba(0,0,0,0.35)'
+          : '0 3px 10px rgba(0,0,0,0.35)',
+        opacity: open ? 1 : 0,
+        transform: open ? 'scale(1)' : 'scale(0.7)',
+        transition: `opacity .2s ease ${open ? delay : 0}s, transform .22s cubic-bezier(.34,1.56,.64,1) ${open ? delay : 0}s, border-color .15s, box-shadow .15s`,
+        pointerEvents: open ? 'auto' : 'none',
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 16,
+          height: 16,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: pressed ? '#7ee787' : '#8b949e',
+        }}
+      >
+        {icon}
+      </span>
+      {label}
+    </ButtonBase>
+  );
+}
+
+function SubwayOverlayChip({ linesEnabled, onToggleLines, stationsEnabled, onToggleStations }: SubwayOverlayChipProps) {
+  const [open, setOpen] = useState(false);
+  // Touch devices (no hover) get tap-to-open; hover devices get hover-to-open.
+  const [touchMode, setTouchMode] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(hover: none)');
+    const update = () => setTouchMode(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
+  const cancelClose = useCallback(() => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }, []);
+  // Grace-period close: brief exits along the arc never flicker the fan shut.
+  const scheduleClose = useCallback(() => {
+    cancelClose();
+    closeTimerRef.current = setTimeout(() => setOpen(false), 250);
+  }, [cancelClose]);
+  useEffect(() => () => cancelClose(), [cancelClose]);
+
+  const openFan = useCallback(() => {
+    cancelClose();
+    setOpen(true);
+  }, [cancelClose]);
+
+  // Touch mode: tapping anywhere outside the container closes the fan and
+  // swallows that tap (capture phase) so the closing tap doesn't also
+  // trigger map click side effects.
+  useEffect(() => {
+    if (!touchMode || !open) return;
+    const onDocClick = (e: MouseEvent) => {
+      const el = containerRef.current;
+      if (el && e.target instanceof Node && el.contains(e.target)) return;
+      setOpen(false);
+      e.stopPropagation();
+      e.preventDefault();
+    };
+    document.addEventListener('click', onDocClick, true);
+    return () => document.removeEventListener('click', onDocClick, true);
+  }, [touchMode, open]);
+
+  const iconColor = linesEnabled ? '#7ee787' : '#ffffff';
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        position: 'absolute',
+        // 16px plus safe-area inset so it clears the home indicator / any
+        // bottom nav on iPhones.
         bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
         left: 16,
         zIndex: 500,
-        display: 'flex',
-        alignItems: 'center',
-        pointerEvents: 'auto',
       }}
-      // Prevent map drag/zoom when interacting with the chip
+      // Prevent map drag/zoom when interacting with the chip/fan
       onMouseDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
       onWheel={(e) => e.stopPropagation()}
       onTouchStart={(e) => e.stopPropagation()}
+      // Single hover container: open/close is owned here, never per-element.
+      onMouseEnter={touchMode ? undefined : openFan}
+      onMouseLeave={touchMode ? undefined : scheduleClose}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' && open) {
+          e.stopPropagation();
+          cancelClose();
+          setOpen(false);
+        }
+      }}
+      onBlur={(e) => {
+        // Close (after grace) when keyboard focus leaves the whole container.
+        const el = containerRef.current;
+        if (el && e.relatedTarget instanceof Node && el.contains(e.relatedTarget)) return;
+        scheduleClose();
+      }}
     >
+      {/* Invisible hover bridge — covers the full chip + arc + pills bounding
+          region so the cursor crossing the diagonal gap between chip and
+          pills stays inside the container. Only rendered while open, so a
+          collapsed fan never blocks map interaction. */}
+      {open && (
+        <div
+          aria-hidden
+          data-testid="subway-fan-bridge"
+          style={{
+            position: 'absolute',
+            left: -12,
+            bottom: -12,
+            width: 220,
+            height: 130,
+            pointerEvents: 'auto',
+          }}
+        />
+      )}
+
+      {/* Faint dotted arc guide, purely decorative */}
+      <svg
+        aria-hidden
+        viewBox="0 0 90 90"
+        style={{
+          position: 'absolute',
+          bottom: 4,
+          left: 4,
+          width: 90,
+          height: 90,
+          opacity: open ? 0.5 : 0,
+          transition: 'opacity .2s ease',
+          pointerEvents: 'none',
+        }}
+      >
+        <path
+          d="M18 82 Q 10 40, 55 18"
+          stroke="rgba(126,231,135,0.4)"
+          strokeWidth="1.5"
+          strokeDasharray="2 4"
+          fill="none"
+          strokeLinecap="round"
+        />
+      </svg>
+
+      {/* Main chip — DOM-first so Tab order runs chip → pills */}
       <ButtonBase
         type="button"
-        aria-pressed={enabled}
-        aria-label={enabled ? 'Hide subway lines' : 'Show subway lines'}
-        onClick={onToggle}
+        aria-expanded={open}
+        aria-haspopup="true"
+        aria-label="Subway overlay options"
+        onClick={(e) => {
+          e.stopPropagation();
+          // Tap/click (and keyboard Enter) toggles the fan. Toggling lines
+          // moved to the "Lines" pill.
+          if (open && !touchMode) return; // hover already keeps it open
+          cancelClose();
+          setOpen((prev) => !prev);
+        }}
+        onFocus={openFan}
         className={cn(
           // Circular icon-only button — 36px on mobile, 32px on md (laptop+).
           'relative flex items-center justify-center rounded-full',
           'w-9 h-9 md:w-8 md:h-8',
           'border bg-[#1c2028]',
-          enabled
+          linesEnabled
             ? 'border-[#7ee787] hover:bg-[#2d333b]'
             : 'border-[#2d333b] hover:bg-[#2d333b] hover:border-[#3d434b]',
         )}
         style={{
-          boxShadow: enabled
+          boxShadow: linesEnabled
             ? '0 0 0 2px rgba(126,231,135,0.20), 0 1px 4px rgba(0,0,0,0.4)'
             : '0 1px 4px rgba(0,0,0,0.4)',
-          borderWidth: enabled ? 2 : 1.5,
+          borderWidth: linesEnabled ? 2 : 1.5,
+          color: iconColor,
         }}
       >
-        {/* Route-with-two-stops glyph: short line with filled dots at endpoints */}
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 18 18"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden
-          style={{ color: iconColor, display: 'block' }}
-        >
-          <line
-            x1="4"
-            y1="9"
-            x2="14"
-            y2="9"
-            stroke="currentColor"
-            strokeWidth="1.75"
-            strokeLinecap="round"
-          />
-          <circle cx="4" cy="9" r="2.25" fill="currentColor" />
-          <circle cx="14" cy="9" r="2.25" fill="currentColor" />
-        </svg>
-        {enabled && (
+        <SubwayLinesGlyph />
+        {linesEnabled && (
           <span
             aria-hidden
             style={{
@@ -1207,6 +1422,29 @@ function SubwayOverlayChip({ enabled, onToggle }: SubwayOverlayChipProps) {
           />
         )}
       </ButtonBase>
+
+      <FanPill
+        label="All stations"
+        ariaLabel={stationsEnabled ? 'Hide all subway stations' : 'Show all subway stations'}
+        pressed={stationsEnabled}
+        open={open}
+        bottom={58}
+        left={30}
+        delay={0.05}
+        onClick={onToggleStations}
+        icon={<StationDotsGlyph />}
+      />
+      <FanPill
+        label="Lines"
+        ariaLabel={linesEnabled ? 'Hide subway lines' : 'Show subway lines'}
+        pressed={linesEnabled}
+        open={open}
+        bottom={6}
+        left={52}
+        delay={0}
+        onClick={onToggleLines}
+        icon={<SubwayLinesGlyph size={14} />}
+      />
     </div>
   );
 }
@@ -1376,6 +1614,36 @@ function HoveredLineStationsLayer({ hoveredLine }: HoveredLineStationsLayerProps
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  All subway stations layer — "All stations" fan pill                */
+/* ------------------------------------------------------------------ */
+// Renders every station in SUBWAY_STATIONS (~475) as a small, non-interactive
+// CircleMarker colored by the station's first line. Deliberately lighter than
+// the glow-ring divIcon used for hover/auto-surfaced stations — 475 divIcon
+// DOM trees would hurt pan smoothness, while CircleMarkers batch into
+// Leaflet's single overlay SVG.
+function AllStationsLayer() {
+  return (
+    <>
+      {SUBWAY_STATIONS.map((s) => (
+        <CircleMarker
+          key={`all-station-${s.stopId}`}
+          center={[s.lat, s.lon]}
+          radius={3.5}
+          pathOptions={{
+            color: '#ffffff',
+            weight: 1,
+            opacity: 0.35,
+            fillColor: LINE_COLORS[s.lines[0]] ?? '#8b949e',
+            fillOpacity: 0.75,
+          }}
+          interactive={false}
+        />
+      ))}
+    </>
+  );
+}
+
 export default function MapInner({ listings: listingsProp, selectedId, onMarkerClick, onSelectDetail, favoritedIds, wouldLiveIds, onToggleFavorite, onToggleWouldLive, onHideListing, onBoundsChange, onMapMove, suppressBoundsRef: suppressBoundsRefProp, isPanningRef: isPanningRefProp, initialCenter, initialZoom, visible = true, commuteInfoMap, hoveredStations, swipeSelectMode = false, favoritesOnly = false }: MapProps) {
   // When favoritesOnly is true (wishlist filter active in topbar), restrict
   // the working listings array to favorited listings only so markers, clusters,
@@ -1455,6 +1723,32 @@ export default function MapInner({ listings: listingsProp, selectedId, onMarkerC
       try {
         if (typeof window !== 'undefined') {
           window.localStorage.setItem(SUBWAY_OVERLAY_STORAGE_KEY, next ? '1' : '0');
+        }
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
+  // "All stations" toggle — persisted in localStorage (default off). When on
+  // (and the lines overlay is on), every subway station renders as a small
+  // marker; when off, stations only appear on line hover / auto-surface.
+  const [allStationsEnabled, setAllStationsEnabled] = useState<boolean>(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = window.localStorage.getItem(SUBWAY_STATIONS_STORAGE_KEY);
+      if (raw === '1' || raw === 'true') setAllStationsEnabled(true);
+    } catch {
+      // localStorage may be unavailable (e.g. private mode) — fail silent.
+    }
+  }, []);
+  const toggleAllStations = useCallback(() => {
+    setAllStationsEnabled((prev) => {
+      const next = !prev;
+      try {
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(SUBWAY_STATIONS_STORAGE_KEY, next ? '1' : '0');
         }
       } catch {
         // ignore
@@ -1787,6 +2081,7 @@ export default function MapInner({ listings: listingsProp, selectedId, onMarkerC
           hoveredLine={hoveredLine}
           onHoverLine={setHoveredLineDebounced}
         />
+        {subwayOverlayEnabled && allStationsEnabled && <AllStationsLayer />}
         {subwayOverlayEnabled && <HoveredLineStationsLayer hoveredLine={hoveredLine} />}
         <InvalidateSize visible={visible} />
         <InjectPopupStyles />
@@ -2102,7 +2397,12 @@ export default function MapInner({ listings: listingsProp, selectedId, onMarkerC
           );
         })}
       </MapContainer>
-      <SubwayOverlayChip enabled={subwayOverlayEnabled} onToggle={toggleSubwayOverlay} />
+      <SubwayOverlayChip
+        linesEnabled={subwayOverlayEnabled}
+        onToggleLines={toggleSubwayOverlay}
+        stationsEnabled={allStationsEnabled}
+        onToggleStations={toggleAllStations}
+      />
     </div>
   );
 }
