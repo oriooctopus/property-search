@@ -41,7 +41,17 @@ async function runAdapter(source: ListingSource, supabase?: SupabaseClient): Pro
       // though the same URL works in a normal browser — it broke fetching
       // entirely. The pipeline's region + 2–4BR gate still filters post-scrape.
       // Brooklyn-only (Manhattan dropped) is still applied inside the adapter.
-      const res = await fetchCraigslistListings(NYC_PARAMS, { supabase });
+      //
+      // PRICE params are safe, unlike bedroom params: verified live 2026-07-05
+      // (control search 153 URLs vs min_price/max_price search 1654 URLs, both
+      // SUCCEEDED — no bot-block). A generous band around the 2–4BR gate cuts
+      // detail-scrapes of room-shares/scams (<$1200) and ultra-luxury (>$15k),
+      // which Phase 2 pays Apify compute to visit only to be dropped by the
+      // pipeline gates anyway.
+      const res = await fetchCraigslistListings(
+        { ...NYC_PARAMS, priceMin: 1200, priceMax: 15000 },
+        { supabase },
+      );
       return res.listings;
     }
     // Facebook Marketplace disabled to save Apify costs — re-enable when needed
