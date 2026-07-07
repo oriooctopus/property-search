@@ -25,6 +25,9 @@ export async function runUpsertPhase(
     batchSize: 50,
     onConflict: "url",
     dryRun: deps.dryRun,
+    // Catch url churn (Craigslist reposts / StreetEasy re-lists get a fresh
+    // url): update the existing active row in place instead of INSERTing a dup.
+    dedupIdentity: true,
   });
 
   log.info(`\n${formatUpsertResult(upsertResult)}`);
@@ -44,6 +47,8 @@ export async function runUpsertPhase(
       failed: upsertResult.failed,
       retries: upsertResult.retries,
       splitOn413: upsertResult.splitOn413,
+      identityDedupedInBatch: upsertResult.identityDedupedInBatch,
+      identityRedirected: upsertResult.identityRedirected,
     },
     output: {
       upsertResult,
