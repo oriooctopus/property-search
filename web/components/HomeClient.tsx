@@ -35,7 +35,7 @@ import { setLastUsedWishlistId } from '@/lib/wishlist-storage';
 import type { WishlistFilterSelection } from '@/components/SaveWishlistPanel';
 import { OccluderProvider } from '@/lib/viewport/OccluderRegistry';
 import { OcclusionDebugOverlay } from '@/lib/viewport/OcclusionDebugOverlay';
-import { LeafletMapProvider } from '@/lib/viewport/LeafletMapContext';
+import { LeafletMapProvider, useLeafletMap } from '@/lib/viewport/LeafletMapContext';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -120,6 +120,11 @@ function readFiltersFromParams(params: URLSearchParams): FiltersState {
         return raw ? JSON.parse(raw) : [];
       } catch { return []; }
     })(),
+    // Not read from URL params here — the URL's own lat/lng/zoom params
+    // (read separately into the `mapPosition` state below) are the source
+    // of truth for the live viewport. This field only carries a snapshot
+    // when a saved search is loaded.
+    mapPosition: null,
   };
 }
 
@@ -914,6 +919,10 @@ function HomeInner() {
 
   const { conversations, invalidate: invalidateConversations } = useConversations(userId);
   const { savedSearches, saveSearch: saveSavedSearch, deleteSearch: deleteSavedSearch, updateSearch: updateSavedSearch, updateSearchFilters: updateSavedSearchFilters } = useSavedSearches(userId);
+  // Live Leaflet instance — used ONLY to pan/zoom in direct response to the
+  // user's "load saved search" click below (a sanctioned exception to the
+  // no-autoscroll rule; see the comment on MapInner's viewport-lock).
+  const leafletMap = useLeafletMap();
 
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(chatMode);
@@ -1477,7 +1486,7 @@ function HomeInner() {
   // "Clear filters" CTA. Default values mirror DEFAULT_FILTERS in
   // useConversation so the two reset paths stay aligned.
   const handleClearAllFilters = useCallback(() => {
-    setFilters({
+    setFilters((prev) => ({
       sort: 'price',
       selectedBeds: null,
       minBaths: null,
@@ -1497,7 +1506,9 @@ function HomeInner() {
       maxAvailableDate: null,
       includeNaAvailableDate: false,
       commuteRules: [],
-    });
+      // Clearing filter criteria shouldn't discard the saved map location.
+      mapPosition: prev.mapPosition,
+    }));
   }, []);
 
   // Clears ONLY the GPS / location-based filter (commute rules). Used by the
@@ -1851,11 +1862,24 @@ function HomeInner() {
             destinationSlot={<SetDestinationPill />}
             userId={userId}
             savedSearches={savedSearches}
-            onSaveSearch={async (name) => saveSavedSearch(name, filters)}
+            onSaveSearch={async (name) => saveSavedSearch(name, { ...filters, mapPosition })}
             onDeleteSearch={deleteSavedSearch}
-            onLoadSearch={setFilters}
+            onLoadSearch={(loaded) => {
+              setFilters(loaded);
+              // Restore the map viewport the search was saved from. This is a
+              // direct user gesture (clicking "load"), so panning here is the
+              // sanctioned exception to the no-autoscroll rule (see
+              // GoToNearestMatch.tsx).
+              if (loaded.mapPosition) {
+                const { lat, lng, zoom } = loaded.mapPosition;
+                setMapPosition({ lat, lng, zoom });
+                leafletMap?.setView([lat, lng], zoom);
+              }
+            }}
             onUpdateSearch={updateSavedSearch}
-            onUpdateSearchFilters={updateSavedSearchFilters}
+            onUpdateSearchFilters={(id, updatedFilters) =>
+              updateSavedSearchFilters(id, { ...updatedFilters, mapPosition })
+            }
             onLoginRequired={() => setAuthModal('login')}
             showHidden={showHidden}
             onToggleShowHidden={() => setShowHidden((v) => !v)}
