@@ -71,6 +71,14 @@ async function fetchNominatimSuggestions(
   return res.json();
 }
 
+/** Map center/zoom snapshotted alongside a saved search so loading it can
+ *  restore the viewport the search was made from, not just the criteria. */
+export interface SavedMapPosition {
+  lat: number;
+  lng: number;
+  zoom: number;
+}
+
 export interface FiltersState {
   selectedBeds: number[] | null;
   minBaths: number | null;
@@ -91,6 +99,8 @@ export interface FiltersState {
   maxAvailableDate: string | null;
   includeNaAvailableDate: boolean;
   commuteRules: CommuteRule[];
+  /** Map center/zoom at time of save, for restoring the viewport on load. */
+  mapPosition: SavedMapPosition | null;
 }
 
 export interface SavedSearchEntry {
@@ -3252,7 +3262,19 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                 the user can swap searches without scrolling past chips. */}
             <div className="px-4 pt-3 pb-4" data-testid="mobile-filters-saved-searches" style={{ borderBottom: '1px solid #2d333b' }}>
               <div className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: '#8b949e' }}>My searches</div>
-              <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
+              {/* renderSavedSearchTabsContent produces ONE unbroken segmented-pill
+                  element (All + every saved-search chip, whitespace-nowrap) — it
+                  cannot wrap onto multiple lines. With more than a couple of saved
+                  searches the pill is wider than the sheet, and previously this
+                  container had no overflow-x, so it silently overflowed past the
+                  viewport edge with no scroll affordance: chips (and their pencil
+                  edit buttons) past ~360px were completely unreachable on mobile.
+                  overflow-x-auto + pan-x makes the row scrollable without fighting
+                  the sheet's own vertical drag-to-dismiss gesture. */}
+              <div
+                className="flex items-center gap-x-1 gap-y-1 overflow-x-auto -mx-4 px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                style={{ touchAction: 'pan-x' }}
+              >
                 {renderSavedSearchTabsContent('sheet')}
               </div>
             </div>

@@ -31,6 +31,7 @@ const DEFAULT_FILTERS: FiltersState = {
   maxAvailableDate: null,
   includeNaAvailableDate: false,
   commuteRules: [],
+  mapPosition: null,
 };
 
 interface UseConversationOptions {
@@ -211,6 +212,7 @@ export function useConversation({
         maxAvailableDate: 'latest move-in date',
         includeNaAvailableDate: 'include N/A move-in dates',
         commuteRules: 'commute rules',
+        mapPosition: 'map location',
       };
 
       const sysMsg: ChatMessageData = {
@@ -252,6 +254,7 @@ export function useConversation({
         maxAvailableDate: 'latest move-in date',
         includeNaAvailableDate: 'include N/A move-in dates',
         commuteRules: 'commute rules',
+        mapPosition: 'map location',
       };
 
       const sysMsg: ChatMessageData = {
