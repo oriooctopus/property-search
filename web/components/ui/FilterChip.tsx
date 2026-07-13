@@ -4,7 +4,7 @@ import { cn } from '@/lib/cn';
 import { ButtonBase } from './ButtonBase';
 
 interface FilterChipProps extends Omit<ComponentPropsWithoutRef<'button'>, 'children'> {
-  label: string;
+  label: ReactNode;
   active?: boolean;
   /**
    * When true, overrides the active/inactive coloring with an amber
