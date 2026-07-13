@@ -164,6 +164,10 @@ interface FiltersProps {
   /** Resolves with the new wishlist's id (or null on failure) so the panel can auto-select it. */
   onCreateWishlist?: (name: string) => Promise<string | null>;
   onOpenWishlistManager?: () => void;
+  /** Returns the live map center/zoom (or a bounds-derived fallback), used by
+   *  the edit-mode Location chip's "Use current map area" action to capture
+   *  the draft filters' mapPosition without moving the map. */
+  getCurrentMapArea?: () => SavedMapPosition | null;
 }
 
 /**
@@ -1251,7 +1255,7 @@ function ListingAgeSlider({
   );
 }
 
-type ChipId = 'price' | 'bedsBaths' | 'listingAge' | 'availableDate' | 'source' | 'commute' | 'yearBuilt' | 'sqft';
+type ChipId = 'price' | 'bedsBaths' | 'listingAge' | 'availableDate' | 'source' | 'commute' | 'yearBuilt' | 'sqft' | 'location';
 
 // ---------------------------------------------------------------------------
 // Active filter count helper
@@ -1314,7 +1318,7 @@ function FilterToggleButton({
   );
 }
 
-const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ filters, onChange, listingCount, viewToggle, destinationSlot, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onUpdateSearchFilters, onSetDefaultSearch, onLoginRequired, showHidden, onToggleShowHidden, showDelisted, onToggleShowDelisted, delistedCount = 0, delistedTotalInWishlist = null, wishlistTotalCount = null, myWishlists = [], sharedWishlists = [], selectedWishlist = null, onSelectWishlist, onCreateWishlist, onOpenWishlistManager }, ref) {
+const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ filters, onChange, listingCount, viewToggle, destinationSlot, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onUpdateSearchFilters, onSetDefaultSearch, onLoginRequired, showHidden, onToggleShowHidden, showDelisted, onToggleShowDelisted, delistedCount = 0, delistedTotalInWishlist = null, wishlistTotalCount = null, myWishlists = [], sharedWishlists = [], selectedWishlist = null, onSelectWishlist, onCreateWishlist, onOpenWishlistManager, getCurrentMapArea }, ref) {
   const [openChip, setOpenChip] = useState<ChipId | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
@@ -2230,6 +2234,53 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
             />
           </div>
         </FilterChip>
+
+        {/* Location chip — only while editing a saved search. This is where
+            the saved search's map area (mapPosition) is now set/cleared;
+            "Save changes" in the edit banner persists whatever this chip
+            leaves in the draft filters. */}
+        {editingFiltersSearchId !== null && (
+          <FilterChip
+            compact
+            label={filters.mapPosition ? 'Location ✓' : 'Location'}
+            active={filters.mapPosition !== null}
+            modified={isChipModified(['mapPosition'])}
+            open={openChip === 'location'}
+            onToggle={() => toggleChip('location')}
+            data-testid="filter-chip-location"
+          >
+            <SectionTitle>Location</SectionTitle>
+            <div className="text-sm mb-3" style={{ color: '#8b949e' }}>
+              {filters.mapPosition
+                ? `Current: ${filters.mapPosition.lat.toFixed(4)}, ${filters.mapPosition.lng.toFixed(4)} · zoom ${filters.mapPosition.zoom}`
+                : 'Not set'}
+            </div>
+            <div className="flex flex-col items-start gap-2">
+              <PrimaryButton
+                onClick={() => {
+                  const area = getCurrentMapArea?.();
+                  if (area) {
+                    onChange({ ...filters, mapPosition: area });
+                  }
+                  setOpenChip(null);
+                }}
+              >
+                Use current map area
+              </PrimaryButton>
+              {filters.mapPosition && (
+                <TextButton
+                  variant="muted"
+                  onClick={() => {
+                    onChange({ ...filters, mapPosition: null });
+                    setOpenChip(null);
+                  }}
+                >
+                  Clear location
+                </TextButton>
+              )}
+            </div>
+          </FilterChip>
+        )}
 
         {/* Photos first toggle chip */}
         <div className="relative group shrink-0">
@@ -3307,43 +3358,6 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
               >
                 {renderSavedSearchTabsContent('sheet')}
               </div>
-              {/* Mobile has no equivalent of the desktop sticky-footer "Update"
-                  button (that lives in SaveWishlistPanel, which mobile users
-                  rarely open) — the only path to updating a loaded search was
-                  the tiny pencil-edit chip, which is easy to miss. Surface an
-                  explicit, clearly-labeled action here whenever a saved search
-                  is currently loaded so updating it (including the map area
-                  via effectiveMapPosition, wired in HomeClient) is obvious. */}
-              {(() => {
-                const activeSearch = savedSearches?.find((s) => s.id === activeSearchId) ?? null;
-                if (!activeSearch) return null;
-                const saving = savingUpdateId === activeSearch.id;
-                return (
-                  <PrimaryButton
-                    data-testid={`mobile-update-saved-search-${activeSearch.id}`}
-                    onClick={async () => {
-                      if (saving) return;
-                      setSavingUpdateId(activeSearch.id);
-                      try {
-                        const ok = await onUpdateSearchFilters?.(activeSearch.id, filters);
-                        if (ok) {
-                          if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
-                          setSaveToastVisible(true);
-                          saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
-                        }
-                      } finally {
-                        setSavingUpdateId(null);
-                      }
-                    }}
-                    disabled={saving}
-                    loading={saving}
-                    fullWidth
-                    className="mt-2 text-[12px] py-2"
-                  >
-                    {`Update "${activeSearch.name}" (incl. map area)`}
-                  </PrimaryButton>
-                );
-              })()}
             </div>
 
             {/* Destination section — mirrors the inline destination pill in
