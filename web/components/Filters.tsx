@@ -3307,6 +3307,43 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
               >
                 {renderSavedSearchTabsContent('sheet')}
               </div>
+              {/* Mobile has no equivalent of the desktop sticky-footer "Update"
+                  button (that lives in SaveWishlistPanel, which mobile users
+                  rarely open) — the only path to updating a loaded search was
+                  the tiny pencil-edit chip, which is easy to miss. Surface an
+                  explicit, clearly-labeled action here whenever a saved search
+                  is currently loaded so updating it (including the map area
+                  via effectiveMapPosition, wired in HomeClient) is obvious. */}
+              {(() => {
+                const activeSearch = savedSearches?.find((s) => s.id === activeSearchId) ?? null;
+                if (!activeSearch) return null;
+                const saving = savingUpdateId === activeSearch.id;
+                return (
+                  <PrimaryButton
+                    data-testid={`mobile-update-saved-search-${activeSearch.id}`}
+                    onClick={async () => {
+                      if (saving) return;
+                      setSavingUpdateId(activeSearch.id);
+                      try {
+                        const ok = await onUpdateSearchFilters?.(activeSearch.id, filters);
+                        if (ok) {
+                          if (saveToastTimerRef.current) clearTimeout(saveToastTimerRef.current);
+                          setSaveToastVisible(true);
+                          saveToastTimerRef.current = setTimeout(() => setSaveToastVisible(false), 3000);
+                        }
+                      } finally {
+                        setSavingUpdateId(null);
+                      }
+                    }}
+                    disabled={saving}
+                    loading={saving}
+                    fullWidth
+                    className="mt-2 text-[12px] py-2"
+                  >
+                    {`Update "${activeSearch.name}" (incl. map area)`}
+                  </PrimaryButton>
+                );
+              })()}
             </div>
 
             {/* Destination section — mirrors the inline destination pill in

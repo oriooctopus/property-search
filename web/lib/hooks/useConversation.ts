@@ -11,7 +11,7 @@ function uid(): string {
 }
 
 /** Default filters matching what page.tsx uses */
-const DEFAULT_FILTERS: FiltersState = {
+export const DEFAULT_FILTERS: FiltersState = {
   sort: 'price',
   selectedBeds: null,
   minBaths: null,

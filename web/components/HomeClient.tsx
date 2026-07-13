@@ -916,6 +916,27 @@ function HomeInner() {
     : undefined;
   const initialZoom: number | undefined = mapPosition?.zoom;
 
+  /**
+   * The "location" to persist on a saved search: the live map viewport if
+   * the user has actually moved the map, else derived from the viewport
+   * that's actually driving results (`lastLoadedBounds`). Falling back to
+   * `lastLoadedBounds` matters because `mapPosition` state stays null for a
+   * fresh session with no URL lat/lng, and on mobile the user is typically
+   * in swipe view and never touches the map at all — without this, saving
+   * from that state would store no location even though results clearly
+   * came from somewhere. Returns null only when neither source is available.
+   */
+  const effectiveMapPosition = useCallback((): MapPosition | null => {
+    if (mapPosition != null) return mapPosition;
+    const bounds = lastLoadedBounds.current;
+    if (bounds == null) return null;
+    return {
+      lat: (bounds.latMin + bounds.latMax) / 2,
+      lng: (bounds.lonMin + bounds.lonMax) / 2,
+      zoom: 12,
+    };
+  }, [mapPosition]);
+
   // Computed once at mount from the URL the page was loaded with — a
   // shared/bookmarked link that already carries filter/view/viewport state
   // must win over the "default saved search" auto-load below.
@@ -1908,7 +1929,7 @@ function HomeInner() {
             destinationSlot={<SetDestinationPill />}
             userId={userId}
             savedSearches={savedSearches}
-            onSaveSearch={async (name) => saveSavedSearch(name, { ...filters, mapPosition })}
+            onSaveSearch={async (name) => saveSavedSearch(name, { ...filters, mapPosition: effectiveMapPosition() })}
             onDeleteSearch={deleteSavedSearch}
             onLoadSearch={(loaded) => {
               setFilters(loaded);
@@ -1924,7 +1945,7 @@ function HomeInner() {
             }}
             onUpdateSearch={updateSavedSearch}
             onUpdateSearchFilters={(id, updatedFilters) =>
-              updateSavedSearchFilters(id, { ...updatedFilters, mapPosition })
+              updateSavedSearchFilters(id, { ...updatedFilters, mapPosition: effectiveMapPosition() })
             }
             onSetDefaultSearch={setDefaultSavedSearch}
             onLoginRequired={() => setAuthModal('login')}
