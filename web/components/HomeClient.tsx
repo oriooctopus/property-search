@@ -1077,6 +1077,17 @@ function HomeInner() {
     window.history.replaceState(null, '', buildQueryString(mobileView, filters, chatMode, detailListing?.id ?? null, mapPosition, selectedWishlist));
   }, [mobileView, filters, chatMode, detailListing, mapPosition, selectedWishlist]);
 
+  // mapPosition is pure viewport metadata — it is never sent to
+  // /api/listings/search (see loadForViewport's query body below), so a
+  // mapPosition-only change must not trigger a re-query or the filter-changing
+  // overlay. This key strips it out so those effects only react to filters
+  // that actually affect the query.
+  const queryRelevantFiltersKey = useMemo(() => {
+    const rest: Partial<FiltersState> = { ...filters };
+    delete rest.mapPosition;
+    return JSON.stringify(rest);
+  }, [filters]);
+
   // Show filter-loading overlay whenever filters change (skip initial mount)
   useEffect(() => {
     if (!filterMountedRef.current) {
@@ -1086,7 +1097,7 @@ function HomeInner() {
     setFilterChanging(true);
     const timer = setTimeout(() => setFilterChanging(false), 400);
     return () => clearTimeout(timer);
-  }, [filters]);
+  }, [queryRelevantFiltersKey]);
 
   // -----------------------------------------------------------------------
   // Fetch data
@@ -1142,7 +1153,7 @@ function HomeInner() {
       loadForViewport(bounds);
     }, 250);
     return () => clearTimeout(t);
-  }, [filters, selectedWishlist, loadForViewport]);
+  }, [queryRelevantFiltersKey, selectedWishlist, loadForViewport]);
 
   // -----------------------------------------------------------------------
   // Deep-link: auto-open listing from ?listing=ID on page load

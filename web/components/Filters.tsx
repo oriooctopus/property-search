@@ -1496,9 +1496,16 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
     setEditingFiltersSearchId(s.id);
     setEditingFiltersName(s.name);
     setEditingFiltersSnapshot(saved);
-    onLoadSearch?.(saved);
+    // Only reload the saved filters when switching onto a DIFFERENT search.
+    // If this search is already active, the live filters may already contain
+    // an in-progress change the user just made before tapping the pencil —
+    // reloading here would clobber it. The snapshot above still gives the
+    // diff/cancel-revert the correct saved baseline either way.
+    if (activeSearchId !== s.id) {
+      onLoadSearch?.(saved);
+    }
     setActiveSearchId(s.id);
-  }, [onLoadSearch]);
+  }, [onLoadSearch, activeSearchId]);
 
   // When the mobile filter sheet closes mid-edit, revert any in-progress
   // changes so the user doesn't see stale filters bleed onto the map.
@@ -1620,6 +1627,67 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
 
   const filterChipsContent = (
     <>
+        {/* Location chip — only while editing a saved search. This is where
+            the saved search's map area (mapPosition) is now set/cleared;
+            "Save changes" in the edit banner persists whatever this chip
+            leaves in the draft filters. Rendered FIRST and with a filled
+            accent treatment so it reads as the primary, special control
+            in edit mode rather than just another grey chip. */}
+        {editingFiltersSearchId !== null && (
+          <FilterChip
+            compact
+            label={
+              <span className="inline-flex items-center gap-1">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z" />
+                </svg>
+                {filters.mapPosition ? 'Location ✓' : 'Location'}
+              </span>
+            }
+            active={filters.mapPosition !== null}
+            modified={isChipModified(['mapPosition'])}
+            open={openChip === 'location'}
+            onToggle={() => toggleChip('location')}
+            data-testid="filter-chip-location"
+            className={cn(
+              'text-[12px] h-[30px] px-3',
+              !isChipModified(['mapPosition']) &&
+                'bg-[#58a6ff] text-white border-[#58a6ff] hover:bg-[#4a94e8] hover:text-white hover:border-[#4a94e8]',
+            )}
+          >
+            <SectionTitle>Location</SectionTitle>
+            <div className="text-sm mb-3" style={{ color: '#8b949e' }}>
+              {filters.mapPosition
+                ? `Current: ${filters.mapPosition.lat.toFixed(4)}, ${filters.mapPosition.lng.toFixed(4)} · zoom ${filters.mapPosition.zoom}`
+                : 'Not set'}
+            </div>
+            <div className="flex flex-col items-start gap-2">
+              <PrimaryButton
+                onClick={() => {
+                  const area = getCurrentMapArea?.();
+                  if (area) {
+                    onChange({ ...filters, mapPosition: area });
+                  }
+                  setOpenChip(null);
+                }}
+              >
+                Use current map area
+              </PrimaryButton>
+              {filters.mapPosition && (
+                <TextButton
+                  variant="muted"
+                  onClick={() => {
+                    onChange({ ...filters, mapPosition: null });
+                    setOpenChip(null);
+                  }}
+                >
+                  Clear location
+                </TextButton>
+              )}
+            </div>
+          </FilterChip>
+        )}
+
         {/* Price chip */}
         <FilterChip
           compact
@@ -2234,53 +2302,6 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
             />
           </div>
         </FilterChip>
-
-        {/* Location chip — only while editing a saved search. This is where
-            the saved search's map area (mapPosition) is now set/cleared;
-            "Save changes" in the edit banner persists whatever this chip
-            leaves in the draft filters. */}
-        {editingFiltersSearchId !== null && (
-          <FilterChip
-            compact
-            label={filters.mapPosition ? 'Location ✓' : 'Location'}
-            active={filters.mapPosition !== null}
-            modified={isChipModified(['mapPosition'])}
-            open={openChip === 'location'}
-            onToggle={() => toggleChip('location')}
-            data-testid="filter-chip-location"
-          >
-            <SectionTitle>Location</SectionTitle>
-            <div className="text-sm mb-3" style={{ color: '#8b949e' }}>
-              {filters.mapPosition
-                ? `Current: ${filters.mapPosition.lat.toFixed(4)}, ${filters.mapPosition.lng.toFixed(4)} · zoom ${filters.mapPosition.zoom}`
-                : 'Not set'}
-            </div>
-            <div className="flex flex-col items-start gap-2">
-              <PrimaryButton
-                onClick={() => {
-                  const area = getCurrentMapArea?.();
-                  if (area) {
-                    onChange({ ...filters, mapPosition: area });
-                  }
-                  setOpenChip(null);
-                }}
-              >
-                Use current map area
-              </PrimaryButton>
-              {filters.mapPosition && (
-                <TextButton
-                  variant="muted"
-                  onClick={() => {
-                    onChange({ ...filters, mapPosition: null });
-                    setOpenChip(null);
-                  }}
-                >
-                  Clear location
-                </TextButton>
-              )}
-            </div>
-          </FilterChip>
-        )}
 
         {/* Photos first toggle chip */}
         <div className="relative group shrink-0">
