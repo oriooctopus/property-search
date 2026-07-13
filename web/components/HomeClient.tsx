@@ -982,6 +982,14 @@ function HomeInner() {
   // searches fetch to resolve so we're reading a real (not empty-because-
   // not-loaded-yet) list.
   const defaultSearchAppliedRef = useRef(false);
+  // The Leaflet map is a dynamic import and often isn't mounted yet when the
+  // auto-load effect below runs, so calling setView inline would silently
+  // no-op (and the once-guard would block any retry) — leaving filters
+  // restored but the map stuck at the default location. Instead we stash the
+  // target here and a follow-up effect pans as soon as the map instance
+  // exists. `mapPosition` state is still set so the map mounts at the right
+  // place if it hasn't rendered yet; this handles the already-mounted case.
+  const [pendingDefaultMapPan, setPendingDefaultMapPan] = useState<MapPosition | null>(null);
   useEffect(() => {
     if (defaultSearchAppliedRef.current) return;
     if (loading || !savedSearchesFetched) return;
@@ -998,7 +1006,7 @@ function HomeInner() {
         if (loadedFilters.mapPosition) {
           const { lat, lng, zoom } = loadedFilters.mapPosition;
           setMapPosition({ lat, lng, zoom });
-          leafletMap?.setView([lat, lng], zoom);
+          setPendingDefaultMapPan({ lat, lng, zoom });
         }
       }
       return;
@@ -1013,10 +1021,22 @@ function HomeInner() {
     if (loadedFilters.mapPosition) {
       const { lat, lng, zoom } = loadedFilters.mapPosition;
       setMapPosition({ lat, lng, zoom });
-      leafletMap?.setView([lat, lng], zoom);
+      setPendingDefaultMapPan({ lat, lng, zoom });
     }
     setActiveSavedSearchId(defaultSearch.id);
-  }, [loading, savedSearchesFetched, savedSearches, hasExplicitUrlState, leafletMap, activeSavedSearchId]);
+  }, [loading, savedSearchesFetched, savedSearches, hasExplicitUrlState, activeSavedSearchId]);
+
+  // Pan the map to the restored default/explicit search's saved location once
+  // the Leaflet instance is actually available. Fires whenever either the map
+  // instance or the pending target changes, so it can't miss the mount window.
+  // This is a direct consequence of the user's default-on-open choice — the
+  // sanctioned exception to the no-auto-scroll rule.
+  useEffect(() => {
+    if (!leafletMap || !pendingDefaultMapPan) return;
+    const { lat, lng, zoom } = pendingDefaultMapPan;
+    leafletMap.setView([lat, lng], zoom);
+    setPendingDefaultMapPan(null);
+  }, [leafletMap, pendingDefaultMapPan]);
 
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(chatMode);
