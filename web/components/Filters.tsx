@@ -168,6 +168,11 @@ interface FiltersProps {
    *  the edit-mode Location chip's "Use current map area" action to capture
    *  the draft filters' mapPosition without moving the map. */
   getCurrentMapArea?: () => SavedMapPosition | null;
+  /** Which saved search's chip is highlighted as "active"/selected. Controlled
+   *  by the parent so it can be seeded from (and persisted to) the URL and
+   *  driven by the default-saved-search auto-load. */
+  activeSearchId?: number | null;
+  onActiveSearchChange?: (id: number | null) => void;
 }
 
 /**
@@ -1318,7 +1323,7 @@ function FilterToggleButton({
   );
 }
 
-const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ filters, onChange, listingCount, viewToggle, destinationSlot, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onUpdateSearchFilters, onSetDefaultSearch, onLoginRequired, showHidden, onToggleShowHidden, showDelisted, onToggleShowDelisted, delistedCount = 0, delistedTotalInWishlist = null, wishlistTotalCount = null, myWishlists = [], sharedWishlists = [], selectedWishlist = null, onSelectWishlist, onCreateWishlist, onOpenWishlistManager, getCurrentMapArea }, ref) {
+const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ filters, onChange, listingCount, viewToggle, destinationSlot, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onUpdateSearchFilters, onSetDefaultSearch, onLoginRequired, showHidden, onToggleShowHidden, showDelisted, onToggleShowDelisted, delistedCount = 0, delistedTotalInWishlist = null, wishlistTotalCount = null, myWishlists = [], sharedWishlists = [], selectedWishlist = null, onSelectWishlist, onCreateWishlist, onOpenWishlistManager, getCurrentMapArea, activeSearchId = null, onActiveSearchChange }, ref) {
   const [openChip, setOpenChip] = useState<ChipId | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
@@ -1421,8 +1426,11 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
   const saveToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clusterDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Saved search tabs state
-  const [activeSearchId, setActiveSearchId] = useState<number | null>(null);
+  // Saved search tabs state — activeSearchId is controlled by the parent
+  // (HomeClient) so it can be seeded from and persisted to the URL.
+  const setActiveSearchId = useCallback((id: number | null) => {
+    onActiveSearchChange?.(id);
+  }, [onActiveSearchChange]);
   const [editingSearchId, setEditingSearchId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -1505,7 +1513,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
       onLoadSearch?.(saved);
     }
     setActiveSearchId(s.id);
-  }, [onLoadSearch, activeSearchId]);
+  }, [onLoadSearch, activeSearchId, setActiveSearchId]);
 
   // When the mobile filter sheet closes mid-edit, revert any in-progress
   // changes so the user doesn't see stale filters bleed onto the map.

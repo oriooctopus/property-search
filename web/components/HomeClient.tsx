@@ -143,10 +143,9 @@ const EXPLICIT_STATE_URL_PARAM_KEYS = [
   'priceMode', 'maxAge', 'photosFirst', 'sources', 'minYearBuilt',
   'maxYearBuilt', 'minSqft', 'maxSqft', 'excludeNoSqft', 'minAvailableDate',
   'maxAvailableDate', 'includeNaAvailableDate', 'commute',
-  'lat', 'lng', 'zoom', 'view',
 ];
 
-function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatMode?: boolean, listingId?: number | null, mapPos?: MapPosition | null, wishlistSel?: string | null): string {
+function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatMode?: boolean, listingId?: number | null, mapPos?: MapPosition | null, wishlistSel?: string | null, savedSearchId?: number | null): string {
   const p = new URLSearchParams();
   // Preserve debug=pins so the viewport-occlusion overlay survives the
   // URL-state rewrites that fire on filter / map position changes.
@@ -183,6 +182,7 @@ function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatM
     p.set('lng', mapPos.lng.toFixed(4));
     p.set('zoom', mapPos.zoom.toFixed(1));
   }
+  if (savedSearchId != null) p.set('savedSearch', String(savedSearchId));
   const qs = p.toString();
   return qs ? `?${qs}` : '/';
 }
@@ -916,6 +916,16 @@ function HomeInner() {
     : undefined;
   const initialZoom: number | undefined = mapPosition?.zoom;
 
+  // Which saved search's chip is highlighted as active — seeded from the
+  // `savedSearch` URL param (if present) so a reload of a URL that persisted
+  // a selection restores the highlighted chip. Also set by the default-search
+  // auto-load below and by explicit chip clicks (via Filters' onActiveSearchChange).
+  const [activeSavedSearchId, setActiveSavedSearchId] = useState<number | null>(() => {
+    const v = searchParams.get('savedSearch');
+    const n = v != null ? Number(v) : NaN;
+    return Number.isFinite(n) ? n : null;
+  });
+
   /**
    * The "location" to persist on a saved search: the live map viewport if
    * the user has actually moved the map, else derived from the viewport
@@ -974,12 +984,28 @@ function HomeInner() {
   const defaultSearchAppliedRef = useRef(false);
   useEffect(() => {
     if (defaultSearchAppliedRef.current) return;
-    if (hasExplicitUrlState) {
-      defaultSearchAppliedRef.current = true;
-      return;
-    }
     if (loading || !savedSearchesFetched) return;
     defaultSearchAppliedRef.current = true;
+
+    // An explicit `savedSearch=<id>` URL param (e.g. from a reload that
+    // persisted the active chip) wins over everything — load that search
+    // and mark it active, but do NOT also apply the default.
+    if (activeSavedSearchId != null) {
+      const explicitSearch = savedSearches.find((s) => s.id === activeSavedSearchId);
+      if (explicitSearch) {
+        const loadedFilters = explicitSearch.filters as unknown as FiltersState;
+        setFilters(loadedFilters);
+        if (loadedFilters.mapPosition) {
+          const { lat, lng, zoom } = loadedFilters.mapPosition;
+          setMapPosition({ lat, lng, zoom });
+          leafletMap?.setView([lat, lng], zoom);
+        }
+      }
+      return;
+    }
+
+    if (hasExplicitUrlState) return;
+
     const defaultSearch = savedSearches.find((s) => s.is_default);
     if (!defaultSearch) return;
     const loadedFilters = defaultSearch.filters as unknown as FiltersState;
@@ -989,7 +1015,8 @@ function HomeInner() {
       setMapPosition({ lat, lng, zoom });
       leafletMap?.setView([lat, lng], zoom);
     }
-  }, [loading, savedSearchesFetched, savedSearches, hasExplicitUrlState, leafletMap]);
+    setActiveSavedSearchId(defaultSearch.id);
+  }, [loading, savedSearchesFetched, savedSearches, hasExplicitUrlState, leafletMap, activeSavedSearchId]);
 
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(chatMode);
@@ -1074,8 +1101,8 @@ function HomeInner() {
       isFirstRender.current = false;
       return;
     }
-    window.history.replaceState(null, '', buildQueryString(mobileView, filters, chatMode, detailListing?.id ?? null, mapPosition, selectedWishlist));
-  }, [mobileView, filters, chatMode, detailListing, mapPosition, selectedWishlist]);
+    window.history.replaceState(null, '', buildQueryString(mobileView, filters, chatMode, detailListing?.id ?? null, mapPosition, selectedWishlist, activeSavedSearchId));
+  }, [mobileView, filters, chatMode, detailListing, mapPosition, selectedWishlist, activeSavedSearchId]);
 
   // mapPosition is pure viewport metadata — it is never sent to
   // /api/listings/search (see loadForViewport's query body below), so a
@@ -1940,6 +1967,8 @@ function HomeInner() {
             destinationSlot={<SetDestinationPill />}
             userId={userId}
             savedSearches={savedSearches}
+            activeSearchId={activeSavedSearchId}
+            onActiveSearchChange={setActiveSavedSearchId}
             onSaveSearch={async (name) => saveSavedSearch(name, { ...filters, mapPosition: effectiveMapPosition() })}
             onDeleteSearch={deleteSavedSearch}
             onLoadSearch={(loaded) => {
