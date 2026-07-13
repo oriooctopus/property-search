@@ -131,8 +131,11 @@ create table public.saved_searches (
   name text not null,
   filters jsonb not null default '{}'::jsonb,
   notify_sms boolean not null default false,
+  is_default boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+create unique index saved_searches_one_default_per_user on public.saved_searches (user_id) where is_default;
 
 alter table public.saved_searches enable row level security;
 

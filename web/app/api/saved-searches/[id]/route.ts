@@ -99,24 +99,52 @@ export async function PATCH(
   }
 
   const body = await request.json();
-  const { name, filters } = body;
+  const { name, filters, is_default } = body;
 
-  // PATCH supports either renaming (name only), updating the filter
-  // snapshot (filters only), or both. Reject the request if neither is
-  // present so we don't issue an empty UPDATE.
+  // PATCH supports renaming (name), updating the filter snapshot (filters),
+  // and/or setting the default flag (is_default), in any combination.
+  // Reject the request if none are present so we don't issue an empty UPDATE.
   const hasName = typeof name === "string" && name.trim().length > 0;
   const hasFilters =
     filters !== undefined && filters !== null && typeof filters === "object";
-  if (!hasName && !hasFilters) {
+  const hasIsDefault = typeof is_default === "boolean";
+  if (!hasName && !hasFilters && !hasIsDefault) {
     return NextResponse.json(
-      { error: "Provide name and/or filters" },
+      { error: "Provide name, filters, and/or is_default" },
       { status: 400 },
     );
   }
 
-  const updatePayload: { name?: string; filters?: Record<string, unknown> } = {};
+  // Setting is_default = true must first clear any existing default for this
+  // user — the partial unique index on (user_id) where is_default rejects
+  // two true rows existing simultaneously, even transiently, so the clear
+  // has to land in its own statement before the target row is set true.
+  if (hasIsDefault && is_default) {
+    const { error: clearError } = await supabase
+      .from("saved_searches")
+      .update({ is_default: false })
+      .eq("user_id", user.id)
+      .eq("is_default", true);
+
+    if (clearError) {
+      return NextResponse.json(
+        {
+          error: "Failed to clear previous default saved search",
+          details: clearError.message,
+        },
+        { status: 500 },
+      );
+    }
+  }
+
+  const updatePayload: {
+    name?: string;
+    filters?: Record<string, unknown>;
+    is_default?: boolean;
+  } = {};
   if (hasName) updatePayload.name = name.trim();
   if (hasFilters) updatePayload.filters = filters as Record<string, unknown>;
+  if (hasIsDefault) updatePayload.is_default = is_default;
 
   const { error } = await supabase
     .from("saved_searches")

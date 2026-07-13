@@ -134,6 +134,18 @@ interface MapPosition {
   zoom: number;
 }
 
+// URL params that indicate the user (or a shared link) already specifies
+// explicit filter/view/viewport state. When any of these is present, the
+// "default saved search" auto-load on mount must NOT override it — a
+// bookmarked/shared URL always wins over the default.
+const EXPLICIT_STATE_URL_PARAM_KEYS = [
+  'sort', 'beds', 'minBaths', 'includeNaBaths', 'minRent', 'maxRent',
+  'priceMode', 'maxAge', 'photosFirst', 'sources', 'minYearBuilt',
+  'maxYearBuilt', 'minSqft', 'maxSqft', 'excludeNoSqft', 'minAvailableDate',
+  'maxAvailableDate', 'includeNaAvailableDate', 'commute',
+  'lat', 'lng', 'zoom', 'view',
+];
+
 function buildQueryString(view: 'list' | 'map' | 'swipe', f: FiltersState, chatMode?: boolean, listingId?: number | null, mapPos?: MapPosition | null, wishlistSel?: string | null): string {
   const p = new URLSearchParams();
   // Preserve debug=pins so the viewport-occlusion overlay survives the
@@ -904,6 +916,13 @@ function HomeInner() {
     : undefined;
   const initialZoom: number | undefined = mapPosition?.zoom;
 
+  // Computed once at mount from the URL the page was loaded with — a
+  // shared/bookmarked link that already carries filter/view/viewport state
+  // must win over the "default saved search" auto-load below.
+  const [hasExplicitUrlState] = useState(() =>
+    EXPLICIT_STATE_URL_PARAM_KEYS.some((key) => searchParams.get(key) != null),
+  );
+
   // -----------------------------------------------------------------------
   // Chat mode hooks
   // -----------------------------------------------------------------------
@@ -918,11 +937,38 @@ function HomeInner() {
   });
 
   const { conversations, invalidate: invalidateConversations } = useConversations(userId);
-  const { savedSearches, saveSearch: saveSavedSearch, deleteSearch: deleteSavedSearch, updateSearch: updateSavedSearch, updateSearchFilters: updateSavedSearchFilters } = useSavedSearches(userId);
+  const { savedSearches, hasFetchedOnce: savedSearchesFetched, saveSearch: saveSavedSearch, deleteSearch: deleteSavedSearch, updateSearch: updateSavedSearch, updateSearchFilters: updateSavedSearchFilters, setDefaultSearch: setDefaultSavedSearch } = useSavedSearches(userId);
   // Live Leaflet instance — used ONLY to pan/zoom in direct response to the
   // user's "load saved search" click below (a sanctioned exception to the
   // no-autoscroll rule; see the comment on MapInner's viewport-lock).
   const leafletMap = useLeafletMap();
+
+  // Auto-load the user's default saved search (if any) on app open, in
+  // place of the hardcoded NYC default — but only when the URL didn't
+  // already specify explicit state (a bookmarked/shared link always wins).
+  // Guarded by a ref so this fires at most once per session, not on every
+  // savedSearches refetch. Waits for BOTH the auth lookup and the saved
+  // searches fetch to resolve so we're reading a real (not empty-because-
+  // not-loaded-yet) list.
+  const defaultSearchAppliedRef = useRef(false);
+  useEffect(() => {
+    if (defaultSearchAppliedRef.current) return;
+    if (hasExplicitUrlState) {
+      defaultSearchAppliedRef.current = true;
+      return;
+    }
+    if (loading || !savedSearchesFetched) return;
+    defaultSearchAppliedRef.current = true;
+    const defaultSearch = savedSearches.find((s) => s.is_default);
+    if (!defaultSearch) return;
+    const loadedFilters = defaultSearch.filters as unknown as FiltersState;
+    setFilters(loadedFilters);
+    if (loadedFilters.mapPosition) {
+      const { lat, lng, zoom } = loadedFilters.mapPosition;
+      setMapPosition({ lat, lng, zoom });
+      leafletMap?.setView([lat, lng], zoom);
+    }
+  }, [loading, savedSearchesFetched, savedSearches, hasExplicitUrlState, leafletMap]);
 
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(chatMode);
@@ -1880,6 +1926,7 @@ function HomeInner() {
             onUpdateSearchFilters={(id, updatedFilters) =>
               updateSavedSearchFilters(id, { ...updatedFilters, mapPosition })
             }
+            onSetDefaultSearch={setDefaultSavedSearch}
             onLoginRequired={() => setAuthModal('login')}
             showHidden={showHidden}
             onToggleShowHidden={() => setShowHidden((v) => !v)}

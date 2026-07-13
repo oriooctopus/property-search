@@ -6,12 +6,23 @@ export interface SavedSearch {
   name: string;
   filters: Record<string, unknown>;
   notify_sms: boolean;
+  is_default: boolean;
   created_at: string;
 }
 
 export function useSavedSearches(userId: string | null) {
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
   const [loading, setLoading] = useState(false);
+  // Distinct from `loading`: `loading` starts false (no fetch has been
+  // *initiated* yet), which lets a consumer's mount effect race ahead and
+  // treat "no default search" as final before the first fetch even starts.
+  // `hasFetchedOnce` only flips true once an AUTHENTICATED fetch resolves —
+  // deliberately NOT for the `!userId` branch below, since `userId` starts
+  // null before Supabase auth resolves even for a logged-in user. Flipping
+  // it there too let a consumer's mount effect see "fetched, empty" during
+  // that pre-auth window and latch a "no default search" conclusion before
+  // the real authenticated fetch had even started.
+  const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
 
   const fetchSavedSearches = useCallback(async () => {
     if (!userId) {
@@ -29,6 +40,7 @@ export function useSavedSearches(userId: string | null) {
       // silently ignore
     } finally {
       setLoading(false);
+      setHasFetchedOnce(true);
     }
   }, [userId]);
 
@@ -120,13 +132,46 @@ export function useSavedSearches(userId: string | null) {
     [],
   );
 
+  /**
+   * Mark (or unmark) a saved search as the default that auto-loads when the
+   * app opens. Setting one default clears any other's `is_default` locally
+   * to mirror the DB-level exclusivity (a partial unique index enforces
+   * only one default per user), so no refetch is needed.
+   */
+  const setDefaultSearch = useCallback(
+    async (id: number, isDefault: boolean): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/saved-searches/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_default: isDefault }),
+        });
+        if (res.ok) {
+          setSavedSearches((prev) =>
+            prev.map((s) => ({
+              ...s,
+              is_default: s.id === id ? isDefault : isDefault ? false : s.is_default,
+            })),
+          );
+          return true;
+        }
+      } catch {
+        // silently ignore
+      }
+      return false;
+    },
+    [],
+  );
+
   return {
     savedSearches,
     loading,
+    hasFetchedOnce,
     saveSearch,
     deleteSearch,
     updateSearch,
     updateSearchFilters,
+    setDefaultSearch,
     refetch: fetchSavedSearches,
   };
 }

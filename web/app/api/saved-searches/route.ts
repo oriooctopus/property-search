@@ -39,7 +39,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("saved_searches")
-    .select("id, name, filters, notify_sms, created_at")
+    .select("id, name, filters, notify_sms, is_default, created_at")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
       name,
       filters,
     })
-    .select("id, name, filters, notify_sms, created_at")
+    .select("id, name, filters, notify_sms, is_default, created_at")
     .single();
 
   if (error) {
