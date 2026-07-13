@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { FiltersState } from '@/components/Filters';
+import { DEFAULT_FILTERS } from '@/lib/hooks/useConversation';
 
 export interface SavedSearch {
   id: number;
@@ -8,6 +9,21 @@ export interface SavedSearch {
   notify_sms: boolean;
   is_default: boolean;
   created_at: string;
+}
+
+/**
+ * Normalize a saved search's persisted `filters` JSON into a COMPLETE
+ * `FiltersState`. Older rows (or any future schema drift) may be missing
+ * keys — e.g. `mapPosition` didn't exist when early rows were saved — and
+ * a partial object flowing into components that assume a complete
+ * `FiltersState` crashes the app (see Filters.tsx `selectedSources.length`).
+ * This is a true system boundary (persisted JSON, possibly stale schema),
+ * so filling in missing keys with defaults here is not defensive
+ * band-aiding — it's normalizing untrusted input at the point it enters
+ * the app.
+ */
+function normalizeFilters(raw: Record<string, unknown> | null | undefined): Record<string, unknown> {
+  return { ...DEFAULT_FILTERS, ...(raw ?? {}) };
 }
 
 export function useSavedSearches(userId: string | null) {
@@ -34,7 +50,10 @@ export function useSavedSearches(userId: string | null) {
       const res = await fetch('/api/saved-searches');
       if (res.ok) {
         const data = await res.json();
-        setSavedSearches(data.savedSearches ?? []);
+        const fetched = (data.savedSearches ?? []) as SavedSearch[];
+        setSavedSearches(
+          fetched.map((s) => ({ ...s, filters: normalizeFilters(s.filters) })),
+        );
       }
     } catch {
       // silently ignore
@@ -58,7 +77,10 @@ export function useSavedSearches(userId: string | null) {
         });
         if (res.ok) {
           const data = await res.json();
-          const saved = data.savedSearch as SavedSearch;
+          const saved = {
+            ...(data.savedSearch as SavedSearch),
+            filters: normalizeFilters((data.savedSearch as SavedSearch).filters),
+          };
           setSavedSearches((prev) => [saved, ...prev]);
           return saved;
         }
@@ -118,7 +140,7 @@ export function useSavedSearches(userId: string | null) {
           setSavedSearches((prev) =>
             prev.map((s) =>
               s.id === id
-                ? { ...s, filters: filters as unknown as Record<string, unknown> }
+                ? { ...s, filters: normalizeFilters(filters as unknown as Record<string, unknown>) }
                 : s,
             ),
           );
