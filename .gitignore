@@ -13,3 +13,5 @@ src/saved-filters/
 .vercel
 otp/data/
 .mcp.json
+
+.claude/settings.local.json

@@ -107,6 +107,7 @@ export interface SavedSearchEntry {
   id: number;
   name: string;
   filters: Record<string, unknown>;
+  is_default: boolean;
   created_at: string;
 }
 
@@ -128,6 +129,10 @@ interface FiltersProps {
   /** Replace a saved search's filter snapshot in place. Used by the
    *  in-sheet "Edit saved search" flow. Returns true on success. */
   onUpdateSearchFilters?: (id: number, filters: FiltersState) => Promise<boolean>;
+  /** Mark (isDefault=true) or unmark (isDefault=false) a saved search as the
+   *  one that auto-loads when the app opens. Setting a new default un-sets
+   *  the previous one server-side; the parent handles that exclusivity. */
+  onSetDefaultSearch?: (id: number, isDefault: boolean) => void;
   onLoginRequired?: () => void;
   showHidden?: boolean;
   onToggleShowHidden?: () => void;
@@ -1309,7 +1314,7 @@ function FilterToggleButton({
   );
 }
 
-const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ filters, onChange, listingCount, viewToggle, destinationSlot, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onUpdateSearchFilters, onLoginRequired, showHidden, onToggleShowHidden, showDelisted, onToggleShowDelisted, delistedCount = 0, delistedTotalInWishlist = null, wishlistTotalCount = null, myWishlists = [], sharedWishlists = [], selectedWishlist = null, onSelectWishlist, onCreateWishlist, onOpenWishlistManager }, ref) {
+const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ filters, onChange, listingCount, viewToggle, destinationSlot, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onUpdateSearchFilters, onSetDefaultSearch, onLoginRequired, showHidden, onToggleShowHidden, showDelisted, onToggleShowDelisted, delistedCount = 0, delistedTotalInWishlist = null, wishlistTotalCount = null, myWishlists = [], sharedWishlists = [], selectedWishlist = null, onSelectWishlist, onCreateWishlist, onOpenWishlistManager }, ref) {
   const [openChip, setOpenChip] = useState<ChipId | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
@@ -2376,7 +2381,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
         setSaveOpen(false);
         onOpenWishlistManager?.();
       }}
-      savedSearches={savedSearches?.map((s) => ({ id: s.id, name: s.name })) ?? []}
+      savedSearches={savedSearches?.map((s) => ({ id: s.id, name: s.name, is_default: s.is_default })) ?? []}
       activeSearchId={activeSearchId}
       onLoadSearch={(id) => {
         const s = savedSearches?.find((x) => x.id === id);
@@ -2387,6 +2392,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
       onClearActiveSearch={() => {
         setActiveSearchId(null);
       }}
+      onSetDefaultSearch={onSetDefaultSearch}
       stickyFooter={
         <div className="px-4 py-2.5">
           {stickySaveExpanded ? (
@@ -2709,7 +2715,31 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                     className="block w-px"
                     style={{ height: '60%', backgroundColor: '#2d333b' }}
                   />
-                  {/* Pencil — the only secondary affordance per chip. Sheet
+                  {/* Star — toggles this saved search as the default that
+                      auto-loads when the app opens. Secondary affordance,
+                      unobtrusive; the name remains the primary tap target. */}
+                  <button
+                    type="button"
+                    data-testid={`saved-search-set-default-${s.id}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSetDefaultSearch?.(s.id, !s.is_default);
+                    }}
+                    aria-label={s.is_default ? `Unset ${s.name} as default` : `Set ${s.name} as default`}
+                    title={s.is_default ? 'Default search — auto-loads on app open' : 'Set as default (auto-loads on app open)'}
+                    className={cn(
+                      'flex items-center justify-center h-full w-7 cursor-pointer transition-colors',
+                      s.is_default
+                        ? 'text-[#f0c419] hover:text-[#f4d35e]'
+                        : 'text-[#6e7681] hover:text-[#f0c419]',
+                    )}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill={s.is_default ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                  </button>
+                  {/* Pencil — secondary affordance per chip (alongside the
+                      star above). Sheet
                       variant: enters the edit-filters flow. Top-bar variant:
                       inline rename input. Delete moved into the editing
                       banner (sheet) or the rename popover (top-bar). */}

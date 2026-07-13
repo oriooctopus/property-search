@@ -18,6 +18,7 @@ export type WishlistFilterSelection = string | 'all-saved' | null;
 export interface SavedSearchRow {
   id: number;
   name: string;
+  is_default: boolean;
 }
 
 export interface SaveWishlistPanelProps {
@@ -33,6 +34,7 @@ export interface SaveWishlistPanelProps {
   activeSearchId?: number | null;
   onLoadSearch?: (id: number) => void;
   onClearActiveSearch?: () => void;
+  onSetDefaultSearch?: (id: number, isDefault: boolean) => void;
 
   // Wishlist filter section data
   myWishlists: Wishlist[];
@@ -67,6 +69,7 @@ export default function SaveWishlistPanel({
   activeSearchId = null,
   onLoadSearch,
   onClearActiveSearch,
+  onSetDefaultSearch,
   myWishlists,
   sharedWishlists,
   selected,
@@ -267,6 +270,12 @@ export default function SaveWishlistPanel({
                     onClose();
                   }}
                   name={s.name}
+                  isDefault={s.is_default}
+                  onToggleDefault={
+                    onSetDefaultSearch
+                      ? () => onSetDefaultSearch(s.id, !s.is_default)
+                      : undefined
+                  }
                 />
               ))
             )}
@@ -557,11 +566,15 @@ function SavedSearchRowButton({
   onClick,
   name,
   nameColor,
+  isDefault,
+  onToggleDefault,
 }: {
   checked: boolean;
   onClick: () => void;
   name: string;
   nameColor?: string;
+  isDefault?: boolean;
+  onToggleDefault?: () => void;
 }) {
   return (
     <ButtonBase
@@ -601,6 +614,31 @@ function SavedSearchRowButton({
           {name}
         </div>
       </div>
+      {onToggleDefault && (
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleDefault();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleDefault();
+            }
+          }}
+          aria-label={isDefault ? `Unset ${name} as default` : `Set ${name} as default`}
+          title={isDefault ? 'Default search — auto-loads on app open' : 'Set as default (auto-loads on app open)'}
+          className="flex items-center justify-center shrink-0 cursor-pointer transition-colors"
+          style={{ width: 20, height: 20, color: isDefault ? '#f0c419' : '#444c56' }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill={isDefault ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+          </svg>
+        </span>
+      )}
     </ButtonBase>
   );
 }
