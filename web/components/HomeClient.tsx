@@ -1944,9 +1944,8 @@ function HomeInner() {
               }
             }}
             onUpdateSearch={updateSavedSearch}
-            onUpdateSearchFilters={(id, updatedFilters) =>
-              updateSavedSearchFilters(id, { ...updatedFilters, mapPosition: effectiveMapPosition() })
-            }
+            onUpdateSearchFilters={(id, updatedFilters) => updateSavedSearchFilters(id, updatedFilters)}
+            getCurrentMapArea={() => effectiveMapPosition()}
             onSetDefaultSearch={setDefaultSavedSearch}
             onLoginRequired={() => setAuthModal('login')}
             showHidden={showHidden}
