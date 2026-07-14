@@ -340,8 +340,15 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
           scrollbarGutter: 'stable',
         }}
       >
-        {/* Horizontal padding wrapper — matches the previous px-3 py-3 */}
-        <div style={{ paddingLeft: 12, paddingRight: 12, paddingTop: 12 }}>
+        {/* Horizontal padding wrapper — matches the previous px-3 py-3.
+            On mobile (<600px) the floating list/swipe view-toggle pill is
+            fixed over the bottom of this scroller, so reserve clearance
+            (pill height + margin + safe area) so the last row of cards can
+            scroll fully above it instead of being permanently covered. */}
+        <div
+          className="pb-[calc(76px+env(safe-area-inset-bottom))] min-[600px]:pb-0"
+          style={{ paddingLeft: 12, paddingRight: 12, paddingTop: 12 }}
+        >
           {rowCount === 0 ? null : (
             <div
               style={{
@@ -402,7 +409,7 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
                           letterSpacing: 0,
                         }}
                       >
-                        These listings have been taken down by the source.
+                        No longer on the market.
                       </div>
                     </div>
                   );

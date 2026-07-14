@@ -2392,16 +2392,16 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                 const action = showDelisted ? 'Hide' : 'Show';
                 // Use unfiltered total when available and different from the
                 // filter-narrowed count, so the user sees how many are hidden
-                // by their current filters too. e.g. "Show delisted (10 of 82)"
-                // means "10 match your current filters; 82 are delisted in the
+                // by their current filters too. e.g. "Show removed (10 of 82)"
+                // means "10 match your current filters; 82 are removed in the
                 // wishlist overall".
                 if (
                   delistedTotalInWishlist != null &&
                   delistedTotalInWishlist > delistedCount
                 ) {
-                  return `${action} delisted (${delistedCount} of ${delistedTotalInWishlist})`;
+                  return `${action} removed (${delistedCount} of ${delistedTotalInWishlist})`;
                 }
-                return `${action} delisted (${delistedCount})`;
+                return `${action} removed (${delistedCount})`;
               })()}
               active={showDelisted ?? false}
               open={false}
@@ -2426,7 +2426,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
                   wordWrap: 'break-word',
                 }}
               >
-                Show listings in this wishlist that have been taken down by the source
+                Show listings in this wishlist that are no longer on the market
               </div>
             </div>
           </div>
@@ -3098,6 +3098,25 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           {viewToggle && <div className="shrink-0 hidden min-[600px]:flex items-center">{viewToggle}</div>}
         </div>
       </div>
+
+      {/* Removed-listings affordance — surfaces the hidden removed count on
+          the main wishlist view (always visible, including mobile, where the
+          "Show removed" chip lives behind the Filters bottom sheet). Tapping
+          toggles the same showDelisted state as the chip. */}
+      {selectedWishlist != null && delistedCount > 0 && onToggleShowDelisted !== undefined && (
+        <div className="flex items-center pb-1.5 -mt-0.5">
+          <TextButton
+            data-testid="removed-count-affordance"
+            variant="muted"
+            onClick={onToggleShowDelisted}
+            className="min-h-0 text-xs font-normal hover:underline underline-offset-2"
+          >
+            {showDelisted
+              ? 'Hide removed listings'
+              : `${delistedTotalInWishlist ?? delistedCount} no longer available`}
+          </TextButton>
+        </div>
+      )}
 
 
       {/* Row 2 (expandable): Filter chips — desktop only; mobile shows these in bottom sheet */}

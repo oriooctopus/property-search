@@ -2399,10 +2399,12 @@ function HomeInner() {
         <div
           className="flex items-center gap-1 rounded-full px-1.5 py-1.5 mb-3"
           style={{
-            background: 'rgba(28, 32, 40, 0.85)',
+            // Near-opaque + strong shadow so the pill reads as a floating
+            // layer above scrolling cards instead of colliding with them.
+            background: 'rgba(28, 32, 40, 0.95)',
             backdropFilter: 'blur(12px)',
             WebkitBackdropFilter: 'blur(12px)',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06)',
+            boxShadow: '0 6px 20px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.1)',
           }}
         >
           {[
