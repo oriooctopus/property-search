@@ -189,6 +189,69 @@ function ListingCard({
   const hasDestination = destinations.length > 0;
   const commutesArr = destinationCommutes ?? [];
 
+  // Outlined source chip (links to listing.url). Lives in the photo overlay
+  // next to the price pill — moving it out of the footer keeps the
+  // bottom-right action cluster to just hide + star. Cards without photos
+  // fall back to rendering it in the footer so the source link never
+  // disappears.
+  const sourceStyle = SOURCE_STYLE[listing.source] ?? {
+    label: listing.source.slice(0, 2).toUpperCase(),
+    color: '#8b949e',
+  };
+  const sourceName = SOURCE_LABELS[listing.source] ?? 'listing';
+  const sourceChip = (withGlass: boolean) => (
+    <a
+      href={listing.url}
+      target="_blank"
+      rel="noreferrer noopener"
+      onClick={(e) => e.stopPropagation()}
+      aria-label={`View on ${sourceName}`}
+      className="rounded-md flex items-center justify-center cursor-pointer"
+      style={{
+        textDecoration: 'none',
+        ...(withGlass ? {} : { minWidth: 44, minHeight: 44 }),
+      }}
+    >
+      <span
+        className="source-chip"
+        style={{
+          ['--src-color' as string]: sourceStyle.color,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: 20,
+          minWidth: 20,
+          padding: '0 5px',
+          borderRadius: 4,
+          backgroundColor: withGlass ? 'rgba(15, 17, 23, 0.75)' : 'transparent',
+          ...(withGlass
+            ? {
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+              }
+            : {}),
+          borderWidth: 1,
+          borderStyle: 'solid',
+          borderColor: sourceStyle.color,
+          color: sourceStyle.color,
+          fontFamily: SOURCE_CHIP_FONT_STACK,
+          fontSize: 9,
+          fontWeight: 700,
+          letterSpacing: '0.5px',
+          textTransform: 'uppercase',
+          textDecoration: 'none',
+          flexShrink: 0,
+          lineHeight: 1,
+          transition:
+            'background-color 150ms ease, color 150ms ease, border-color 150ms ease',
+          cursor: 'pointer',
+        }}
+      >
+        {sourceStyle.label}
+      </span>
+    </a>
+  );
+
   return (
     <div
       data-listing-id={listing.id}
@@ -220,7 +283,9 @@ function ListingCard({
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          {/* Sliding track: all photos in a horizontal strip */}
+          {/* Sliding track: all photos in a horizontal strip. Removed cards
+              get a grayscale/dimmed photo (media only — text stays readable)
+              so they read as inactive without shouting. */}
           <div
             style={{
               display: 'flex',
@@ -228,6 +293,7 @@ function ListingCard({
               height: '100%',
               transform: `translateX(-${(photoIndex * 100) / totalPhotos}%)`,
               transition: 'transform 300ms ease',
+              filter: isRemoved ? 'grayscale(1) brightness(0.85)' : undefined,
             }}
           >
             {photos.map((url, idx) => {
@@ -304,32 +370,34 @@ function ListingCard({
           </div>
           {/* Vignette overlay */}
           <div className="absolute inset-0 pointer-events-none z-[1]" style={{ background: 'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.3) 100%)' }} />
-          {/* Glass price chip */}
-          <div
-            className="absolute bottom-2 left-2 z-[3] px-2 py-1 rounded-md text-sm font-bold"
-            style={{
-              color: '#7ee787',
-              background: 'rgba(15, 17, 23, 0.75)',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-            }}
-          >
-            ${listing.price.toLocaleString()}<span className="text-xs font-normal" style={{ color: '#8b949e' }}>/mo</span>
+          {/* Glass price chip + source chip, side by side bottom-left */}
+          <div className="absolute bottom-2 left-2 z-[3] flex items-center gap-1.5">
+            <div
+              className="px-2 py-1 rounded-md text-sm font-bold"
+              style={{
+                color: '#7ee787',
+                background: 'rgba(15, 17, 23, 0.75)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+              }}
+            >
+              ${listing.price.toLocaleString()}<span className="text-xs font-normal" style={{ color: '#8b949e' }}>/mo</span>
+            </div>
+            {sourceChip(true)}
           </div>
           {isRemoved && (
             <div
               data-testid="removed-badge"
-              className="absolute top-2 left-2 z-[3] px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider"
+              className="absolute top-2 left-2 z-[3] px-2 py-1 rounded-md text-[10px] font-semibold"
               style={{
-                color: '#fda4af',
+                color: '#8b949e',
                 background: 'rgba(15, 17, 23, 0.85)',
-                border: '1px solid rgba(244, 63, 94, 0.35)',
+                border: '1px solid rgba(139, 148, 158, 0.4)',
                 backdropFilter: 'blur(8px)',
                 WebkitBackdropFilter: 'blur(8px)',
-                letterSpacing: '0.06em',
               }}
             >
-              Removed
+              No longer listed
             </div>
           )}
           {totalPhotos > 1 && (
@@ -506,7 +574,9 @@ function ListingCard({
         </div>
       )}
 
-      {/* Footer: listed date + actions + source chip, all on one row */}
+      {/* Footer: listed date + actions on one row. The source chip lives in
+          the photo overlay next to the price pill — it only falls back to the
+          footer for photo-less cards, so the action cluster stays uncluttered. */}
       <div className="flex items-center justify-between mt-2">
         <span className="text-[11px]" style={{ color: '#8b949e' }}>
           {listedDateLabel}
@@ -529,59 +599,7 @@ function ListingCard({
             onClick={handleStarBtnClick}
           />
 
-          {/* Outlined source chip (links to listing.url) — wrapped in a 44x44
-              shell so its outer footprint matches the sibling ActionButtons,
-              giving even horizontal spacing between all three footer icons. */}
-          {(() => {
-            const style = SOURCE_STYLE[listing.source] ?? {
-              label: listing.source.slice(0, 2).toUpperCase(),
-              color: '#8b949e',
-            };
-            const sourceName = SOURCE_LABELS[listing.source] ?? 'listing';
-            return (
-              <a
-                href={listing.url}
-                target="_blank"
-                rel="noreferrer noopener"
-                onClick={(e) => e.stopPropagation()}
-                aria-label={`View on ${sourceName}`}
-                className="rounded-md flex items-center justify-center cursor-pointer"
-                style={{ minWidth: 44, minHeight: 44, textDecoration: 'none' }}
-              >
-                <span
-                  className="source-chip"
-                  style={{
-                    ['--src-color' as string]: style.color,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    height: 20,
-                    minWidth: 20,
-                    padding: '0 5px',
-                    borderRadius: 4,
-                    backgroundColor: 'transparent',
-                    borderWidth: 1,
-                    borderStyle: 'solid',
-                    borderColor: style.color,
-                    color: style.color,
-                    fontFamily: SOURCE_CHIP_FONT_STACK,
-                    fontSize: 9,
-                    fontWeight: 700,
-                    letterSpacing: '0.5px',
-                    textTransform: 'uppercase',
-                    textDecoration: 'none',
-                    flexShrink: 0,
-                    lineHeight: 1,
-                    transition:
-                      'background-color 150ms ease, color 150ms ease, border-color 150ms ease',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {style.label}
-                </span>
-              </a>
-            );
-          })()}
+          {totalPhotos === 0 && sourceChip(false)}
         </div>
       </div>
       </div>
