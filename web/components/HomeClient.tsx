@@ -997,26 +997,27 @@ function HomeInner() {
   const occluders = useOccluders();
 
   const effectiveMapPosition = useCallback((): MapPosition | null => {
-    // Capture the VISIBLE-rect center (the point above the swipe card), NOT the
-    // raw container center. Restore pans the saved point to the visible center
-    // via panMapToShowLatLng, and getVisibleCenter is its exact inverse — so
-    // capturing the visible center here makes save↔restore symmetric. Using the
-    // container center (mapPosition) instead left the restored view shifted
-    // ~a quarter-screen north of where it was saved ("slightly off").
+    // Prefer the midpoint of the last RESULT-DRIVING viewport (lastLoadedBounds):
+    // BoundsWatcher captures it on every moveend with the occluders that were
+    // actually on screen while browsing. Computing getVisibleCenter at
+    // save-click time is wrong — the filter sheet is open then, the swipe-card
+    // occluder is unregistered, and the captured point silently degrades to the
+    // container center (≈1.5km off after restore into swipe view).
+    const bounds = lastLoadedBounds.current;
+    const zoom = leafletMap?.getZoom() ?? mapPosition?.zoom ?? 12;
+    if (bounds != null) {
+      return {
+        lat: (bounds.latMin + bounds.latMax) / 2,
+        lng: (bounds.lonMin + bounds.lonMax) / 2,
+        zoom,
+      };
+    }
+    // No viewport has loaded yet — fall back to live visible-center, then URL state.
     if (leafletMap) {
       const c = getVisibleCenter(leafletMap, occluders?.getAll?.() ?? []);
-      return { lat: c.lat, lng: c.lng, zoom: leafletMap.getZoom() };
+      return { lat: c.lat, lng: c.lng, zoom };
     }
-    // No live map (e.g. pre-mount): fall back to the viewport that drove
-    // results. lastLoadedBounds is already the visible/occluder-adjusted rect
-    // (see MapInner's BoundsWatcher), so its midpoint is visible-centered too.
-    const bounds = lastLoadedBounds.current;
-    if (bounds == null) return mapPosition;
-    return {
-      lat: (bounds.latMin + bounds.latMax) / 2,
-      lng: (bounds.lonMin + bounds.lonMax) / 2,
-      zoom: mapPosition?.zoom ?? 12,
-    };
+    return mapPosition;
   }, [mapPosition, leafletMap, occluders]);
 
   // Computed once at mount from the URL the page was loaded with — a
