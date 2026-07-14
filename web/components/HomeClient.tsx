@@ -36,7 +36,7 @@ import type { WishlistFilterSelection } from '@/components/SaveWishlistPanel';
 import { OccluderProvider, useOccluders } from '@/lib/viewport/OccluderRegistry';
 import { OcclusionDebugOverlay } from '@/lib/viewport/OcclusionDebugOverlay';
 import { LeafletMapProvider, useLeafletMap } from '@/lib/viewport/LeafletMapContext';
-import { panMapToShowLatLng } from '@/lib/viewport/visibleMapView';
+import { panMapToShowLatLng, getVisibleCenter } from '@/lib/viewport/visibleMapView';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -988,16 +988,36 @@ function HomeInner() {
    * from that state would store no location even though results clearly
    * came from somewhere. Returns null only when neither source is available.
    */
+  // Live Leaflet instance (the visible one on mobile — see useLeafletMap) and
+  // the on-screen occluder registry (swipe card / action pill). Declared here
+  // so effectiveMapPosition and the restore-pan effect can both reason about
+  // the visible band; keeping save (getVisibleCenter) and restore
+  // (panMapToShowLatLng) symmetric around the same visible center.
+  const leafletMap = useLeafletMap();
+  const occluders = useOccluders();
+
   const effectiveMapPosition = useCallback((): MapPosition | null => {
-    if (mapPosition != null) return mapPosition;
+    // Capture the VISIBLE-rect center (the point above the swipe card), NOT the
+    // raw container center. Restore pans the saved point to the visible center
+    // via panMapToShowLatLng, and getVisibleCenter is its exact inverse — so
+    // capturing the visible center here makes save↔restore symmetric. Using the
+    // container center (mapPosition) instead left the restored view shifted
+    // ~a quarter-screen north of where it was saved ("slightly off").
+    if (leafletMap) {
+      const c = getVisibleCenter(leafletMap, occluders?.getAll?.() ?? []);
+      return { lat: c.lat, lng: c.lng, zoom: leafletMap.getZoom() };
+    }
+    // No live map (e.g. pre-mount): fall back to the viewport that drove
+    // results. lastLoadedBounds is already the visible/occluder-adjusted rect
+    // (see MapInner's BoundsWatcher), so its midpoint is visible-centered too.
     const bounds = lastLoadedBounds.current;
-    if (bounds == null) return null;
+    if (bounds == null) return mapPosition;
     return {
       lat: (bounds.latMin + bounds.latMax) / 2,
       lng: (bounds.lonMin + bounds.lonMax) / 2,
-      zoom: 12,
+      zoom: mapPosition?.zoom ?? 12,
     };
-  }, [mapPosition]);
+  }, [mapPosition, leafletMap, occluders]);
 
   // Computed once at mount from the URL the page was loaded with — a
   // shared/bookmarked link that already carries filter/view/viewport state
@@ -1021,15 +1041,6 @@ function HomeInner() {
 
   const { conversations, invalidate: invalidateConversations } = useConversations(userId);
   const { savedSearches, hasFetchedOnce: savedSearchesFetched, saveSearch: saveSavedSearch, deleteSearch: deleteSavedSearch, updateSearch: updateSavedSearch, updateSearchFilters: updateSavedSearchFilters, setDefaultSearch: setDefaultSavedSearch } = useSavedSearches(userId);
-  // Live Leaflet instance — used ONLY to pan/zoom in direct response to the
-  // user's "load saved search" click below (a sanctioned exception to the
-  // no-autoscroll rule; see the comment on MapInner's viewport-lock).
-  const leafletMap = useLeafletMap();
-  // Registry of on-screen occluders (mobile swipe card / action pill). Used
-  // to pan a restored saved location into the VISIBLE band rather than the
-  // container center — otherwise the viewport query box is shifted north of
-  // the saved point (behind the swipe card) and can miss its listings.
-  const occluders = useOccluders();
 
   // Auto-load the user's default saved search (if any) on app open, in
   // place of the hardcoded NYC default — but only when the URL didn't
