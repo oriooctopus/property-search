@@ -33,11 +33,53 @@ import ManageWishlistsModal from '@/components/ManageWishlistsModal';
 import AuthModal from '@/components/AuthModal';
 import { setLastUsedWishlistId } from '@/lib/wishlist-storage';
 import type { WishlistFilterSelection } from '@/components/SaveWishlistPanel';
-import { OccluderProvider } from '@/lib/viewport/OccluderRegistry';
+import { OccluderProvider, useOccluders } from '@/lib/viewport/OccluderRegistry';
 import { OcclusionDebugOverlay } from '@/lib/viewport/OcclusionDebugOverlay';
 import { LeafletMapProvider, useLeafletMap } from '@/lib/viewport/LeafletMapContext';
+import { panMapToShowLatLng } from '@/lib/viewport/visibleMapView';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
+
+/**
+ * Lightweight diagnostic logger. Records key app state (default-load,
+ * viewport queries + result counts, view changes) so that when the user
+ * hits an issue we can see exactly what they were on: console for live
+ * debugging, `window.__dwellState` for the latest snapshot, and a capped
+ * `window.__dwellLog` / localStorage buffer for the recent history. Wrapped
+ * so logging can never throw into the app (localStorage is unavailable in
+ * some private-mode / embedded contexts).
+ */
+function dlog(event: string, data: Record<string, unknown>) {
+  if (typeof window === 'undefined') return;
+  try {
+    const entry = { t: new Date().toISOString(), event, ...data };
+    // eslint-disable-next-line no-console
+    console.log(`[dwell] ${event}`, data);
+    const w = window as unknown as { __dwellState?: unknown; __dwellLog?: unknown[] };
+    w.__dwellState = entry;
+    const buf = (w.__dwellLog ??= []);
+    buf.push(entry);
+    while (buf.length > 40) buf.shift();
+    try { localStorage.setItem('__dwellLog', JSON.stringify(buf)); } catch { /* storage unavailable */ }
+  } catch { /* logging must never break the app */ }
+}
+
+/** Compact, query-relevant summary of a filter set for diagnostic logs. */
+function filterSummary(f: Partial<FiltersState> | null | undefined): Record<string, unknown> {
+  if (!f) return {};
+  return {
+    beds: f.selectedBeds ?? null,
+    minBaths: f.minBaths ?? null,
+    minRent: f.minRent ?? null,
+    maxRent: f.maxRent ?? null,
+    priceMode: f.priceMode ?? null,
+    sources: f.selectedSources ?? null,
+    minAvail: f.minAvailableDate ?? null,
+    maxAvail: f.maxAvailableDate ?? null,
+    maxAge: f.maxListingAge ?? null,
+    commute: f.commuteRules?.length ?? 0,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Seed data fallback (used when DB is empty)
@@ -540,6 +582,16 @@ function HomeInner() {
         photo_urls: l.photo_urls ?? [],
       }));
 
+      // Diagnostic: record every viewport query's bounds + filters + result
+      // count so a "loaded then No listings found" report is traceable to the
+      // exact box/filters that came back empty.
+      dlog('viewport-query', {
+        bounds,
+        filters: filterSummary(currentFilters),
+        total: data.total,
+        returned: newListings.length,
+      });
+
       // Commute info handling (server side has already intersected):
       // - If commute rules are active, always update commute state — even
       //   for empty results — so filtering is reactive. Otherwise clear it.
@@ -973,6 +1025,11 @@ function HomeInner() {
   // user's "load saved search" click below (a sanctioned exception to the
   // no-autoscroll rule; see the comment on MapInner's viewport-lock).
   const leafletMap = useLeafletMap();
+  // Registry of on-screen occluders (mobile swipe card / action pill). Used
+  // to pan a restored saved location into the VISIBLE band rather than the
+  // container center — otherwise the viewport query box is shifted north of
+  // the saved point (behind the swipe card) and can miss its listings.
+  const occluders = useOccluders();
 
   // Auto-load the user's default saved search (if any) on app open, in
   // place of the hardcoded NYC default — but only when the URL didn't
@@ -1008,6 +1065,7 @@ function HomeInner() {
           setMapPosition({ lat, lng, zoom });
           setPendingDefaultMapPan({ lat, lng, zoom });
         }
+        dlog('load-search-from-url', { id: explicitSearch.id, name: explicitSearch.name, mapPosition: loadedFilters.mapPosition ?? null, filters: filterSummary(loadedFilters) });
       }
       return;
     }
@@ -1015,7 +1073,10 @@ function HomeInner() {
     if (hasExplicitUrlState) return;
 
     const defaultSearch = savedSearches.find((s) => s.is_default);
-    if (!defaultSearch) return;
+    if (!defaultSearch) {
+      dlog('default-load-skip', { reason: 'no default saved search' });
+      return;
+    }
     const loadedFilters = defaultSearch.filters as unknown as FiltersState;
     setFilters(loadedFilters);
     if (loadedFilters.mapPosition) {
@@ -1024,6 +1085,7 @@ function HomeInner() {
       setPendingDefaultMapPan({ lat, lng, zoom });
     }
     setActiveSavedSearchId(defaultSearch.id);
+    dlog('default-load', { id: defaultSearch.id, name: defaultSearch.name, mapPosition: loadedFilters.mapPosition ?? null, filters: filterSummary(loadedFilters) });
   }, [loading, savedSearchesFetched, savedSearches, hasExplicitUrlState, activeSavedSearchId]);
 
   // Pan the map to the restored default/explicit search's saved location once
@@ -1034,9 +1096,17 @@ function HomeInner() {
   useEffect(() => {
     if (!leafletMap || !pendingDefaultMapPan) return;
     const { lat, lng, zoom } = pendingDefaultMapPan;
-    leafletMap.setView([lat, lng], zoom);
+    // Set the saved zoom instantly, then recenter so the saved point lands in
+    // the VISIBLE band (above the swipe card), not the container center. This
+    // is what keeps the resulting viewport query centered on the saved
+    // location instead of a strip shifted north of it.
+    leafletMap.setView([lat, lng], zoom, { animate: false });
+    panMapToShowLatLng(leafletMap, lat, lng, occluders?.getAll?.() ?? [], {
+      setViewOptions: { animate: false },
+    });
+    dlog('default-pan', { lat, lng, zoom, occluders: occluders?.getAll?.().length ?? 0 });
     setPendingDefaultMapPan(null);
-  }, [leafletMap, pendingDefaultMapPan]);
+  }, [leafletMap, pendingDefaultMapPan, occluders]);
 
   const [saveSearchOpen, setSaveSearchOpen] = useState(false);
   const [chatDrawerOpen, setChatDrawerOpen] = useState(chatMode);

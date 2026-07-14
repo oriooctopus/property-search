@@ -26,6 +26,15 @@ Agents must check for these layout issues after any UI change:
 
 After every implementation agent completes, spawn the `verify` agent before reporting results to the user. Pass it a description of what the task was supposed to accomplish. Do not tell the user something is done until the verifier confirms it.
 
+## BLOCKING: Reproduce the bug FIRST — before fixing, before verifying
+
+For any BUG fix, the FIRST step is to REPRODUCE the broken behavior with concrete evidence (a screenshot of the wrong state, a captured network request/response, a logged value) — BEFORE writing the fix and before verifying it. You must have a failing baseline; a fix you can't first make fail is a fix you can't prove.
+
+- **If you cannot reproduce it, STOP.** Do not fix blind, do not deploy, do not claim "verified." Report what you tried and ask for the missing detail.
+- Be relentless: exhaust the axes that differ from the user's reality before giving up — run against **production** (`https://dwelligence.vercel.app`), not just the warm local dev server (which hides timing/latency/build differences); replicate the user's **exact saved record** (fetch its full `filters` JSON via the Supabase CLI, not a partial replica); match the **viewport/device + which view tab** (swipe/list/map) and any occluders; account for **real network latency** (repeat many times); follow the **exact steps in order**.
+- Capture failing → apply fix → show the SAME reproduction now passes. Then verify + deploy as usual.
+- When you crack a hard repro, record the technique in `~/.claude/agents/verify.md`'s "Reproduction techniques that worked" log so it compounds.
+
 ## BLOCKING: Verify Agents Must Use Playwright Headless + a Dedicated Test Account
 
 When spawning the verify agent (or any agent that logs in to the app), the prompt MUST explicitly instruct:

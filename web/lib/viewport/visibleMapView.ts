@@ -137,8 +137,12 @@ export function panMapToShowLatLng(
 
   // Project at the TARGET zoom (pixel offsets are zoom-dependent in Leaflet).
   const targetPoint = map.project([lat, lng], targetZoom);
-  // Leaflet's Point.subtract accepts a [number, number] PointExpression.
-  const newCenterPoint = targetPoint.subtract([dx, dy]);
+  // newCenter = target + (containerCenter - visibleCenter) = target + (dx, dy)
+  // (see derivation above). For a bottom occluder dy > 0, so the new center is
+  // SOUTH of the target, which lifts the target UP into the visible band.
+  // (Previously this used .subtract, which pushed the target the wrong way —
+  // deeper into the occluded band — shifting viewport queries north of it.)
+  const newCenterPoint = targetPoint.add([dx, dy]);
   const newCenter = map.unproject(newCenterPoint, targetZoom);
 
   map.setView(newCenter, targetZoom, setViewOptions);
