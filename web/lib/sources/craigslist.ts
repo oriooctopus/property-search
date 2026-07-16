@@ -102,123 +102,94 @@ async function pageFunction(context) {
     return { zeroResults: true, hasSearchShell, url, title };
   }
 
-  // STOP relying on the JS gallery entirely for pagination/counting. Two
-  // rewrites of the click-loop and then the data-pid/gallery-card selectors
-  // both failed against live CL DOM: the click loop never advanced past page
-  // 1, and combining '[data-pid], .gallery-card, .cl-search-result' into one
-  // node list overcounted (400/600 "cards" on a 120-listing page — those
-  // selectors match nested/overlapping elements, not one node per listing)
-  // while a live run also showed the s=<offset> goto being ignored (pages
-  // 3-4 re-showed page 1's first pid). CL separately serves a static,
-  // server-rendered result list — li.cl-static-search-result, each with one
-  // direct <a href> child — present in the raw HTML before any client JS
-  // runs. This is CL's documented no-JS fallback markup, used by scrapers
-  // specifically because it has none of the JS gallery's ambiguity: one <li>
-  // per listing, one <a href> per <li>, and honest ?s=<offset> pagination.
-  const RESULTS_PER_PAGE = 120;
-  const MAX_PAGES = 30;
+  // CL has REDESIGNED (diagnosed live via a throwaway Apify pageFunction dump,
+  // runs V1InMG2MqlxXNy4oC / oybP1S0NbQVjPSejk / VlB0GniPstruC3TdV):
+  //   - Search URLs now redirect newyork.craigslist.org/search/<brc>/apa to
+  //     www.craigslist.org/search/subarea/<brc>?cat=apa (Puppeteer follows the
+  //     redirect transparently; fetchCraigslistListings below now constructs
+  //     the canonical form directly instead of relying on the hop).
+  //   - Listing URLs are now https://www.craigslist.org/view/d/<slug>/<token>
+  //     — no .html suffix, no numeric id anywhere (confirmed: no data-pid on
+  //     the search card OR the detail page, no id in the detail page's
+  //     JSON-LD, og:url/canonical both equal the same opaque /view/d/ url).
+  //   - CL now serves ONE OF TWO DOM variants PER REQUEST, observed to differ
+  //     between concurrent identical requests: (a) a static server-rendered
+  //     list — li.cl-static-search-result > a[href], one per listing, present
+  //     before any client JS runs; (b) a client-rendered "gallery" variant
+  //     reached via a #search=<id>~gallery~<n> hash route, whose real markup
+  //     we have NOT captured — a diagnostic run found 0 elements matching the
+  //     old [data-pid]/.gallery-card/.cl-search-result selectors there, i.e.
+  //     those selectors are stale AND unverified against the redesign. Rather
+  //     than guess at unverified gallery markup, we reload (up to 3x) to try
+  //     to land on the static variant, and fail loudly if we can't.
+  //   - The old ?s=<offset> pagination param is now DEAD: appending s=120
+  //     after the redirect produced the byte-identical page-1 result set
+  //     (confirmed via a direct diagnostic request), and 6 rounds of
+  //     scroll-to-bottom over ~12s did not grow the static list past its
+  //     initial count either (no infinite scroll). No <link rel="next"> or
+  //     next/prev control was found in either variant (the only "next"-ish
+  //     control found was an unrelated "next day" date-filter button). No
+  //     working pagination mechanism was found within the diagnostic budget —
+  //     rather than invent one, this scrapes the single static result set
+  //     per request and logs its true size; lib/ingest/strategies.ts's
+  //     CL_DISCOVERY_FLOOR alert will correctly flag under-discovery for
+  //     follow-up investigation instead of us papering over the gap here.
+  const MAX_VARIANT_RETRIES = 3;
 
-  function buildPageUrl(baseUrl, offset) {
-    const parsed = new URL(baseUrl);
-    parsed.searchParams.set('s', String(offset));
-    return parsed.toString();
+  // NOTE: page.evaluate can only return JSON-serializable values across the
+  // browser/Node boundary — DOM elements do NOT survive the trip (they
+  // serialize to empty objects with no .getAttribute etc). Extract the
+  // hrefs as plain strings INSIDE the evaluate callback, not the elements.
+  function extractStaticHrefs() {
+    return Array.from(document.querySelectorAll('li.cl-static-search-result > a[href]'))
+      .map(a => a.getAttribute('href'))
+      .filter(Boolean);
   }
 
-  let pageNum = 1;
-  let totalFound = 0;
-  let prevFirstHref = null;
+  let cardCount = 0;
+  let firstHref = null;
+  let hrefs = [];
 
-  while (pageNum <= MAX_PAGES) {
-    if (pageNum > 1) {
-      const nextUrl = buildPageUrl(url, (pageNum - 1) * RESULTS_PER_PAGE);
+  for (let attempt = 1; attempt <= MAX_VARIANT_RETRIES; attempt++) {
+    hrefs = await page.evaluate(extractStaticHrefs);
+    cardCount = hrefs.length;
+    if (cardCount > 0) {
+      firstHref = hrefs[0] || null;
+      if (attempt > 1) {
+        log.info('Static result variant found on reload attempt ' + attempt + ' (' + cardCount + ' cards).');
+      }
+      break;
+    }
+    if (attempt < MAX_VARIANT_RETRIES) {
+      log.warning('Static results missing (attempt ' + attempt + '/' + MAX_VARIANT_RETRIES + ') — CL served the unverified gallery DOM variant for this request. Reloading to retry for the static variant.');
       try {
-        // domcontentloaded is enough — the static result list is part of the
-        // initial HTML response, no client-side render to wait for.
-        await page.goto(nextUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
       } catch (e) {
-        log.info('Page ' + pageNum + ': navigation failed (' + e.message + ') — treating as end of results. Total URLs found: ' + totalFound);
-        break;
+        log.warning('Reload failed: ' + e.message);
       }
     }
-
-    // Extract card count and links from the static server-rendered result
-    // list — count IS links.length here (one <a href> per <li>), so a
-    // count/links mismatch like the JS-gallery bug is structurally
-    // impossible. The JS-gallery selectors are a last-resort fallback only,
-    // logged loudly, in case CL ever drops the static markup entirely.
-    const { links, cardCount, firstHref, usedFallback, staticMissing } = await page.evaluate(() => {
-      let anchors = Array.from(document.querySelectorAll('li.cl-static-search-result > a[href]'));
-      let usedFallback = false;
-      if (anchors.length === 0) {
-        anchors = Array.from(document.querySelectorAll('.cl-static-search-result a[href]'));
-        usedFallback = anchors.length > 0;
-      }
-
-      let staticMissing = false;
-      if (anchors.length === 0) {
-        staticMissing = true;
-        // Last-resort fallback: the JS-gallery markup, one link per card.
-        const cards = Array.from(
-          document.querySelectorAll('[data-pid], .gallery-card, .cl-search-result'),
-        );
-        cards.forEach(card => {
-          const a = card.matches('a[href]') ? card : card.querySelector('a[href]');
-          if (a) anchors.push(a);
-        });
-      }
-
-      const hrefs = anchors.map(a => a.getAttribute('href')).filter(Boolean);
-      const links = [...new Set(
-        hrefs
-          .filter(href => /\\d+\\.html/.test(href))
-          .map(href => (href.startsWith('http') ? href : 'https://newyork.craigslist.org' + href)),
-      )];
-
-      return {
-        links,
-        cardCount: anchors.length,
-        firstHref: anchors[0] ? anchors[0].getAttribute('href') : null,
-        usedFallback,
-        staticMissing,
-      };
-    });
-
-    if (staticMissing) {
-      log.warning('Page ' + pageNum + ': static results missing — DOM variant changed. Falling back to JS-gallery selectors (' + cardCount + ' found).');
-    } else if (usedFallback) {
-      log.info('Page ' + pageNum + ': primary static selector empty, used fallback ".cl-static-search-result a[href]".');
-    }
-
-    log.info('Page ' + pageNum + ': ' + cardCount + ' cards, ' + links.length + ' links, first href ' + firstHref);
-
-    if (cardCount === 0) {
-      log.info('Page ' + pageNum + ': zero results — stopping. Total URLs found: ' + totalFound);
-      break;
-    }
-
-    if (prevFirstHref !== null && firstHref === prevFirstHref) {
-      log.info('Page ' + pageNum + ': first href unchanged from previous page (' + firstHref + ') — pagination stalled, stopping. Total URLs found: ' + totalFound);
-      break;
-    }
-
-    // Push each URL as data (NOT enqueueLinks — we don't visit them)
-    for (const link of links) {
-      await context.pushData({ url: link });
-    }
-    totalFound += links.length;
-    prevFirstHref = firstHref;
-
-    if (cardCount < RESULTS_PER_PAGE) {
-      log.info('Page ' + pageNum + ': short page (' + cardCount + ' results < ' + RESULTS_PER_PAGE + ') — last page. Total URLs found: ' + totalFound);
-      break;
-    }
-
-    pageNum++;
   }
 
-  if (pageNum > MAX_PAGES) {
-    log.warning('Hit MAX_PAGES (' + MAX_PAGES + ') cap — pagination stopped early. Total URLs found: ' + totalFound);
+  if (cardCount === 0) {
+    log.error('Static results missing after ' + MAX_VARIANT_RETRIES + ' attempts — DOM variant changed and the gallery fallback is unverified. Reporting zero results rather than guessing at stale selectors: ' + url);
+    return { zeroResults: true, hasSearchShell: true, staticVariantMissing: true, url, title: await page.title().catch(() => '') };
   }
+
+  // Match both the new opaque /view/d/<slug>/<token> scheme and the legacy
+  // <id>.html scheme, in case CL serves either depending on region/cohort.
+  const links = [...new Set(
+    hrefs
+      .filter(href => /\\/view\\/d\\//.test(href) || /\\d+\\.html$/.test(href))
+      .map(href => (href.startsWith('http') ? href : 'https://www.craigslist.org' + href)),
+  )];
+
+  log.info('Page 1: ' + cardCount + ' cards, ' + links.length + ' links, first href ' + firstHref);
+
+  for (const link of links) {
+    await context.pushData({ url: link });
+  }
+
+  log.info('Done: ' + links.length + ' total URLs found (single-page scrape — no working pagination mechanism found, see comment above).');
 }
 `;
 
@@ -231,9 +202,16 @@ async function pageFunction(context) {
   const { page, request, log } = context;
   const url = request.url;
 
-  // Wait for content to load
+  // Wait for content to load. CL's redesign (see the diagnostic-run comment
+  // in SEARCH_ONLY_PAGE_FUNCTION above) confirmed script[type="application/
+  // ld+json"] and span.price are present on the new detail-page DOM — kept
+  // as the primary wait targets, with the old selectors as an OR-fallback in
+  // case some listings still render the classic markup.
   try {
-    await page.waitForSelector('#postingbody, .posting-title, span#titletextonly', { timeout: 10000 });
+    await page.waitForSelector(
+      'script[type="application/ld+json"], span.price, #postingbody, .posting-title, span#titletextonly',
+      { timeout: 10000 },
+    );
   } catch (e) {
     // Do NOT fall through to pushData on a failed load. Previously this
     // logged a warning and continued to extraction anyway, pushing a
@@ -250,12 +228,21 @@ async function pageFunction(context) {
   }
 
   const data = await page.evaluate(() => {
-    // Try JSON-LD structured data
+    // Try JSON-LD structured data. CL's redesigned detail page emits TWO
+    // ld+json blocks — a BreadcrumbList and an "Apartment" schema carrying
+    // name/price/address/lat-lng/beds/baths — confirmed via a diagnostic
+    // dump (see SEARCH_ONLY_PAGE_FUNCTION comment above). Prefer the
+    // Apartment block explicitly rather than relying on DOM order (last
+    // matching script wins), so this doesn't silently break if CL reorders
+    // or adds more ld+json blocks.
     let ld = null;
     document.querySelectorAll('script[type="application/ld+json"]').forEach(el => {
       try {
         const parsed = JSON.parse(el.textContent || '');
-        if (parsed && (parsed['@type'] || parsed.name)) {
+        if (!parsed) return;
+        if (parsed['@type'] === 'Apartment') {
+          ld = parsed;
+        } else if (!ld && (parsed['@type'] || parsed.name)) {
           ld = parsed;
         }
       } catch (e) { /* ignore */ }
@@ -281,9 +268,14 @@ async function pageFunction(context) {
       }
     }
     if (!locationStr) {
+      // h2.street-address is the redesigned DOM's address element (confirmed
+      // via diagnostic dump); small/div.mapaddress kept as fallback for the
+      // classic DOM.
+      const streetAddrEl = document.querySelector('h2.street-address');
       const smallEl = document.querySelector('small');
       const mapAddrEl = document.querySelector('div.mapaddress');
-      locationStr = (smallEl ? smallEl.textContent.replace(/[()]/g, '').trim() : '')
+      locationStr = (streetAddrEl ? streetAddrEl.textContent.trim() : '')
+        || (smallEl ? smallEl.textContent.replace(/[()]/g, '').trim() : '')
         || (mapAddrEl ? mapAddrEl.textContent.trim() : '')
         || '';
     }
@@ -349,9 +341,20 @@ async function pageFunction(context) {
     const housingEl = document.querySelector('span.shared-line-bubble, span.housing');
     const housingSpan = housingEl ? housingEl.textContent : '';
 
-    // Post ID from URL
-    const idMatch = window.location.href.match(/(\\d+)\\.html/);
-    const postId = idMatch ? idMatch[1] : '';
+    // Post ID from URL. The redesigned /view/d/<slug>/<token> URL scheme has
+    // NO numeric id anywhere — confirmed via diagnostic dump: no data-pid
+    // attribute on the detail page, no id field in the ld+json Apartment
+    // block, og:url/canonical both just echo the same opaque view URL. So
+    // there is no stable numeric identity to recover here at all; the
+    // opaque token (last URL path segment) is the closest thing to a stable
+    // id and is used as external_id. This does NOT affect DB dedup — the
+    // upsert pipeline's identity-redirect (lib/sources/identity.ts,
+    // dedupIdentity: true in lib/ingest/phases/upsert.ts) keys off
+    // address/beds/price, not url or external_id, specifically because CL
+    // post ids/urls already churned on reposts before this redesign.
+    const viewMatch = window.location.href.match(/\\/view\\/d\\/[^/]+\\/([^/?#]+)/);
+    const legacyMatch = window.location.href.match(/(\\d+)\\.html/);
+    const postId = (viewMatch && viewMatch[1]) || (legacyMatch && legacyMatch[1]) || '';
 
     return {
       url: window.location.href,
@@ -581,7 +584,11 @@ export async function fetchCraigslistListings(
   // Launch one search-only Apify run per borough in parallel
   await Promise.all(
     CL_BOROUGHS.map(async (borough) => {
-      const startUrl = `https://newyork.craigslist.org/search/${borough}/apa?${qs}`;
+      // Canonical URL scheme (see the redesign comment inside
+      // SEARCH_ONLY_PAGE_FUNCTION above): CL redirects the old
+      // newyork.craigslist.org/search/<borough>/apa form to this one, so we
+      // construct it directly rather than relying on the redirect hop.
+      const startUrl = `https://www.craigslist.org/search/subarea/${borough}?cat=apa&${qs}`;
       const input = {
         startUrls: [{ url: startUrl }],
         pageFunction: SEARCH_ONLY_PAGE_FUNCTION,
