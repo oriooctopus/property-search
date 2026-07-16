@@ -32,6 +32,27 @@ const MAX_WAIT_MS = 3_600_000; // 60 min max (detail scrape for ~1000 URLs needs
 // ---------------------------------------------------------------------------
 
 const SEARCH_ONLY_PAGE_FUNCTION = `
+// Markers that distinguish a Craigslist bot-block/CAPTCHA interstitial from a
+// normal (possibly zero-result) search page. "automatically blocked" is CL's
+// documented rate-limit message, reported verbatim by multiple scraping
+// guides (e.g. https://marsproxies.com/blog/craigslist-ip-block-guide/ and
+// https://proxywing.com/blog/craigslist-ip-blocked-causes-fixes-and-ban-prevention-guide).
+// "captcha"/"recaptcha" cover CL's documented reCAPTCHA challenge
+// (https://www.craigslist.org/about/help/captcha). "robot"/"denied" cover the
+// generic anti-bot interstitial copy scrapers commonly report. Kept as one
+// const so both the detection check and any future log/debug code share the
+// same list.
+const CL_BLOCK_MARKERS = [
+  'automatically blocked',
+  'access denied',
+  'blocked',
+  'denied',
+  'are you a robot',
+  'verify you are human',
+  'captcha',
+  'recaptcha',
+];
+
 async function pageFunction(context) {
   const { page, request, log } = context;
   const url = request.url;
@@ -46,7 +67,32 @@ async function pageFunction(context) {
   try {
     await page.waitForSelector('[data-pid], .gallery-card, .cl-search-result', { timeout: 15000 });
   } catch (e) {
-    log.warning('No search results found on page: ' + url);
+    // Results never appeared. Previously this silently returned, which made
+    // a bot-blocked run indistinguishable from a genuine zero-results page
+    // on the Node side (both looked like a SUCCEEDED run with 0 items).
+    // Inspect the page and push the distinction into the dataset instead.
+    const title = await page.title().catch(() => '');
+    const bodyText = await page.evaluate(() => (document.body ? document.body.innerText : '')).catch(() => '');
+    const combined = (title + ' ' + bodyText).slice(0, 3000).toLowerCase();
+    const isBlocked = CL_BLOCK_MARKERS.some(marker => combined.includes(marker));
+
+    if (isBlocked) {
+      log.error('BOT BLOCK DETECTED on search page: ' + url + ' — title: "' + title + '"');
+      await context.pushData({
+        blocked: true,
+        url,
+        blockTitle: title,
+        blockSnippet: bodyText.slice(0, 300),
+      });
+      return;
+    }
+
+    // Not a block page. Check whether CL still rendered the normal search
+    // shell (a genuine zero-results page) vs. something unrecognized that
+    // isn't a block but also isn't a normal shell (e.g. a layout change).
+    const hasSearchShell = await page.evaluate(() => !!document.querySelector('#searchform, .filter-column, .cl-app-anchor')).catch(() => false);
+    log.warning('No search results found on page (hasSearchShell=' + hasSearchShell + '): ' + url);
+    await context.pushData({ zeroResults: true, hasSearchShell, url, title });
     return;
   }
 
@@ -112,7 +158,18 @@ async function pageFunction(context) {
   try {
     await page.waitForSelector('#postingbody, .posting-title, span#titletextonly', { timeout: 10000 });
   } catch (e) {
-    log.warning('Listing page did not load expected content: ' + url);
+    // Do NOT fall through to pushData on a failed load. Previously this
+    // logged a warning and continued to extraction anyway, pushing a
+    // mostly-empty row for the failed attempt. That is the root cause of the
+    // detail-scrape double-push bug (Phase 2 dataset counts ~2x the URL
+    // count): when the Apify actor's own retry logic re-runs a request for
+    // an unrelated reason (bad proxy session, slow network-idle, etc.), the
+    // failed attempt's garbage row AND the eventual successful retry's row
+    // both land in the dataset — one URL, two items. Throwing here instead
+    // lets the actor's retry mechanism own the request cleanly: exactly one
+    // dataset row per URL, whichever attempt actually succeeds.
+    log.error('Listing page did not load expected content, throwing for clean retry: ' + url);
+    throw new Error('Listing content did not load: ' + url);
   }
 
   const data = await page.evaluate(() => {
@@ -266,6 +323,13 @@ interface ApifyCLItem {
 /** Shape returned by SEARCH_ONLY_PAGE_FUNCTION */
 interface ApifySearchItem {
   url?: string;
+  /** Set when the search page rendered a bot-block/CAPTCHA interstitial. */
+  blocked?: boolean;
+  blockTitle?: string;
+  blockSnippet?: string;
+  /** Set when the page loaded normally but showed a genuine zero-results state. */
+  zeroResults?: boolean;
+  hasSearchShell?: boolean;
   [key: string]: unknown;
 }
 
@@ -381,7 +445,14 @@ async function fetchDatasetItems<T>(
 export async function fetchCraigslistListings(
   params: SearchParams,
   opts?: { supabase?: SupabaseClient },
-): Promise<{ listings: AdapterOutput[]; total: number }> {
+): Promise<{
+  listings: AdapterOutput[];
+  total: number;
+  /** Unique URLs discovered in Phase 1, before the DB new/existing filter. */
+  discovered: number;
+  /** True if any borough's Phase 1 search page hit a bot-block/CAPTCHA interstitial. */
+  blocked: boolean;
+}> {
   const { bedsMin, bedsMax, priceMax, priceMin } = params;
 
   const token = process.env.APIFY_TOKEN;
@@ -455,6 +526,7 @@ export async function fetchCraigslistListings(
 
   // Collect all discovered URLs from search datasets
   const allDiscoveredUrls: string[] = [];
+  const blockedBoroughs: string[] = [];
   await Promise.all(
     searchRunStatuses
       .filter((r) => r.status === "SUCCEEDED")
@@ -463,20 +535,31 @@ export async function fetchCraigslistListings(
           token,
           run.datasetId,
         );
+        const blockedItems = items.filter((item) => item.blocked);
+        if (blockedItems.length > 0) {
+          blockedBoroughs.push(run.borough);
+          console.error(
+            `[Craigslist] BOT BLOCK DETECTED — borough ${run.borough}: ${blockedItems.length} blocked page(s). ` +
+              `Sample: title="${blockedItems[0].blockTitle ?? ""}" snippet="${(blockedItems[0].blockSnippet ?? "").slice(0, 150)}"`,
+          );
+        }
         const urls = items
           .map((item) => item.url)
           .filter((u): u is string => !!u);
         console.log(
-          `[Craigslist] Phase 1 — borough ${run.borough}: ${urls.length} URLs discovered`,
+          `[Craigslist] Phase 1 — borough ${run.borough}: ${urls.length} URLs discovered` +
+            (blockedItems.length > 0 ? " (BOT-BLOCKED run — treat as unreliable, not a genuine zero-result day)" : ""),
         );
         allDiscoveredUrls.push(...urls);
       }),
   );
 
+  const blocked = blockedBoroughs.length > 0;
+
   // Deduplicate URLs across boroughs
   const uniqueUrls = [...new Set(allDiscoveredUrls)];
   console.log(
-    `[Craigslist] Phase 1 complete: ${uniqueUrls.length} unique URLs discovered (${allDiscoveredUrls.length} total before dedup)`,
+    `[Craigslist] Phase 1 complete: ${uniqueUrls.length} unique URLs discovered (${allDiscoveredUrls.length} total before dedup)${blocked ? ` — BOT-BLOCKED boroughs: ${blockedBoroughs.join(", ")}` : ""}`,
   );
 
   // Warn about boroughs that failed
@@ -491,7 +574,7 @@ export async function fetchCraigslistListings(
 
   if (uniqueUrls.length === 0) {
     console.log("[Craigslist] No URLs discovered — nothing to do");
-    return { listings: [], total: 0 };
+    return { listings: [], total: 0, discovered: 0, blocked };
   }
 
   // =========================================================================
@@ -572,7 +655,7 @@ export async function fetchCraigslistListings(
     console.log(
       "[Craigslist] Phase 2: no new listings to fetch — all existing listings had last_seen_at bumped",
     );
-    return { listings: [], total: 0 };
+    return { listings: [], total: 0, discovered: uniqueUrls.length, blocked };
   }
 
   console.log(
@@ -601,13 +684,33 @@ export async function fetchCraigslistListings(
     console.error(
       `[Craigslist] Phase 2: detail run ${detailStatus} — returning empty`,
     );
-    return { listings: [], total: 0 };
+    return { listings: [], total: 0, discovered: uniqueUrls.length, blocked };
   }
 
-  const items = await fetchDatasetItems<ApifyCLItem>(token, detailDatasetId);
+  const rawItems = await fetchDatasetItems<ApifyCLItem>(token, detailDatasetId);
   console.log(
-    `[Craigslist] Phase 2: ${items.length} detail items retrieved`,
+    `[Craigslist] Phase 2: ${rawItems.length} detail items retrieved`,
   );
+
+  // Guard against duplicate dataset rows per URL. Root cause (see comment in
+  // DETAIL_PAGE_FUNCTION above): a failed page load used to still push a row,
+  // so if the Apify actor retried that request, both the failed and
+  // successful attempts landed in the dataset. The throw-on-failed-load fix
+  // above should make this a no-op going forward; this dedupe is a backstop,
+  // not the fix.
+  const seenUrls = new Set<string>();
+  const items: ApifyCLItem[] = [];
+  for (const item of rawItems) {
+    if (!item.url) continue;
+    if (seenUrls.has(item.url)) continue;
+    seenUrls.add(item.url);
+    items.push(item);
+  }
+  if (items.length !== rawItems.length) {
+    console.warn(
+      `[Craigslist] Phase 2: deduped ${rawItems.length - items.length} duplicate dataset item(s) by URL (${rawItems.length} raw → ${items.length} unique)`,
+    );
+  }
 
   // =========================================================================
   // Map detail items to AdapterOutput[]
@@ -663,5 +766,5 @@ export async function fetchCraigslistListings(
     `[Craigslist] Done: ${listings.length} new listings ready for pipeline`,
   );
 
-  return { listings, total: listings.length };
+  return { listings, total: listings.length, discovered: uniqueUrls.length, blocked };
 }

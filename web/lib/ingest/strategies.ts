@@ -31,6 +31,11 @@ const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY ?? "";
 
 const NYC_PARAMS: SearchParams = { city: "New York", stateCode: "NY" };
 
+// Below this many unique URLs discovered in Craigslist Phase 1, something is
+// wrong (bot-block or a genuine anomaly) — alert rather than silently
+// upserting a trickle. Real runs typically discover 1,000+ URLs.
+const CL_DISCOVERY_FLOOR = 300;
+
 /** Runs a single adapter by name. Returns raw AdapterOutput[] with source tag. */
 async function runAdapter(source: ListingSource, supabase?: SupabaseClient): Promise<AdapterOutput[]> {
   switch (source) {
@@ -52,6 +57,21 @@ async function runAdapter(source: ListingSource, supabase?: SupabaseClient): Pro
         { ...NYC_PARAMS, priceMin: 1200, priceMax: 15000 },
         { supabase },
       );
+      if (res.discovered < CL_DISCOVERY_FLOOR || res.blocked) {
+        const reason = res.blocked
+          ? "bot-block/CAPTCHA detected on the search page"
+          : "no block detected — appears to be a genuine low/zero-result day";
+        console.error(
+          `[Craigslist] ALERT: discovery ${res.discovered} URLs is below floor ${CL_DISCOVERY_FLOOR} (blocked=${res.blocked}). Reason: ${reason}. Continuing run — upserting whatever was found.`,
+        );
+        // Fire-and-forget: alert is informational, must never block the run.
+        sendIngestAlert(
+          "[Dwelligence] Craigslist discovery floor alert",
+          `Craigslist Phase 1 discovered ${res.discovered} unique URLs (floor: ${CL_DISCOVERY_FLOOR}).\n\n` +
+            `Blocked: ${res.blocked ? "YES" : "no"} — ${reason}.\n\n` +
+            `The ingest run is continuing and will upsert the ${res.listings.length} new listing(s) found.`,
+        ).catch(() => {});
+      }
       return res.listings;
     }
     // Facebook Marketplace disabled to save Apify costs — re-enable when needed
