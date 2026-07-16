@@ -120,6 +120,10 @@ interface FiltersProps {
    *  Used by the parent to drop the SetDestinationPill into the filters top bar
    *  so it doesn't need its own dedicated row. */
   destinationSlot?: React.ReactNode;
+  /** Slot rendered in the mobile filter sheet's Destination section. Distinct
+   *  from `destinationSlot` because the sheet wants a labeled "+ Set
+   *  destination" affordance instead of the topbar's compact icon-only pill. */
+  destinationSlotSheet?: React.ReactNode;
   userId?: string | null;
   savedSearches?: SavedSearchEntry[];
   onSaveSearch?: (name: string) => Promise<SavedSearchEntry | null>;
@@ -1323,7 +1327,7 @@ function FilterToggleButton({
   );
 }
 
-const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ filters, onChange, listingCount, viewToggle, destinationSlot, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onUpdateSearchFilters, onSetDefaultSearch, onLoginRequired, showHidden, onToggleShowHidden, showDelisted, onToggleShowDelisted, delistedCount = 0, delistedTotalInWishlist = null, wishlistTotalCount = null, myWishlists = [], sharedWishlists = [], selectedWishlist = null, onSelectWishlist, onCreateWishlist, onOpenWishlistManager, getCurrentMapArea, activeSearchId = null, onActiveSearchChange }, ref) {
+const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ filters, onChange, listingCount, viewToggle, destinationSlot, destinationSlotSheet, userId, savedSearches, onSaveSearch, onDeleteSearch, onLoadSearch, onUpdateSearch, onUpdateSearchFilters, onSetDefaultSearch, onLoginRequired, showHidden, onToggleShowHidden, showDelisted, onToggleShowDelisted, delistedCount = 0, delistedTotalInWishlist = null, wishlistTotalCount = null, myWishlists = [], sharedWishlists = [], selectedWishlist = null, onSelectWishlist, onCreateWishlist, onOpenWishlistManager, getCurrentMapArea, activeSearchId = null, onActiveSearchChange }, ref) {
   const [openChip, setOpenChip] = useState<ChipId | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
@@ -2890,12 +2894,21 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
       style={{ backgroundColor: '#1c2028', borderBottom: '1px solid #2d333b' }}
     >
       {/* Row 1 (always visible): Saved cluster + Destination pill + Area tabs + listing count + Filters button + Sort + View toggle.
-          `flex-wrap` lets the right-side controls drop to a second line when
-          the panel is narrow (e.g. desktop sidebar at lg:480px with a long
-          wishlist label). Without this the rightmost icons can be clipped by
-          the panel's right edge. `gap-y-1.5` adds vertical breathing room
-          when wrapping kicks in. */}
-      <div className="flex items-center min-h-[36px] gap-1.5 sm:gap-3 gap-y-1.5 flex-wrap overflow-visible">
+          `flex-nowrap` on the outer row keeps this to a SINGLE line at every
+          width — the left chip cluster (Saved + Destination) is the one
+          `flex-1 min-w-0` element and scrolls horizontally when it doesn't
+          fit, while the right-side controls (Filters button, Sort, view
+          toggle) stay `shrink-0` and pinned at the right edge. Previously the
+          row used `flex-wrap`, which let the Filters button wrap to a second
+          line at 390px whenever a destination chip was present, orphaning it
+          with dead space below. */}
+      <div className="flex items-center min-h-[36px] gap-1.5 sm:gap-3 flex-nowrap overflow-visible">
+        {/* Left chip cluster (Saved + Destination) — flex-1 min-w-0 so it's the
+            element that shrinks, flex-nowrap + overflow-x-auto so at narrow
+            widths (390px) these chips scroll horizontally instead of wrapping
+            onto a second line or pushing the Filters button off-screen.
+            Scrollbar hidden to keep the bar visually clean. */}
+        <div className="flex-1 min-w-0 flex items-center gap-2 flex-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {/* Saved cluster pill — consolidated entry-point for save-search and
             wishlist filtering. Anchors the SaveWishlistPanel via clusterDropdownRef. */}
         {(() => {
@@ -3010,18 +3023,14 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
         {destinationSlot && (
           <div className="shrink-0 flex items-center">{destinationSlot}</div>
         )}
-
-        {/* Spacer — pushes right-side controls to the right edge.
-            (The saved-search "All | <name>" segmented slider that used to live
-            here was replaced by the top-left Saved cluster pill.) */}
-        <div className="flex-1 min-w-0" />
+        </div>
 
         {/* Right-side controls */}
         <div className="flex items-center gap-1.5 shrink-0 pl-2">
           {/* Mobile: compact filter pill that opens bottom sheet */}
           <button
             onClick={() => setMobileSheetOpen(true)}
-            className="flex min-[600px]:hidden items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap transition-colors duration-150 cursor-pointer"
+            className="flex min-[600px]:hidden items-center gap-1.5 rounded-full px-2.5 h-7 text-[11px] font-semibold whitespace-nowrap transition-colors duration-150 cursor-pointer"
             style={{
               background: activeCount > 0 ? 'rgba(88, 166, 255, 0.1)' : '#2d333b',
               color: activeCount > 0 ? '#58a6ff' : '#8b949e',
@@ -3411,10 +3420,10 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
             {/* Destination section — mirrors the inline destination pill in
                 the top bar so the mobile filter sheet (used in swipe view where
                 the top bar is hidden) can still set/edit a preferred destination. */}
-            {destinationSlot && (
+            {(destinationSlotSheet ?? destinationSlot) && (
               <div className="px-4 pt-5 pb-4" data-testid="mobile-filters-destination" style={{ borderBottom: '1px solid #2d333b' }}>
                 <div className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{ color: '#8b949e' }}>Destination</div>
-                <div className="flex flex-wrap items-center gap-2">{destinationSlot}</div>
+                <div className="flex flex-wrap items-center gap-2">{destinationSlotSheet ?? destinationSlot}</div>
               </div>
             )}
 
