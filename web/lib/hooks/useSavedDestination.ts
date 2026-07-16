@@ -29,9 +29,11 @@ interface StoredV2 {
 
 function ensureMode(d: SavedDestination): SavedDestination {
   // Backward-compat: older saved destinations predate the `mode` field —
-  // default to 'walk' so the destination chip's commute lookup has a mode.
+  // default to 'transit' so the destination chip's commute lookup has a mode.
+  // Exception: subway-line rules don't support transit mode (see the mode
+  // selector filtering in Filters.tsx), so they must stay 'walk'.
   if (!d.mode) {
-    return { ...d, mode: 'walk' };
+    return { ...d, mode: d.type === 'subway-line' ? 'walk' : 'transit' };
   }
   return d;
 }

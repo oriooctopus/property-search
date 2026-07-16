@@ -117,7 +117,7 @@ export function useDestinationCommutes(
       destination: d,
       cacheKey: destinationCacheKey(d),
       coords: destinationCoords(d),
-      mode: (d.mode ?? 'walk') as 'walk' | 'transit' | 'bike',
+      mode: (d.mode ?? (d.type === 'subway-line' ? 'walk' : 'transit')) as 'walk' | 'transit' | 'bike',
       otpMode: destinationOtpMode(d),
     }));
   }, [destinations]);
@@ -285,7 +285,7 @@ export function useListingDestinationCommutes(
   return destinations.map((d, i) => {
     const ck = destinationCacheKey(d);
     const coords = destinationCoords(d);
-    const mode = (d.mode ?? 'walk') as 'walk' | 'transit' | 'bike';
+    const mode = (d.mode ?? (d.type === 'subway-line' ? 'walk' : 'transit')) as 'walk' | 'transit' | 'bike';
     if (!ck || !coords) {
       return { minutes: null, mode, loading: false, errored: true };
     }
