@@ -63,9 +63,17 @@ async function pageFunction(context) {
     return;
   }
 
-  // Wait for JS-rendered results
+  // Wait for results. CL serves a static, server-rendered result list
+  // (li.cl-static-search-result, with plain a[href] children) BEFORE any
+  // client JS runs — this is CL's no-JS fallback markup, well documented and
+  // widely used by scrapers, and unlike the JS gallery it paginates honestly
+  // via the ?s=<offset> param. The JS-gallery selectors are kept here only so
+  // bot-block/zero-result detection below still fires on either DOM variant.
   try {
-    await page.waitForSelector('[data-pid], .gallery-card, .cl-search-result', { timeout: 15000 });
+    await page.waitForSelector(
+      'li.cl-static-search-result, .cl-static-search-result, [data-pid], .gallery-card, .cl-search-result',
+      { timeout: 15000 },
+    );
   } catch (e) {
     // Results never appeared. Previously this silently returned, which made
     // a bot-blocked run indistinguishable from a genuine zero-results page
@@ -94,16 +102,19 @@ async function pageFunction(context) {
     return { zeroResults: true, hasSearchShell, url, title };
   }
 
-  // CL's gallery is a client-rendered SPA that does NOT swap in new results
-  // reliably when the on-page "next" button (cl-next-result) is clicked —
-  // in production runs the click loop got exactly 120 links (one page) then
-  // 0 forever after, never advancing. CL's own documented pagination scheme
-  // instead uses a URL query param s=<offset> (results-per-page = 120 for
-  // this layout), so we drive pagination by navigating to that URL directly
-  // — a fresh page.goto per page is deterministic where in-page clicking on
-  // a SPA gallery was not. Bounded by MAX_PAGES so a stuck/looping page count
-  // can never run away (1650 live results / 120 per page ≈ 14 pages; 30 is a
-  // generous ceiling).
+  // STOP relying on the JS gallery entirely for pagination/counting. Two
+  // rewrites of the click-loop and then the data-pid/gallery-card selectors
+  // both failed against live CL DOM: the click loop never advanced past page
+  // 1, and combining '[data-pid], .gallery-card, .cl-search-result' into one
+  // node list overcounted (400/600 "cards" on a 120-listing page — those
+  // selectors match nested/overlapping elements, not one node per listing)
+  // while a live run also showed the s=<offset> goto being ignored (pages
+  // 3-4 re-showed page 1's first pid). CL separately serves a static,
+  // server-rendered result list — li.cl-static-search-result, each with one
+  // direct <a href> child — present in the raw HTML before any client JS
+  // runs. This is CL's documented no-JS fallback markup, used by scrapers
+  // specifically because it has none of the JS gallery's ambiguity: one <li>
+  // per listing, one <a href> per <li>, and honest ?s=<offset> pagination.
   const RESULTS_PER_PAGE = 120;
   const MAX_PAGES = 30;
 
@@ -115,65 +126,78 @@ async function pageFunction(context) {
 
   let pageNum = 1;
   let totalFound = 0;
-  let prevFirstPid = null;
+  let prevFirstHref = null;
 
   while (pageNum <= MAX_PAGES) {
     if (pageNum > 1) {
       const nextUrl = buildPageUrl(url, (pageNum - 1) * RESULTS_PER_PAGE);
       try {
-        await page.goto(nextUrl, { waitUntil: 'networkidle2', timeout: 30000 });
-        await page.waitForSelector('[data-pid], .gallery-card, .cl-search-result', { timeout: 15000 });
+        // domcontentloaded is enough — the static result list is part of the
+        // initial HTML response, no client-side render to wait for.
+        await page.goto(nextUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
       } catch (e) {
-        log.info('Page ' + pageNum + ': navigation/render failed (' + e.message + ') — treating as end of results. Total URLs found: ' + totalFound);
+        log.info('Page ' + pageNum + ': navigation failed (' + e.message + ') — treating as end of results. Total URLs found: ' + totalFound);
         break;
       }
     }
 
-    // Scroll to trigger any lazy content before extracting
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await new Promise(r => setTimeout(r, 1000));
+    // Extract card count and links from the static server-rendered result
+    // list — count IS links.length here (one <a href> per <li>), so a
+    // count/links mismatch like the JS-gallery bug is structurally
+    // impossible. The JS-gallery selectors are a last-resort fallback only,
+    // logged loudly, in case CL ever drops the static markup entirely.
+    const { links, cardCount, firstHref, usedFallback, staticMissing } = await page.evaluate(() => {
+      let anchors = Array.from(document.querySelectorAll('li.cl-static-search-result > a[href]'));
+      let usedFallback = false;
+      if (anchors.length === 0) {
+        anchors = Array.from(document.querySelectorAll('.cl-static-search-result a[href]'));
+        usedFallback = anchors.length > 0;
+      }
 
-    // Extract card count, first pid, and listing links from the SAME node
-    // list. Previously the card count came from a broad "a[href] inside a
-    // card" selector while the first-pid read came from a separate
-    // document.querySelector('[data-pid], .gallery-card, .cl-search-result')
-    // call — on the current CL DOM those two selectors disagree (a live run
-    // logged "0 cards, first pid 7947659645": a pid was found while the
-    // separate count selector matched nothing), so the zero-cards stop
-    // condition fired on page 1 with real results present. Deriving
-    // cardCount, firstPid, and links all from one cards array makes
-    // "count==0 but pid found" impossible by construction — cards[0] is
-    // where firstPid comes from, so it can only be non-null when
-    // cards.length > 0.
-    const { links, cardCount, firstPid } = await page.evaluate(() => {
-      const cards = Array.from(
-        document.querySelectorAll('[data-pid], .gallery-card, .cl-search-result'),
-      );
-      const found = [];
-      cards.forEach(card => {
-        const anchor = card.matches('a[href]') ? card : card.querySelector('a[href]');
-        const href = anchor ? anchor.getAttribute('href') : null;
-        if (href && /\\d+\\.html/.test(href)) {
-          found.push(href.startsWith('http') ? href : 'https://newyork.craigslist.org' + href);
-        }
-      });
-      const firstCard = cards[0];
+      let staticMissing = false;
+      if (anchors.length === 0) {
+        staticMissing = true;
+        // Last-resort fallback: the JS-gallery markup, one link per card.
+        const cards = Array.from(
+          document.querySelectorAll('[data-pid], .gallery-card, .cl-search-result'),
+        );
+        cards.forEach(card => {
+          const a = card.matches('a[href]') ? card : card.querySelector('a[href]');
+          if (a) anchors.push(a);
+        });
+      }
+
+      const hrefs = anchors.map(a => a.getAttribute('href')).filter(Boolean);
+      const links = [...new Set(
+        hrefs
+          .filter(href => /\\d+\\.html/.test(href))
+          .map(href => (href.startsWith('http') ? href : 'https://newyork.craigslist.org' + href)),
+      )];
+
       return {
-        links: [...new Set(found)],
-        cardCount: cards.length,
-        firstPid: firstCard ? (firstCard.getAttribute('data-pid') || firstCard.id || null) : null,
+        links,
+        cardCount: anchors.length,
+        firstHref: anchors[0] ? anchors[0].getAttribute('href') : null,
+        usedFallback,
+        staticMissing,
       };
     });
 
-    log.info('Page ' + pageNum + ': ' + cardCount + ' cards, ' + links.length + ' links, first pid ' + firstPid);
+    if (staticMissing) {
+      log.warning('Page ' + pageNum + ': static results missing — DOM variant changed. Falling back to JS-gallery selectors (' + cardCount + ' found).');
+    } else if (usedFallback) {
+      log.info('Page ' + pageNum + ': primary static selector empty, used fallback ".cl-static-search-result a[href]".');
+    }
+
+    log.info('Page ' + pageNum + ': ' + cardCount + ' cards, ' + links.length + ' links, first href ' + firstHref);
 
     if (cardCount === 0) {
-      log.info('Page ' + pageNum + ': zero cards — stopping. Total URLs found: ' + totalFound);
+      log.info('Page ' + pageNum + ': zero results — stopping. Total URLs found: ' + totalFound);
       break;
     }
 
-    if (prevFirstPid !== null && firstPid === prevFirstPid) {
-      log.info('Page ' + pageNum + ': first pid unchanged from previous page (' + firstPid + ') — pagination stalled, stopping. Total URLs found: ' + totalFound);
+    if (prevFirstHref !== null && firstHref === prevFirstHref) {
+      log.info('Page ' + pageNum + ': first href unchanged from previous page (' + firstHref + ') — pagination stalled, stopping. Total URLs found: ' + totalFound);
       break;
     }
 
@@ -182,10 +206,10 @@ async function pageFunction(context) {
       await context.pushData({ url: link });
     }
     totalFound += links.length;
-    prevFirstPid = firstPid;
+    prevFirstHref = firstHref;
 
     if (cardCount < RESULTS_PER_PAGE) {
-      log.info('Page ' + pageNum + ': short page (' + cardCount + ' cards < ' + RESULTS_PER_PAGE + ') — last page. Total URLs found: ' + totalFound);
+      log.info('Page ' + pageNum + ': short page (' + cardCount + ' results < ' + RESULTS_PER_PAGE + ') — last page. Total URLs found: ' + totalFound);
       break;
     }
 
