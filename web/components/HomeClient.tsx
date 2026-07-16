@@ -137,8 +137,15 @@ function parseNumOrNull(v: string | null): number | null {
 function readFiltersFromParams(params: URLSearchParams): FiltersState {
   const sort = params.get('sort');
   const age = params.get('maxAge');
+  // Default sort is 'price' EXCEPT when landing directly on a wishlist URL
+  // with no explicit `sort` param — wishlists default to newest-first (List
+  // Date) since users browsing a saved wishlist care more about what's new
+  // than price ordering. An explicit `sort` param (bookmarked/shared URL)
+  // always wins.
+  const isWishlistView = !!params.get('wishlist');
+  const defaultSort: SortField = isWishlistView ? 'listDate' : 'price';
   return {
-    sort: (sort && VALID_SORTS.has(sort) ? sort : 'price') as SortField,
+    sort: (sort && VALID_SORTS.has(sort) ? sort : defaultSort) as SortField,
     selectedBeds: params.get('beds') ? params.get('beds')!.split(',').map(Number).filter(Number.isFinite) : null,
     minBaths: parseNumOrNull(params.get('minBaths')),
     includeNaBaths: params.get('includeNaBaths') === '1',
@@ -948,6 +955,36 @@ function HomeInner() {
   // Sync the ref synchronously on every render so the stable loadForViewport
   // callback always reads the latest filter state without re-creating.
   filtersRef.current = filters;
+
+  // Tracks whether the user has ever explicitly picked a sort option this
+  // session (clicking a sort pill, or landing on a URL with an explicit
+  // `sort` param). Gates the "default to List Date on entering a wishlist"
+  // behavior below — once the user has made their own choice, switching
+  // wishlists must never silently override it.
+  const manualSortRef = useRef<boolean>(!!searchParams.get('sort'));
+
+  // Wraps setFilters so any sort change coming from the UI (sort pill click)
+  // is recorded as a manual choice, before entering/leaving wishlist view
+  // stops trying to apply its own default.
+  const handleFiltersChange = useCallback((next: FiltersState) => {
+    if (next.sort !== filtersRef.current?.sort) {
+      manualSortRef.current = true;
+    }
+    setFilters(next);
+  }, []);
+
+  // Wraps the wishlist-selection setter: entering wishlist view (transition
+  // from no wishlist selected to one selected) defaults sort to List Date
+  // (newest first), unless the user already manually chose a sort this
+  // session. Only the default changes — an explicit user pick is respected.
+  const handleSelectWishlist = useCallback((sel: WishlistFilterSelection) => {
+    setSelectedWishlist((prev) => {
+      if (prev === null && sel !== null && !manualSortRef.current) {
+        setFilters((f) => (f.sort === 'listDate' ? f : { ...f, sort: 'listDate' }));
+      }
+      return sel;
+    });
+  }, []);
 
   // Map position — read initial values from URL params if present and valid
   const [mapPosition, setMapPosition] = useState<MapPosition | null>(() => {
@@ -2063,7 +2100,7 @@ function HomeInner() {
           <Filters
             ref={filtersHandleRef}
             filters={filters}
-            onChange={setFilters}
+            onChange={handleFiltersChange}
             listingCount={filteredListings.length}
             viewToggle={viewToggle}
             destinationSlot={<SetDestinationPill />}
@@ -2101,7 +2138,7 @@ function HomeInner() {
             myWishlists={myWishlists}
             sharedWishlists={sharedWishlists}
             selectedWishlist={selectedWishlist}
-            onSelectWishlist={setSelectedWishlist}
+            onSelectWishlist={handleSelectWishlist}
             onCreateWishlist={async (name) => {
               try {
                 const created = await createWishlist.mutateAsync(name);
@@ -2521,7 +2558,7 @@ function HomeInner() {
             if (selectedWishlist === wishlistId) setSelectedWishlist(null);
           }}
           onView={(wishlistId) => {
-            setSelectedWishlist(wishlistId);
+            handleSelectWishlist(wishlistId);
             setManageWishlistsOpen(false);
           }}
         />
