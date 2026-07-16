@@ -496,7 +496,7 @@ export function createDefaultRule(): CommuteRule {
     type: 'address',
     address: '',
     maxMinutes: 30,
-    mode: 'walk',
+    mode: 'transit',
   };
 }
 
