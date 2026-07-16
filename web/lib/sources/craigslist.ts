@@ -78,13 +78,12 @@ async function pageFunction(context) {
 
     if (isBlocked) {
       log.error('BOT BLOCK DETECTED on search page: ' + url + ' — title: "' + title + '"');
-      await context.pushData({
+      return {
         blocked: true,
         url,
         blockTitle: title,
         blockSnippet: bodyText.slice(0, 300),
-      });
-      return;
+      };
     }
 
     // Not a block page. Check whether CL still rendered the normal search
@@ -92,24 +91,52 @@ async function pageFunction(context) {
     // isn't a block but also isn't a normal shell (e.g. a layout change).
     const hasSearchShell = await page.evaluate(() => !!document.querySelector('#searchform, .filter-column, .cl-app-anchor')).catch(() => false);
     log.warning('No search results found on page (hasSearchShell=' + hasSearchShell + '): ' + url);
-    await context.pushData({ zeroResults: true, hasSearchShell, url, title });
-    return;
+    return { zeroResults: true, hasSearchShell, url, title };
   }
 
-  // CL paginates at ~200 results per page via a "next" button (cl-next-result).
-  // Loop: extract links from current page, click next, repeat until no more pages.
+  // CL's gallery is a client-rendered SPA that does NOT swap in new results
+  // reliably when the on-page "next" button (cl-next-result) is clicked —
+  // in production runs the click loop got exactly 120 links (one page) then
+  // 0 forever after, never advancing. CL's own documented pagination scheme
+  // instead uses a URL query param s=<offset> (results-per-page = 120 for
+  // this layout), so we drive pagination by navigating to that URL directly
+  // — a fresh page.goto per page is deterministic where in-page clicking on
+  // a SPA gallery was not. Bounded by MAX_PAGES so a stuck/looping page count
+  // can never run away (1650 live results / 120 per page ≈ 14 pages; 30 is a
+  // generous ceiling).
+  const RESULTS_PER_PAGE = 120;
+  const MAX_PAGES = 30;
+
+  function buildPageUrl(baseUrl, offset) {
+    const parsed = new URL(baseUrl);
+    parsed.searchParams.set('s', String(offset));
+    return parsed.toString();
+  }
+
   let pageNum = 1;
   let totalFound = 0;
+  let prevFirstPid = null;
 
-  while (true) {
-    // Scroll to load any lazy content
-    for (let i = 0; i < 3; i++) {
-      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      await new Promise(r => setTimeout(r, 1000));
+  while (pageNum <= MAX_PAGES) {
+    if (pageNum > 1) {
+      const nextUrl = buildPageUrl(url, (pageNum - 1) * RESULTS_PER_PAGE);
+      try {
+        await page.goto(nextUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+        await page.waitForSelector('[data-pid], .gallery-card, .cl-search-result', { timeout: 15000 });
+      } catch (e) {
+        log.info('Page ' + pageNum + ': navigation/render failed (' + e.message + ') — treating as end of results. Total URLs found: ' + totalFound);
+        break;
+      }
     }
 
-    // Extract listing links
-    const links = await page.evaluate(() => {
+    // Scroll to trigger any lazy content before extracting
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await new Promise(r => setTimeout(r, 1000));
+
+    // Extract listing links + the first card's data-pid (used to detect a
+    // stalled/non-advancing page — CL sometimes re-serves the same page for
+    // an out-of-range offset instead of an empty result set).
+    const { links, firstPid } = await page.evaluate(() => {
       const found = [];
       document.querySelectorAll('[data-pid] a[href], .gallery-card a[href], .cl-search-result a[href]').forEach(a => {
         const href = a.getAttribute('href');
@@ -117,30 +144,42 @@ async function pageFunction(context) {
           found.push(href.startsWith('http') ? href : 'https://newyork.craigslist.org' + href);
         }
       });
-      return [...new Set(found)];
+      const firstEl = document.querySelector('[data-pid], .gallery-card, .cl-search-result');
+      return {
+        links: [...new Set(found)],
+        firstPid: firstEl ? (firstEl.getAttribute('data-pid') || firstEl.id || null) : null,
+      };
     });
 
-    log.info('Page ' + pageNum + ': found ' + links.length + ' listing URLs');
-    if (links.length > 0) {
-      // Push each URL as data (NOT enqueueLinks — we don't visit them)
-      for (const link of links) {
-        await context.pushData({ url: link });
-      }
-      totalFound += links.length;
-    }
+    log.info('Page ' + pageNum + ': ' + links.length + ' cards, first pid ' + firstPid);
 
-    // Check for next page button
-    const nextBtn = await page.$('button.bd-button.cl-next-result');
-    if (!nextBtn) {
-      log.info('No more pages after page ' + pageNum + '. Total URLs found: ' + totalFound);
+    if (links.length === 0) {
+      log.info('Page ' + pageNum + ': zero cards — stopping. Total URLs found: ' + totalFound);
       break;
     }
 
-    // Scroll into view and click via JS (Puppeteer's native click fails
-    // when the button is off-screen or overlapped)
-    await page.evaluate(el => { el.scrollIntoView(); el.click(); }, nextBtn);
-    await new Promise(r => setTimeout(r, 3000));
+    if (prevFirstPid !== null && firstPid === prevFirstPid) {
+      log.info('Page ' + pageNum + ': first pid unchanged from previous page (' + firstPid + ') — pagination stalled, stopping. Total URLs found: ' + totalFound);
+      break;
+    }
+
+    // Push each URL as data (NOT enqueueLinks — we don't visit them)
+    for (const link of links) {
+      await context.pushData({ url: link });
+    }
+    totalFound += links.length;
+    prevFirstPid = firstPid;
+
+    if (links.length < RESULTS_PER_PAGE) {
+      log.info('Page ' + pageNum + ': short page (' + links.length + ' < ' + RESULTS_PER_PAGE + ') — last page. Total URLs found: ' + totalFound);
+      break;
+    }
+
     pageNum++;
+  }
+
+  if (pageNum > MAX_PAGES) {
+    log.warning('Hit MAX_PAGES (' + MAX_PAGES + ') cap — pagination stopped early. Total URLs found: ' + totalFound);
   }
 }
 `;
@@ -294,7 +333,16 @@ async function pageFunction(context) {
     };
   });
 
-  await context.pushData(data);
+  // Return the object instead of calling context.pushData(data) here. The
+  // apify/puppeteer-scraper actor auto-pushes ONE dataset record per
+  // pageFunction invocation from whatever it returns, merged with request
+  // metadata (#error/#debug) — this is documented actor behavior, not a bug.
+  // The previous code called pushData(data) explicitly AND still returned
+  // nothing, so the actor's own auto-push contributed a second, mostly-empty
+  // {#error, #debug} row per URL on top of our real one: exactly the
+  // "154 raw items for 77 URLs" 2x seen in production. Returning here means
+  // there is exactly one record per invocation, carrying our real fields.
+  return data;
 }
 `;
 
@@ -692,12 +740,16 @@ export async function fetchCraigslistListings(
     `[Craigslist] Phase 2: ${rawItems.length} detail items retrieved`,
   );
 
-  // Guard against duplicate dataset rows per URL. Root cause (see comment in
-  // DETAIL_PAGE_FUNCTION above): a failed page load used to still push a row,
-  // so if the Apify actor retried that request, both the failed and
-  // successful attempts landed in the dataset. The throw-on-failed-load fix
-  // above should make this a no-op going forward; this dedupe is a backstop,
-  // not the fix.
+  // Guard against duplicate/junk dataset rows. Root cause (confirmed by
+  // inspecting the raw dataset of run fjTCMgWEVXRGTXQG8: 154 items for 77
+  // URLs, and every "extra" item was `{ "#error": false, "#debug": {...} }`
+  // with no `url` field): apify/puppeteer-scraper auto-pushes one dataset
+  // record per pageFunction invocation from its return value, merged with
+  // request metadata — DETAIL_PAGE_FUNCTION used to call context.pushData(data)
+  // explicitly AND return nothing, so the actor's own auto-push contributed a
+  // second, url-less row per URL on top of our real one. DETAIL_PAGE_FUNCTION
+  // now returns data instead of calling pushData, which should make this a
+  // no-op going forward; this filter is a backstop, not the fix.
   const seenUrls = new Set<string>();
   const items: ApifyCLItem[] = [];
   for (const item of rawItems) {
