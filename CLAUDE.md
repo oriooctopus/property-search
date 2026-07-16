@@ -4,7 +4,7 @@
 
 Do NOT tell the user a change is done until ALL of these are true:
 - [ ] Verify agent spawned and returned PASS
-- [ ] Screenshot/report link included in status table
+- [ ] Screenshot/report link included in the response
 - [ ] If the verify agent used DOM measurements for spacing/layout, it ALSO took a screenshot and visually confirmed
 
 If the verify agent fails, fix the issue and re-verify. Do NOT report as done with a failing verify.
@@ -65,23 +65,15 @@ it can't be synced — reproduce those in-session.
 
 This applies to every verify-agent spawn, every project. Repeat the rule explicitly in the spawn prompt — don't assume the agent will infer it.
 
-## MANDATORY: Status Table on Every Response
+## Deliverable Links
 
-Every response must end with a compact status table of active work items. Done items drop off. Format:
+Whenever a response references a deliverable (file, HTML mockup, screenshot, URL), always include a clickable link. "Done — ready for review" is not enough; include the path or URL so the user can click it directly.
 
-| Item | Next step |
-|------|-----------|
-| Feature X | ⏳ Agent running / 🔲 Not started / Description |
-
-When a status table row references a deliverable (file, HTML mockup, screenshot, URL), always include a clickable link. "Done — ready for review" is not enough; include the path or URL so the user can click it directly. This applies to all tables and lists, not just status tables — whenever a file or URL is relevant, link it.
-
-**Verify agent specifically**: when a verify agent completes and produced screenshots or files as evidence, you MUST link every one of them in the status table. Reporting "verified" without linking the proof screenshots is incomplete.
+**Verify agent specifically**: when a verify agent completes and produced screenshots or files as evidence, link the report/screenshots. Reporting "verified" without linking the proof is incomplete.
 
 When presenting design options (A/B/C/D):
 - If all options are on ONE page: single link like `[Pick A/B/C/D](url)`
 - If options are on SEPARATE pages: individual links like `[A](url1) / [B](url2) / [C](url3) / [D](url4)`
-
-Links always go in the **Next step** column, never in the **Item** column. The Item column is plain text only.
 
 ## Agent Context Continuity
 
@@ -115,7 +107,7 @@ The dev server runs on port **8000** (`http://localhost:8000`), NOT the Next.js 
 - Before starting the dev server, confirm the script still has `--port 8000`. If an agent stripped it, add it back before running.
 - Never run `next dev` or any other dev command that lets the framework pick a default port. If you need to start dev in a non-standard way, pass `--port 8000` explicitly.
 - If you see `localhost:3000` in any URL, screenshot, or log output related to this project, STOP — something launched the wrong port. Kill it (`lsof -ti:3000 | xargs kill -9`) and restart on 8000.
-- When linking to local pages in status tables, reports, or messages: always use `http://localhost:8000/...`.
+- When linking to local pages in reports or messages: always use `http://localhost:8000/...`.
 - Never tell the user "dev server is running on 3000" — that's a regression. Fix it silently and report 8000.
 
 ## Deployment
