@@ -133,27 +133,41 @@ async function pageFunction(context) {
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await new Promise(r => setTimeout(r, 1000));
 
-    // Extract listing links + the first card's data-pid (used to detect a
-    // stalled/non-advancing page — CL sometimes re-serves the same page for
-    // an out-of-range offset instead of an empty result set).
-    const { links, firstPid } = await page.evaluate(() => {
+    // Extract card count, first pid, and listing links from the SAME node
+    // list. Previously the card count came from a broad "a[href] inside a
+    // card" selector while the first-pid read came from a separate
+    // document.querySelector('[data-pid], .gallery-card, .cl-search-result')
+    // call — on the current CL DOM those two selectors disagree (a live run
+    // logged "0 cards, first pid 7947659645": a pid was found while the
+    // separate count selector matched nothing), so the zero-cards stop
+    // condition fired on page 1 with real results present. Deriving
+    // cardCount, firstPid, and links all from one cards array makes
+    // "count==0 but pid found" impossible by construction — cards[0] is
+    // where firstPid comes from, so it can only be non-null when
+    // cards.length > 0.
+    const { links, cardCount, firstPid } = await page.evaluate(() => {
+      const cards = Array.from(
+        document.querySelectorAll('[data-pid], .gallery-card, .cl-search-result'),
+      );
       const found = [];
-      document.querySelectorAll('[data-pid] a[href], .gallery-card a[href], .cl-search-result a[href]').forEach(a => {
-        const href = a.getAttribute('href');
-        if (href && /\\/\\d+\\.html/.test(href)) {
+      cards.forEach(card => {
+        const anchor = card.matches('a[href]') ? card : card.querySelector('a[href]');
+        const href = anchor ? anchor.getAttribute('href') : null;
+        if (href && /\\d+\\.html/.test(href)) {
           found.push(href.startsWith('http') ? href : 'https://newyork.craigslist.org' + href);
         }
       });
-      const firstEl = document.querySelector('[data-pid], .gallery-card, .cl-search-result');
+      const firstCard = cards[0];
       return {
         links: [...new Set(found)],
-        firstPid: firstEl ? (firstEl.getAttribute('data-pid') || firstEl.id || null) : null,
+        cardCount: cards.length,
+        firstPid: firstCard ? (firstCard.getAttribute('data-pid') || firstCard.id || null) : null,
       };
     });
 
-    log.info('Page ' + pageNum + ': ' + links.length + ' cards, first pid ' + firstPid);
+    log.info('Page ' + pageNum + ': ' + cardCount + ' cards, ' + links.length + ' links, first pid ' + firstPid);
 
-    if (links.length === 0) {
+    if (cardCount === 0) {
       log.info('Page ' + pageNum + ': zero cards — stopping. Total URLs found: ' + totalFound);
       break;
     }
@@ -170,8 +184,8 @@ async function pageFunction(context) {
     totalFound += links.length;
     prevFirstPid = firstPid;
 
-    if (links.length < RESULTS_PER_PAGE) {
-      log.info('Page ' + pageNum + ': short page (' + links.length + ' < ' + RESULTS_PER_PAGE + ') — last page. Total URLs found: ' + totalFound);
+    if (cardCount < RESULTS_PER_PAGE) {
+      log.info('Page ' + pageNum + ': short page (' + cardCount + ' cards < ' + RESULTS_PER_PAGE + ') — last page. Total URLs found: ' + totalFound);
       break;
     }
 
