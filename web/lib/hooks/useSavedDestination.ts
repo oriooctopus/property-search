@@ -21,9 +21,19 @@ export type SavedDestination = CommuteRule;
 /**
  * Storage shape (versioned). v2 stores an array of up to MAX_DESTINATIONS
  * destinations. v1 stored a single object — we migrate transparently on read.
+ *
+ * v3 exists to flip `mode: 'walk'` values that were written explicitly back
+ * when 'walk' was still the default, now that the default is 'transit'. The
+ * migration runs once on read and writes v3 back immediately; any 'walk'
+ * chosen after that point lives in a v3 payload and is never touched again.
  */
 interface StoredV2 {
   v: 2;
+  destinations: SavedDestination[];
+}
+
+interface StoredV3 {
+  v: 3;
   destinations: SavedDestination[];
 }
 
@@ -44,6 +54,29 @@ function isValidDestination(x: unknown): x is SavedDestination {
   return typeof d.type === 'string';
 }
 
+/**
+ * v2 -> v3 one-time fix-up: destinations explicitly saved as 'walk' before
+ * transit became the default should now default to transit, same as if
+ * `mode` had been left unset. Subway-line destinations stay 'walk' (transit
+ * mode isn't valid for them). Missing mode still goes through ensureMode.
+ */
+function migrateWalkToTransit(d: SavedDestination): SavedDestination {
+  if (d.mode === 'walk' && d.type !== 'subway-line') {
+    return { ...d, mode: 'transit' };
+  }
+  return ensureMode(d);
+}
+
+/** Plain localStorage write — no event dispatch, used by the read-path migration. */
+function writeV3Silently(destinations: SavedDestination[]) {
+  try {
+    const payload: StoredV3 = { v: 3, destinations };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    /* quota / private mode — ignore */
+  }
+}
+
 function readFromStorage(): SavedDestination[] {
   if (typeof window === 'undefined') return [];
   try {
@@ -51,24 +84,41 @@ function readFromStorage(): SavedDestination[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
 
-    // v2 array shape
+    // v3 array shape — already migrated, read as-is (still run ensureMode
+    // per destination for safety).
     if (
       parsed &&
       typeof parsed === 'object' &&
-      'v' in (parsed as Record<string, unknown>) &&
+      (parsed as { v: unknown }).v === 3 &&
+      Array.isArray((parsed as StoredV3).destinations)
+    ) {
+      return (parsed as StoredV3).destinations
+        .filter(isValidDestination)
+        .slice(0, MAX_DESTINATIONS)
+        .map(ensureMode);
+    }
+
+    // v2 array shape — migrate walk->transit, then write back as v3 so this
+    // runs exactly once per device.
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
       (parsed as { v: unknown }).v === 2 &&
       Array.isArray((parsed as StoredV2).destinations)
     ) {
       const arr = (parsed as StoredV2).destinations
         .filter(isValidDestination)
         .slice(0, MAX_DESTINATIONS)
-        .map(ensureMode);
+        .map(migrateWalkToTransit);
+      writeV3Silently(arr);
       return arr;
     }
 
-    // v1 single-object shape — migrate to a 1-element array
+    // v1 bare single-object shape — same migration treatment, write back as v3.
     if (isValidDestination(parsed)) {
-      return [ensureMode(parsed)];
+      const arr = [migrateWalkToTransit(parsed)];
+      writeV3Silently(arr);
+      return arr;
     }
 
     return [];
@@ -83,8 +133,8 @@ function writeToStorage(destinations: SavedDestination[]) {
     if (destinations.length === 0) {
       window.localStorage.removeItem(STORAGE_KEY);
     } else {
-      const payload: StoredV2 = {
-        v: 2,
+      const payload: StoredV3 = {
+        v: 3,
         destinations: destinations.slice(0, MAX_DESTINATIONS),
       };
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
