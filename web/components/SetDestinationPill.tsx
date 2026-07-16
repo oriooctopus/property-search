@@ -21,8 +21,36 @@ import {
  * Supports up to MAX_DESTINATIONS (currently 2). When 0 destinations are
  * saved the pill reads "Set destination". When ≥1 is saved the pill shows
  * the first short name plus a "+N" badge for any additional destinations.
+ *
+ * `variant` controls the empty-state (no destinations saved) affordance:
+ * - 'icon' (default): compact icon-only pill for the top filter bar, where
+ *   space is tight next to the Saved chip and Filters button.
+ * - 'labeled': a labeled "+ Set destination" pill for the mobile filter
+ *   sheet's Destination section, where a bare icon reads as broken/placeholder UI.
  */
-export default function SetDestinationPill() {
+// Shared map-pin icon (Feather-style) used for both the collapsed and
+// expanded destination pill states — replaces the raw 📍 emoji, which
+// tofu-boxes without an emoji font and clashes with the app's SVG iconography.
+function MapPinIcon({ size = 12 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+export default function SetDestinationPill({ variant = 'icon' }: { variant?: 'icon' | 'labeled' }) {
   const { destinations, setDestinations, clearDestination } = useSavedDestination();
   const [open, setOpen] = useState(false);
   // Tracks whether the next/current modal-open should pre-append an empty
@@ -126,8 +154,8 @@ export default function SetDestinationPill() {
             color: '#7ee787',
           }}
         >
-          <span aria-hidden style={{ fontSize: 11, lineHeight: 1 }}>📍</span>
-          <span>{firstName}</span>
+          <MapPinIcon size={12} />
+          <span className="max-w-[110px] truncate">{firstName}</span>
           {extraCount > 0 && (
             <span
               aria-hidden
@@ -177,22 +205,39 @@ export default function SetDestinationPill() {
           </ButtonBase>
         )}
         </span>
+      ) : variant === 'labeled' ? (
+        // Labeled mode — used in the mobile filter sheet's Destination
+        // section, where a bare icon square reads as broken/placeholder UI.
+        <ButtonBase
+          onClick={() => setOpen(true)}
+          aria-label="Set destination"
+          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium border h-7 whitespace-nowrap"
+          style={{
+            backgroundColor: 'rgba(88,166,255,0.06)',
+            borderColor: '#3a3f4a',
+            color: '#58a6ff',
+          }}
+        >
+          <MapPinIcon size={12} />
+          <span>Set destination</span>
+        </ButtonBase>
       ) : (
         // Collapsed icon-only mode — keeps the topbar narrow. Tapping opens
         // the full destination modal (which is the "expanded" state).
+        // rounded-full + solid border to match the neighboring "Saved" chip
+        // and Filters button rather than reading as a dashed placeholder.
         <ButtonBase
           onClick={() => setOpen(true)}
           aria-label="Set destination"
           title="Set destination"
-          className="inline-flex items-center justify-center rounded-lg border h-8 w-8 shrink-0"
+          className="inline-flex items-center justify-center rounded-full border h-7 w-7 shrink-0"
           style={{
-            backgroundColor: 'transparent',
+            backgroundColor: 'rgba(88,166,255,0.06)',
             borderColor: '#3a3f4a',
-            borderStyle: 'dashed',
             color: '#58a6ff',
           }}
         >
-          <span aria-hidden style={{ fontSize: 14, lineHeight: 1 }}>📍</span>
+          <MapPinIcon size={13} />
         </ButtonBase>
       )}
 

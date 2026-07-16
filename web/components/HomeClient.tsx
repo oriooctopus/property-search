@@ -2067,6 +2067,7 @@ function HomeInner() {
             listingCount={filteredListings.length}
             viewToggle={viewToggle}
             destinationSlot={<SetDestinationPill />}
+            destinationSlotSheet={<SetDestinationPill variant="labeled" />}
             userId={userId}
             savedSearches={savedSearches}
             activeSearchId={activeSavedSearchId}
