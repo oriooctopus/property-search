@@ -31,31 +31,31 @@ const MAX_WAIT_MS = 3_600_000; // 60 min max (detail scrape for ~1000 URLs needs
 // SEARCH_ONLY_PAGE_FUNCTION — only scrapes search result pages, extracts URLs
 // ---------------------------------------------------------------------------
 
-const SEARCH_ONLY_PAGE_FUNCTION = `
-// Markers that distinguish a Craigslist bot-block/CAPTCHA interstitial from a
-// normal (possibly zero-result) search page. "automatically blocked" is CL's
-// documented rate-limit message, reported verbatim by multiple scraping
-// guides (e.g. https://marsproxies.com/blog/craigslist-ip-block-guide/ and
-// https://proxywing.com/blog/craigslist-ip-blocked-causes-fixes-and-ban-prevention-guide).
-// "captcha"/"recaptcha" cover CL's documented reCAPTCHA challenge
-// (https://www.craigslist.org/about/help/captcha). "robot"/"denied" cover the
-// generic anti-bot interstitial copy scrapers commonly report. Kept as one
-// const so both the detection check and any future log/debug code share the
-// same list.
-const CL_BLOCK_MARKERS = [
-  'automatically blocked',
-  'access denied',
-  'blocked',
-  'denied',
-  'are you a robot',
-  'verify you are human',
-  'captcha',
-  'recaptcha',
-];
-
+export const SEARCH_ONLY_PAGE_FUNCTION = `
 async function pageFunction(context) {
   const { page, request, log } = context;
   const url = request.url;
+
+  // Markers that distinguish a Craigslist bot-block/CAPTCHA interstitial from a
+  // normal (possibly zero-result) search page. "automatically blocked" is CL's
+  // documented rate-limit message, reported verbatim by multiple scraping
+  // guides (e.g. https://marsproxies.com/blog/craigslist-ip-block-guide/ and
+  // https://proxywing.com/blog/craigslist-ip-blocked-causes-fixes-and-ban-prevention-guide).
+  // "captcha"/"recaptcha" cover CL's documented reCAPTCHA challenge
+  // (https://www.craigslist.org/about/help/captcha). "robot"/"denied" cover the
+  // generic anti-bot interstitial copy scrapers commonly report. Kept as one
+  // const so both the detection check and any future log/debug code share the
+  // same list.
+  const CL_BLOCK_MARKERS = [
+    'automatically blocked',
+    'access denied',
+    'blocked',
+    'denied',
+    'are you a robot',
+    'verify you are human',
+    'captcha',
+    'recaptcha',
+  ];
 
   // Only handle search result pages
   if (!url.includes('/search/') && !url.includes('search=')) {
@@ -149,7 +149,7 @@ async function pageFunction(context) {
 // DETAIL_PAGE_FUNCTION — only handles individual listing pages
 // ---------------------------------------------------------------------------
 
-const DETAIL_PAGE_FUNCTION = `
+export const DETAIL_PAGE_FUNCTION = `
 async function pageFunction(context) {
   const { page, request, log } = context;
   const url = request.url;
