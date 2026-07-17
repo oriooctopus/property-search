@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { useSwipeable, type SwipeEventData } from 'react-swipeable';
 import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
+import { getClosestDistinctLines } from '@/lib/isochrone/nearest-lines';
 import { CompactStats } from '@/components/ui';
 import { formatAvailabilityDate, formatAvailabilityCompact } from '@/lib/format-date';
 import DestinationChip from '@/components/DestinationChip';
@@ -451,6 +452,14 @@ export default function SwipeCard({
     return getClosestStations(listing.lat as number, listing.lon as number, 2);
   }, [listing.lat, listing.lon]);
 
+  // Distinct closest LINES (not stations) — used by the compact mobile
+  // indicator so the same line doesn't appear twice when two nearby
+  // stations happen to serve it.
+  const nearbyLines = useMemo(() => {
+    if (listing.lat == null || listing.lon == null) return [];
+    return getClosestDistinctLines(listing.lat as number, listing.lon as number, 2);
+  }, [listing.lat, listing.lon]);
+
   const listDateFormatted = listing.list_date
     ? new Date(listing.list_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : null;
@@ -563,18 +572,17 @@ export default function SwipeCard({
             );
           })()}
           {compactMobile && listing.lat != null && listing.lon != null && (() => {
-            const stations = getClosestStations(listing.lat as number, listing.lon as number, 2)
-              .filter(({ station }) => Array.isArray(station.lines) && station.lines.length > 0);
-            if (stations.length === 0) return null;
+            const lines = getClosestDistinctLines(listing.lat as number, listing.lon as number, 2);
+            if (lines.length === 0) return null;
             return (
               <div
                 className="min-[600px]:hidden flex items-center gap-3 text-[12px]"
                 style={{ color: '#c9d1d9' }}
                 data-testid="compact-subway-row"
               >
-                {stations.map(({ station, distMi }) => (
-                  <div key={station.stopId} className="flex items-center gap-1">
-                    <LineBadge line={station.lines[0]} />
+                {lines.map(({ line, distMi, station }) => (
+                  <div key={`${station.stopId}-${line}`} className="flex items-center gap-1">
+                    <LineBadge line={line} />
                     <span style={{ color: '#8b949e' }}>{walkMinFromMiles(distMi)} min</span>
                   </div>
                 ))}
@@ -1106,24 +1114,20 @@ export default function SwipeCard({
                 Shows the two closest lines + walking time inline so the
                 information is visible on the mobile swipe card where the
                 full "Nearest Subway" section is hidden. */}
-            {compactMobile && nearbyStations.length > 0 && (() => {
-              const rows = nearbyStations.filter(({ station }) => Array.isArray(station.lines) && station.lines.length > 0);
-              if (rows.length === 0) return null;
-              return (
-                <div
-                  className="min-[600px]:hidden flex items-center gap-3 text-[12px]"
-                  style={{ color: '#c9d1d9' }}
-                  data-testid="compact-subway-row"
-                >
-                  {rows.map(({ station, distMi }) => (
-                    <div key={station.stopId} className="flex items-center gap-1" title={`${station.name} — ${walkMinFromMiles(distMi)} min walk`}>
-                      <LineBadge line={station.lines[0]} />
-                      <span style={{ color: '#8b949e' }}>{walkMinFromMiles(distMi)} min</span>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
+            {compactMobile && nearbyLines.length > 0 && (
+              <div
+                className="min-[600px]:hidden flex items-center gap-3 text-[12px]"
+                style={{ color: '#c9d1d9' }}
+                data-testid="compact-subway-row"
+              >
+                {nearbyLines.map(({ line, distMi, station }) => (
+                  <div key={`${station.stopId}-${line}`} className="flex items-center gap-1" title={`${station.name} — ${walkMinFromMiles(distMi)} min walk`}>
+                    <LineBadge line={line} />
+                    <span style={{ color: '#8b949e' }}>{walkMinFromMiles(distMi)} min</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* External link + optional leading slot (e.g. mobile "Save to" control) */}
             <div
