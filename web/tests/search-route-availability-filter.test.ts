@@ -91,3 +91,80 @@ describe("applyBoundsAndFilters — availability-date carve-out", () => {
     expect(availabilityCalls).toHaveLength(0);
   });
 });
+
+describe("applyBoundsAndFilters — craigslist 7-day staleness rule", () => {
+  // Product rule: CL posts go stale fast (56-day median active lifetime vs
+  // 19 for StreetEasy) — hide craigslist listings older than 7 days.
+  // Always-on (not a user toggle), same treatment as the facebook-marketplace
+  // exclusion. Verified live 2026-07-17: list_date is 100% populated for
+  // craigslist rows (0 nulls / 5,150 rows), so created_at is a fallback for
+  // a theoretical future gap, not something exercised by current data.
+
+  function findClStaleOrClause(calls: Array<{ method: string; args: unknown[] }>): string {
+    const call = calls.find(
+      (c) => c.method === "or" && String(c.args[0]).includes("source.neq.craigslist"),
+    );
+    expect(call).toBeDefined();
+    return String(call!.args[0]);
+  }
+
+  it("is applied unconditionally, even with no filters set at all", () => {
+    const { stub, calls } = makeStubQuery();
+    applyBoundsAndFilters(stub, null, baseFilters());
+
+    const clause = findClStaleOrClause(calls);
+    expect(clause).toContain("source.neq.craigslist");
+    expect(clause).toMatch(/list_date\.gte\.\d{4}-\d{2}-\d{2}T/);
+    expect(clause).toContain("and(list_date.is.null,created_at.gte.");
+  });
+
+  it("non-craigslist rows pass via the source.neq.craigslist branch regardless of list_date", () => {
+    const { stub, calls } = makeStubQuery();
+    applyBoundsAndFilters(stub, null, baseFilters());
+
+    // The clause's first branch is exactly "source.neq.craigslist" — any
+    // non-craigslist row satisfies the OR without touching list_date at all.
+    const clause = findClStaleOrClause(calls);
+    expect(clause.startsWith("source.neq.craigslist,")).toBe(true);
+  });
+
+  it("the cutoff is ~7 days (CL_MAX_AGE_DAYS) before now, not some other window", () => {
+    const { stub, calls } = makeStubQuery();
+    const before = Date.now();
+    applyBoundsAndFilters(stub, null, baseFilters());
+    const after = Date.now();
+
+    const clause = findClStaleOrClause(calls);
+    const match = clause.match(/list_date\.gte\.([^,]+)/);
+    expect(match).toBeTruthy();
+    const cutoffMs = new Date(match![1]).getTime();
+
+    const expectedMin = before - 7 * 86_400_000;
+    const expectedMax = after - 7 * 86_400_000;
+    expect(cutoffMs).toBeGreaterThanOrEqual(expectedMin - 1000);
+    expect(cutoffMs).toBeLessThanOrEqual(expectedMax + 1000);
+  });
+
+  it("composes as an independent top-level filter alongside other active filters (e.g. an availability window)", () => {
+    const { stub, calls } = makeStubQuery();
+    applyBoundsAndFilters(stub, null, baseFilters({ minAvailableDate: "2026-08-01" }));
+
+    // Both .or() clauses must be present as SEPARATE top-level calls (which
+    // Supabase/PostgREST ANDs together) — the CL-staleness rule must not be
+    // folded into, or replaced by, the availability-date clause.
+    const orClauses = calls.filter((c) => c.method === "or").map((c) => String(c.args[0]));
+    expect(orClauses.some((c) => c.includes("source.neq.craigslist"))).toBe(true);
+    expect(orClauses.some((c) => c.includes("availability_date"))).toBe(true);
+    expect(orClauses.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("is applied even when selectedSources explicitly includes craigslist", () => {
+    const { stub, calls } = makeStubQuery();
+    applyBoundsAndFilters(stub, null, baseFilters({ selectedSources: ["craigslist", "streeteasy"] }));
+
+    // Not a user-facing toggle — selecting craigslist as a source doesn't
+    // exempt it from the staleness rule.
+    const clause = findClStaleOrClause(calls);
+    expect(clause).toContain("source.neq.craigslist");
+  });
+});
