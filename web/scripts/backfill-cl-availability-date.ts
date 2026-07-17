@@ -2,7 +2,7 @@
  * One-off, idempotent backfill of `availability_date` for source='craigslist'
  * listings.
  *
- * Fixes two separate bugs:
+ * Fixes three separate bugs:
  *   1. Newly-scraped rows (post-redesign) land with availability_date = ''
  *      or null because the pageFunction's selector went stale and — before
  *      the fix — the raw value was written straight through unparsed.
@@ -12,6 +12,15 @@
  *      availability-date range filter (route.ts drops anything that isn't a
  *      comparable ISO date, same as it drops '' / null when
  *      includeNaAvailableDate is false).
+ *   3. Many CL posts only state availability in the free-form description,
+ *      not the structured field at all (e.g. "*Available 8/1", "August 1st
+ *      MOVE-IN") — for rows still null after (1)/(2), this also mines
+ *      `description` as a fallback via extractAvailabilityFromDescription.
+ *      NOTE: description was ALSO never persisted to the DB until the same
+ *      fix that added this backfill step (see the comment on `description:`
+ *      in lib/sources/craigslist.ts) — so this step is a no-op for rows
+ *      scraped before that fix landed (description is null for them too);
+ *      it only helps rows scraped after, and future re-scrapes.
  *
  * Uses the SAME normalizer as the live adapter (lib/sources/availability.ts)
  * — one implementation, not a re-derived copy — so the backfilled values and
@@ -22,6 +31,8 @@
  *                                          counted as a distinct category so
  *                                          the report shows real work done)
  *   - raw text ("available now", etc.)  → parseAvailabilityDate(raw, list_date)
+ *   - still null after the above, but
+ *     description has a date-like phrase → extractAvailabilityFromDescription(...)
  *   - already valid ISO                 → left untouched (no-op, not counted
  *                                          as a write) — this is what makes
  *                                          the script safe to re-run
@@ -39,7 +50,7 @@ import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { createClient } from "@supabase/supabase-js";
-import { parseAvailabilityDate } from "../lib/sources/availability";
+import { parseAvailabilityDate, extractAvailabilityFromDescription } from "../lib/sources/availability";
 
 // ── env ────────────────────────────────────────────────────────────────────
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -67,6 +78,7 @@ interface Row {
   url: string;
   availability_date: string | null;
   list_date: string | null;
+  description: string | null;
 }
 
 async function fetchCraigslistRows(): Promise<Row[]> {
@@ -75,7 +87,7 @@ async function fetchCraigslistRows(): Promise<Row[]> {
   for (let offset = 0; ; offset += PAGE) {
     const { data, error } = await sb
       .from("listings")
-      .select("id, url, availability_date, list_date")
+      .select("id, url, availability_date, list_date, description")
       .eq("source", "craigslist")
       .range(offset, offset + PAGE - 1);
     if (error) throw new Error(`fetch failed: ${error.message}`);
@@ -97,11 +109,17 @@ async function main() {
   let rawTextParsedToDate = 0;
   let rawTextParsedToNull = 0;
   let unchangedNull = 0;
+  let filledFromDescription = 0;
+  let descriptionCheckedNoMatch = 0;
 
   const updates: Array<{ id: number; from: string | null; to: string | null }> = [];
 
   for (const row of rows) {
     const before = row.availability_date;
+    // Tracks the post-structured-pass value so the description fallback
+    // below can run uniformly regardless of which branch produced null.
+    let structuredResult: string | null = null;
+    let wroteFromStructuredPass = false;
 
     if (before != null && ISO_RE.test(before)) {
       // Already a well-formed ISO string. Still run it through the
@@ -112,33 +130,58 @@ async function main() {
         alreadyValidIso++;
         continue;
       }
-      // Fall through — validated is null (garbage ISO), handled below.
-      updates.push({ id: row.id, from: before, to: validated });
+      // Fall through — validated is null (garbage ISO).
+      structuredResult = validated;
       if (validated == null) rawTextParsedToNull++;
       else rawTextParsedToDate++;
-      continue;
-    }
-
-    if (before === "" || before == null) {
+      if (validated != null) {
+        updates.push({ id: row.id, from: before, to: validated });
+        wroteFromStructuredPass = true;
+      }
+    } else if (before === "" || before == null) {
       if (before === null) {
         unchangedNull++;
-        continue;
+      } else {
+        // '' → null. Distinct category from raw-text parsing since there's
+        // nothing to parse — this is purely the type fix.
+        emptyOrNullToNull++;
       }
-      // '' → null. Distinct category from raw-text parsing since there's
-      // nothing to parse — this is purely the type fix.
-      emptyOrNullToNull++;
-      updates.push({ id: row.id, from: before, to: null });
-      continue;
+      structuredResult = null;
+    } else {
+      // Raw scraped text (e.g. "available now", "available may 1").
+      const parsed = parseAvailabilityDate(before, row.list_date);
+      structuredResult = parsed;
+      if (parsed == null) {
+        rawTextParsedToNull++;
+      } else {
+        rawTextParsedToDate++;
+        updates.push({ id: row.id, from: before, to: parsed });
+        wroteFromStructuredPass = true;
+      }
     }
 
-    // Raw scraped text (e.g. "available now", "available may 1").
-    const parsed = parseAvailabilityDate(before, row.list_date);
-    if (parsed == null) {
-      rawTextParsedToNull++;
-    } else {
-      rawTextParsedToDate++;
+    if (wroteFromStructuredPass) continue;
+
+    // Fallback: still null after the structured pass — try mining the
+    // free-form description. (See file header: description is currently
+    // null for most existing rows too, since it was never persisted before
+    // the same fix — this only helps rows that have it.)
+    if (structuredResult == null && row.description) {
+      const fromDesc = extractAvailabilityFromDescription(row.description, row.list_date);
+      if (fromDesc != null) {
+        filledFromDescription++;
+        updates.push({ id: row.id, from: before, to: fromDesc });
+        continue;
+      }
+      descriptionCheckedNoMatch++;
     }
-    updates.push({ id: row.id, from: before, to: parsed });
+
+    // structuredResult is null and no description fallback fired — only
+    // queue a write if the DB value isn't already null (avoid a no-op write
+    // on every re-run for rows with no signal anywhere).
+    if (structuredResult == null && before !== null) {
+      updates.push({ id: row.id, from: before, to: null });
+    }
   }
 
   console.log("── Before/after breakdown ──────────────────────────────────");
@@ -147,6 +190,8 @@ async function main() {
   console.log(`'' → null:                            ${emptyOrNullToNull}`);
   console.log(`raw text → parsed ISO date:            ${rawTextParsedToDate}`);
   console.log(`raw text/garbage → null:               ${rawTextParsedToNull}`);
+  console.log(`filled from description mining:        ${filledFromDescription}`);
+  console.log(`description present but no date found: ${descriptionCheckedNoMatch}`);
   console.log(`Total rows needing a write:            ${updates.length}`);
   console.log("");
 

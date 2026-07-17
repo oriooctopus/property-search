@@ -2,6 +2,13 @@
  * Parses Craigslist's raw availability text into an ISO YYYY-MM-DD date, or
  * null when genuinely unparseable/absent.
  *
+ * Two entry points:
+ *   - parseAvailabilityDate: the structured `.attrgroup` field's text
+ *     ("available now", "available aug 1").
+ *   - extractAvailabilityFromDescription: a fallback that mines the same
+ *     signal out of free-form listing prose, for posts where the structured
+ *     field is absent but the date is stated in the description.
+ *
  * Shared by the craigslist adapter (lib/sources/craigslist.ts) and the
  * one-off backfill script (scripts/backfill-cl-availability-date.ts) so
  * there is exactly one implementation of this parsing logic.
@@ -83,6 +90,37 @@ function parseReferenceDateString(s: string): Date {
   return new Date(s);
 }
 
+/** Resolves a caller-supplied reference date (or today) to a date-only Date. */
+function resolveRefDay(referenceDate?: string | Date | null): Date {
+  const refCandidate = referenceDate
+    ? referenceDate instanceof Date
+      ? referenceDate
+      : parseReferenceDateString(referenceDate)
+    : null;
+  const ref = refCandidate && !isNaN(refCandidate.getTime()) ? refCandidate : new Date();
+  return dateOnly(ref);
+}
+
+/**
+ * Resolves a (monthIdx, day) pair to the "next occurrence" ISO date at or
+ * after refDay — the shared year-inference rule used by both
+ * parseAvailabilityDate and extractAvailabilityFromDescription. Returns null
+ * for a non-real calendar day (e.g. Feb 30).
+ */
+function resolveMonthDayToIso(monthIdx: number, day: number, refDay: Date): string | null {
+  if (day < 1 || day > 31) return null;
+  let year = refDay.getFullYear();
+  let candidate = new Date(year, monthIdx, day);
+  if (candidate.getMonth() !== monthIdx || candidate.getDate() !== day) {
+    return null; // not a real calendar day
+  }
+  if (candidate < refDay) {
+    year += 1;
+    candidate = new Date(year, monthIdx, day);
+  }
+  return toIsoDate(candidate);
+}
+
 /**
  * @param raw Raw availability text scraped from CL (e.g. "available now",
  *   "available aug 1"), an already-ISO string, or null/undefined/empty.
@@ -111,14 +149,7 @@ export function parseAvailabilityDate(
     return isReal ? trimmed : null;
   }
 
-  const refCandidate = referenceDate
-    ? referenceDate instanceof Date
-      ? referenceDate
-      : parseReferenceDateString(referenceDate)
-    : null;
-  const ref = refCandidate && !isNaN(refCandidate.getTime()) ? refCandidate : new Date();
-  const refDay = dateOnly(ref);
-
+  const refDay = resolveRefDay(referenceDate);
   const lower = trimmed.toLowerCase();
 
   // "available now" / "available immediately" / "available today" /
@@ -137,23 +168,100 @@ export function parseAvailabilityDate(
     const monthKey = monthDayMatch[1].replace(/\.$/, "");
     const day = Number(monthDayMatch[2]);
     const monthIdx = MONTHS[monthKey];
-    if (monthIdx != null && day >= 1 && day <= 31) {
-      let year = refDay.getFullYear();
-      let candidate = new Date(year, monthIdx, day);
-      // Reject non-real calendar days (e.g. "feb 30").
-      if (candidate.getMonth() !== monthIdx || candidate.getDate() !== day) {
-        return null;
-      }
-      // "Next occurrence" relative to the reference date: if this year's
-      // month/day already passed relative to refDay, it means next year.
-      if (candidate < refDay) {
-        year += 1;
-        candidate = new Date(year, monthIdx, day);
-      }
-      return toIsoDate(candidate);
+    if (monthIdx != null) {
+      const iso = resolveMonthDayToIso(monthIdx, day, refDay);
+      if (iso) return iso;
     }
   }
 
   // Anything else (garbage, unrecognized phrasing) — genuinely unparseable.
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// extractAvailabilityFromDescription — mines free-form listing prose
+// ---------------------------------------------------------------------------
+//
+// Many CL posts state availability ONLY in the prose, not the structured
+// .attrgroup field (confirmed via a live diagnostic dump of 10 real
+// /view/d/ listing descriptions with null availability_date: e.g.
+// "*Available 8/1", "August 1st MOVE-IN" — patterns parseAvailabilityDate
+// alone never sees, because it's only fed the structured field's text).
+//
+// Used as a FALLBACK when the structured field is absent — never as a
+// replacement, since the structured field (when present) is unambiguous and
+// this is regex-over-prose, inherently riskier.
+
+const AVAIL_CONTEXT_RE = /avail(?:able)?|move[- ]?in|moving/gi;
+// A window (chars) searched around each context anchor for a date pattern —
+// wide enough to catch "*Available 8/1" and "August 1st MOVE-IN" (date
+// before OR after the anchor word), narrow enough to avoid picking up an
+// unrelated date elsewhere in a long description (lease terms, building age,
+// a phone number, etc).
+const AVAIL_WINDOW = 40;
+const NUMERIC_MD_RE = /\b(\d{1,2})\/(\d{1,2})\b/;
+// Day is OPTIONAL here (unlike MONTH_DAY_RE above) — "available in
+// September" with no day is a deliberately supported case, see below.
+const MONTH_OPTIONAL_DAY_RE = new RegExp(
+  `\\b(${MONTH_NAME_PATTERN})\\.?\\s*(?:(\\d{1,2})(?:st|nd|rd|th)?)?\\b`,
+  "i",
+);
+
+/**
+ * @param text Free-form listing description/post body.
+ * @param referenceDate The listing's posted date, same role as in
+ *   parseAvailabilityDate.
+ */
+export function extractAvailabilityFromDescription(
+  text: string | null | undefined,
+  referenceDate?: string | Date | null,
+): string | null {
+  if (!text) return null;
+  const lower = text.toLowerCase();
+  const refDay = resolveRefDay(referenceDate);
+
+  AVAIL_CONTEXT_RE.lastIndex = 0;
+  let anchor: RegExpExecArray | null;
+  while ((anchor = AVAIL_CONTEXT_RE.exec(lower)) !== null) {
+    const start = Math.max(0, anchor.index - AVAIL_WINDOW);
+    const end = Math.min(lower.length, anchor.index + anchor[0].length + AVAIL_WINDOW);
+    const windowText = lower.slice(start, end);
+
+    // Check the SPECIFIC date patterns before the vague "now" family — a
+    // wide-ish window can accidentally straddle an unrelated "ASAP"/"today"
+    // from a different sentence (e.g. "Inquire for video ASAP\n*Available
+    // 8/1"), which would otherwise win over the actual, more informative
+    // "8/1" sitting right next to the anchor.
+    const numMatch = windowText.match(NUMERIC_MD_RE);
+    if (numMatch) {
+      const month = Number(numMatch[1]);
+      const day = Number(numMatch[2]);
+      if (month >= 1 && month <= 12) {
+        const iso = resolveMonthDayToIso(month - 1, day, refDay);
+        if (iso) return iso;
+      }
+    }
+
+    const monthMatch = windowText.match(MONTH_OPTIONAL_DAY_RE);
+    if (monthMatch) {
+      const monthKey = monthMatch[1].replace(/\.$/, "");
+      const monthIdx = MONTHS[monthKey];
+      // No day captured ("available in September") → deliberately default
+      // to the 1st, rather than returning null on an otherwise-clear month
+      // signal.
+      const day = monthMatch[2] ? Number(monthMatch[2]) : 1;
+      if (monthIdx != null) {
+        const iso = resolveMonthDayToIso(monthIdx, day, refDay);
+        if (iso) return iso;
+      }
+    }
+
+    if (NOW_RE.test(windowText)) {
+      return toIsoDate(refDay);
+    }
+  }
+
+  // No date-like pattern found near any availability-context anchor (or no
+  // anchor at all) — genuinely absent, not a guess.
   return null;
 }
