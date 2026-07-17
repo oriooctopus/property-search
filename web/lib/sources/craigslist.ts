@@ -134,6 +134,96 @@ async function pageFunction(context) {
   //     per request and logs its true size; lib/ingest/strategies.ts's
   //     CL_DISCOVERY_FLOOR alert will correctly flag under-discovery for
   //     follow-up investigation instead of us papering over the gap here.
+  // CL's internal search API (sapi.craigslist.org) returns the ENTIRE result
+  // set for a query in one response — confirmed live: 2,748 items for a
+  // 2-4BR Brooklyn search, items.length === totalResultCount, no pagination
+  // needed at all. It 403s when called directly (no browser context), so it
+  // must be fetch()ed from inside the page via page.evaluate — which is safe
+  // to do here since we're already on a craigslist.org origin.
+  //
+  // Item tuple shape: [postingId, secondaryId, hasPic, price,
+  // "beds:baths~lat~lng", token, [featureIds]]. The 6-char sapi token does
+  // NOT match the 22-char /view/d/ URL token — there is no shared key between
+  // an sapi item and a scraped static-page URL. A live Apify test (2 real
+  // postingIds x 3 URL-pattern candidates: /brk/apa/d/x/<id>.html,
+  // /apa/<id>.html, /brk/apa/<id>.html) confirmed ALL 404 — postingId does
+  // NOT resolve to a working detail URL post-redesign. So sapi CANNOT replace
+  // the static-page scrape as the URL/detail-fetch source; it is used here
+  // purely as a completeness signal: totalResultCount for discovery-floor
+  // alerting (lib/ingest/strategies.ts), and an in-region count (bbox mirrors
+  // lib/sources/pipeline.ts's REGION_LAT_MIN/MAX/LON_MIN/MAX) logged as a
+  // diagnostic gap indicator. It does NOT reduce Phase 2 detail-fetch volume
+  // (no key to join sapi items to scraped URLs) — the precise in-region gate
+  // still runs in normalize, unchanged.
+  function buildSapiUrl(searchUrl) {
+    const u = new URL(searchUrl);
+    const boroughMatch = u.pathname.match(/\\/search\\/subarea\\/([a-z]+)/);
+    const borough = boroughMatch ? boroughMatch[1] : 'brk';
+    const params = new URLSearchParams();
+    params.set('cat', 'apa');
+    params.set('searchPath', 'subarea/' + borough);
+    params.set('lang', 'en');
+    params.set('cc', 'us');
+    ['min_price', 'max_price', 'min_bedrooms', 'max_bedrooms'].forEach(k => {
+      const v = u.searchParams.get(k);
+      if (v != null) params.set(k, v);
+    });
+    params.set('batch', '0-' + Date.now() + '-0-1-0');
+    return 'https://sapi.craigslist.org/web/v8/postings/search/full?' + params.toString();
+  }
+
+  const sapiUrl = buildSapiUrl(url);
+  const sapiRaw = await page.evaluate(async (u) => {
+    try {
+      const res = await fetch(u, { headers: { Accept: 'application/json' } });
+      const text = await res.text();
+      let json = null;
+      try { json = JSON.parse(text); } catch (e) { /* not json */ }
+      return { status: res.status, json, textSnippet: text.slice(0, 300) };
+    } catch (e) {
+      return { error: e.message };
+    }
+  }, sapiUrl);
+
+  let sapiTotalResultCount = null;
+  let sapiInRegionCount = null;
+  let sapiBlocked = false;
+
+  if (sapiRaw.error || sapiRaw.status !== 200 || !sapiRaw.json) {
+    sapiBlocked = true;
+    log.error('SAPI call failed/blocked: status=' + sapiRaw.status + ' error=' + sapiRaw.error + ' snippet=' + (sapiRaw.textSnippet || '') + ' url=' + sapiUrl);
+  } else {
+    const sapiItems = (sapiRaw.json.data && sapiRaw.json.data.items) || [];
+    const total = (sapiRaw.json.data && sapiRaw.json.data.totalResultCount != null) ? sapiRaw.json.data.totalResultCount : null;
+    sapiTotalResultCount = total;
+    if (total != null && total > 0 && sapiItems.length === 0) {
+      sapiBlocked = true;
+      log.error('SAPI returned totalResultCount=' + total + ' but 0 items — treating as blocked: ' + sapiUrl);
+    } else {
+      // In-region diagnostic count. Bbox mirrors lib/sources/pipeline.ts
+      // REGION_LAT_MIN/MAX/LON_MIN/MAX — kept as literals here since this
+      // pageFunction string can't import from the app's TS modules.
+      const REGION_LAT_MIN = 40.655;
+      const REGION_LAT_MAX = 40.74;
+      const REGION_LON_MIN = -74.02;
+      const REGION_LON_MAX = -73.895;
+      let inRegion = 0;
+      sapiItems.forEach(item => {
+        const geoStr = item[4];
+        if (typeof geoStr === 'string') {
+          const parts = geoStr.split('~');
+          const lat = parseFloat(parts[1]);
+          const lng = parseFloat(parts[2]);
+          if (!isNaN(lat) && !isNaN(lng) && lat >= REGION_LAT_MIN && lat <= REGION_LAT_MAX && lng >= REGION_LON_MIN && lng <= REGION_LON_MAX) {
+            inRegion++;
+          }
+        }
+      });
+      sapiInRegionCount = inRegion;
+      log.info('SAPI: totalResultCount=' + total + ' items=' + sapiItems.length + ' inRegion(bbox)=' + inRegion);
+    }
+  }
+
   const MAX_VARIANT_RETRIES = 3;
 
   // NOTE: page.evaluate can only return JSON-serializable values across the
@@ -172,7 +262,16 @@ async function pageFunction(context) {
 
   if (cardCount === 0) {
     log.error('Static results missing after ' + MAX_VARIANT_RETRIES + ' attempts — DOM variant changed and the gallery fallback is unverified. Reporting zero results rather than guessing at stale selectors: ' + url);
-    return { zeroResults: true, hasSearchShell: true, staticVariantMissing: true, url, title: await page.title().catch(() => '') };
+    return {
+      zeroResults: true,
+      hasSearchShell: true,
+      staticVariantMissing: true,
+      url,
+      title: await page.title().catch(() => ''),
+      sapiTotalResultCount,
+      sapiInRegionCount,
+      sapiBlocked,
+    };
   }
 
   // Match both the new opaque /view/d/<slug>/<token> scheme and the legacy
@@ -189,7 +288,21 @@ async function pageFunction(context) {
     await context.pushData({ url: link });
   }
 
-  log.info('Done: ' + links.length + ' total URLs found (single-page scrape — no working pagination mechanism found, see comment above).');
+  log.info('Done: ' + links.length + ' total URLs found (single-page scrape — no working pagination mechanism found, see comment above). SAPI total=' + sapiTotalResultCount + ' inRegion=' + sapiInRegionCount);
+
+  // This summary row is the function's return value, auto-pushed by the
+  // actor as ONE additional dataset record alongside the per-link pushData
+  // rows above (see the DETAIL_PAGE_FUNCTION comment on this actor behavior).
+  // It has no \`url\` field so it's naturally excluded when
+  // fetchCraigslistListings collects discovered URLs, and is instead read
+  // separately for the sapi completeness/discovery-floor signal.
+  return {
+    sapiSummary: true,
+    linksCount: links.length,
+    sapiTotalResultCount,
+    sapiInRegionCount,
+    sapiBlocked,
+  };
 }
 `;
 
@@ -419,6 +532,21 @@ interface ApifySearchItem {
   /** Set when the page loaded normally but showed a genuine zero-results state. */
   zeroResults?: boolean;
   hasSearchShell?: boolean;
+  /**
+   * The pageFunction's own return value — the actor auto-pushes it as one
+   * extra dataset record per invocation (see the DETAIL_PAGE_FUNCTION
+   * comment on this actor behavior). It carries the sapi.craigslist.org
+   * completeness signal (see SEARCH_ONLY_PAGE_FUNCTION): sapi returns the
+   * FULL result set in one call, so totalResultCount is ground truth for
+   * discovery-floor alerting, independent of what the static-page scrape
+   * above managed to extract. Has no `url`, so it's naturally excluded when
+   * collecting discovered URLs.
+   */
+  sapiSummary?: boolean;
+  linksCount?: number;
+  sapiTotalResultCount?: number | null;
+  sapiInRegionCount?: number | null;
+  sapiBlocked?: boolean;
   [key: string]: unknown;
 }
 
@@ -541,6 +669,13 @@ export async function fetchCraigslistListings(
   discovered: number;
   /** True if any borough's Phase 1 search page hit a bot-block/CAPTCHA interstitial. */
   blocked: boolean;
+  /**
+   * Sum across boroughs of sapi.craigslist.org's totalResultCount (the FULL
+   * live result count for the query, independent of what the static-page
+   * scrape managed to extract) — null if every borough's sapi call failed.
+   * Ground truth for discovery-floor alerting; see lib/ingest/strategies.ts.
+   */
+  sapiTotalResultCount: number | null;
 }> {
   const { bedsMin, bedsMax, priceMax, priceMin } = params;
 
@@ -620,6 +755,8 @@ export async function fetchCraigslistListings(
   // Collect all discovered URLs from search datasets
   const allDiscoveredUrls: string[] = [];
   const blockedBoroughs: string[] = [];
+  let sapiTotalResultCount: number | null = null;
+  let sapiSawAnyValue = false;
   await Promise.all(
     searchRunStatuses
       .filter((r) => r.status === "SUCCEEDED")
@@ -628,7 +765,7 @@ export async function fetchCraigslistListings(
           token,
           run.datasetId,
         );
-        const blockedItems = items.filter((item) => item.blocked);
+        const blockedItems = items.filter((item) => item.blocked || item.sapiBlocked);
         if (blockedItems.length > 0) {
           blockedBoroughs.push(run.borough);
           console.error(
@@ -644,10 +781,27 @@ export async function fetchCraigslistListings(
             (blockedItems.length > 0 ? " (BOT-BLOCKED run — treat as unreliable, not a genuine zero-result day)" : ""),
         );
         allDiscoveredUrls.push(...urls);
+
+        // sapiSummary is the pageFunction's own return value — see the field
+        // comment on ApifySearchItem. Sum it in (single borough today, but
+        // written to generalize if CL_BOROUGHS grows again).
+        const sapiItem = items.find((item) => item.sapiSummary);
+        if (sapiItem && sapiItem.sapiTotalResultCount != null) {
+          sapiTotalResultCount = (sapiTotalResultCount ?? 0) + sapiItem.sapiTotalResultCount;
+          sapiSawAnyValue = true;
+          console.log(
+            `[Craigslist] Phase 1 — borough ${run.borough}: sapi totalResultCount=${sapiItem.sapiTotalResultCount} inRegion(bbox)=${sapiItem.sapiInRegionCount ?? "?"} vs ${urls.length} scraped URLs`,
+          );
+        } else {
+          console.warn(
+            `[Craigslist] Phase 1 — borough ${run.borough}: sapi summary missing or failed — no completeness signal for this borough.`,
+          );
+        }
       }),
   );
 
   const blocked = blockedBoroughs.length > 0;
+  if (!sapiSawAnyValue) sapiTotalResultCount = null;
 
   // Deduplicate URLs across boroughs
   const uniqueUrls = [...new Set(allDiscoveredUrls)];
@@ -667,7 +821,7 @@ export async function fetchCraigslistListings(
 
   if (uniqueUrls.length === 0) {
     console.log("[Craigslist] No URLs discovered — nothing to do");
-    return { listings: [], total: 0, discovered: 0, blocked };
+    return { listings: [], total: 0, discovered: 0, blocked, sapiTotalResultCount };
   }
 
   // =========================================================================
@@ -748,7 +902,7 @@ export async function fetchCraigslistListings(
     console.log(
       "[Craigslist] Phase 2: no new listings to fetch — all existing listings had last_seen_at bumped",
     );
-    return { listings: [], total: 0, discovered: uniqueUrls.length, blocked };
+    return { listings: [], total: 0, discovered: uniqueUrls.length, blocked, sapiTotalResultCount };
   }
 
   console.log(
@@ -777,7 +931,7 @@ export async function fetchCraigslistListings(
     console.error(
       `[Craigslist] Phase 2: detail run ${detailStatus} — returning empty`,
     );
-    return { listings: [], total: 0, discovered: uniqueUrls.length, blocked };
+    return { listings: [], total: 0, discovered: uniqueUrls.length, blocked, sapiTotalResultCount };
   }
 
   const rawItems = await fetchDatasetItems<ApifyCLItem>(token, detailDatasetId);
@@ -863,5 +1017,5 @@ export async function fetchCraigslistListings(
     `[Craigslist] Done: ${listings.length} new listings ready for pipeline`,
   );
 
-  return { listings, total: listings.length, discovered: uniqueUrls.length, blocked };
+  return { listings, total: listings.length, discovered: uniqueUrls.length, blocked, sapiTotalResultCount };
 }
