@@ -49,6 +49,17 @@ export interface SearchFilters {
   includeNaAvailableDate?: boolean;
 }
 
+// Deliberate always-on product rule (not a user-facing toggle, same
+// treatment as the facebook-marketplace exclusion below): CL posts go stale
+// — DB data shows a 56-day median active lifetime vs 19 for StreetEasy — so
+// listings older than this are hidden outright. Verified live 2026-07-17:
+// list_date is 100% populated for craigslist rows (0 nulls across 5,150
+// rows), so the age anchor is list_date for every existing row; created_at
+// is kept as a fallback for the theoretical case where a future scrape
+// fails to populate it (matches the maxListingAge filter's existing
+// null-tolerant pattern below).
+const CL_MAX_AGE_DAYS = 7;
+
 const MAX_AGE_MS: Record<string, number> = {
   "1h": 3_600_000,
   "3h": 10_800_000,
@@ -77,6 +88,17 @@ export function applyBoundsAndFilters(
     q = q.is("delisted_at", null);
   }
   q = q.neq("source", "facebook-marketplace");
+
+  // CL staleness rule (see CL_MAX_AGE_DAYS comment above). Always-on, not a
+  // user toggle: non-craigslist rows pass through untouched
+  // (source.neq.craigslist), craigslist rows must have list_date within the
+  // window, falling back to created_at as a first-seen proxy on the rare
+  // row where list_date is somehow null. Composes as an independent ANDed
+  // top-level clause, same pattern as the maxListingAge .or() below.
+  const clStaleCutoffIso = new Date(Date.now() - CL_MAX_AGE_DAYS * 86_400_000).toISOString();
+  q = q.or(
+    `source.neq.craigslist,list_date.gte.${clStaleCutoffIso},and(list_date.is.null,created_at.gte.${clStaleCutoffIso})`,
+  );
 
   if (bounds) {
     q = q
