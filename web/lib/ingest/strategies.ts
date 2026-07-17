@@ -33,8 +33,18 @@ const NYC_PARAMS: SearchParams = { city: "New York", stateCode: "NY" };
 
 // Below this many unique URLs discovered in Craigslist Phase 1, something is
 // wrong (bot-block or a genuine anomaly) — alert rather than silently
-// upserting a trickle. Real runs typically discover 1,000+ URLs.
+// upserting a trickle. Used as a fallback floor when sapi.craigslist.org's
+// totalResultCount is unavailable (its own call failed) — real runs used to
+// discover 1,000+ URLs pre-redesign, but CL's redesign killed pagination
+// (see the comment in lib/sources/craigslist.ts's SEARCH_ONLY_PAGE_FUNCTION),
+// so the primary signal is now sapiTotalResultCount below.
 const CL_DISCOVERY_FLOOR = 300;
+
+// When sapi's totalResultCount IS available, it's ground truth (sapi returns
+// the FULL live result set in one call — no pagination, no DOM-variant
+// coin-flip). Alert if the static-page scrape discovered fewer than this
+// fraction of it — a real gap, not a rounding difference.
+const CL_DISCOVERY_SAPI_RATIO = 0.5;
 
 /** Runs a single adapter by name. Returns raw AdapterOutput[] with source tag. */
 async function runAdapter(source: ListingSource, supabase?: SupabaseClient): Promise<AdapterOutput[]> {
@@ -57,17 +67,31 @@ async function runAdapter(source: ListingSource, supabase?: SupabaseClient): Pro
         { ...NYC_PARAMS, priceMin: 1200, priceMax: 15000 },
         { supabase },
       );
-      if (res.discovered < CL_DISCOVERY_FLOOR || res.blocked) {
+      // Prefer sapi's live totalResultCount as the discovery floor — it's
+      // ground truth (the full result set in one call), unlike the fixed 300
+      // constant which predates CL's redesign. Fall back to the fixed floor
+      // only when sapi itself failed (sapiTotalResultCount === null), so
+      // there's still SOME signal.
+      const sapiFloor =
+        res.sapiTotalResultCount != null
+          ? Math.floor(res.sapiTotalResultCount * CL_DISCOVERY_SAPI_RATIO)
+          : null;
+      const effectiveFloor = sapiFloor ?? CL_DISCOVERY_FLOOR;
+      if (res.discovered < effectiveFloor || res.blocked) {
         const reason = res.blocked
-          ? "bot-block/CAPTCHA detected on the search page"
+          ? "bot-block/CAPTCHA detected on the search page (or sapi returned totalResultCount>0 with 0 items)"
           : "no block detected — appears to be a genuine low/zero-result day";
+        const floorDesc =
+          sapiFloor != null
+            ? `${effectiveFloor} (${Math.round(CL_DISCOVERY_SAPI_RATIO * 100)}% of sapi totalResultCount=${res.sapiTotalResultCount})`
+            : `${effectiveFloor} (fixed fallback — sapi call failed, no live total available)`;
         console.error(
-          `[Craigslist] ALERT: discovery ${res.discovered} URLs is below floor ${CL_DISCOVERY_FLOOR} (blocked=${res.blocked}). Reason: ${reason}. Continuing run — upserting whatever was found.`,
+          `[Craigslist] ALERT: discovery ${res.discovered} URLs is below floor ${floorDesc} (blocked=${res.blocked}). Reason: ${reason}. Continuing run — upserting whatever was found.`,
         );
         // Fire-and-forget: alert is informational, must never block the run.
         sendIngestAlert(
           "[Dwelligence] Craigslist discovery floor alert",
-          `Craigslist Phase 1 discovered ${res.discovered} unique URLs (floor: ${CL_DISCOVERY_FLOOR}).\n\n` +
+          `Craigslist Phase 1 discovered ${res.discovered} unique URLs (floor: ${floorDesc}).\n\n` +
             `Blocked: ${res.blocked ? "YES" : "no"} — ${reason}.\n\n` +
             `The ingest run is continuing and will upsert the ${res.listings.length} new listing(s) found.`,
         ).catch(() => {});
