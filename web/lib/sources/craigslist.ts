@@ -20,7 +20,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AdapterOutput, SearchParams } from "./types";
 import { extractBaths, extractBeds, parsePrice } from "./parse-utils";
-import { parseAvailabilityDate } from "./availability";
+import { parseAvailabilityDate, extractAvailabilityFromDescription } from "./availability";
 
 const APIFY_START_URL =
   "https://api.apify.com/v2/acts/apify~puppeteer-scraper/runs";
@@ -1000,6 +1000,25 @@ export async function fetchCraigslistListings(
     const lat = item.latitude ? parseFloat(item.latitude) : null;
     const lon = item.longitude ? parseFloat(item.longitude) : null;
 
+    // Normalize into ISO YYYY-MM-DD (or null) here, Node-side — the
+    // pageFunction only scrapes the raw text (see the comment on
+    // availableFrom in DETAIL_PAGE_FUNCTION). Never write '' — the
+    // saved-search availability-date range filter (route.ts) treats ''
+    // and null identically when dropping unknown-availability rows, but
+    // null is the honest "we don't know" signal; '' looked like a
+    // successful-but-empty parse.
+    //
+    // Fall back to mining the free-form description when the structured
+    // .attrgroup field didn't have it — many CL posts only state
+    // availability in the prose (e.g. "*Available 8/1", "August 1st
+    // MOVE-IN"), confirmed via a live diagnostic dump of 10 real listings
+    // with null availability_date. Structured field wins when present —
+    // it's unambiguous; description mining is regex-over-prose and used
+    // only as a fallback.
+    const availabilityDate =
+      parseAvailabilityDate(item.availableFrom, item.datetime ?? null) ??
+      extractAvailabilityFromDescription(item.post, item.datetime ?? null);
+
     listings.push({
       address: item.location || item.title,
       area: item.location || "New York, NY",
@@ -1021,16 +1040,19 @@ export async function fetchCraigslistListings(
         ),
       ].slice(0, 8),
       url: item.url,
+      // BUG FIX: item.post (the scraped post body) was extracted by
+      // DETAIL_PAGE_FUNCTION and used for beds/baths text extraction above,
+      // but was never actually written to the `description` field — the
+      // column and AdapterOutput field both exist (see row.ts / types.ts),
+      // it was just silently dropped here. Confirmed live: 100% of
+      // source='craigslist' rows had description = null in the DB, for
+      // every row ever scraped. This also means extractAvailabilityFromDescription
+      // above only mines a live scrape's in-memory item.post — going
+      // forward, description is finally persisted too.
+      description: item.post || null,
       list_date: item.datetime ?? null,
       last_update_date: null,
-      // Normalize into ISO YYYY-MM-DD (or null) here, Node-side — the
-      // pageFunction only scrapes the raw text (see the comment on
-      // availableFrom in DETAIL_PAGE_FUNCTION). Never write '' — the
-      // saved-search availability-date range filter (route.ts) treats ''
-      // and null identically when dropping unknown-availability rows, but
-      // null is the honest "we don't know" signal; '' looked like a
-      // successful-but-empty parse.
-      availability_date: parseAvailabilityDate(item.availableFrom, item.datetime ?? null),
+      availability_date: availabilityDate,
       source: "craigslist" as const,
       external_id: item.id ?? null,
     });
