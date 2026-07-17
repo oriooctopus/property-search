@@ -20,6 +20,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AdapterOutput, SearchParams } from "./types";
 import { extractBaths, extractBeds, parsePrice } from "./parse-utils";
+import { parseAvailabilityDate } from "./availability";
 
 const APIFY_START_URL =
   "https://api.apify.com/v2/acts/apify~puppeteer-scraper/runs";
@@ -444,11 +445,26 @@ async function pageFunction(context) {
     const timeEl = document.querySelector('time.date.timeago, time.posting-info-date');
     const datetime = timeEl ? (timeEl.getAttribute('datetime') || '') : '';
 
-    // Availability date
-    const availEl = document.querySelector('span.housing_movein_now, span.availabilitytext');
-    const availText = availEl ? availEl.textContent.trim() : '';
-    const availMatch = availText.match(/available\\s+(\\S+)/i);
-    const availableFrom = availMatch ? availMatch[1] : '';
+    // Availability date. CL's redesign moved this into .attrgroup — a set of
+    // <span class="attr important"> tags, one per attribute (beds/baths,
+    // availability, pets, laundry, etc). The "available now" case gets an
+    // EXTRA "available-now" class, but month-day text ("available aug 1")
+    // does NOT get any distinguishing class — so match by TEXT CONTENT
+    // ("avail"), not by class, to catch both. Confirmed via a diagnostic
+    // dump against 3 live /view/d/ URLs. Old selectors kept as a fallback
+    // for any classic-DOM stragglers.
+    //
+    // Pass the FULL raw text through unparsed — normalization into ISO
+    // happens Node-side (lib/sources/availability.ts), not here. The
+    // PREVIOUS code parsed with /available\s+(\S+)/, which truncated
+    // "available may 1" down to just "may" (dropping the day number) — the
+    // pageFunction has no business doing partial date parsing at all.
+    const attrSpans = Array.from(document.querySelectorAll('.attrgroup .attr'));
+    const availSpan = attrSpans.find(el => /avail/i.test(el.textContent || ''));
+    const legacyAvailEl = document.querySelector('span.housing_movein_now, span.availabilitytext');
+    const availableFrom = (availSpan ? availSpan.textContent.trim().replace(/\\s+/g, ' ') : '')
+      || (legacyAvailEl ? legacyAvailEl.textContent.trim() : '')
+      || '';
 
     // Housing info
     const housingEl = document.querySelector('span.shared-line-bubble, span.housing');
@@ -1007,7 +1023,14 @@ export async function fetchCraigslistListings(
       url: item.url,
       list_date: item.datetime ?? null,
       last_update_date: null,
-      availability_date: item.availableFrom ?? null,
+      // Normalize into ISO YYYY-MM-DD (or null) here, Node-side — the
+      // pageFunction only scrapes the raw text (see the comment on
+      // availableFrom in DETAIL_PAGE_FUNCTION). Never write '' — the
+      // saved-search availability-date range filter (route.ts) treats ''
+      // and null identically when dropping unknown-availability rows, but
+      // null is the honest "we don't know" signal; '' looked like a
+      // successful-but-empty parse.
+      availability_date: parseAvailabilityDate(item.availableFrom, item.datetime ?? null),
       source: "craigslist" as const,
       external_id: item.id ?? null,
     });
