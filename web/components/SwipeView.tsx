@@ -240,6 +240,16 @@ export default function SwipeView({
     setCurrentIndex(0);
   }, [passStorageKey]);
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
+  // Ids that were just undone from a hide (left) or save (right) swipe. The
+  // deck ALWAYS includes these regardless of what `hiddenIds`/`wishlistedIds`
+  // (both driven by the parent's async server mutation → invalidate →
+  // refetch round trip) currently say — this is the local override that
+  // removes the race those async props would otherwise create between
+  // "undo cleared local state" and "server confirmed the reversal". Each id
+  // self-cleans (see the effect below) once the parent's own data confirms
+  // the listing is genuinely no longer hidden/wishlisted, so long-term state
+  // always stays server-truthful.
+  const [restoredIds, setRestoredIds] = useState<Set<number>>(new Set());
   const [wishlistDropdownOpen, setWishlistDropdownOpen] = useState(false);
   // Array so we can glow 1 (desktop hover) or 2 (mobile auto) stations.
   const [hoveredStations, setHoveredStations] = useState<HoveredStation[] | null>(null);
@@ -352,6 +362,17 @@ export default function SwipeView({
 
   // After undo, track which listing id needs its index restored once deck recomputes
   const pendingUndoId = useRef<number | null>(null);
+  // Safety-valve timer for pendingUndoId — see handleUndo / the pendingUndo
+  // effect below. Cleared/reset on every new undo.
+  const pendingUndoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Full listing objects for anything this component has swiped, keyed by
+  // id. Undo needs the object back even if it fell out of the `listings`
+  // prop entirely (left-swipe/hide is excluded server-side by the parent —
+  // see HomeClient's hiddenIds filter — so a hidden listing can vanish from
+  // `listings` before its unhide mutation round-trips back). Populated in
+  // handleSwipe for every direction; cheap to keep for all three.
+  const swipeCacheRef = useRef<Map<number, SwipeListing>>(new Map());
 
   // ---------------------------------------------------------------------
   // Mobile: drag-down-to-dismiss for the floating swipe card.
@@ -474,22 +495,74 @@ export default function SwipeView({
   // or it scrolled out of the result set entirely).
   const currentListingIdRef = useRef<number | null>(null);
 
+  // A restored id might be genuinely absent from `listings` itself
+  // (left-swipe/hide case: the parent already excluded it before the unhide
+  // mutation round-tripped back). Append the cached object from swipe time
+  // BEFORE geo-sorting — not after — so it gets a real, stable geo-sorted
+  // position alongside everything else instead of being pinned to index 0
+  // and then visibly jumping when the parent prop catches up and the
+  // override clears. Once `listings` genuinely contains the id, this is a
+  // no-op (already present), so the override clearing never changes
+  // `listingsForSort`'s contents and can't trigger a second reorder.
+  const listingsForSort = useMemo(() => {
+    if (restoredIds.size === 0) return listings;
+    const present = new Set(listings.map((l) => l.id));
+    const missing: SwipeListing[] = [];
+    for (const id of restoredIds) {
+      if (present.has(id)) continue;
+      const cached = swipeCacheRef.current.get(id);
+      if (cached) missing.push(cached);
+    }
+    return missing.length > 0 ? [...listings, ...missing] : listings;
+  }, [listings, restoredIds]);
+
   // Geo-sort when listings change
   const geoSorted = useMemo(() => {
     const c = mapCenterRef.current;
-    return geoSort(listings, c?.lat, c?.lng);
-  }, [listings]);
+    return geoSort(listingsForSort, c?.lat, c?.lng);
+  }, [listingsForSort]);
   // Exclude listings the user has already swiped on THIS session
   // (swipedIds) AND ones they've already saved to a wishlist (persists
   // across sessions via Supabase). Without the wishlistedIds check, a
   // listing the user right-swiped yesterday would reappear in the deck
-  // today because swipedIds is intentionally session-only.
+  // today because swipedIds is intentionally session-only. `restoredIds`
+  // overrides the wishlistedIds exclusion for a just-undone right-swipe
+  // while its removeFromWishlist mutation is still in flight — see the
+  // self-cleaning effect below.
   // Hidden listings are excluded server-side by /api/listings/search,
   // so they don't need a client-side filter here.
   const deck = useMemo(
-    () => geoSorted.filter((l) => !swipedIds.has(l.id) && !(wishlistedIds?.has(l.id) ?? false)),
-    [geoSorted, swipedIds, wishlistedIds],
+    () => geoSorted.filter(
+      (l) => !swipedIds.has(l.id) && (restoredIds.has(l.id) || !(wishlistedIds?.has(l.id) ?? false)),
+    ),
+    [geoSorted, swipedIds, wishlistedIds, restoredIds],
   );
+
+  // Self-clean restoredIds once the parent's own data confirms each id is no
+  // longer hidden (back in `listings`, the raw parent-sourced prop — NOT
+  // `geoSorted`/`listingsForSort`, which always contains it via the cache
+  // append above and would never confirm anything) and no longer wishlisted.
+  // Until then the override above keeps it in the deck. Checking against
+  // `listings` directly also means this cleanup never itself changes
+  // `listingsForSort`'s contents (the id was already present, cache-appended
+  // or now natively) — so clearing the override can't trigger a second
+  // reorder the way re-deriving position from `deck` did before.
+  useEffect(() => {
+    if (restoredIds.size === 0) return;
+    setRestoredIds((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const id of prev) {
+        const confirmedUnhidden = listings.some((l) => l.id === id);
+        const stillWishlisted = wishlistedIds?.has(id) ?? false;
+        if (confirmedUnhidden && !stillWishlisted) {
+          next.delete(id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [listings, wishlistedIds, restoredIds]);
 
   // After deck recomputes, restore position to the listing the user was viewing.
   // If the tracked listing is gone (or there's no tracked id yet — e.g. fresh
@@ -518,6 +591,12 @@ export default function SwipeView({
       if (trackedIdx !== currentIndex) setCurrentIndex(trackedIdx);
       return;
     }
+
+    // An undo is armed and waiting for its listing to land back in the deck
+    // (restoredIds guarantees it will, on this render or the next). Don't
+    // run the fallback scan below — it would stomp currentListingIdRef with
+    // an unrelated card and race the pendingUndo effect.
+    if (pendingUndoId.current !== null) return;
 
     // Tracked listing missing (deleted from deck, OR deck just rebuilt from
     // a fresh-area pan). Find the first deck item whose pin is visible per
@@ -784,11 +863,23 @@ export default function SwipeView({
   // After undo-left/right, deck recomputes with the re-inserted item.
   // Find its new position and restore currentIndex to it.
   useEffect(() => {
-    if (pendingUndoId.current !== null) {
-      const idx = deck.findIndex((l) => l.id === pendingUndoId.current);
-      if (idx >= 0) setCurrentIndex(idx);
+    if (pendingUndoId.current === null) return;
+    const idx = deck.findIndex((l) => l.id === pendingUndoId.current);
+    if (idx >= 0) {
+      setCurrentIndex(idx);
       pendingUndoId.current = null;
+      if (pendingUndoTimeoutRef.current) {
+        clearTimeout(pendingUndoTimeoutRef.current);
+        pendingUndoTimeoutRef.current = null;
+      }
+      return;
     }
+    // Not found yet — with restoredIds guaranteeing presence (including the
+    // cached-object reinsertion for listings the parent dropped), this
+    // should resolve on the very next deck recompute. Stay armed rather
+    // than clearing immediately; the 5s safety-valve timeout set in
+    // handleUndo covers the case where the listing genuinely never comes
+    // back (failed mutation, listing truly deleted).
   }, [deck]);
 
   // ---------------------------------------------------------------------
@@ -810,6 +901,11 @@ export default function SwipeView({
     (direction: 'left' | 'right' | 'down') => {
       const listing = deck[currentIndex];
       if (!listing) return;
+
+      // Cache the full object so undo can reconstitute it even if it later
+      // falls out of the `listings` prop entirely (hide is excluded
+      // server-side by the parent once its hiddenIds query refetches).
+      swipeCacheRef.current.set(listing.id, listing);
 
       // Any swipe action (button or gesture) dismisses the onboarding overlay.
       dismissOnboarding();
@@ -894,6 +990,12 @@ export default function SwipeView({
 
     if (last.action === 'left') {
       onUnhideListing?.(last.listingId);
+      // Local override: the unhide mutation above is an async server round
+      // trip (upsert/delete + invalidateQueries + refetch). Without this,
+      // the parent's hiddenIds prop can still exclude the listing from
+      // `listings` for hundreds of ms after this click — see restoredIds
+      // above for the deck-level override and its self-cleaning effect.
+      setRestoredIds((prev) => new Set(prev).add(last.listingId));
     }
 
     if (last.action === 'right') {
@@ -903,11 +1005,22 @@ export default function SwipeView({
       if (wlId) {
         removeFromWishlist.mutate({ wishlistId: wlId, listingId: last.listingId });
       }
+      // Same async-race concern as left/hide above, for wishlistedIds.
+      setRestoredIds((prev) => new Set(prev).add(last.listingId));
     }
     // After removing from swipedIds the deck recomputes; find the re-inserted
     // item's new index and restore currentIndex to it. This applies to all
     // three swipe directions now that 'down' also tracks via swipedIds.
     pendingUndoId.current = last.listingId;
+    // Safety valve: an armed pendingUndoId that never resolves (failed
+    // mutation, listing genuinely gone) must not wedge the position-restore
+    // effect's fallback-suppression (above) forever.
+    if (pendingUndoTimeoutRef.current) clearTimeout(pendingUndoTimeoutRef.current);
+    const armedId = last.listingId;
+    pendingUndoTimeoutRef.current = setTimeout(() => {
+      if (pendingUndoId.current === armedId) pendingUndoId.current = null;
+      pendingUndoTimeoutRef.current = null;
+    }, 5000);
     // ALSO make the undone listing the tracked selection. The deck-restore
     // effect runs before the pendingUndo effect and reads currentListingIdRef;
     // without this it would try to KEEP the card we'd advanced to (the one
