@@ -35,6 +35,10 @@ interface VirtualListingGridProps {
    * `delisted_at` is set.
    */
   removedListings?: Listing[];
+  /** True when rendering the wishlist view. Swaps each card's top-right
+   *  map-peek button for an external-link button to the listing's
+   *  original source URL. */
+  wishlistMode?: boolean;
   selectedId: number | null;
   wishlistedIds: Set<number>;
   hidingId: number | null;
@@ -125,6 +129,7 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
     {
       listings,
       removedListings,
+      wishlistMode,
       selectedId,
       wishlistedIds,
       hidingId,
@@ -437,6 +442,7 @@ const VirtualListingGrid = forwardRef<VirtualListingGridHandle, VirtualListingGr
                         isFavorited={wishlistedIds.has(listing.id)}
                         isHiding={hidingId === listing.id}
                         isRemoved={isRemovedRow}
+                        wishlistMode={wishlistMode}
                         commuteInfo={commuteInfoMap?.get(listing.id)}
                         priority={rowIndex === 0}
                         allListings={listings}
