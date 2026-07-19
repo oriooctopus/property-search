@@ -169,6 +169,8 @@ interface ActiveRow {
   price: number;
   source: string;
   last_seen_at: string | null;
+  lat: number | null;
+  lon: number | null;
 }
 
 function rowToIdentity(r: {
@@ -177,6 +179,8 @@ function rowToIdentity(r: {
   price?: number;
   url: string;
   source?: string;
+  lat?: number | null;
+  lon?: number | null;
 }) {
   return {
     address: r.address ?? null,
@@ -187,6 +191,11 @@ function rowToIdentity(r: {
     // toListingRow — an undefined here would be an upstream bug, so we don't
     // paper over it with a fallback string.
     source: r.source as string,
+    // Needed for the craigslist title+coords identity fallback (rule 3 in
+    // identity.ts) — undefined/null on either just falls through to the
+    // url-only rule 4, same as before this field existed.
+    lat: r.lat ?? null,
+    lon: r.lon ?? null,
   };
 }
 
@@ -214,7 +223,7 @@ async function buildIdentityIndex(
   for (let offset = 0; ; offset += PAGE) {
     const { data, error } = await supabase
       .from("listings")
-      .select("id, url, address, beds, price, source, last_seen_at")
+      .select("id, url, address, beds, price, source, last_seen_at, lat, lon")
       .is("delisted_at", null)
       .in("source", sources)
       .range(offset, offset + PAGE - 1);
