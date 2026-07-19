@@ -766,14 +766,14 @@ export default function SwipeView({
       if (suppressBoundsRef) suppressBoundsRef.current = true;
       map.panBy([Math.round(p.x - targetX), Math.round(p.y - targetY)], {
         animate: true,
-        duration: 0.35,
+        duration: 0.18,
       });
     });
 
     // Clear bounds suppression after the pan settles.
     const clearT = window.setTimeout(() => {
       if (suppressBoundsRef) suppressBoundsRef.current = false;
-    }, 500);
+    }, 280);
 
     return () => {
       window.cancelAnimationFrame(raf);

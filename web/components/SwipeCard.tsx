@@ -268,12 +268,23 @@ export default function SwipeCard({
     setPhotoIndex(0);
   }, [listing.id]);
 
-  // Tinder-style commit: a fast flick should fly off in the flick direction
-  // even if displacement was small. Slow drag past the displacement threshold
-  // also commits. We pass the user's release velocity into the spring so the
-  // exit (or snap-back) carries natural inertia instead of snapping instantly.
+  // Tinder-style commit: the card flies off in the swipe/flick direction.
+  //
+  // Previously this used velocity-seeded springs (stiffness 300, damping 20).
+  // That spring is underdamped (ζ≈0.577) with a target 1.5x the viewport
+  // away, so `onComplete` — which gates promoting the next card via
+  // onSwipe() — didn't fire until the spring settled within its rest
+  // thresholds, ~400-500ms later, even though the card was already fully
+  // off-screen (and thus invisible) after roughly the first third of that.
+  // The user perceived that trailing ~200-300ms as a dead gap before the
+  // next card became interactive.
+  //
+  // Fixed-duration tween bounds `onComplete` deterministically instead of
+  // waiting on spring rest-thresholds, so the next card promotes right
+  // after the card is safely off-screen. Still visibly "flies off" (easeOut
+  // deceleration), just without the long invisible settle tail.
   const commitSwipe = useCallback(
-    (direction: 'left' | 'right' | 'down', vxPxPerSec = 0, vyPxPerSec = 0) => {
+    (direction: 'left' | 'right' | 'down') => {
       const targets = {
         left: { x: -window.innerWidth * 1.5, y: 0, rotate: -25 },
         right: { x: window.innerWidth * 1.5, y: 0, rotate: 25 },
@@ -281,24 +292,14 @@ export default function SwipeCard({
       };
 
       const t = targets[direction];
-      const springConfig = { stiffness: 300, damping: 20 };
+      const exitTransition = { type: 'tween' as const, duration: 0.18, ease: 'easeOut' as const };
 
       if (direction === 'down') {
-        animate(x, t.x, { type: 'spring', ...springConfig });
-        animate(y, t.y, {
-          type: 'spring',
-          velocity: vyPxPerSec,
-          ...springConfig,
-          onComplete: () => onSwipe(direction),
-        });
+        animate(x, t.x, exitTransition);
+        animate(y, t.y, { ...exitTransition, onComplete: () => onSwipe(direction) });
       } else {
-        animate(x, t.x, {
-          type: 'spring',
-          velocity: vxPxPerSec,
-          ...springConfig,
-          onComplete: () => onSwipe(direction),
-        });
-        animate(y, t.y, { type: 'spring', ...springConfig });
+        animate(x, t.x, { ...exitTransition, onComplete: () => onSwipe(direction) });
+        animate(y, t.y, exitTransition);
       }
     },
     [onSwipe, x, y]
@@ -344,9 +345,6 @@ export default function SwipeCard({
       const absX = Math.abs(e.deltaX);
       const absY = Math.abs(e.deltaY);
 
-      const vxPxPerSec = e.vxvy?.[0] ? e.vxvy[0] * 1000 : 0;
-      const vyPxPerSec = e.vxvy?.[1] ? e.vxvy[1] * 1000 : 0;
-
       // Always snap the visual transform back; carousel + skip use their
       // own animations. Done before any branch so even commit paths get
       // a clean origin baseline.
@@ -389,9 +387,9 @@ export default function SwipeCard({
 
       if (horizontalCommit) {
         const dir: 'left' | 'right' = e.deltaX < 0 ? 'left' : 'right';
-        commitSwipe(dir, vxPxPerSec);
+        commitSwipe(dir);
       } else if (verticalCommit) {
-        commitSwipe('down', 0, vyPxPerSec);
+        commitSwipe('down');
       } else {
         animate(x, 0, springBack);
         animate(y, 0, springBack);
@@ -723,7 +721,7 @@ export default function SwipeCard({
                     width: `${totalPhotos * 100}%`,
                     height: '100%',
                     transform: `translateX(-${(photoIndex * 100) / totalPhotos}%)`,
-                    transition: 'transform 300ms ease',
+                    transition: 'transform 150ms ease',
                   }}
                 >
                   {photos.map((url, idx) => {
