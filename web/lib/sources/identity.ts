@@ -38,18 +38,40 @@
  *     collapsing a straight repost of the same unit at the same price
  *     ("18 monitor st brooklyn ny" beds=4, both $6995).
  *
- *  3. No street number (vague / junk address — "google map", or a bare street
- *     name like "himrod brooklyn ny" / "lexington brooklyn ny"):
- *        key = `url`  — NEVER merge. These are DISTINCT apartments that merely
- *     share a vague address; the url is their only reliable identity.
+ *  3. No street number, source = craigslist, AND lat/lon present:
+ *        key = `normTitle|beds|round(lat,3)|round(lon,3)`  — merge on
+ *     normalized title text + beds + coordinates rounded to 3 decimals
+ *     (~110m at NYC latitude — an intentionally loose >50m-scale bucket,
+ *     since CL's own coordinates for the SAME posting can drift a little
+ *     between reposts). PRICE IS DELIBERATELY EXCLUDED: a real confirmed
+ *     cluster (3 active rows, identical address/title/lat/lon, same
+ *     ingest batch — "⚡🔥WILLIAMSBURG 3 Bed/2 Bath DUPLEX🔥⚡ GREAT DEAL!!!")
+ *     had prices $5600/$5700/$5700 across what was unambiguously one
+ *     apartment reposted 3x by the same lister — requiring exact price
+ *     would have left 2 of 3 duplicates unmerged. This exists because CL
+ *     specifically and heavily reposts the SAME listing with no address at
+ *     all (unlike StreetEasy, which always has one) — title text is the
+ *     only remaining signal, and it's a strong one when combined with tight
+ *     coordinates: two DIFFERENT apartments coincidentally sharing both an
+ *     identical (post-normalization) title AND coordinates within ~110m is
+ *     vanishingly unlikely. Gated to craigslist only — the
+ *     precision-over-recall bias stays in force for every other source.
+ *
+ *  4. No street number, and EITHER source != craigslist OR lat/lon missing
+ *     (vague / junk address — "google map", or a bare street name like
+ *     "himrod brooklyn ny" / "lexington brooklyn ny", or a CL row that
+ *     somehow has no coordinates):
+ *        key = `url`  — NEVER merge. These are DISTINCT apartments that
+ *     merely share a vague address; the url is their only reliable
+ *     identity, and rule 3's coordinate signal isn't available to do better.
  *
  * The key is prefixed with `source` so de-duplication is source-scoped: we only
  * ever collapse rows that came from the SAME source (avoids cross-source
  * surprises — that reconciliation is handled separately by lib/sources/dedup).
  *
  * NOTE: `/^\d+\s/` deliberately does NOT match hyphenated Queens-style numbers
- * ("86-79 …"): those fall to rule 3 (url, never merge). That's a safe
- * under-merge, consistent with the precision-over-recall bias.
+ * ("86-79 …"): those fall to rule 4 (url, never merge) unless rule 3 applies.
+ * That's a safe under-merge, consistent with the precision-over-recall bias.
  */
 
 export interface IdentityInput {
@@ -58,6 +80,22 @@ export interface IdentityInput {
   price: number;
   url: string;
   source: string;
+  lat?: number | null;
+  lon?: number | null;
+}
+
+/**
+ * Strips a Craigslist title down to comparable text: lowercase, emoji/
+ * punctuation removed entirely (not just collapsed — reposts commonly vary
+ * emoji choice/count and "!!!" vs "!!!!" around otherwise-identical text),
+ * whitespace collapsed.
+ */
+function normalizeTitle(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /** Detects a unit token on the lowercased, whitespace-collapsed address. */
@@ -85,7 +123,23 @@ export function apartmentIdentityKey(l: IdentityInput): string {
 
   const hasStreetNumber = /^\d+\s/.test(normAddr);
   if (!hasStreetNumber) {
-    // Rule 3 — vague/junk address: unique by url, never merged.
+    // Rule 3 — craigslist-only title+coords fallback (see file header).
+    if (
+      l.source === "craigslist" &&
+      l.lat != null &&
+      l.lon != null &&
+      !isNaN(l.lat) &&
+      !isNaN(l.lon)
+    ) {
+      const normTitle = normalizeTitle(l.address ?? "");
+      if (normTitle !== "") {
+        const rlat = l.lat.toFixed(3);
+        const rlon = l.lon.toFixed(3);
+        return `${l.source}|cltitle|${normTitle}|${l.beds}|${rlat}|${rlon}`;
+      }
+    }
+    // Rule 4 — vague/junk address, no usable title+coords fallback:
+    // unique by url, never merged.
     return `${l.source}|url|${l.url}`;
   }
 
