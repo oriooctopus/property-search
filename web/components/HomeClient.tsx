@@ -2218,6 +2218,7 @@ function HomeInner() {
                 ref={virtualGridRef}
                 listings={listingsForDisplay}
                 removedListings={removedFilteredListings}
+                wishlistMode={selectedWishlist != null}
                 selectedId={selectedId}
                 wishlistedIds={wishlistedIds}
                 hidingId={hidingId}

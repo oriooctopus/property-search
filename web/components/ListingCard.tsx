@@ -61,6 +61,10 @@ interface ListingCardProps {
    *  wishlist's "Removed" section — fades the card and shows a small badge
    *  so users can still see what they had saved without thinking it's live. */
   isRemoved?: boolean;
+  /** True when rendering inside the wishlist view — swaps the top-right
+   *  tap-to-peek map button for an external-link button that opens the
+   *  listing's original source URL in a new tab. */
+  wishlistMode?: boolean;
   commuteInfo?: CommuteInfo;
   /** True for cards in the first visible grid row — hints the browser to
    *  prioritize their hero photos (LCP candidates). */
@@ -84,6 +88,7 @@ function ListingCard({
   isFavorited,
   isHiding,
   isRemoved = false,
+  wishlistMode = false,
   commuteInfo,
   priority = false,
   allListings,
@@ -112,6 +117,10 @@ function ListingCard({
 
   const handleClosePeek = useCallback(() => {
     setPeeked(false);
+  }, []);
+
+  const handleOpenSourceLink = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
   }, []);
 
   const handleOpenFullMap = useCallback(() => {
@@ -436,9 +445,39 @@ function ListingCard({
             </>
           )}
 
+          {/* Wishlist view: external-link button to the listing's original
+              source URL, replacing the map-peek toggle. */}
+          {wishlistMode && listing.url && (
+            <a
+              href={listing.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleOpenSourceLink}
+              aria-label="Open original listing"
+              className="absolute top-2 right-2 z-[4] flex items-center justify-center cursor-pointer"
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                background: 'rgba(13, 17, 23, 0.75)',
+                border: '1px solid rgba(88, 166, 255, 0.35)',
+                backdropFilter: 'blur(6px)',
+                WebkitBackdropFilter: 'blur(6px)',
+                transition: 'background 150ms ease, border-color 150ms ease',
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+            </a>
+          )}
+
           {/* Tap-to-peek mini-map button — top-right of photo area. Only
-              renders when we have coordinates to show. */}
-          {listing.lat != null && listing.lon != null && (
+              renders when we have coordinates to show. Hidden in wishlist
+              mode (replaced by the external-link button above). */}
+          {!wishlistMode && listing.lat != null && listing.lon != null && (
             <button
               type="button"
               onClick={handleTogglePeek}
@@ -496,7 +535,34 @@ function ListingCard({
             <polyline points="21 15 16 10 5 21" />
           </svg>
 
-          {listing.lat != null && listing.lon != null && (
+          {wishlistMode && listing.url && (
+            <a
+              href={listing.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleOpenSourceLink}
+              aria-label="Open original listing"
+              className="absolute top-2 right-2 z-[4] flex items-center justify-center cursor-pointer"
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 10,
+                background: 'rgba(13, 17, 23, 0.75)',
+                border: '1px solid rgba(88, 166, 255, 0.35)',
+                backdropFilter: 'blur(6px)',
+                WebkitBackdropFilter: 'blur(6px)',
+                transition: 'background 150ms ease, border-color 150ms ease',
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+            </a>
+          )}
+
+          {!wishlistMode && listing.lat != null && listing.lon != null && (
             <button
               type="button"
               onClick={handleTogglePeek}
