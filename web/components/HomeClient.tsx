@@ -518,7 +518,9 @@ function HomeInner() {
     viewportAbortRef.current = controller;
     setViewportLoading(true);
     const currentFilters = filtersRef.current;
-    const commuteRules = currentFilters?.commuteRules ?? [];
+    // TEMP: commute filter hidden 2026-07-23 — force empty regardless of any
+    // persisted/URL-restored commuteRules so results are never narrowed/reordered.
+    const commuteRules: FiltersState['commuteRules'] = [];
     if (commuteRules.length > 0) setCommuteLoading(true);
     // Resolve wishlist selection → array of ids (or null for "no restriction")
     let wishlistIds: string[] | null = null;
@@ -717,7 +719,8 @@ function HomeInner() {
     setLoadingMoreListings(true);
     const requestId = ++loadMoreRequestRef.current;
     const currentFilters = filtersRef.current;
-    const commuteRules = currentFilters?.commuteRules ?? [];
+    // TEMP: commute filter hidden 2026-07-23 — see loadForViewport above.
+    const commuteRules: FiltersState['commuteRules'] = [];
     let wishlistIds: string[] | null = null;
     const sel = selectedWishlistRef.current;
     if (sel === 'all-saved') {
@@ -2160,7 +2163,8 @@ function HomeInner() {
             swipe + map views since those surfaces don't need a banner: swipe
             already shows match counts inline, and map view shows the
             commuted zone visually. */}
-        {!isSwipeView && !isMapView && filters.commuteRules.length > 0 && (
+        {/* TEMP: commute filter hidden 2026-07-23 — `false &&` suppresses this banner even if commuteRules is restored from a saved search/URL */}
+        {false && !isSwipeView && !isMapView && filters.commuteRules.length > 0 && (
           <div
             data-testid="gps-filter-banner"
             className="flex items-center gap-2 px-3 py-2 text-xs"
