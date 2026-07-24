@@ -2184,7 +2184,8 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
           />
         </FilterChip>
     
-        {/* Commute chip */}
+        {/* TEMP: commute filter hidden 2026-07-23 — re-enable by removing the `false &&` gate below */}
+        {false && (
         <FilterChip
           compact
           label={commuteLabel(filters.commuteRules ?? [])}
@@ -2314,6 +2315,7 @@ const Filters = memo(forwardRef<FiltersHandle, FiltersProps>(function Filters({ 
             />
           </div>
         </FilterChip>
+        )}
 
         {/* Photos first toggle chip */}
         <div className="relative group shrink-0">

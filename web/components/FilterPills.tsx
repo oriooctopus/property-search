@@ -42,7 +42,9 @@ function getActiveFilters(filters: FiltersState): FilterPillData[] {
   if (filters.selectedSources !== null) {
     pills.push({ key: 'selectedSources', label: `Sources (${filters.selectedSources.length})` });
   }
-  if (filters.commuteRules && filters.commuteRules.length > 0) {
+  // TEMP: commute filter hidden 2026-07-23 — suppress pill even if commuteRules
+  // is restored from a saved search/URL, so no phantom active-filter shows.
+  if (false && filters.commuteRules && filters.commuteRules.length > 0) {
     pills.push({ key: 'commuteRules', label: `${filters.commuteRules.length} commute rule${filters.commuteRules.length > 1 ? 's' : ''}` });
   }
   if (filters.minYearBuilt !== null || filters.maxYearBuilt !== null) {
