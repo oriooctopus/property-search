@@ -11,7 +11,7 @@
 import type { AdapterOutput, SearchParams } from "./types";
 import { resolveApifyProxyUrl, makeProxyFetch, withRotatingSession } from "./proxy";
 import { fetchSliceRecursive, SE_CAP } from "./streeteasy-bisection";
-import { TARGET_AREA_CODES } from "./pipeline";
+import { PRICE_MAX, PRICE_MIN, TARGET_AREA_CODES } from "./pipeline";
 
 export const SE_API_URL = "https://api-v6.streeteasy.com/";
 // 1000 (not 100) so any single bedroom/price slice (always <= SE_CAP=950) is
@@ -361,13 +361,13 @@ function nodesToListings(nodes: SENode[], city: string): AdapterOutput[] {
 // Public API
 // ---------------------------------------------------------------------------
 
-// We ONLY want 2–4 bedrooms (enforced everywhere; see the bedroom gate in
-// pipeline.ts). Fetch only those buckets — studios/1BR/5BR+ are never
-// collected. Ordered by user value: 3BR + 4BR first, then 2BR. Override with
-// SE_BEDROOMS (e.g. SE_BEDROOMS=3) to ramp a run to a subset of {2,3,4}.
+// We ONLY want 1–2 bedrooms (enforced everywhere; see the bedroom gate in
+// pipeline.ts). Fetch only those buckets — studios/3BR+ are never collected.
+// Ordered by user value: 2BR first, then 1BR. Override with SE_BEDROOMS
+// (e.g. SE_BEDROOMS=2) to ramp a run to a subset of the band.
 const SE_BEDROOM_SLICES = process.env.SE_BEDROOMS
   ? process.env.SE_BEDROOMS.split(",").map((s) => Number(s.trim()))
-  : [3, 4, 2];
+  : [2, 1];
 const SE_SLICE_DELAY_MS = 5_000; // delay between bedroom slices
 const SE_403_RETRY_DELAYS = [30_000, 60_000, 120_000]; // exponential backoff for 403s
 
@@ -454,7 +454,7 @@ export async function fetchStreetEasyListings(
 
   for (const bedrooms of SE_BEDROOM_SLICES) {
     const label = bedrooms === 0 ? "studio" : `${bedrooms}BR`;
-    const filters = buildFilters(areas, bedrooms);
+    const filters = buildFilters(areas, bedrooms, PRICE_MIN, PRICE_MAX);
 
     // Probe totalCount first to skip empty slices (with 403 retry)
     let sliceTotal = 0;
@@ -526,8 +526,8 @@ export async function fetchStreetEasyListings(
         await fetchSliceRecursive(
           areas,
           bedroomFilter,
-          0,
-          null,
+          PRICE_MIN,
+          PRICE_MAX,
           label,
           0,
           allNodes,

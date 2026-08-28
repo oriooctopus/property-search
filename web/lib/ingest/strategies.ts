@@ -17,6 +17,7 @@ import type { AdapterOutput, ListingSource, SearchParams } from "../sources/type
 import type { FetchDeps, FetchStrategy } from "./types";
 
 import { fetchCraigslistListings } from "../sources/craigslist";
+import { PRICE_MAX, PRICE_MIN } from "../sources/pipeline";
 import { fetchStreetEasyListings } from "../sources/streeteasy";
 import { fetchStreetEasyFullBisection } from "../sources/streeteasy-bisection";
 // Facebook Marketplace disabled to save Apify costs — re-enable when needed
@@ -54,17 +55,16 @@ async function runAdapter(source: ListingSource, supabase?: SupabaseClient): Pro
       // with min/max_bedrooms made craigslist return 0 URLs to the Apify
       // scraper (bot-blocked on the parameterized search from proxy IPs), even
       // though the same URL works in a normal browser — it broke fetching
-      // entirely. The pipeline's region + 2–4BR gate still filters post-scrape.
+      // entirely. The pipeline's region + bedroom gate still filters post-scrape.
       // Brooklyn-only (Manhattan dropped) is still applied inside the adapter.
       //
       // PRICE params are safe, unlike bedroom params: verified live 2026-07-05
       // (control search 153 URLs vs min_price/max_price search 1654 URLs, both
-      // SUCCEEDED — no bot-block). A generous band around the 2–4BR gate cuts
-      // detail-scrapes of room-shares/scams (<$1200) and ultra-luxury (>$15k),
-      // which Phase 2 pays Apify compute to visit only to be dropped by the
-      // pipeline gates anyway.
+      // SUCCEEDED — no bot-block). Send the pipeline's exact price band so
+      // Phase 2 doesn't pay Apify compute to detail-scrape rows the pipeline
+      // gate drops anyway.
       const res = await fetchCraigslistListings(
-        { ...NYC_PARAMS, priceMin: 1200, priceMax: 15000 },
+        { ...NYC_PARAMS, priceMin: PRICE_MIN, priceMax: PRICE_MAX },
         { supabase },
       );
       // Prefer sapi's live totalResultCount as the discovery floor — it's

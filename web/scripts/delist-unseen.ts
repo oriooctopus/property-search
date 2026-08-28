@@ -1,7 +1,7 @@
 /**
  * Set-difference delisting (stale detection for the complete-refetch model).
  *
- * Because the daily ingest fetches the ENTIRE active in-region 2–4BR set from
+ * Because the daily ingest fetches the ENTIRE active in-region in-band set from
  * StreetEasy's free API, "active" listings get last_seen_at refreshed every
  * run. So any in-region listing NOT refreshed within the cadence window is no
  * longer on StreetEasy → delisted. This is the cheap inverse of verify-stale,
@@ -89,7 +89,7 @@ async function main() {
   const staleN = stale ?? 0;
   const frac = totalN > 0 ? staleN / totalN : 0;
   console.log(
-    `active in-region 2-4BR=${totalN}  not-seen-in-${maxAgeHours}h=${staleN}  frac=${(frac * 100).toFixed(1)}%  cutoff=${cutoff}`,
+    `active in-region in-band=${totalN}  not-seen-in-${maxAgeHours}h=${staleN}  frac=${(frac * 100).toFixed(1)}%  cutoff=${cutoff}`,
   );
 
   if (staleN === 0) {

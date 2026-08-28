@@ -706,7 +706,7 @@ export async function fetchCraigslistListings(
   const CL_BOROUGHS = ["brk"];
   // Scope the SEARCH server-side so we detail-scrape far fewer out-of-scope
   // listings (the detail scrape is the Apify cost). min/max_bedrooms filter to
-  // the 2–4BR band before Phase 2; the pipeline's region gate then trims the
+  // the 1–2BR band before Phase 2; the pipeline's region gate then trims the
   // remaining out-of-neighborhood listings (craigslist search has no usable
   // neighborhood-code filter, and its radius can't fit this region's shape).
   const queryParams = new URLSearchParams();

@@ -44,13 +44,13 @@ function isInNYC(lat: number, lon: number): boolean {
 // ---------------------------------------------------------------------------
 //
 // The region is defined PRECISELY by the StreetEasy neighborhood area codes
-// below — this matches the "DWELLIGENCE NW Bklyn 2-4BR (auto)" saved-search
+// below — this matches the "DWELLIGENCE NW Bklyn (auto)" saved-search
 // detector exactly. The StreetEasy fetch sites (daily, full-bisection,
 // local-runner) all query these codes, so the server returns only in-region
 // listings; Manhattan and out-of-region Brooklyn (Red Hook, Brooklyn Heights,
 // Downtown Brooklyn, all of south Brooklyn, etc.) are never fetched.
 //
-// north/NW Brooklyn + Crown Heights, 2–4BR:
+// north/NW Brooklyn + Crown Heights:
 //   301 Williamsburg-area · 302 Williamsburg · 304 Greenpoint · 306 Bed-Stuy
 //   307 Bushwick · 310 Fort Greene · 313 Clinton Hill · 319 Prospect Heights
 //   320 Park Slope · 321 Gowanus · 322 Boerum Hill · 325 Crown Heights
@@ -79,6 +79,21 @@ export function isInTargetRegion(lat: number, lon: number): boolean {
     lon <= REGION_LON_MAX
   );
 }
+
+// ---------------------------------------------------------------------------
+// Target search band
+// ---------------------------------------------------------------------------
+//
+// The single source of truth for the bedroom + price band we ingest. The
+// craigslist adapter reuses PRICE_MIN/PRICE_MAX as server-side search params
+// (see lib/ingest/strategies.ts) so we don't pay Apify to detail-scrape rows
+// this gate would drop anyway. Bedrooms are NOT sent to craigslist — its
+// parameterized bedroom search is bot-blocked from proxy IPs — so the bedroom
+// band is enforced here, post-scrape, for every source.
+export const BEDS_MIN = 1;
+export const BEDS_MAX = 2;
+export const PRICE_MIN = 3000;
+export const PRICE_MAX = 5000;
 
 // ---------------------------------------------------------------------------
 // Rejection
@@ -111,10 +126,15 @@ function rejectReason(raw: AdapterOutput): string | null {
   if (hasCoords(raw) && !isInTargetRegion(raw.lat!, raw.lon!)) {
     return "outside target region";
   }
-  // Bedroom gating: we ONLY want 2–4 bedrooms, on every run type. Drop
-  // studios/1BR/5BR+, and unknown-bedroom listings (can't confirm 2–4).
-  if (raw.beds == null || raw.beds < 2 || raw.beds > 4) {
-    return "bedrooms outside 2-4";
+  // Bedroom gating: we ONLY want 1–2 bedrooms, on every run type. Drop
+  // studios/3BR+, and unknown-bedroom listings (can't confirm 1–2).
+  if (raw.beds == null || raw.beds < BEDS_MIN || raw.beds > BEDS_MAX) {
+    return `bedrooms outside ${BEDS_MIN}-${BEDS_MAX}`;
+  }
+  // Price gating: the target band only. raw.price is non-null and > 0 by the
+  // check at the top of this function.
+  if (raw.price! < PRICE_MIN || raw.price! > PRICE_MAX) {
+    return `price outside ${PRICE_MIN}-${PRICE_MAX}`;
   }
   return null;
 }

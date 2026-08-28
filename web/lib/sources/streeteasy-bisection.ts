@@ -25,7 +25,7 @@ import {
   type SENode,
 } from "./streeteasy";
 import type { AdapterOutput } from "./types";
-import { TARGET_AREA_CODES } from "./pipeline";
+import { PRICE_MAX, PRICE_MIN, TARGET_AREA_CODES } from "./pipeline";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -86,13 +86,13 @@ async function discoverBedroomBuckets(
   proxyFetch: typeof fetch,
   log: (msg: string) => void,
 ): Promise<BedroomBucket[]> {
-  // We ONLY want 2–4 bedrooms (enforced everywhere; see the bedroom gate in
-  // pipeline.ts). Fixed closed buckets for 2/3/4 — no studio/1BR, no
-  // open-ended 5BR+ tail.
+  // We ONLY want 1–2 bedrooms (enforced everywhere; see the bedroom gate in
+  // pipeline.ts). Fixed closed buckets for 1/2 — no studio, no open-ended
+  // 3BR+ tail.
   const buckets: BedroomBucket[] = [];
-  for (const bed of [2, 3, 4]) {
+  for (const bed of [1, 2]) {
     await delay(PROBE_DELAY_MS);
-    const filters = buildBaseFilters(areas, { lowerBound: bed, upperBound: bed });
+    const filters = buildBaseFilters(areas, { lowerBound: bed, upperBound: bed }, PRICE_MIN, PRICE_MAX);
     const count = await probeTotalCount(areas, filters, proxyFetch);
     log(`    bed=${bed}: ${count}`);
     if (count > 0) {
@@ -248,7 +248,7 @@ export async function fetchStreetEasyFullBisection(
     log("=".repeat(60));
 
     await delay(PROBE_DELAY_MS);
-    const boroughFilters = buildBaseFilters(borough.areas);
+    const boroughFilters = buildBaseFilters(borough.areas, undefined, PRICE_MIN, PRICE_MAX);
     const boroughTotal = await probeTotalCount(
       borough.areas,
       boroughFilters,
@@ -299,8 +299,8 @@ export async function fetchStreetEasyFullBisection(
       await fetchSliceRecursive(
         borough.areas,
         bedroomFilter,
-        0,
-        null,
+        PRICE_MIN,
+        PRICE_MAX,
         label,
         0,
         seNodes,
