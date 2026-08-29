@@ -15,6 +15,7 @@ import { useOccluders } from '@/lib/viewport/OccluderRegistry';
 import { useLeafletMapSetter } from '@/lib/viewport/LeafletMapContext';
 import { getVisibleMapRect } from '@/lib/viewport/occlusion';
 import { panMapToShowLatLng } from '@/lib/viewport/visibleMapView';
+import { BASEMAP_TILE_URL, BASEMAP_ATTRIBUTION } from '@/lib/basemap';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -2072,10 +2073,7 @@ export default function MapInner({ listings: listingsProp, selectedId, onMarkerC
         zoomControl={false}
         keyboard={false}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        />
+        <TileLayer attribution={BASEMAP_ATTRIBUTION} url={BASEMAP_TILE_URL} />
         <SubwayLinesLayer
           enabled={subwayOverlayEnabled}
           hoveredLine={hoveredLine}

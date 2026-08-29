@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, CircleMarker, Marker, useMap } from 'react-lea
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { SubwayMarker } from './DetailMap';
+import { BASEMAP_TILE_URL, BASEMAP_ATTRIBUTION } from '@/lib/basemap';
 
 const LINE_COLORS: Record<string, string> = {
   '1': '#EE352E', '2': '#EE352E', '3': '#EE352E',
@@ -82,7 +83,6 @@ export default function DetailMapInner({ lat, lon, subway }: DetailMapInnerProps
     <MapContainer
       center={[lat, lon]}
       zoom={15}
-      attributionControl={false}
       style={{
         height: 200,
         width: '100%',
@@ -90,7 +90,7 @@ export default function DetailMapInner({ lat, lon, subway }: DetailMapInnerProps
         border: '1px solid #2d333b',
       }}
     >
-      <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+      <TileLayer attribution={BASEMAP_ATTRIBUTION} url={BASEMAP_TILE_URL} />
       <CircleMarker
         center={[lat, lon]}
         radius={8}

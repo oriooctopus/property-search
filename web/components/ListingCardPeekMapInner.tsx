@@ -19,6 +19,7 @@ import {
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { SubwayStation } from '@/lib/isochrone/types';
+import { BASEMAP_TILE_URL, BASEMAP_ATTRIBUTION } from '@/lib/basemap';
 
 interface NearbyPin {
   id: number;
@@ -97,14 +98,13 @@ export default function ListingCardPeekMapInner({
       center={[lat, lon]}
       zoom={15}
       zoomControl={false}
-      attributionControl={false}
       style={{
         height: '100%',
         width: '100%',
         background: '#111820',
       }}
     >
-      <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+      <TileLayer attribution={BASEMAP_ATTRIBUTION} url={BASEMAP_TILE_URL} />
 
       {/* Dimmed surrounding listing pins — render BEHIND the primary pin */}
       {nearby.map((p) => (

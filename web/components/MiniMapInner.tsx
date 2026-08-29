@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { MapContainer, TileLayer, CircleMarker, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { HoveredStation } from './SwipeCard';
+import { BASEMAP_TILE_URL, BASEMAP_ATTRIBUTION } from '@/lib/basemap';
 
 const LINE_COLORS: Record<string, string> = {
   '1': '#EE352E', '2': '#EE352E', '3': '#EE352E',
@@ -54,14 +55,13 @@ export default function MiniMapInner({ lat, lon, hoveredStation }: MiniMapInnerP
       center={[lat, lon]}
       zoom={14}
       zoomControl={false}
-      attributionControl={false}
       style={{
         height: '100%',
         width: '100%',
         background: '#161b24',
       }}
     >
-      <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
+      <TileLayer attribution={BASEMAP_ATTRIBUTION} url={BASEMAP_TILE_URL} />
       <CircleMarker
         center={[lat, lon]}
         radius={6}
