@@ -278,11 +278,15 @@ function ListingCardPeekMap({
         </svg>
       </button>
 
-      {/* Address tag — bottom center */}
+      {/* Address tag — bottom center. Offset clears the CARTO/OSM
+          attribution strip (compact-styled in globals.css) that Leaflet
+          renders bottom-right of the map — this pill used to sit at
+          bottom: 10 and collide with it. */}
       <div
+        data-testid="peek-address-tag"
         style={{
           position: 'absolute',
-          bottom: 10,
+          bottom: 22,
           left: '50%',
           transform: 'translateX(-50%)',
           background: 'rgba(13, 17, 23, 0.85)',

@@ -296,3 +296,21 @@ body[data-swipe-mobile="1"] [data-swipe-sidebar="1"] {
 .leaflet-tooltip.peek-station-tooltip::before {
   display: none;
 }
+
+/* Compact CARTO/OSM attribution control across all four map surfaces
+   (MapInner, DetailMapInner, MiniMapInner, ListingCardPeekMapInner). CARTO's
+   free basemap tier is conditional on this credit staying visible, so this
+   only restyles it (smaller, translucent, legible against dark tiles) —
+   never hides or shrinks it to illegibility. */
+.leaflet-control-attribution {
+  background: rgba(13, 17, 23, 0.72) !important;
+  color: #8b949e !important;
+  font-size: 9px !important;
+  line-height: 1.5 !important;
+  padding: 1px 5px !important;
+  border-radius: 4px 0 0 0 !important;
+  box-shadow: none !important;
+}
+.leaflet-control-attribution a {
+  color: #79b8ff !important;
+}
