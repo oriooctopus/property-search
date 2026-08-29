@@ -117,6 +117,14 @@ export interface VerifyStaleOutput {
   delistedConfirmed: number;
   unknown: number;
   errors: number;
+  /**
+   * True if any source's pass aborted on a bot-block signal mid-run (only
+   * the craigslist-local gentle pass can set this today — see
+   * lib/ingest/phases/verify-stale.ts). A matching warning is also pushed
+   * onto the phase result's `warnings` array so the run report surfaces it
+   * without a caller having to know to check this field.
+   */
+  blocked?: boolean;
 }
 
 // ---------------------------------------------------------------------------

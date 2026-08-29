@@ -9,7 +9,21 @@
 export type VerifyResult =
   | { status: "active" }
   | { status: "delisted"; delistedAt: Date | null; reason: string }
-  | { status: "unknown"; reason: string };
+  | {
+      status: "unknown";
+      reason: string;
+      /**
+       * True when `reason` specifically means "the source bot-blocked us"
+       * (e.g. HTTP 403, or a 200 body with a block banner) rather than any
+       * other unknown outcome (network hiccup, unexpected status). Distinct
+       * from "unknown" alone so a caller that needs to react to a block
+       * specifically (verify-stale's craigslist-local gentle pass aborting
+       * the rest of its batch — see the 2026-08-28 bot-block incident) can
+       * key on this instead of string-matching `reason`. Never set on
+       * "delisted" — a block is not evidence the posting is gone.
+       */
+      blocked?: boolean;
+    };
 
 export interface VerifyDeps {
   /** Apify proxy token — required for sources that need residential proxy (SE, FB). */

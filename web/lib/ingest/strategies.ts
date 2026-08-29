@@ -94,11 +94,30 @@ export function craigslistDiscoveryAlertReason(res: {
  * regression-tests this against the gate silently widening (e.g. to
  * `|| "LOCAL"`).
  */
+/**
+ * True when Craigslist fetching should run in "local" mode — this box's own
+ * residential IP doing direct HTTP, as opposed to the paid Apify actor /
+ * GitHub Actions path. Exact-string match only (H9 in the QA scenarios),
+ * same reasoning as selectCraigslistRunner's own gate below: a typo'd env
+ * var must not silently switch behavior.
+ *
+ * Shared by selectCraigslistRunner (which runner fetches Craigslist search/
+ * detail pages) and lib/ingest/phases/verify-stale.ts (whether the
+ * verify-stale pass against Craigslist must be throttled the same way — see
+ * the 2026-08-28 incident where an un-throttled local verify-stale burst,
+ * 500 direct fetches at concurrency 10 in 5.8s, got this box's IP
+ * bot-blocked about 30 minutes later). One predicate, two call sites, so
+ * they can never drift apart on what "local" means.
+ */
+export function isCraigslistLocalMode(env: NodeJS.ProcessEnv): boolean {
+  return env.CRAIGSLIST_FETCHER === "local";
+}
+
 export function selectCraigslistRunner(
   env: NodeJS.ProcessEnv,
   create: () => PageFunctionRunner,
 ): PageFunctionRunner | undefined {
-  return env.CRAIGSLIST_FETCHER === "local" ? create() : undefined;
+  return isCraigslistLocalMode(env) ? create() : undefined;
 }
 
 /** Runs a single adapter by name. Returns raw AdapterOutput[] with source tag. */
