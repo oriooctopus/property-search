@@ -6,6 +6,7 @@ import { resolveCommuteRules, type ListingCommuteMeta } from "@/lib/commute-reso
 import { createClient as createServerClient } from "@/lib/supabase-server";
 import type { Bounds, SearchFilters } from "@/lib/search-filters";
 import { applyBoundsAndFilters } from "@/lib/search-filters";
+import { resolveLStripIsochroneIds } from "@/lib/l-strip";
 
 // ---------------------------------------------------------------------------
 // Unified listings search endpoint.
@@ -154,6 +155,46 @@ const LISTING_SELECT = [
   "photos", "created_at", "availability_date", "delisted_at",
 ].join(", ");
 
+const LISTING_SELECT_WITH_L_STRIP = `${LISTING_SELECT}, listing_isochrones!inner(isochrone_id)`;
+
+/**
+ * Apply the LISTING_SELECT projection to a `listings` query, gated by the
+ * L-strip isochrone ids when active (`lStripIds !== null`). The gate is
+ * pushed into SQL as a to-many `listing_isochrones!inner` embed intersected
+ * with `.in("listing_isochrones.isochrone_id", ids)` — PostgREST does NOT
+ * duplicate the parent `listings` row even when it matches more than one id
+ * in the set (verified against the live DB). `lStripIds === null` means "no
+ * gate" — used only for wishlist-mode callers, who must still see
+ * everything they saved.
+ *
+ * Every call site must use this helper rather than `.select(LISTING_SELECT)`
+ * directly, so the gate can never be forgotten on a new/edited query path.
+ * Callers must strip the `listing_isochrones` embed key back off the
+ * returned rows with `stripLStripEmbed` before returning them to the client.
+ */
+function selectListings(query: any, lStripIds: number[] | null): any {
+  if (lStripIds === null) {
+    return query.select(LISTING_SELECT);
+  }
+  return query
+    .select(LISTING_SELECT_WITH_L_STRIP)
+    .in("listing_isochrones.isochrone_id", lStripIds);
+}
+
+/**
+ * Strip the `listing_isochrones` embed key (added by `selectListings` when
+ * the L-strip gate is active) back off returned rows so the response shape
+ * matches the pre-gate `LISTING_SELECT` shape exactly. A no-op when the
+ * gate wasn't applied (the key is simply absent).
+ */
+function stripLStripEmbed(rows: any[]): Listing[] {
+  return rows.map((r) => {
+    const rest = { ...r };
+    delete rest.listing_isochrones;
+    return rest;
+  }) as Listing[];
+}
+
 /**
  * Apply the filters that can't be (or aren't) pushed down to SQL:
  *  - priceMode=perRoom min/max
@@ -206,6 +247,16 @@ export async function POST(request: NextRequest) {
     const bounds = body.bounds ?? null;
 
     const supabase = getClient();
+
+    // ---- Always-on L-strip location gate: every listing returned must be
+    //      within a 12-minute walk of one of the 8 L-train stops from
+    //      Bedford Av to DeKalb Av. Wishlist mode is exempt — the user must
+    //      still see everything they saved, even outside the strip. Not
+    //      wrapped in a try/catch: a resolution failure must surface as a
+    //      500 (via the route's outer catch), never fall back to
+    //      unfiltered results.
+    const lStripIds: number[] | null =
+      wishlistIds === null ? await resolveLStripIsochroneIds(supabase) : null;
 
     // ---- nearestTo mode: short-circuit. Apply all filters except `bounds`,
     //      pull every matching row (capped at 20k — the table is ~16k active
@@ -280,10 +331,10 @@ export async function POST(request: NextRequest) {
       const NEAREST_FETCH_CAP = 20000;
       let allRows: Listing[] = [];
       if (nearestEffective === null) {
-        let q: any = supabase
-          .from("listings")
-          .select(LISTING_SELECT)
-          .range(0, NEAREST_FETCH_CAP - 1);
+        let q: any = selectListings(supabase.from("listings"), lStripIds).range(
+          0,
+          NEAREST_FETCH_CAP - 1,
+        );
         // Note: we intentionally pass `null` for bounds — nearestTo is
         // explicitly a whole-DB search.
         q = applyBoundsAndFilters(q, null, filters, {
@@ -293,17 +344,14 @@ export async function POST(request: NextRequest) {
         if (error) {
           return NextResponse.json({ error: error.message }, { status: 500 });
         }
-        allRows = (data ?? []) as Listing[];
+        allRows = stripLStripEmbed(data ?? []);
       } else {
         const ids = [...nearestEffective];
         const CHUNK = 500;
         const seen = new Set<number>();
         for (let i = 0; i < ids.length; i += CHUNK) {
           const chunk = ids.slice(i, i + CHUNK);
-          let q: any = supabase
-            .from("listings")
-            .select(LISTING_SELECT)
-            .in("id", chunk);
+          let q: any = selectListings(supabase.from("listings"), lStripIds).in("id", chunk);
           q = applyBoundsAndFilters(q, null, filters, {
             includeDelisted: includeDelistedNearest,
           });
@@ -311,7 +359,7 @@ export async function POST(request: NextRequest) {
           if (error) {
             return NextResponse.json({ error: error.message }, { status: 500 });
           }
-          for (const r of (data ?? []) as Listing[]) {
+          for (const r of stripLStripEmbed(data ?? [])) {
             if (!seen.has(r.id)) {
               seen.add(r.id);
               allRows.push(r);
@@ -488,9 +536,7 @@ export async function POST(request: NextRequest) {
     let rawRowCount = 0;
 
     if (commuteIds === null) {
-      let pageQ: any = supabase
-        .from("listings")
-        .select(LISTING_SELECT)
+      let pageQ: any = selectListings(supabase.from("listings"), lStripIds)
         .order("last_update_date", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
         .order("id", { ascending: true })
@@ -501,7 +547,7 @@ export async function POST(request: NextRequest) {
         console.error("[listings-search] query error:", error.message);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
-      rows = (data ?? []) as Listing[];
+      rows = stripLStripEmbed(data ?? []);
       rawRowCount = rows.length;
     } else {
       // Commute rules resolved — intersect via .in('id', …). We fetch all
@@ -515,9 +561,7 @@ export async function POST(request: NextRequest) {
       const allRows: Listing[] = [];
       for (let i = 0; i < ids.length; i += CHUNK) {
         const chunk = ids.slice(i, i + CHUNK);
-        let chunkQ: any = supabase
-          .from("listings")
-          .select(LISTING_SELECT)
+        let chunkQ: any = selectListings(supabase.from("listings"), lStripIds)
           .order("last_update_date", { ascending: false, nullsFirst: false })
           .order("created_at", { ascending: false })
           .order("id", { ascending: true })
@@ -528,7 +572,7 @@ export async function POST(request: NextRequest) {
           console.error("[listings-search] chunk query error:", error.message);
           return NextResponse.json({ error: error.message }, { status: 500 });
         }
-        for (const r of (data ?? []) as Listing[]) {
+        for (const r of stripLStripEmbed(data ?? [])) {
           if (!seen.has(r.id)) {
             seen.add(r.id);
             allRows.push(r);
