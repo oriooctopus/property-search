@@ -16,7 +16,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AdapterOutput, ListingSource, SearchParams } from "../sources/types";
 import type { FetchDeps, FetchStrategy } from "./types";
 
-import { fetchCraigslistListings } from "../sources/craigslist";
+import { fetchCraigslistListings, type PageFunctionRunner } from "../sources/craigslist";
+import { createLocalRunner, type LocalCraigslistRunner } from "../sources/craigslist-local";
 import { PRICE_MAX, PRICE_MIN } from "../sources/pipeline";
 import { fetchStreetEasyListings } from "../sources/streeteasy";
 import { fetchStreetEasyFullBisection } from "../sources/streeteasy-bisection";
@@ -33,19 +34,72 @@ const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY ?? "";
 const NYC_PARAMS: SearchParams = { city: "New York", stateCode: "NY" };
 
 // Below this many unique URLs discovered in Craigslist Phase 1, something is
-// wrong (bot-block or a genuine anomaly) — alert rather than silently
-// upserting a trickle. Used as a fallback floor when sapi.craigslist.org's
-// totalResultCount is unavailable (its own call failed) — real runs used to
-// discover 1,000+ URLs pre-redesign, but CL's redesign killed pagination
-// (see the comment in lib/sources/craigslist.ts's SEARCH_ONLY_PAGE_FUNCTION),
-// so the primary signal is now sapiTotalResultCount below.
-const CL_DISCOVERY_FLOOR = 300;
+// wrong (bot-block, a variant miss, or a genuine anomaly) — alert rather than
+// silently upserting a trickle. A healthy single-page scrape post-redesign
+// (see the comment in lib/sources/craigslist.ts's SEARCH_ONLY_PAGE_FUNCTION —
+// CL's redesign killed pagination, so ONE search page is now the entire
+// discovery budget) typically yields 200-400 URLs; 0 means a block or variant
+// miss, so 100 leaves real margin without being noisy on normal variance.
+//
+// REMOVED 2026-08-28 (incident): this used to ALSO compare `discovered`
+// against a fraction of sapi.craigslist.org's totalResultCount (ground truth
+// for the query's FULL live result count). That comparison is structurally
+// wrong, not just mistuned — CL has no working pagination (see the redesign
+// comment above), so a single search page can NEVER reach even 50% of sapi's
+// full count once that count is more than ~2x a healthy page's size, and it
+// fired for real on a normal run (258 discovered vs. a computed floor of
+// 1404, i.e. 50% of sapi's totalResultCount=2809) — this would have emailed
+// every single day. sapi's total is still logged for context (see
+// craigslistDiscoveryAlertReason's caller), just no longer part of the
+// alert DECISION.
+const CL_DISCOVERY_FLOOR = 100;
 
-// When sapi's totalResultCount IS available, it's ground truth (sapi returns
-// the FULL live result set in one call — no pagination, no DOM-variant
-// coin-flip). Alert if the static-page scrape discovered fewer than this
-// fraction of it — a real gap, not a rounding difference.
-const CL_DISCOVERY_SAPI_RATIO = 0.5;
+/**
+ * Pure decision function for whether a Craigslist Phase 1 result is worth
+ * alerting on — factored out from runAdapter so it's testable without a real
+ * fetchCraigslistListings run (no browser, no network). Returns a
+ * human-readable reason string, or null when nothing is wrong. Deliberately
+ * takes only the 3 fields the decision actually uses (not the full
+ * fetchCraigslistListings return type) so a caller can't accidentally make
+ * sapi's totalResultCount influence this again — see the REMOVED comment
+ * above for why that specific regression must not come back.
+ */
+export function craigslistDiscoveryAlertReason(res: {
+  discovered: number;
+  blocked: boolean;
+  staticVariantMissing: boolean;
+}): string | null {
+  if (res.blocked) {
+    return "bot-block/CAPTCHA detected on the search page (or sapi returned totalResultCount>0 with 0 items)";
+  }
+  if (res.staticVariantMissing) {
+    return "neither DOM variant (static list nor JS gallery) yielded any search-result cards after retries";
+  }
+  if (res.discovered < CL_DISCOVERY_FLOOR) {
+    return `only ${res.discovered} URLs discovered, below the floor of ${CL_DISCOVERY_FLOOR} — no block detected, but this is too few for a healthy day`;
+  }
+  return null;
+}
+
+/**
+ * Decides whether Craigslist Phase 1/2 execution should switch from the paid
+ * Apify actor to the local headless-Playwright runner (see
+ * lib/sources/craigslist-local.ts) — same pageFunction strings, same
+ * post-processing, just a different runner. Exact-string match only (H9 in
+ * the QA scenarios): "LOCAL"/"true"/"1"/anything else keeps the Apify
+ * default, so a typo'd env var can't silently switch modes. `create` is
+ * injected (rather than calling createLocalRunner directly) purely so tests
+ * can assert the gate decision without launching a real browser or touching
+ * the production lock file — see H6 in tests/craigslist-local.test.ts, which
+ * regression-tests this against the gate silently widening (e.g. to
+ * `|| "LOCAL"`).
+ */
+export function selectCraigslistRunner(
+  env: NodeJS.ProcessEnv,
+  create: () => PageFunctionRunner,
+): PageFunctionRunner | undefined {
+  return env.CRAIGSLIST_FETCHER === "local" ? create() : undefined;
+}
 
 /** Runs a single adapter by name. Returns raw AdapterOutput[] with source tag. */
 async function runAdapter(source: ListingSource, supabase?: SupabaseClient): Promise<AdapterOutput[]> {
@@ -63,36 +117,47 @@ async function runAdapter(source: ListingSource, supabase?: SupabaseClient): Pro
       // SUCCEEDED — no bot-block). Send the pipeline's exact price band so
       // Phase 2 doesn't pay Apify compute to detail-scrape rows the pipeline
       // gate drops anyway.
-      const res = await fetchCraigslistListings(
-        { ...NYC_PARAMS, priceMin: PRICE_MIN, priceMax: PRICE_MAX },
-        { supabase },
-      );
-      // Prefer sapi's live totalResultCount as the discovery floor — it's
-      // ground truth (the full result set in one call), unlike the fixed 300
-      // constant which predates CL's redesign. Fall back to the fixed floor
-      // only when sapi itself failed (sapiTotalResultCount === null), so
-      // there's still SOME signal.
-      const sapiFloor =
-        res.sapiTotalResultCount != null
-          ? Math.floor(res.sapiTotalResultCount * CL_DISCOVERY_SAPI_RATIO)
-          : null;
-      const effectiveFloor = sapiFloor ?? CL_DISCOVERY_FLOOR;
-      if (res.discovered < effectiveFloor || res.blocked) {
-        const reason = res.blocked
-          ? "bot-block/CAPTCHA detected on the search page (or sapi returned totalResultCount>0 with 0 items)"
-          : "no block detected — appears to be a genuine low/zero-result day";
-        const floorDesc =
-          sapiFloor != null
-            ? `${effectiveFloor} (${Math.round(CL_DISCOVERY_SAPI_RATIO * 100)}% of sapi totalResultCount=${res.sapiTotalResultCount})`
-            : `${effectiveFloor} (fixed fallback — sapi call failed, no live total available)`;
+      // localRunner captures the concrete LocalCraigslistRunner (which has
+      // .close(), unlike the generic PageFunctionRunner selectCraigslistRunner
+      // returns) so the finally block below can still release the browser +
+      // lock file — selectCraigslistRunner's return type is intentionally the
+      // narrower PageFunctionRunner (its only job is the env-gate decision).
+      let localRunner: LocalCraigslistRunner | undefined;
+      const runner = selectCraigslistRunner(process.env, () => {
+        localRunner = createLocalRunner();
+        return localRunner;
+      });
+      console.log(`[Craigslist] fetcher=${runner ? "local (playwright)" : "apify"}`);
+      let res;
+      try {
+        res = await fetchCraigslistListings(
+          { ...NYC_PARAMS, priceMin: PRICE_MIN, priceMax: PRICE_MAX },
+          { supabase, runner },
+        );
+      } finally {
+        // Always close the local runner's browser + release its lock file,
+        // even if fetchCraigslistListings threw (e.g. CraigslistNetworkError)
+        // — QA B1/B2: no zombie chromium, no stuck lock, on any error path.
+        await localRunner?.close();
+      }
+      const alertReason = craigslistDiscoveryAlertReason(res);
+      if (alertReason) {
+        // sapi's totalResultCount is logged here for CONTEXT only — it no
+        // longer influences the alert decision itself (see the REMOVED
+        // comment on CL_DISCOVERY_FLOOR above).
         console.error(
-          `[Craigslist] ALERT: discovery ${res.discovered} URLs is below floor ${floorDesc} (blocked=${res.blocked}). Reason: ${reason}. Continuing run — upserting whatever was found.`,
+          `[Craigslist] ALERT: ${alertReason} (discovered=${res.discovered}, blocked=${res.blocked}, sapi totalResultCount=${res.sapiTotalResultCount ?? "unavailable"}). Continuing run — upserting whatever was found.`,
         );
         // Fire-and-forget: alert is informational, must never block the run.
+        // sendIngestAlert applies its own 24h per-subject cooldown (see
+        // lib/ingest/alert.ts) so this doesn't re-email on every ingest
+        // cycle while the condition persists — rules/alerting.md MANDATORY
+        // "one message per problem, never one per occurrence".
         sendIngestAlert(
           "[Dwelligence] Craigslist discovery floor alert",
-          `Craigslist Phase 1 discovered ${res.discovered} unique URLs (floor: ${floorDesc}).\n\n` +
-            `Blocked: ${res.blocked ? "YES" : "no"} — ${reason}.\n\n` +
+          `Craigslist Phase 1: ${alertReason}.\n\n` +
+            `Discovered: ${res.discovered} URLs (sapi totalResultCount: ${res.sapiTotalResultCount ?? "unavailable"}, for context only).\n` +
+            `Blocked: ${res.blocked ? "YES" : "no"}.\n\n` +
             `The ingest run is continuing and will upsert the ${res.listings.length} new listing(s) found.`,
         ).catch(() => {});
       }

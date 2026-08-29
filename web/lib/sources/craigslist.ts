@@ -15,6 +15,15 @@
  * 3. Bumps last_seen_at for existing URLs.
  * 4. Phase 2 — Detail scrape: only visits NEW listing pages for full data.
  * 5. Returns only new listings for the upsert pipeline.
+ *
+ * Execution backend is pluggable via the PageFunctionRunner interface
+ * (opts.runner, default = the Apify actor runner defined below): everything
+ * from "dataset items" onward — URL dedup, the DB incremental check,
+ * last_seen_at bumping, AdapterOutput mapping, sapi completeness fields —
+ * is byte-for-byte identical regardless of which runner actually executed
+ * SEARCH_ONLY_PAGE_FUNCTION / DETAIL_PAGE_FUNCTION. See
+ * lib/sources/craigslist-local.ts for a local-headless-Playwright runner
+ * that runs the exact same pageFunction strings without paying for Apify.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -29,6 +38,39 @@ const POLL_INTERVAL_MS = 5_000;
 const MAX_WAIT_MS = 3_600_000; // 60 min max (detail scrape for ~1000 URLs needs ~50 min)
 
 // ---------------------------------------------------------------------------
+// Bot-block detection markers
+// ---------------------------------------------------------------------------
+
+/**
+ * Markers that distinguish a Craigslist bot-block/CAPTCHA interstitial from
+ * a normal (possibly zero-result) page. "automatically blocked" is CL's
+ * documented rate-limit message, reported verbatim by multiple scraping
+ * guides (e.g. https://marsproxies.com/blog/craigslist-ip-block-guide/ and
+ * https://proxywing.com/blog/craigslist-ip-blocked-causes-fixes-and-ban-prevention-guide).
+ * "captcha"/"recaptcha" cover CL's documented reCAPTCHA challenge
+ * (https://www.craigslist.org/about/help/captcha). "robot"/"denied" cover
+ * the generic anti-bot interstitial copy scrapers commonly report.
+ *
+ * Kept as one exported TS-level array (rather than duplicated inline inside
+ * SEARCH_ONLY_PAGE_FUNCTION's string) so there is exactly one source of
+ * truth: SEARCH_ONLY_PAGE_FUNCTION interpolates it via JSON.stringify below,
+ * and lib/sources/craigslist-local.ts's local Playwright runner imports it
+ * directly to run the equivalent check during the DETAIL-page phase — which,
+ * unlike the search phase, has no block-detection logic baked into
+ * DETAIL_PAGE_FUNCTION itself (see that function's header comment below).
+ */
+export const CL_BLOCK_MARKERS = [
+  "automatically blocked",
+  "access denied",
+  "blocked",
+  "denied",
+  "are you a robot",
+  "verify you are human",
+  "captcha",
+  "recaptcha",
+];
+
+// ---------------------------------------------------------------------------
 // SEARCH_ONLY_PAGE_FUNCTION — only scrapes search result pages, extracts URLs
 // ---------------------------------------------------------------------------
 
@@ -37,26 +79,11 @@ async function pageFunction(context) {
   const { page, request, log } = context;
   const url = request.url;
 
-  // Markers that distinguish a Craigslist bot-block/CAPTCHA interstitial from a
-  // normal (possibly zero-result) search page. "automatically blocked" is CL's
-  // documented rate-limit message, reported verbatim by multiple scraping
-  // guides (e.g. https://marsproxies.com/blog/craigslist-ip-block-guide/ and
-  // https://proxywing.com/blog/craigslist-ip-blocked-causes-fixes-and-ban-prevention-guide).
-  // "captcha"/"recaptcha" cover CL's documented reCAPTCHA challenge
-  // (https://www.craigslist.org/about/help/captcha). "robot"/"denied" cover the
-  // generic anti-bot interstitial copy scrapers commonly report. Kept as one
-  // const so both the detection check and any future log/debug code share the
-  // same list.
-  const CL_BLOCK_MARKERS = [
-    'automatically blocked',
-    'access denied',
-    'blocked',
-    'denied',
-    'are you a robot',
-    'verify you are human',
-    'captcha',
-    'recaptcha',
-  ];
+  // See the CL_BLOCK_MARKERS export at the top of craigslist.ts for what
+  // these markers are and why. Interpolated here (rather than duplicated)
+  // so this stays the single source of truth shared with the local
+  // Playwright runner's detail-page block check.
+  const CL_BLOCK_MARKERS = ${JSON.stringify(CL_BLOCK_MARKERS)};
 
   // Only handle search result pages
   if (!url.includes('/search/') && !url.includes('search=')) {
@@ -64,16 +91,45 @@ async function pageFunction(context) {
     return;
   }
 
-  // Wait for results. CL serves a static, server-rendered result list
-  // (li.cl-static-search-result, with plain a[href] children) BEFORE any
-  // client JS runs — this is CL's no-JS fallback markup, well documented and
-  // widely used by scrapers, and unlike the JS gallery it paginates honestly
-  // via the ?s=<offset> param. The JS-gallery selectors are kept here only so
-  // bot-block/zero-result detection below still fires on either DOM variant.
+  // Capture the static, server-rendered result list (li.cl-static-search-result,
+  // plain a[href] children) IMMEDIATELY — before any wait, any network call,
+  // anything. See the dated finding in the redesign comment below: this list
+  // is present at domcontentloaded but gets REPLACED by client JS within
+  // ~1-1.5s, and there is a ~1s gap before the hydrated gallery variant
+  // appears — so this is the only point in the function where the static
+  // list is reliably still there to read.
+  const extractStaticNow = () =>
+    Array.from(document.querySelectorAll('li.cl-static-search-result > a[href]'))
+      .map(a => a.getAttribute('href'));
+  const extractGalleryNow = () =>
+    Array.from(document.querySelectorAll('[data-pid] a[href]'))
+      .map(a => a.getAttribute('href'));
+
+  let staticHrefs = await page.evaluate(extractStaticNow).catch(() => []);
+
+  // Wait for SOME result content to exist (either variant) before deciding
+  // this is a genuine zero-results/blocked page. The JS-gallery selectors
+  // are included here only so bot-block/zero-result detection below still
+  // fires on either DOM variant.
   try {
+    // state: 'attached' is explicit and load-bearing, not decoration. On
+    // Apify (Puppeteer) this key is simply ignored — Puppeteer's
+    // waitForSelector has no 'state' concept and its default already means
+    // "exists in the DOM" (visible:false). On the local Playwright runner
+    // (lib/sources/craigslist-local.ts), Playwright's page.waitForSelector
+    // defaults to state:'visible' instead — and since document.querySelector
+    // resolves this OR-list to whichever matching element is FIRST in
+    // document order, if that first match happens to be an invisible one
+    // (confirmed live for DETAIL_PAGE_FUNCTION's script[type=ld+json], which
+    // is always display:none and appears before the visible fields), the
+    // wait hangs the full timeout even though visible cards/fields ARE on
+    // the page. Discovered while wiring the local runner (every single
+    // detail fetch failed with "did not load" until this was added) — see
+    // the same explicit state on DETAIL_PAGE_FUNCTION's waitForSelector
+    // below, which is where this actually bit.
     await page.waitForSelector(
       'li.cl-static-search-result, .cl-static-search-result, [data-pid], .gallery-card, .cl-search-result',
-      { timeout: 15000 },
+      { timeout: 15000, state: 'attached' },
     );
   } catch (e) {
     // Results never appeared. Previously this silently returned, which made
@@ -117,12 +173,33 @@ async function pageFunction(context) {
   //     between concurrent identical requests: (a) a static server-rendered
   //     list — li.cl-static-search-result > a[href], one per listing, present
   //     before any client JS runs; (b) a client-rendered "gallery" variant
-  //     reached via a #search=<id>~gallery~<n> hash route, whose real markup
-  //     we have NOT captured — a diagnostic run found 0 elements matching the
-  //     old [data-pid]/.gallery-card/.cl-search-result selectors there, i.e.
-  //     those selectors are stale AND unverified against the redesign. Rather
-  //     than guess at unverified gallery markup, we reload (up to 3x) to try
-  //     to land on the static variant, and fail loudly if we can't.
+  //     reached via a #search=<id>~gallery~<n> hash route.
+  //   - UPDATE (2026-08-28, root-caused via a local-vs-Apify parity run —
+  //     raw captures in /home/esme/.claude/jobs/2ab1ae70/tmp/parity/{local-search,apify-search}.json
+  //     — followed by a 1s-resolution timeline probe of the live DOM,
+  //     /home/esme/.claude/jobs/2ab1ae70/tmp/discovery/probe.mjs): the two
+  //     "DOM variants" are NOT randomly served one-or-the-other per request
+  //     — every request gets BOTH, in sequence. CL first
+  //     serves the static, server-rendered list (li.cl-static-search-result
+  //     > a[href], ~300 items) present already at domcontentloaded; client
+  //     JS then REPLACES it with a hydrated gallery ([data-pid] a[href],
+  //     ~200 items, freshest-first). Measured timeline for one search:
+  //     static count 258 at t=0.5s -> 0 at t=1.5s; gallery count 0 through
+  //     t=1.5s -> 400 (raw anchor count, ~200 cards) at t=2.5s onward. The
+  //     parity run confirmed this end to end: a local runner that waits 8s
+  //     before reading the DOM (craigslist-local.ts's old pre-wait) saw only
+  //     the 200-item gallery; the Apify runner (no pre-wait, networkidle)
+  //     saw only the ~300-item static list; only 100 URLs were common
+  //     between them, and the local runner's items 100-199 matched the
+  //     Apify runner's items 0-99 in the same order — i.e. each run was
+  //     missing what the OTHER captured, not extra/duplicate data. The fix:
+  //     read the static list IMMEDIATELY on entry (before any wait — see
+  //     extractStaticNow above), THEN wait for the gallery to hydrate and
+  //     read that too, and UNION the two (deduped by href) — see the
+  //     extraction block below. The "variant missing entirely" case (NEITHER
+  //     ever yields anything, after the hydration wait) still triggers the
+  //     reload-and-retry loop and the loud zero-results return below,
+  //     unchanged.
   //   - The old ?s=<offset> pagination param is now DEAD: appending s=120
   //     after the redirect produced the byte-identical page-1 result set
   //     (confirmed via a direct diagnostic request), and 6 rounds of
@@ -226,43 +303,58 @@ async function pageFunction(context) {
   }
 
   const MAX_VARIANT_RETRIES = 3;
+  const GALLERY_HYDRATE_TIMEOUT_MS = 10000;
+
+  // Wait for the client-JS gallery to hydrate (see the dated finding above —
+  // it lands ~2.5s post-nav, well within this budget), then read it. Tolerate
+  // a timeout: some pages may only ever serve the static variant, and
+  // staticHrefs (captured before this function ran) still covers that case.
+  async function waitAndExtractGallery() {
+    try {
+      await page.waitForSelector('[data-pid] a[href]', { timeout: GALLERY_HYDRATE_TIMEOUT_MS, state: 'attached' });
+    } catch (e) {
+      log.warning('Gallery hydration wait timed out (' + GALLERY_HYDRATE_TIMEOUT_MS + 'ms) — proceeding with whatever was captured: ' + url);
+    }
+    return page.evaluate(extractGalleryNow).catch(() => []);
+  }
 
   // NOTE: page.evaluate can only return JSON-serializable values across the
   // browser/Node boundary — DOM elements do NOT survive the trip (they
   // serialize to empty objects with no .getAttribute etc). Extract the
-  // hrefs as plain strings INSIDE the evaluate callback, not the elements.
-  function extractStaticHrefs() {
-    return Array.from(document.querySelectorAll('li.cl-static-search-result > a[href]'))
-      .map(a => a.getAttribute('href'))
-      .filter(Boolean);
-  }
+  // hrefs as plain strings inside the evaluate callback, not the elements.
+  let galleryHrefs = await waitAndExtractGallery();
 
-  let cardCount = 0;
-  let firstHref = null;
-  let hrefs = [];
+  // Union of BOTH DOM phases (see the dated finding above), deduped by href
+  // string. staticHrefs was captured at function entry, before any wait —
+  // by the time we reach here it is usually already stale in the live DOM,
+  // but the string array we captured is unaffected by that.
+  let hrefs = [...new Set([...staticHrefs, ...galleryHrefs])].filter(Boolean);
+  let cardCount = hrefs.length;
+  let firstHref = hrefs[0] || null;
 
-  for (let attempt = 1; attempt <= MAX_VARIANT_RETRIES; attempt++) {
-    hrefs = await page.evaluate(extractStaticHrefs);
+  // The reload-and-retry loop now triggers only when the UNION is empty
+  // after the hydration wait above — i.e. neither phase ever produced a
+  // single card for this request (a genuinely different failure than one
+  // phase being merely absent, which the union already tolerates).
+  for (let attempt = 2; cardCount === 0 && attempt <= MAX_VARIANT_RETRIES; attempt++) {
+    log.warning('Both DOM variants empty (attempt ' + (attempt - 1) + '/' + MAX_VARIANT_RETRIES + ') — reloading to retry: ' + url);
+    try {
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
+    } catch (e) {
+      log.warning('Reload failed: ' + e.message);
+    }
+    staticHrefs = await page.evaluate(extractStaticNow).catch(() => []);
+    galleryHrefs = await waitAndExtractGallery();
+    hrefs = [...new Set([...staticHrefs, ...galleryHrefs])].filter(Boolean);
     cardCount = hrefs.length;
     if (cardCount > 0) {
       firstHref = hrefs[0] || null;
-      if (attempt > 1) {
-        log.info('Static result variant found on reload attempt ' + attempt + ' (' + cardCount + ' cards).');
-      }
-      break;
-    }
-    if (attempt < MAX_VARIANT_RETRIES) {
-      log.warning('Static results missing (attempt ' + attempt + '/' + MAX_VARIANT_RETRIES + ') — CL served the unverified gallery DOM variant for this request. Reloading to retry for the static variant.');
-      try {
-        await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
-      } catch (e) {
-        log.warning('Reload failed: ' + e.message);
-      }
+      log.info('Result cards found on reload attempt ' + attempt + ' (' + cardCount + ' cards).');
     }
   }
 
   if (cardCount === 0) {
-    log.error('Static results missing after ' + MAX_VARIANT_RETRIES + ' attempts — DOM variant changed and the gallery fallback is unverified. Reporting zero results rather than guessing at stale selectors: ' + url);
+    log.error('Both DOM variants missing after ' + MAX_VARIANT_RETRIES + ' attempts — reporting zero results rather than guessing at stale selectors: ' + url);
     return {
       zeroResults: true,
       hasSearchShell: true,
@@ -283,7 +375,7 @@ async function pageFunction(context) {
       .map(href => (href.startsWith('http') ? href : 'https://www.craigslist.org' + href)),
   )];
 
-  log.info('Page 1: ' + cardCount + ' cards, ' + links.length + ' links, first href ' + firstHref);
+  log.info('Page 1: ' + cardCount + ' cards (static=' + staticHrefs.length + ' gallery=' + galleryHrefs.length + '), ' + links.length + ' links, first href ' + firstHref);
 
   for (const link of links) {
     await context.pushData({ url: link });
@@ -296,10 +388,14 @@ async function pageFunction(context) {
   // rows above (see the DETAIL_PAGE_FUNCTION comment on this actor behavior).
   // It has no \`url\` field so it's naturally excluded when
   // fetchCraigslistListings collects discovered URLs, and is instead read
-  // separately for the sapi completeness/discovery-floor signal.
+  // separately for the sapi completeness/discovery-floor signal. staticCount
+  // / galleryCount are the raw (pre-union) href counts from each DOM phase —
+  // see the dated finding above — kept for diagnosing coverage drift.
   return {
     sapiSummary: true,
     linksCount: links.length,
+    staticCount: staticHrefs.length,
+    galleryCount: galleryHrefs.length,
     sapiTotalResultCount,
     sapiInRegionCount,
     sapiBlocked,
@@ -316,15 +412,29 @@ async function pageFunction(context) {
   const { page, request, log } = context;
   const url = request.url;
 
-  // Wait for content to load. CL's redesign (see the diagnostic-run comment
-  // in SEARCH_ONLY_PAGE_FUNCTION above) confirmed script[type="application/
-  // ld+json"] and span.price are present on the new detail-page DOM — kept
-  // as the primary wait targets, with the old selectors as an OR-fallback in
-  // case some listings still render the classic markup.
+  // Wait for content to load. Selector list is deliberately REAL BODY
+  // CONTENT only (span.price/#postingbody/.posting-title/span#titletextonly/
+  // .postingtitletext) — script[type="application/ld+json"] used to be
+  // included too, but that tag lives in <head> and is attached to the DOM
+  // before the page BODY renders. On the local Playwright runner (page.goto
+  // with waitUntil:'domcontentloaded', then this function invoked
+  // immediately — see craigslist-local.ts) that meant this wait could
+  // resolve on the ld+json match alone, before span.price/#postingbody etc.
+  // actually existed, and extraction below ran against a half-rendered page.
+  // Root-caused 2026-08-28 from a real ingest run: 108 of 258 detail pages
+  // came back with null title/price even though a live probe confirmed the
+  // pages had a visible price — Apify's networkidle2 pre-wait masked this
+  // same race on that path, which is why it only ever showed up locally.
   try {
+    // state: 'attached' — see the matching comment on SEARCH_ONLY_PAGE_FUNCTION's
+    // waitForSelector above for why this is required, not optional: without
+    // it, Playwright's default state:'visible' can wait on whichever of
+    // these matches first in DOM order even if it never becomes visible.
+    // Puppeteer (Apify) ignores this key and already behaves this way by
+    // default, so this has no effect there — pure parity fix.
     await page.waitForSelector(
-      'script[type="application/ld+json"], span.price, #postingbody, .posting-title, span#titletextonly',
-      { timeout: 10000 },
+      'span.price, #postingbody, .posting-title, span#titletextonly, .postingtitletext',
+      { timeout: 10000, state: 'attached' },
     );
   } catch (e) {
     // Do NOT fall through to pushData on a failed load. Previously this
@@ -549,6 +659,16 @@ interface ApifySearchItem {
   zeroResults?: boolean;
   hasSearchShell?: boolean;
   /**
+   * Set when neither DOM variant's selector yielded any cards after
+   * MAX_VARIANT_RETRIES reloads — distinct from a genuine zeroResults page
+   * (which has a normal search shell and just no listings): this means the
+   * page's markup didn't match anything we know how to read at all, and
+   * fetchCraigslistListings.staticVariantMissing surfaces it so callers can
+   * report a distinguishable "variant-miss" outcome instead of a silent
+   * empty-listings result (QA scenario E3).
+   */
+  staticVariantMissing?: boolean;
+  /**
    * The pageFunction's own return value — the actor auto-pushes it as one
    * extra dataset record per invocation (see the DETAIL_PAGE_FUNCTION
    * comment on this actor behavior). It carries the sapi.craigslist.org
@@ -560,6 +680,10 @@ interface ApifySearchItem {
    */
   sapiSummary?: boolean;
   linksCount?: number;
+  /** Raw (pre-union, pre-dedup) href count from li.cl-static-search-result — see the dated finding in SEARCH_ONLY_PAGE_FUNCTION. */
+  staticCount?: number;
+  /** Raw (pre-union, pre-dedup) href count from [data-pid] a[href] — see the dated finding in SEARCH_ONLY_PAGE_FUNCTION. */
+  galleryCount?: number;
   sapiTotalResultCount?: number | null;
   sapiInRegionCount?: number | null;
   sapiBlocked?: boolean;
@@ -672,19 +796,139 @@ async function fetchDatasetItems<T>(
 }
 
 // ---------------------------------------------------------------------------
+// PageFunctionRunner — executes the pageFunction strings above against real
+// listing pages. Two implementations exist: createApifyRunner below (the
+// original Apify puppeteer-scraper actor calls, unchanged) and
+// lib/sources/craigslist-local.ts's local headless-Playwright runner, which
+// runs the EXACT SAME pageFunction strings in a real local browser instead
+// of paying for Apify's proxy/compute. Factoring this out is what lets
+// fetchCraigslistListings' post-processing (URL dedup, DB incremental check,
+// sapi completeness fields, AdapterOutput mapping) stay byte-for-byte
+// identical between the two paths.
+// ---------------------------------------------------------------------------
+
+export interface PageFunctionRunner {
+  /**
+   * Runs SEARCH_ONLY_PAGE_FUNCTION against one search-results start URL.
+   * Returns the resulting dataset rows: one per context.pushData call the
+   * function made, PLUS the function's own return value as one extra row —
+   * this mirrors the real Apify actor's auto-push-return-value behavior
+   * (see the comment on DETAIL_PAGE_FUNCTION's final `return data` below).
+   */
+  runSearch(startUrl: string): Promise<unknown[]>;
+  /**
+   * Runs DETAIL_PAGE_FUNCTION against each listing URL. Returns the same
+   * dataset-row shape as runSearch. May throw CraigslistBlockedError (with
+   * whatever rows were already extracted attached) or CraigslistNetworkError
+   * — see those classes below.
+   */
+  runDetail(urls: string[]): Promise<unknown[]>;
+  /** Short name for logging, e.g. "apify" or "playwright-local". */
+  name: string;
+}
+
+/**
+ * Thrown by a PageFunctionRunner when a bot-block/CAPTCHA interstitial is
+ * detected mid-detail-scrape. Carries whatever rows were already extracted
+ * before the block so the caller can still upsert partial progress (QA
+ * scenario E6: never mark the un-fetched remainder as delisted, never throw
+ * away real data just because the run had to stop).
+ */
+export class CraigslistBlockedError extends Error {
+  constructor(
+    message: string,
+    public readonly partialItems: unknown[],
+    public readonly blockedAtUrl: string | null = null,
+  ) {
+    super(message);
+    this.name = "CraigslistBlockedError";
+  }
+}
+
+/**
+ * Thrown by a PageFunctionRunner on a network-level failure (DNS resolution,
+ * connection refused, etc.) — distinct from a bot-block (QA scenario
+ * requirement): a block means "the site is responding but doesn't want us",
+ * a network error means "we can't reach the site at all". Fatal for the
+ * whole run — unlike CraigslistBlockedError there is no partial-progress
+ * path, since the failure isn't localized to one page.
+ */
+export class CraigslistNetworkError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CraigslistNetworkError";
+  }
+}
+
+/** The default runner: the original Apify puppeteer-scraper actor calls, unchanged. */
+export function createApifyRunner(token: string): PageFunctionRunner {
+  return {
+    name: "apify",
+    async runSearch(startUrl: string): Promise<unknown[]> {
+      const input = {
+        startUrls: [{ url: startUrl }],
+        pageFunction: SEARCH_ONLY_PAGE_FUNCTION,
+        proxyConfiguration: { useApifyProxy: true },
+        maxRequestsPerCrawl: 50,
+        maxConcurrency: 3,
+        waitUntil: ["networkidle2"],
+      };
+      const { runId, datasetId } = await launchApifyRun(token, input);
+      console.log(`[Craigslist] Apify search run started (${runId}) for ${startUrl}`);
+      const status = await pollApifyRun(token, runId, MAX_WAIT_MS);
+      console.log(`[Craigslist] Apify search run ${runId}: ${status}`);
+      if (status !== "SUCCEEDED") {
+        throw new Error(`Apify search run ${status}: ${runId}`);
+      }
+      return fetchDatasetItems<unknown>(token, datasetId);
+    },
+    async runDetail(urls: string[]): Promise<unknown[]> {
+      const input = {
+        startUrls: urls.map((url) => ({ url })),
+        pageFunction: DETAIL_PAGE_FUNCTION,
+        proxyConfiguration: { useApifyProxy: true },
+        maxRequestsPerCrawl: urls.length + 100,
+        maxConcurrency: 10,
+        waitUntil: ["networkidle2"],
+      };
+      const { runId, datasetId } = await launchApifyRun(token, input);
+      console.log(`[Craigslist] Apify detail run started (${runId}) for ${urls.length} URLs`);
+      const status = await pollApifyRun(token, runId, MAX_WAIT_MS);
+      console.log(`[Craigslist] Apify detail run ${status}`);
+      if (status !== "SUCCEEDED") {
+        throw new Error(`Apify detail run ${status}: ${runId}`);
+      }
+      return fetchDatasetItems<unknown>(token, datasetId);
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Main fetch function
 // ---------------------------------------------------------------------------
 
 export async function fetchCraigslistListings(
   params: SearchParams,
-  opts?: { supabase?: SupabaseClient },
+  opts?: { supabase?: SupabaseClient; runner?: PageFunctionRunner },
 ): Promise<{
   listings: AdapterOutput[];
   total: number;
   /** Unique URLs discovered in Phase 1, before the DB new/existing filter. */
   discovered: number;
-  /** True if any borough's Phase 1 search page hit a bot-block/CAPTCHA interstitial. */
+  /**
+   * True if any borough's Phase 1 search page hit a bot-block/CAPTCHA
+   * interstitial, OR the detail phase hit one mid-scrape (local runner
+   * only — see CraigslistBlockedError). When true, `blockedAtUrl` names
+   * where.
+   */
   blocked: boolean;
+  /**
+   * True if, after MAX_VARIANT_RETRIES reloads, neither DOM-variant
+   * selector yielded any search-result cards at all — distinct from a
+   * genuine zero-results page (QA scenario E3: these must be
+   * distinguishable outcomes, not both collapsed into "0 listings").
+   */
+  staticVariantMissing: boolean;
   /**
    * Sum across boroughs of sapi.craigslist.org's totalResultCount (the FULL
    * live result count for the query, independent of what the static-page
@@ -692,13 +936,32 @@ export async function fetchCraigslistListings(
    * Ground truth for discovery-floor alerting; see lib/ingest/strategies.ts.
    */
   sapiTotalResultCount: number | null;
+  /** Sum across boroughs of sapi's in-target-region-bbox item count. Null under the same conditions as sapiTotalResultCount. */
+  sapiInRegionCount: number | null;
+  /** Count of detail URLs that were successfully page-fetched (excludes 404/timeout skips and un-attempted URLs after a mid-detail block). */
+  fetched: number;
+  /** Count of detail URLs that 404'd or timed out (after one retry) — counted skips, not silent drops (QA E12/E13). */
+  skipped: number;
+  /** The URL where a block was detected, if `blocked` is true and it happened on a specific page (search-phase blocks may leave this null). */
+  blockedAtUrl: string | null;
 }> {
   const { bedsMin, bedsMax, priceMax, priceMin } = params;
 
-  const token = process.env.APIFY_TOKEN;
-  if (!token) {
-    throw new Error("APIFY_TOKEN not set — cannot query Craigslist via Apify");
-  }
+  // The runner owns HOW SEARCH_ONLY_PAGE_FUNCTION / DETAIL_PAGE_FUNCTION
+  // actually get executed (a paid Apify actor run vs. a local headless
+  // Playwright browser) — see the PageFunctionRunner doc comment above.
+  // Default to Apify, matching every call site before this abstraction
+  // existed; only resolve/require APIFY_TOKEN when no runner was supplied,
+  // so the local runner path never needs it.
+  const runner: PageFunctionRunner =
+    opts?.runner ??
+    (() => {
+      const token = process.env.APIFY_TOKEN;
+      if (!token) {
+        throw new Error("APIFY_TOKEN not set — cannot query Craigslist via Apify");
+      }
+      return createApifyRunner(token);
+    })();
 
   // Brooklyn only — the target region is entirely in Brooklyn, so we don't scan
   // Manhattan (saves a paid Apify search run; it returned 0 in-region anyway).
@@ -723,101 +986,127 @@ export async function fetchCraigslistListings(
   // Phase 1 — Search-page scan (discover listing URLs without visiting them)
   // =========================================================================
   console.log(
-    `[Craigslist] Phase 1: search-page scan across ${CL_BOROUGHS.length} boroughs`,
+    `[Craigslist] Phase 1: search-page scan across ${CL_BOROUGHS.length} boroughs (runner=${runner.name})`,
   );
 
-  const searchRuns: Array<{
+  interface SearchRunResult {
     borough: string;
-    runId: string;
-    datasetId: string;
-  }> = [];
+    items: ApifySearchItem[];
+    ok: boolean;
+    error?: string;
+  }
 
-  // Launch one search-only Apify run per borough in parallel
-  await Promise.all(
-    CL_BOROUGHS.map(async (borough) => {
+  // One runner.runSearch call per borough, in parallel — the runner owns
+  // however it actually executes SEARCH_ONLY_PAGE_FUNCTION (an Apify actor
+  // run vs. a local Playwright page); everything below only cares about the
+  // resulting dataset rows, so this is identical for both runners.
+  const searchResults: SearchRunResult[] = await Promise.all(
+    CL_BOROUGHS.map(async (borough): Promise<SearchRunResult> => {
       // Canonical URL scheme (see the redesign comment inside
       // SEARCH_ONLY_PAGE_FUNCTION above): CL redirects the old
       // newyork.craigslist.org/search/<borough>/apa form to this one, so we
       // construct it directly rather than relying on the redirect hop.
       const startUrl = `https://www.craigslist.org/search/subarea/${borough}?cat=apa&${qs}`;
-      const input = {
-        startUrls: [{ url: startUrl }],
-        pageFunction: SEARCH_ONLY_PAGE_FUNCTION,
-        proxyConfiguration: { useApifyProxy: true },
-        maxRequestsPerCrawl: 50,
-        maxConcurrency: 3,
-        waitUntil: ["networkidle2"],
-      };
-
-      const { runId, datasetId } = await launchApifyRun(token, input);
-      console.log(
-        `[Craigslist] Phase 1 — borough ${borough}: run started (${runId})`,
-      );
-      searchRuns.push({ borough, runId, datasetId });
+      try {
+        const items = (await runner.runSearch(startUrl)) as ApifySearchItem[];
+        console.log(
+          `[Craigslist] Phase 1 — borough ${borough}: search run completed (${items.length} raw dataset row(s))`,
+        );
+        return { borough, items, ok: true };
+      } catch (e) {
+        if (e instanceof CraigslistNetworkError) {
+          // Network-level failure is fatal for the whole run, not just this
+          // borough — rethrow so it propagates all the way to the caller
+          // (scripts/craigslist-local-run.ts) as a distinct "network-error"
+          // outcome, per QA scenario requiring it be distinguishable from a
+          // bot-block or a genuine empty result.
+          throw e;
+        }
+        console.warn(
+          `[Craigslist] Phase 1 — borough ${borough}: search run failed: ${(e as Error).message}`,
+        );
+        return { borough, items: [], ok: false, error: (e as Error).message };
+      }
     }),
   );
 
-  // Poll all search runs until complete
-  const searchRunStatuses = await Promise.all(
-    searchRuns.map(async (run) => {
-      const status = await pollApifyRun(token, run.runId, MAX_WAIT_MS);
-      console.log(
-        `[Craigslist] Phase 1 — borough ${run.borough}: ${status}`,
-      );
-      return { ...run, status };
-    }),
-  );
-
-  // Collect all discovered URLs from search datasets
+  // Collect discovered URLs, bot-block, and sapi-completeness signals from
+  // every borough that completed. staticVariantMissing mirrors `blocked`:
+  // both are per-item flags the pageFunction already computes (see the
+  // redesign comment inside SEARCH_ONLY_PAGE_FUNCTION) — surfaced here so
+  // scripts/craigslist-local-run.ts can report the correct outcome class
+  // (QA E3: zero-results / variant-miss / blocked must be distinguishable,
+  // not all collapsed into "0 listings").
   const allDiscoveredUrls: string[] = [];
   const blockedBoroughs: string[] = [];
+  const staticVariantMissingBoroughs: string[] = [];
   let sapiTotalResultCount: number | null = null;
+  let sapiInRegionCount: number | null = null;
   let sapiSawAnyValue = false;
-  await Promise.all(
-    searchRunStatuses
-      .filter((r) => r.status === "SUCCEEDED")
-      .map(async (run) => {
-        const items = await fetchDatasetItems<ApifySearchItem>(
-          token,
-          run.datasetId,
-        );
-        const blockedItems = items.filter((item) => item.blocked || item.sapiBlocked);
-        if (blockedItems.length > 0) {
-          blockedBoroughs.push(run.borough);
-          console.error(
-            `[Craigslist] BOT BLOCK DETECTED — borough ${run.borough}: ${blockedItems.length} blocked page(s). ` +
-              `Sample: title="${blockedItems[0].blockTitle ?? ""}" snippet="${(blockedItems[0].blockSnippet ?? "").slice(0, 150)}"`,
-          );
-        }
-        const urls = items
-          .map((item) => item.url)
-          .filter((u): u is string => !!u);
-        console.log(
-          `[Craigslist] Phase 1 — borough ${run.borough}: ${urls.length} URLs discovered` +
-            (blockedItems.length > 0 ? " (BOT-BLOCKED run — treat as unreliable, not a genuine zero-result day)" : ""),
-        );
-        allDiscoveredUrls.push(...urls);
+  let blockedAtUrl: string | null = null;
 
-        // sapiSummary is the pageFunction's own return value — see the field
-        // comment on ApifySearchItem. Sum it in (single borough today, but
-        // written to generalize if CL_BOROUGHS grows again).
-        const sapiItem = items.find((item) => item.sapiSummary);
-        if (sapiItem && sapiItem.sapiTotalResultCount != null) {
-          sapiTotalResultCount = (sapiTotalResultCount ?? 0) + sapiItem.sapiTotalResultCount;
-          sapiSawAnyValue = true;
-          console.log(
-            `[Craigslist] Phase 1 — borough ${run.borough}: sapi totalResultCount=${sapiItem.sapiTotalResultCount} inRegion(bbox)=${sapiItem.sapiInRegionCount ?? "?"} vs ${urls.length} scraped URLs`,
-          );
-        } else {
-          console.warn(
-            `[Craigslist] Phase 1 — borough ${run.borough}: sapi summary missing or failed — no completeness signal for this borough.`,
-          );
-        }
-      }),
-  );
+  // Only keep urls that look like an actual listing (same /view/d/ or legacy
+  // <id>.html regex DETAIL_PAGE_FUNCTION's callers rely on elsewhere). A
+  // blocked / zeroResults / staticVariantMissing summary row ALSO carries a
+  // `url` field — it's request.url, i.e. the SEARCH page's own url, not a
+  // listing — which would otherwise get treated as a "discovered" listing
+  // URL and sent to Phase 2 for a detail fetch. Found while wiring the local
+  // runner (QA E5: a block on the search page must produce ZERO detail
+  // fetches); without this filter a blocked run still fired exactly one
+  // bogus detail request, at the search page's own URL. Also fixes the
+  // identical latent issue for genuine-zero-results and variant-miss rows.
+  const LISTING_URL_RE = /\/view\/d\//;
+  const LISTING_URL_LEGACY_RE = /\d+\.html$/;
+
+  for (const run of searchResults.filter((r) => r.ok)) {
+    const items = run.items;
+    const blockedItems = items.filter((item) => item.blocked || item.sapiBlocked);
+    if (blockedItems.length > 0) {
+      blockedBoroughs.push(run.borough);
+      if (!blockedAtUrl) blockedAtUrl = blockedItems[0].url ?? null;
+      console.error(
+        `[Craigslist] BOT BLOCK DETECTED — borough ${run.borough}: ${blockedItems.length} blocked page(s). ` +
+          `Sample: title="${blockedItems[0].blockTitle ?? ""}" snippet="${(blockedItems[0].blockSnippet ?? "").slice(0, 150)}"`,
+      );
+    }
+    if (items.some((item) => item.staticVariantMissing)) {
+      staticVariantMissingBoroughs.push(run.borough);
+    }
+    const urls = items
+      .map((item) => item.url)
+      .filter((u): u is string => !!u && (LISTING_URL_RE.test(u) || LISTING_URL_LEGACY_RE.test(u)));
+    console.log(
+      `[Craigslist] Phase 1 — borough ${run.borough}: ${urls.length} URLs discovered` +
+        (blockedItems.length > 0 ? " (BOT-BLOCKED run — treat as unreliable, not a genuine zero-result day)" : ""),
+    );
+    allDiscoveredUrls.push(...urls);
+
+    // sapiSummary is the pageFunction's own return value — see the field
+    // comment on ApifySearchItem. Sum it in (single borough today, but
+    // written to generalize if CL_BOROUGHS grows again).
+    const sapiItem = items.find((item) => item.sapiSummary);
+    if (sapiItem && sapiItem.sapiTotalResultCount != null) {
+      sapiTotalResultCount = (sapiTotalResultCount ?? 0) + sapiItem.sapiTotalResultCount;
+      if (sapiItem.sapiInRegionCount != null) {
+        sapiInRegionCount = (sapiInRegionCount ?? 0) + sapiItem.sapiInRegionCount;
+      }
+      sapiSawAnyValue = true;
+      console.log(
+        `[Craigslist] Phase 1 — borough ${run.borough}: sapi totalResultCount=${sapiItem.sapiTotalResultCount} inRegion(bbox)=${sapiItem.sapiInRegionCount ?? "?"} vs ${urls.length} scraped URLs`,
+      );
+    } else {
+      console.warn(
+        `[Craigslist] Phase 1 — borough ${run.borough}: sapi summary missing or failed — no completeness signal for this borough.`,
+      );
+    }
+  }
 
   const blocked = blockedBoroughs.length > 0;
-  if (!sapiSawAnyValue) sapiTotalResultCount = null;
+  const staticVariantMissing = staticVariantMissingBoroughs.length > 0;
+  if (!sapiSawAnyValue) {
+    sapiTotalResultCount = null;
+    sapiInRegionCount = null;
+  }
 
   // Deduplicate URLs across boroughs
   const uniqueUrls = [...new Set(allDiscoveredUrls)];
@@ -826,18 +1115,27 @@ export async function fetchCraigslistListings(
   );
 
   // Warn about boroughs that failed
-  const failedBoroughs = searchRunStatuses.filter(
-    (r) => r.status !== "SUCCEEDED",
-  );
+  const failedBoroughs = searchResults.filter((r) => !r.ok);
   if (failedBoroughs.length > 0) {
     console.warn(
-      `[Craigslist] Phase 1: ${failedBoroughs.length} borough(s) failed: ${failedBoroughs.map((r) => `${r.borough} (${r.status})`).join(", ")}`,
+      `[Craigslist] Phase 1: ${failedBoroughs.length} borough(s) failed: ${failedBoroughs.map((r) => `${r.borough} (${r.error ?? "unknown error"})`).join(", ")}`,
     );
   }
 
   if (uniqueUrls.length === 0) {
     console.log("[Craigslist] No URLs discovered — nothing to do");
-    return { listings: [], total: 0, discovered: 0, blocked, sapiTotalResultCount };
+    return {
+      listings: [],
+      total: 0,
+      discovered: 0,
+      blocked,
+      staticVariantMissing,
+      sapiTotalResultCount,
+      sapiInRegionCount,
+      fetched: 0,
+      skipped: 0,
+      blockedAtUrl,
+    };
   }
 
   // =========================================================================
@@ -864,10 +1162,21 @@ export async function fetchCraigslistListings(
         .in("url", chunk);
 
       if (error) {
-        console.warn(
-          `[Craigslist] DB query error (batch ${Math.floor(i / BATCH_SIZE) + 1}): ${error.message}`,
+        // BUG FIX (QA scenario E11): this used to `console.warn` and
+        // `continue`, which silently treated every URL in the failed batch
+        // as "not in DB" — i.e. degraded straight into fetch-everything
+        // behavior for exactly the URLs the DB couldn't confirm. That's the
+        // failure mode that gets a home IP rate-limited/banned: a real DB
+        // outage would make an incremental run silently detail-scrape the
+        // ENTIRE discovered set (minus whatever batches happened to
+        // succeed) instead of just the new rows, with no operator
+        // visibility. A supabase client was explicitly supplied by the
+        // caller, so an unreachable/erroring DB here is a hard error, not a
+        // fallback path — contrast the `else` branch below, which is the
+        // ONLY sanctioned "fetch everything" path (no DB client at all).
+        throw new Error(
+          `[Craigslist] DB query failed while checking existing URLs (batch ${Math.floor(i / BATCH_SIZE) + 1}, ${chunk.length} urls): ${error.message}`,
         );
-        continue;
       }
       if (data) {
         for (const row of data) {
@@ -918,39 +1227,49 @@ export async function fetchCraigslistListings(
     console.log(
       "[Craigslist] Phase 2: no new listings to fetch — all existing listings had last_seen_at bumped",
     );
-    return { listings: [], total: 0, discovered: uniqueUrls.length, blocked, sapiTotalResultCount };
+    return {
+      listings: [], total: 0, discovered: uniqueUrls.length, blocked, staticVariantMissing,
+      sapiTotalResultCount, sapiInRegionCount, fetched: 0, skipped: 0, blockedAtUrl,
+    };
   }
 
   console.log(
-    `[Craigslist] Phase 2: fetching ${urlsToFetch.length} new listing details`,
+    `[Craigslist] Phase 2: fetching ${urlsToFetch.length} new listing details via runner=${runner.name}`,
   );
 
-  const detailInput = {
-    startUrls: urlsToFetch.map((url) => ({ url })),
-    pageFunction: DETAIL_PAGE_FUNCTION,
-    proxyConfiguration: { useApifyProxy: true },
-    maxRequestsPerCrawl: urlsToFetch.length + 100,
-    maxConcurrency: 10,
-    waitUntil: ["networkidle2"],
-  };
-
-  const { runId: detailRunId, datasetId: detailDatasetId } =
-    await launchApifyRun(token, detailInput);
-  console.log(
-    `[Craigslist] Phase 2: detail run started (${detailRunId}) for ${urlsToFetch.length} URLs`,
-  );
-
-  const detailStatus = await pollApifyRun(token, detailRunId, MAX_WAIT_MS);
-  console.log(`[Craigslist] Phase 2: detail run ${detailStatus}`);
-
-  if (detailStatus !== "SUCCEEDED") {
-    console.error(
-      `[Craigslist] Phase 2: detail run ${detailStatus} — returning empty`,
-    );
-    return { listings: [], total: 0, discovered: uniqueUrls.length, blocked, sapiTotalResultCount };
+  let rawItems: ApifyCLItem[];
+  let detailBlocked = false;
+  try {
+    rawItems = (await runner.runDetail(urlsToFetch)) as ApifyCLItem[];
+  } catch (e) {
+    if (e instanceof CraigslistNetworkError) {
+      // Fatal for the whole run — propagate to the caller
+      // (scripts/craigslist-local-run.ts maps this to a distinct
+      // "network-error" outcome/exit code, per QA scenario requiring it be
+      // distinguishable from a bot-block).
+      throw e;
+    }
+    if (e instanceof CraigslistBlockedError) {
+      // Mid-detail bot-block (QA E6): stop cold, keep whatever the runner
+      // already extracted before the block, and surface it as blocked
+      // rather than silently returning a partial success or throwing away
+      // real data. Falls through to the SAME dedup/mapping code used for a
+      // normal run below, so a partial blocked run still upserts what it
+      // got — never marks the un-fetched remainder as delisted.
+      console.error(`[Craigslist] Phase 2: ${e.message}`);
+      rawItems = e.partialItems as ApifyCLItem[];
+      detailBlocked = true;
+      blockedAtUrl = blockedAtUrl ?? e.blockedAtUrl;
+    } else {
+      console.error(
+        `[Craigslist] Phase 2: detail run failed: ${(e as Error).message} — returning empty`,
+      );
+      return {
+        listings: [], total: 0, discovered: uniqueUrls.length, blocked, staticVariantMissing,
+        sapiTotalResultCount, sapiInRegionCount, fetched: 0, skipped: 0, blockedAtUrl,
+      };
+    }
   }
-
-  const rawItems = await fetchDatasetItems<ApifyCLItem>(token, detailDatasetId);
   console.log(
     `[Craigslist] Phase 2: ${rawItems.length} detail items retrieved`,
   );
@@ -978,6 +1297,17 @@ export async function fetchCraigslistListings(
       `[Craigslist] Phase 2: deduped ${rawItems.length - items.length} duplicate dataset item(s) by URL (${rawItems.length} raw → ${items.length} unique)`,
     );
   }
+
+  // Local-runner skip rows (lib/sources/craigslist-local.ts) carry
+  // `__skipped: true` for a detail URL that 404'd or timed out (after one
+  // retry) — counted here so the caller can report a genuine skip count,
+  // distinct from "fetched but rejected by the pipeline gate" (e.g. null
+  // price, below). Apify rows never carry this marker, so `skipped` is
+  // always 0 on that path — parity preserved.
+  const skippedCount = items.filter(
+    (item) => (item as { __skipped?: boolean }).__skipped === true,
+  ).length;
+  const fetchedCount = items.length - skippedCount;
 
   // =========================================================================
   // Map detail items to AdapterOutput[]
@@ -1062,5 +1392,16 @@ export async function fetchCraigslistListings(
     `[Craigslist] Done: ${listings.length} new listings ready for pipeline`,
   );
 
-  return { listings, total: listings.length, discovered: uniqueUrls.length, blocked, sapiTotalResultCount };
+  return {
+    listings,
+    total: listings.length,
+    discovered: uniqueUrls.length,
+    blocked: blocked || detailBlocked,
+    staticVariantMissing,
+    sapiTotalResultCount,
+    sapiInRegionCount,
+    fetched: fetchedCount,
+    skipped: skippedCount,
+    blockedAtUrl,
+  };
 }
