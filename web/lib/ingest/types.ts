@@ -111,6 +111,23 @@ export interface CleanupStaleOutput {
   staleDeleted: number;
 }
 
+export interface DelistUnseenOutput {
+  /** Rows matching the streeteasy/region/beds/price predicate. */
+  scanned: number;
+  /** Of `scanned`, rows whose last_seen_at is older than the cutoff. */
+  stale: number;
+  /** Rows actually marked delisted this run (0 when skipped, refused, or dry-run). */
+  delisted: number;
+  /**
+   * Why the phase did zero DB work this run, or null if it ran normally
+   * (including the "0 stale" and "refused by cap" outcomes, which still did
+   * the counting queries and are NOT "skipped" — see phase file header).
+   */
+  skippedReason: string | null;
+  /** True when a non-default --max-delist-frac was passed this run. */
+  capOverridden: boolean;
+}
+
 export interface VerifyStaleOutput {
   candidates: number;
   activeConfirmed: number;

@@ -77,81 +77,11 @@ try {
 }
 
 // ---------------------------------------------------------------------------
-// Allow-list of sources
+// Arg parsing (no deps) — lives in lib/ingest/cli-args.ts so it can be
+// imported by tests without pulling in this file's main()/process handlers.
 // ---------------------------------------------------------------------------
 
-import { ALL_SOURCES as ACTIVE_LISTING_SOURCES } from "../lib/sources/types";
-
-const ALL_SOURCES = [...ACTIVE_LISTING_SOURCES];
-
-// ---------------------------------------------------------------------------
-// Arg parsing (no deps)
-// ---------------------------------------------------------------------------
-
-interface ParsedArgs {
-  fetchStrategy: string;
-  sources: string[];
-  skipPhases: Set<string>;
-  onlyPhases: Set<string> | null;
-  dryRun: boolean;
-  since?: string;
-  budgetUsd?: number;
-}
-
-function parseArgs(argv: string[]): ParsedArgs {
-  let fetchStrategy = "staleness-gated";
-  let sources = ALL_SOURCES.slice();
-  const skipPhases = new Set<string>();
-  let onlyPhases: Set<string> | null = null;
-  let dryRun = false;
-  let since: string | undefined;
-  let budgetUsd: number | undefined;
-
-  for (const arg of argv.slice(2)) {
-    if (arg === "--dry-run") {
-      dryRun = true;
-    } else if (arg.startsWith("--fetch-strategy=")) {
-      fetchStrategy = arg.slice("--fetch-strategy=".length);
-    } else if (arg.startsWith("--sources=")) {
-      sources = arg
-        .slice("--sources=".length)
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-    } else if (arg.startsWith("--skip-phase=")) {
-      for (const p of arg.slice("--skip-phase=".length).split(",")) {
-        skipPhases.add(p.trim());
-      }
-    } else if (arg.startsWith("--only-phase=")) {
-      onlyPhases = new Set(
-        arg
-          .slice("--only-phase=".length)
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-      );
-    } else if (arg.startsWith("--since=")) {
-      since = arg.slice("--since=".length);
-    } else if (arg.startsWith("--budget=")) {
-      budgetUsd = parseFloat(arg.slice("--budget=".length));
-      if (isNaN(budgetUsd) || budgetUsd <= 0) {
-        throw new Error(`Invalid --budget value: ${arg.slice("--budget=".length)}`);
-      }
-    }
-  }
-
-  if (skipPhases.size > 0 && onlyPhases) {
-    throw new Error("--skip-phase and --only-phase are mutually exclusive");
-  }
-
-  for (const s of sources) {
-    if (!ALL_SOURCES.includes(s)) {
-      throw new Error(`Unknown source: ${s} (allow-list: ${ALL_SOURCES.join(",")})`);
-    }
-  }
-
-  return { fetchStrategy, sources, skipPhases, onlyPhases, dryRun, since, budgetUsd };
-}
+import { parseArgs } from "../lib/ingest/cli-args";
 
 function buildStrategy(name: string): FetchStrategy {
   switch (name) {
@@ -200,6 +130,8 @@ async function main() {
     onlyPhases: args.onlyPhases,
     since: args.since,
     budgetUsd,
+    maxAgeHours: args.maxAgeHours,
+    maxDelistFrac: args.maxDelistFrac,
   });
 
   console.log(`\n=== done (runId=${report.runId}) ===`);

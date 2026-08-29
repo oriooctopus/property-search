@@ -12,6 +12,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { runFetchPhase } from "./phases/fetch";
 import { runNormalizePhase } from "./phases/normalize";
 import { runUpsertPhase } from "./phases/upsert";
+import {
+  DEFAULT_MAX_AGE_HOURS,
+  DEFAULT_MAX_DELIST_FRAC,
+  runDelistUnseenPhase,
+} from "./phases/delist-unseen";
 import { runEnrichYearBuiltPhase } from "./phases/enrich-year-built";
 import { runEnrichIsochronesPhase } from "./phases/enrich-isochrones";
 import { runCleanupStalePhase } from "./phases/cleanup-stale";
@@ -38,12 +43,15 @@ export interface RunOrchestratorOpts {
   onlyPhases: Set<string> | null;
   since?: string;
   budgetUsd?: number;
+  maxAgeHours?: number;
+  maxDelistFrac?: number;
 }
 
 const ALL_PHASES = [
   "fetch",
   "normalize",
   "upsert",
+  "delist-unseen",
   "enrich-year-built",
   "enrich-isochrones",
   "verify-stale",
@@ -137,6 +145,34 @@ export async function runOrchestrator(
     const res = await safeRun("upsert", () => runUpsertPhase(input, deps));
     phases.push(res);
     upsertOut = res.output as UpsertPhaseOutput | undefined;
+  }
+
+  // delist-unseen: set-difference delisting for StreetEasy (see phase file
+  // header). Runs right after upsert since it needs this run's fetch outcome
+  // for streeteasy to decide whether to trust the complete-fetch assumption.
+  //
+  // `null` must mean "the fetch phase was not SCHEDULED this invocation" —
+  // i.e. gated on fetchScheduled, not on whether fetchOut ended up populated.
+  // Passing `fetchOut?.perSourceResults ?? null` here was the actual bug:
+  // when fetch WAS scheduled but threw (safeRun's catch swallows the
+  // exception into an errorless PhaseResult with no `output`), fetchOut stays
+  // undefined, so that expression collapsed to `null` too — indistinguishable
+  // from "fetch never ran". The gate (delist-unseen.ts's gateReason) reads
+  // null as "operator invocation, trust the caller" and proceeds to delist,
+  // which is exactly the unverified-fetch case the gate exists to block.
+  // `perSourceResults` (declared above, seeded `[]`, populated from fetchOut
+  // when fetch succeeds) stays `[]` on a thrown fetch, so passing it here
+  // when fetch WAS scheduled correctly routes a throw into the "streeteasy
+  // not in sources" skip branch instead of the trust-the-caller branch.
+  const fetchScheduled = shouldRun("fetch", opts.skipPhases, opts.onlyPhases);
+  if (shouldRun("delist-unseen", opts.skipPhases, opts.onlyPhases)) {
+    const res = await safeRun("delist-unseen", () =>
+      runDelistUnseenPhase(deps, fetchScheduled ? perSourceResults : null, {
+        maxAgeHours: opts.maxAgeHours ?? DEFAULT_MAX_AGE_HOURS,
+        maxDelistFrac: opts.maxDelistFrac ?? DEFAULT_MAX_DELIST_FRAC,
+      }),
+    );
+    phases.push(res);
   }
 
   // enrich-year-built (operates on DB state, not this run's output)

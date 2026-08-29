@@ -5,9 +5,11 @@ on:
   # forced the 2026-05-06 shutdown no longer applies: StreetEasy now fetches
   # via the FREE direct api-v6 endpoint (single atomic page per bedroom slice,
   # Apify only as a 403 fallback). Stale detection is the free set-difference
-  # delist-unseen step (see below) instead of the per-listing verify-stale path.
+  # delist-unseen phase (runs inside ingest.ts itself now — see
+  # web/lib/ingest/phases/delist-unseen.ts) instead of the per-listing
+  # verify-stale path.
   schedule:
-    - cron: "0 16 * * *" # daily full refetch of the in-region 2–4BR set
+    - cron: "0 16 * * *" # daily full refetch of the in-region in-band (BEDS_MIN..BEDS_MAX, PRICE_MIN..PRICE_MAX) set
   workflow_dispatch:
     inputs:
       sources:
@@ -82,21 +84,13 @@ jobs:
           fi
           echo "Running: npx tsx scripts/ingest.ts $ARGS"
           npx tsx scripts/ingest.ts $ARGS
-
-      # Free set-difference stale detection for StreetEasy: the fetch above
-      # refreshed last_seen_at for every active in-region 2–4BR listing, so any
-      # that weren't refreshed are gone → delisted. Safety-gated (won't delist
-      # if the fraction is implausibly large, i.e. the fetch was incomplete).
-      # Replaces the paid per-listing verify-stale path for StreetEasy.
-      - name: Delist unseen StreetEasy listings (set-difference)
-        if: github.event.inputs.dry_run != 'true'
-        working-directory: web
-        env:
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          INGEST_ALERT_EMAIL: ${{ secrets.INGEST_ALERT_EMAIL }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: npx tsx scripts/delist-unseen.ts
+          # delist-unseen (free set-difference stale detection for
+          # StreetEasy — the fetch above refreshed last_seen_at for every
+          # active in-region in-band listing, so anything not refreshed is
+          # gone) now runs automatically as a phase inside the call above; it
+          # self-gates on this run's streeteasy fetch result and honors
+          # --dry-run the same way every other phase does, so no separate
+          # step is needed here any more.
 
   # Verify-stale only. Runs in parallel with fetch on the 16:00 cron, and is
   # the sole job on the 22:00 catch-up cron. Updates delisted_at on existing
