@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase-browser";
 import { PrimaryButton } from "@/components/ui";
+import { classifySignupResult } from "@/lib/auth-signup-result";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
@@ -12,6 +13,11 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [confirmSent, setConfirmSent] = useState(false);
+  // Set when Supabase's signup response indicates this email already has a
+  // confirmed account (see lib/auth-signup-result.ts) — Supabase returns
+  // HTTP 200 with no error in that case and sends no mail, so without this
+  // the user would be shown "check your email" and wait forever.
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const router = useRouter();
   const supabase = createClient();
 
@@ -30,21 +36,26 @@ export default function SignupPage() {
       },
     });
 
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-      return;
-    }
+    const result = classifySignupResult({ error, data });
 
-    // If email confirmation is required, the session will be null
-    if (data.session) {
-      // Auto-confirmed — go straight to profile
-      router.push("/profile?setup=true");
-      router.refresh();
-    } else {
-      // Confirmation email sent — show message
-      setConfirmSent(true);
-      setLoading(false);
+    switch (result.kind) {
+      case "error":
+        setError(result.message);
+        setLoading(false);
+        return;
+      case "already-registered":
+        setAlreadyRegistered(true);
+        setLoading(false);
+        return;
+      case "success-session":
+        // Auto-confirmed — go straight to profile
+        router.push("/profile?setup=true");
+        router.refresh();
+        return;
+      case "confirm-email":
+        setConfirmSent(true);
+        setLoading(false);
+        return;
     }
   };
 
@@ -60,7 +71,25 @@ export default function SignupPage() {
           border: "1px solid #2d333b",
         }}
       >
-        {confirmSent ? (
+        {alreadyRegistered ? (
+          <div className="text-center py-4">
+            <div className="text-3xl mb-4">👤</div>
+            <h1 className="text-xl font-semibold mb-2" style={{ color: "#e1e4e8" }}>
+              Account already exists
+            </h1>
+            <p className="text-sm mb-4" style={{ color: "#8b949e" }}>
+              An account already exists for <strong style={{ color: "#e1e4e8" }}>{email}</strong>.
+              Log in instead.
+            </p>
+            <Link
+              href="/auth/login"
+              className="text-sm hover:underline"
+              style={{ color: "#58a6ff" }}
+            >
+              Go to login →
+            </Link>
+          </div>
+        ) : confirmSent ? (
           <div className="text-center py-4">
             <div className="text-3xl mb-4">📧</div>
             <h1 className="text-xl font-semibold mb-2" style={{ color: "#e1e4e8" }}>
