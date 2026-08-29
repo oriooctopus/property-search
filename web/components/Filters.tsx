@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { ButtonBase, FilterChip, PillButton, PrimaryButton, TextButton } from '@/components/ui';
 import { cn } from '@/lib/cn';
 import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
+import { fetchNominatimSuggestions, type NominatimResult } from '@/lib/geocode';
 import SaveWishlistPanel, { type WishlistFilterSelection } from '@/components/SaveWishlistPanel';
 import type { Wishlist } from '@/lib/hooks/useWishlists';
 
@@ -35,41 +36,11 @@ export interface CommuteRule {
 }
 
 // ---------------------------------------------------------------------------
-// Nominatim address autocomplete types + helpers
+// Nominatim address autocomplete — shared with StationSearchBox, see
+// lib/geocode.ts for the implementation (kept in one place so the two
+// autocomplete UIs can't silently drift apart).
 // ---------------------------------------------------------------------------
 
-interface NominatimResult {
-  place_id: number;
-  display_name: string;
-  lat: string;
-  lon: string;
-  type: string;
-  class: string;
-}
-
-async function fetchNominatimSuggestions(
-  query: string,
-  signal?: AbortSignal,
-): Promise<NominatimResult[]> {
-  if (!query.trim()) return [];
-  const params = new URLSearchParams({
-    q: query,
-    format: 'json',
-    countrycodes: 'us',
-    viewbox: '-74.3,40.4,-73.6,40.95',
-    bounded: '1',
-    limit: '5',
-  });
-  const res = await fetch(
-    `https://nominatim.openstreetmap.org/search?${params}`,
-    {
-      signal,
-      headers: { 'User-Agent': 'Dwelligence/1.0' },
-    },
-  );
-  if (!res.ok) throw new Error('Nominatim request failed');
-  return res.json();
-}
 
 /** Map center/zoom snapshotted alongside a saved search so loading it can
  *  restore the viewport the search was made from, not just the criteria. */

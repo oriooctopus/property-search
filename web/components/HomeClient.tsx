@@ -20,6 +20,9 @@ import DestinationCommuteFetcher from '@/components/DestinationCommuteFetcher';
 import SwipeView from '@/components/SwipeView';
 import MobileMenuPill from '@/components/MobileMenuPill';
 import GoToNearestMatch from '@/components/GoToNearestMatch';
+import MapSearchButton from '@/components/MapSearchButton';
+import SearchModal, { type SelectedPlace } from '@/components/SearchModal';
+import SearchPinLayer, { type SearchPin } from '@/components/SearchPinLayer';
 import UnhideHiddenButton from '@/components/UnhideHiddenButton';
 import TourGuide from '@/components/TourGuide';
 import { useConversation } from '@/lib/hooks/useConversation';
@@ -256,6 +259,40 @@ function HomeInner() {
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [authModal, setAuthModal] = useState<'login' | 'signup' | null>(null);
+
+  // Map-search icon + modal (top-left permanent search, see MapSearchButton
+  // / SearchModal). `searchTriggerRef` remembers whichever of the two
+  // button instances (swipe view vs. shared mapPanel) opened the modal, so
+  // focus can be restored to the right one on close.
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [searchPin, setSearchPin] = useState<SearchPin | null>(null);
+  const searchTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const searchButtonSwipeRef = useRef<HTMLButtonElement | null>(null);
+  const searchButtonMapRef = useRef<HTMLButtonElement | null>(null);
+  const searchButtonListRef = useRef<HTMLButtonElement | null>(null);
+
+  const openSearchModal = useCallback((trigger: HTMLButtonElement | null) => {
+    searchTriggerRef.current = trigger;
+    setSearchModalOpen(true);
+  }, []);
+
+  const handleSearchModalSelect = useCallback((place: SelectedPlace) => {
+    setSearchPin({ id: `${Date.now()}-${place.lat}-${place.lon}`, lat: place.lat, lon: place.lon, label: place.label });
+    // Best-effort — the recent-searches backend may not be deployed yet
+    // (404s while its parallel PR lands), and signed-out users get a
+    // no-op 200. Either way, failures here must never surface to the user.
+    fetch('/api/recent-searches', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        label: place.label,
+        sublabel: place.sublabel,
+        lat: place.lat,
+        lon: place.lon,
+        kind: place.kind,
+      }),
+    }).catch(() => {});
+  }, []);
 
   // Profile for tour status
   const { data: profile } = useProfile(userId);
@@ -1715,17 +1752,19 @@ function HomeInner() {
   // net for narrow viewports) so the empty-state card stays compact on
   // iPhone SE (375x667) without horizontal scroll.
   const swipeNearestEmptyExtra = (
-    <div className="flex flex-row flex-wrap items-center justify-center gap-2">
-      <GoToNearestMatch
-        getFiltersPayload={getNearestSearchPayload}
-        onMatchSelected={handleNearestMatchSelected}
-        label="Find nearest"
-        variant="primary"
-      />
-      <UnhideHiddenButton
-        userId={userId}
-        getFiltersPayload={getUnhideFiltersPayload}
-      />
+    <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-row flex-wrap items-center justify-center gap-2">
+        <GoToNearestMatch
+          getFiltersPayload={getNearestSearchPayload}
+          onMatchSelected={handleNearestMatchSelected}
+          label="Find nearest"
+          variant="primary"
+        />
+        <UnhideHiddenButton
+          userId={userId}
+          getFiltersPayload={getUnhideFiltersPayload}
+        />
+      </div>
     </div>
   );
 
@@ -1861,6 +1900,25 @@ function HomeInner() {
         onMarkerClick={handleMapMarkerClick}
         favoritesOnly={selectedWishlist != null}
       />
+
+      {/* Permanent map-search icon — top-left of the MAP CONTAINER, not the
+          page. Anchored here (not the page root) because desktop already
+          has a navbar + listings sidebar occupying the page's top-left;
+          this mirrors the Google Maps convention of anchoring search to
+          the map itself. This mapPanel div is itself only visible on
+          mobile when mobileView === 'map' (see mapPanelMobileClass
+          above), so this instance naturally covers desktop AND mobile
+          map view. Mobile LIST view has no visible map container here —
+          it gets its own instance below the page's Navbar instead (see
+          "Permanent map-search icon for mobile list view" further down). */}
+      <div className="absolute z-[500]" style={{ top: 12, left: 12 }}>
+        <MapSearchButton
+          ref={searchButtonMapRef}
+          loading={viewportLoading || commuteLoading}
+          onClick={() => openSearchModal(searchButtonMapRef.current)}
+          data-testid="map-search-button-map"
+        />
+      </div>
 
       {/* Map overlay: loading spinner */}
       {(viewportLoading || commuteLoading) && (
@@ -2359,46 +2417,26 @@ function HomeInner() {
             onClearFilters={handleClearAllFilters}
           />
 
-          {/* Loading indicator for swipe mode (mobile-only).
-              Icon-only spinning magnifier in the TOP-LEFT corner. We dropped
-              the "Searching..." chip + matching pill alignment because the
-              chip kept feeling cramped against the right edge, and we don't
-              need word-level feedback on a touch surface — a small animated
-              search glyph reads as "loading" without competing with the
-              MobileMenuPill on the opposite corner. Anchored with
-              env(safe-area-inset-top) so it stays clear of the notch. */}
-          {(viewportLoading || commuteLoading) && (
-            <div
-              className="absolute z-[500] pointer-events-none flex items-center justify-center"
+          {/* Permanent map-search icon for swipe mode (mobile-only),
+              TOP-LEFT corner. Used to be a spinning-magnifier loading
+              indicator shown only while viewportLoading/commuteLoading —
+              the user asked for that removed in favor of an always-present
+              search icon that only SWAPS to the app's standard circular
+              spinner (not an animated magnifier) while a fetch is in
+              flight; idle state opens SearchModal. Anchored with
+              env(safe-area-inset-top) so it stays clear of the notch, and
+              kept clear of MobileMenuPill on the opposite corner. */}
+          <div
+            className="absolute z-[500]"
+            style={{ top: 'calc(env(safe-area-inset-top) + 12px)', left: 12 }}
+          >
+            <MapSearchButton
+              ref={searchButtonSwipeRef}
+              loading={viewportLoading || commuteLoading}
+              onClick={() => openSearchModal(searchButtonSwipeRef.current)}
               data-testid="swipe-searching-spinner"
-              style={{
-                top: 'calc(env(safe-area-inset-top) + 12px)',
-                left: 12,
-                width: 36,
-                height: 36,
-                borderRadius: 9999,
-                backgroundColor: 'rgba(28, 32, 40, 0.85)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-              }}
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#c9d1d9"
-                strokeWidth="2.25"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{ animation: 'spin 1s linear infinite' }}
-                aria-label="Searching"
-              >
-                <circle cx="11" cy="11" r="7" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </div>
-          )}
+            />
+          </div>
         </div>
       )}
 
@@ -2425,6 +2463,28 @@ function HomeInner() {
           onOpenFilters={() => filtersHandleRef.current?.openMobileSheet()}
           onOpenManageWishlists={() => setManageWishlistsOpen(true)}
         />
+      )}
+
+      {/* Permanent map-search icon for mobile LIST view. The desktop/mobile
+          -map instance lives inside mapPanel (which is CSS-hidden on
+          mobile whenever mobileView !== 'map'), so list view — the mobile
+          default — would otherwise have no search icon at all. Positioned
+          the same way MobileMenuPill is: absolute within this component's
+          own root (which starts below the page's global Navbar, so top:12
+          lands just under it, not on top of it), `lg:hidden` since desktop
+          always uses the mapPanel instance regardless of `mobileView`. */}
+      {!isSwipeView && mobileView === 'list' && (
+        // z-[1250]: the sidebar's Filters bar wrapper is z-[1100] and would
+        // otherwise intercept clicks on (and visually sit above) a lower
+        // z-index button occupying the same top-left corner.
+        <div className="absolute z-[1250] lg:hidden" style={{ top: 'calc(env(safe-area-inset-top) + 12px)', left: 12 }}>
+          <MapSearchButton
+            ref={searchButtonListRef}
+            loading={viewportLoading || commuteLoading}
+            onClick={() => openSearchModal(searchButtonListRef.current)}
+            data-testid="map-search-button-list"
+          />
+        </div>
       )}
 
       {/* Mobile bottom nav — view mode toggle (list/swipe).
@@ -2581,6 +2641,19 @@ function HomeInner() {
           }}
         />
       )}
+
+      {/* Map-search modal — mounted once regardless of which of the two
+          MapSearchButton instances (swipe view / shared mapPanel) opened
+          it. Selecting a result pans the map and drops/relocates the
+          sticky pin below. */}
+      <SearchModal
+        open={searchModalOpen}
+        onClose={() => setSearchModalOpen(false)}
+        onSelect={handleSearchModalSelect}
+        userId={userId}
+        triggerRef={searchTriggerRef}
+      />
+      <SearchPinLayer pin={searchPin} onClear={() => setSearchPin(null)} />
     </div>
   );
 }
