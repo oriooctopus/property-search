@@ -1403,25 +1403,20 @@ export default function SwipeView({
                   desktop keeps 12px to match the original attached-card layout. */}
               {currentIndex + 1 < deck.length && (
                 <div
+                  data-testid="next-card-layer"
                   className="absolute inset-0 rounded-3xl min-[600px]:rounded-xl overflow-hidden"
                   style={{
                     zIndex: 1,
                     transform: 'scale(0.97)',
                     pointerEvents: 'none',
-                    // Belt-and-suspenders: don't rely solely on the top
-                    // card's opaque background (rgba(28,32,40,0.97), itself
-                    // only ~97% opaque) to hide this always-mounted card.
-                    // If `isDragging` ever gets stuck true while the top
-                    // card is actually idle (e.g. a real-device touchcancel
-                    // that react-swipeable never surfaces as a release —
-                    // see SwipeCard's forceEndDrag), the top card's
-                    // background goes transparent and this card would
-                    // otherwise bleed through as ghosted, overlapping text.
-                    // `visibility: hidden` keeps it mounted (no fade-in lag
-                    // when it's promoted) but guarantees it paints nothing
-                    // whenever we're not actually dragging, independent of
-                    // the top card's own state.
-                    visibility: isDragging ? 'visible' : 'hidden',
+                    // NOTE: do not gate this layer on `isDragging`. It must
+                    // stay painted through the 180ms fly-out tween, which
+                    // starts *after* `onSwiped` has already set isDragging
+                    // false — hiding it there leaves a blank gap behind the
+                    // exiting card until the deck advances. Bleed-through
+                    // while idle is prevented at its source instead, by
+                    // SwipeCard's forceEndDrag (touchcancel/pointercancel),
+                    // which stops `isDragging` from sticking true.
                   }}
                 >
                   {/* Dark overlay to show depth — only while dragging.
@@ -1467,6 +1462,7 @@ export default function SwipeView({
                   Desktop: 12px radius (original attached-bar look). */}
               <div
                 data-tour="swipe-card"
+                data-testid="top-card-layer"
                 className="absolute inset-0 rounded-3xl min-[600px]:rounded-xl"
                 style={{
                   zIndex: 2,

@@ -1,13 +1,21 @@
 import { type Page } from "@playwright/test";
 
-const TEST_EMAIL = "oliverullman@gmail.com";
-const TEST_PASSWORD = "***REMOVED-CREDENTIAL***";
+// Credentials come from the environment (web/.env.local, gitignored) so that
+// no real account password is committed. Use the dedicated test account —
+// never a personal login.
+const TEST_EMAIL = process.env.TEST_USER_EMAIL;
+const TEST_PASSWORD = process.env.TEST_USER_PASSWORD;
 
 /**
  * Log in via the login page UI. Waits for the home page to finish loading
  * after a successful login so subsequent tests start from a ready state.
  */
 export async function login(page: Page) {
+  if (!TEST_EMAIL || !TEST_PASSWORD) {
+    throw new Error(
+      "TEST_USER_EMAIL / TEST_USER_PASSWORD must be set (see web/.env.local)",
+    );
+  }
   await page.goto("/auth/login");
   await page.locator("#email").fill(TEST_EMAIL);
   await page.locator("#password").fill(TEST_PASSWORD);
