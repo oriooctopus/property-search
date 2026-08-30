@@ -9,6 +9,11 @@ const TEST_EMAIL = process.env.TEST_USER_EMAIL;
 const TEST_PASSWORD = process.env.TEST_USER_PASSWORD;
 
 async function login(page: Page) {
+  if (!TEST_EMAIL || !TEST_PASSWORD) {
+    throw new Error(
+      "TEST_USER_EMAIL / TEST_USER_PASSWORD must be set (see web/.env.local)",
+    );
+  }
   await page.goto("/auth/login");
   await page.locator("#email").fill(TEST_EMAIL);
   await page.locator("#password").fill(TEST_PASSWORD);
