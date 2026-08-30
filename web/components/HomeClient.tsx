@@ -39,7 +39,7 @@ import type { WishlistFilterSelection } from '@/components/SaveWishlistPanel';
 import { OccluderProvider, useOccluders } from '@/lib/viewport/OccluderRegistry';
 import { OcclusionDebugOverlay } from '@/lib/viewport/OcclusionDebugOverlay';
 import { LeafletMapProvider, useLeafletMap } from '@/lib/viewport/LeafletMapContext';
-import { panMapToShowLatLng, getVisibleCenter } from '@/lib/viewport/visibleMapView';
+import { panMapToShowLatLng, getVisibleCenter, boundsForZoom15AtPoint } from '@/lib/viewport/visibleMapView';
 
 type Listing = Database['public']['Tables']['listings']['Row'];
 
@@ -274,24 +274,6 @@ function HomeInner() {
   const openSearchModal = useCallback((trigger: HTMLButtonElement | null) => {
     searchTriggerRef.current = trigger;
     setSearchModalOpen(true);
-  }, []);
-
-  const handleSearchModalSelect = useCallback((place: SelectedPlace) => {
-    setSearchPin({ id: `${Date.now()}-${place.lat}-${place.lon}`, lat: place.lat, lon: place.lon, label: place.label });
-    // Best-effort — the recent-searches backend may not be deployed yet
-    // (404s while its parallel PR lands), and signed-out users get a
-    // no-op 200. Either way, failures here must never surface to the user.
-    fetch('/api/recent-searches', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        label: place.label,
-        sublabel: place.sublabel,
-        lat: place.lat,
-        lon: place.lon,
-        kind: place.kind,
-      }),
-    }).catch(() => {});
   }, []);
 
   // Profile for tour status
@@ -1072,6 +1054,54 @@ function HomeInner() {
   // (panMapToShowLatLng) symmetric around the same visible center.
   const leafletMap = useLeafletMap();
   const occluders = useOccluders();
+
+  /**
+   * Search-modal selection handler. `SearchModal.selectSuggestion` has
+   * ALREADY panned `useLeafletMap()`'s resolved map (via panMapToShowLatLng)
+   * by the time this runs, but on mobile LIST view that resolved map is the
+   * mapPanel's map with its container CSS `display:none` — a 0x0 Leaflet
+   * container. Panning it still "works" internally, but its container has
+   * no real size, so `map.getBounds()` collapses to a degenerate
+   * single-point box and MapInner's BoundsWatcher explicitly refuses to
+   * fire the listings query on that (see its `latMax === latMin` guard) —
+   * repro showed the mobile list, before this fix, simply never changing.
+   *
+   * Per product decision, list view must NOT switch to the map — it stays
+   * in list and reloads listings around the picked point. So when the
+   * resolved map's container is genuinely unusable (width/height 0 — read
+   * directly here rather than inferring it from `mobileView`, so this stays
+   * correct if another zero-size-map case shows up later), derive the
+   * search area straight from the picked coordinates
+   * (`boundsForZoom15AtPoint`, matching panMapToShowLatLng's zoom-15 pan)
+   * and re-run the query ourselves. When the map IS usable (desktop, mobile
+   * map view, mobile swipe view), do nothing extra — its own moveend
+   * already drives `loadForViewport` with the real (correct) bounds, which
+   * is the already-working path this brief says not to regress.
+   */
+  const handleSearchModalSelect = useCallback((place: SelectedPlace) => {
+    setSearchPin({ id: `${Date.now()}-${place.lat}-${place.lon}`, lat: place.lat, lon: place.lon, label: place.label });
+
+    const mapRect = leafletMap?.getContainer().getBoundingClientRect();
+    const mapUsable = mapRect != null && mapRect.width > 0 && mapRect.height > 0;
+    if (!mapUsable) {
+      loadForViewport(boundsForZoom15AtPoint(place.lat, place.lon));
+    }
+
+    // Best-effort — the recent-searches backend may not be deployed yet
+    // (404s while its parallel PR lands), and signed-out users get a
+    // no-op 200. Either way, failures here must never surface to the user.
+    fetch('/api/recent-searches', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        label: place.label,
+        sublabel: place.sublabel,
+        lat: place.lat,
+        lon: place.lon,
+        kind: place.kind,
+      }),
+    }).catch(() => {});
+  }, [leafletMap, loadForViewport]);
 
   const effectiveMapPosition = useCallback((): MapPosition | null => {
     // Prefer the midpoint of the last RESULT-DRIVING viewport (lastLoadedBounds):

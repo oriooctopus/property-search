@@ -147,3 +147,75 @@ export function panMapToShowLatLng(
 
   map.setView(newCenter, targetZoom, setViewOptions);
 }
+
+export interface LatLngBounds {
+  latMin: number;
+  latMax: number;
+  lonMin: number;
+  lonMax: number;
+}
+
+/**
+ * Reference viewport (CSS px) used by `boundsForZoom15AtPoint` below when
+ * there is no live map container to measure at all — see that function's
+ * comment for why. 390x844 matches the device this was reproduced and
+ * fixed against (an iPhone 12/13/14-class logical viewport): if the user
+ * switched from list view to map/swipe view right now, THAT is
+ * approximately the container panMapToShowLatLng would actually pan, so
+ * using it here is what keeps the list-view search area agreeing with what
+ * the map would show for the same selection.
+ */
+const ASSUMED_VIEWPORT_PX = { width: 390, height: 844 };
+
+// Web Mercator / Leaflet tiling convention (matches L.CRS.EPSG3857):
+// https://wiki.openstreetmap.org/wiki/Zoom_levels
+const TILE_SIZE_PX = 256;
+const EARTH_CIRCUMFERENCE_M = 40075016.686;
+// Meters per degree of latitude. This varies slightly with latitude
+// (~110,574m at the equator to ~111,694m at the poles) — 111,320 is the
+// commonly-used mid-latitude approximation, accurate to well under 1% at
+// NYC's ~40.7°N. Not validated near the poles.
+const METERS_PER_DEGREE_LAT = 111320;
+
+/**
+ * Bounding box centered on (lat, lon) approximating what
+ * `panMapToShowLatLng(map, lat, lon, [], { minZoom: 15 })` would put on
+ * screen, computed WITHOUT a live map instance.
+ *
+ * Why this exists: mobile LIST view has no visible Leaflet container — the
+ * map panel is CSS `display:none` there (see HomeClient.tsx's
+ * `mapPanelMobileClass`), so `.leaflet-container` measures 0x0. Repro
+ * (before this fix): selecting a place in list view still called
+ * `panMapToShowLatLng` on that 0-sized map, which set its internal view
+ * fine, but `map.getBounds()` on a 0x0 container collapses to a
+ * degenerate single-point box (`latMin === latMax`) — MapInner's
+ * BoundsWatcher explicitly guards against firing on that degenerate box,
+ * so the listings query never re-ran and the list never changed. Selecting
+ * a place from list view still needs SOME search area, so this derives one
+ * directly from the picked coordinates instead of reading it off the dead
+ * map.
+ *
+ * Math: standard Web Mercator ground resolution at zoom z, latitude φ is
+ * `metersPerPixel = EARTH_CIRCUMFERENCE_M * cos(φ) / (TILE_SIZE_PX * 2^z)`.
+ * Longitude is linear in Web Mercator x, so converting a pixel width back
+ * to degrees is `(px / (TILE_SIZE_PX * 2^z)) * 360` — the cos(φ) term
+ * cancels out exactly (this is a property of the projection, not an
+ * approximation: metersPerPixel * px / (111320 * cos φ) reduces to the same
+ * expression). Latitude is NOT linear in Web Mercator y, but the
+ * projection is locally conformal (isotropic) at any given point, so using
+ * the same ground-resolution figure for the height and dividing by
+ * METERS_PER_DEGREE_LAT is accurate to well under 1% at NYC's latitude.
+ * NYC-only scope is intentional — see tests/visible-map-view.test.ts.
+ */
+export function boundsForZoom15AtPoint(lat: number, lon: number): LatLngBounds {
+  const zoomScale = TILE_SIZE_PX * Math.pow(2, 15);
+  const metersPerPixel = (EARTH_CIRCUMFERENCE_M * Math.cos((lat * Math.PI) / 180)) / zoomScale;
+  const lonDeltaDeg = ((ASSUMED_VIEWPORT_PX.width / 2) / zoomScale) * 360;
+  const latDeltaDeg = ((ASSUMED_VIEWPORT_PX.height / 2) * metersPerPixel) / METERS_PER_DEGREE_LAT;
+  return {
+    latMin: lat - latDeltaDeg,
+    latMax: lat + latDeltaDeg,
+    lonMin: lon - lonDeltaDeg,
+    lonMax: lon + lonDeltaDeg,
+  };
+}

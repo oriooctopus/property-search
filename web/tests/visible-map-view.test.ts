@@ -1,4 +1,6 @@
 /**
+ * @vitest-environment jsdom
+ *
  * Round-trip invariant for the saved-search map location.
  *
  * The bug: SAVE captured the container center but RESTORE placed the saved
@@ -16,7 +18,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { getVisibleCenter, panMapToShowLatLng } from '../lib/viewport/visibleMapView';
+import { getVisibleCenter, panMapToShowLatLng, boundsForZoom15AtPoint } from '../lib/viewport/visibleMapView';
 import type { Occluder } from '../lib/viewport/occlusion';
 
 class TestDOMRect implements DOMRect {
@@ -112,5 +114,89 @@ describe('save↔restore visible-center round-trip', () => {
     expect(restored.lng).toBeCloseTo(saved.lng, 6);
     // And with no occluders the container center IS the saved point.
     expect(map.getCenter().lat).toBeCloseTo(saved.lat, 6);
+  });
+});
+
+/**
+ * boundsForZoom15AtPoint — the mobile-list-view fallback search area.
+ *
+ * Regression coverage for the bug: mobile LIST view's map panel is CSS
+ * `display:none`, so `.leaflet-container` measures 0x0. Repro (see the
+ * implementer report / repro-list-search.mjs): selecting a place there
+ * still panned that 0-sized map "successfully" internally, but
+ * `map.getBounds()` on it collapsed to a degenerate single-point box
+ * (`latMin === latMax`), which MapInner's BoundsWatcher explicitly refuses
+ * to fire a query on — so the listings list never changed. These tests
+ * pin down `boundsForZoom15AtPoint`'s actual geometry so a future edit
+ * can't quietly reintroduce a degenerate or off-center box.
+ *
+ * Scope: NYC-latitude only (~40-41°N), matching this app's only market —
+ * not validated near the poles or the antimeridian (see the function's own
+ * header comment on why the latitude approximation is safe here).
+ */
+describe('boundsForZoom15AtPoint', () => {
+  // Real Jefferson St (Bushwick, Brooklyn) coordinates — the exact repro
+  // case from the list-view bug.
+  const JEFFERSON_ST = { lat: 40.706607, lon: -73.922913 };
+
+  it('is centered on the given point and has a non-degenerate span', () => {
+    const b = boundsForZoom15AtPoint(JEFFERSON_ST.lat, JEFFERSON_ST.lon);
+    expect((b.latMin + b.latMax) / 2).toBeCloseTo(JEFFERSON_ST.lat, 9);
+    expect((b.lonMin + b.lonMax) / 2).toBeCloseTo(JEFFERSON_ST.lon, 9);
+    // The whole bug being fixed is a box collapsing to a point — assert
+    // the span is meaningfully positive, not just technically nonzero.
+    expect(b.latMax - b.latMin).toBeGreaterThan(0.001);
+    expect(b.lonMax - b.lonMin).toBeGreaterThan(0.001);
+  });
+
+  it('produces a different, correctly-shifted box for a different point (Manhattan vs. Bushwick)', () => {
+    const manhattan = boundsForZoom15AtPoint(40.7484, -73.9857); // Empire State Building-ish
+    const bushwick = boundsForZoom15AtPoint(JEFFERSON_ST.lat, JEFFERSON_ST.lon);
+    // The two boxes must not overlap — they're ~9km apart, and the zoom-15
+    // span (see the next test) is under 2km wide.
+    expect(manhattan.lonMax).toBeLessThan(bushwick.lonMin);
+  });
+
+  it("matches panMapToShowLatLng's real zoom-15 pan at the assumed viewport size", async () => {
+    // This is the strongest form of "matches the map path's zoom-15
+    // equivalent": drive the REAL `leaflet` package (not a linear mock —
+    // Web Mercator's y-axis is nonlinear in latitude, so only the real
+    // projection can validate the latitude side of the math) with a
+    // container stubbed to report exactly ASSUMED_VIEWPORT_PX (390x844,
+    // ASSUMED_VIEWPORT_PX's whole reason for existing), pan to Jefferson
+    // St the same way SearchModal does (`{ minZoom: 15 }`, no occluders),
+    // and compare the map's real resulting bounds to this function's
+    // output.
+    const L = (await import('leaflet')).default;
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    // jsdom reports 0x0 for every element by default — exactly the
+    // production bug. Stub both the properties Leaflet's internal
+    // `getSize()` reads (clientWidth/clientHeight) and the
+    // getBoundingClientRect() panMapToShowLatLng reads directly, to the
+    // size the map WOULD have if it were actually visible.
+    Object.defineProperty(container, 'clientWidth', { value: 390, configurable: true });
+    Object.defineProperty(container, 'clientHeight', { value: 844, configurable: true });
+    container.getBoundingClientRect = () => new TestDOMRect(0, 0, 390, 844);
+
+    const map = L.map(container, { center: [40.6, -73.8], zoom: 10 });
+    panMapToShowLatLng(map, JEFFERSON_ST.lat, JEFFERSON_ST.lon, [], {
+      minZoom: 15,
+      setViewOptions: { animate: false },
+    });
+
+    const real = map.getBounds();
+    const derived = boundsForZoom15AtPoint(JEFFERSON_ST.lat, JEFFERSON_ST.lon);
+
+    // toBeCloseTo(x, 3) = agreement to within ~0.0005° (~50m at this
+    // latitude) — tight enough to catch a wrong constant (e.g. a stray
+    // factor-of-2 or the wrong zoom level), loose enough to tolerate
+    // Leaflet's own float/pixel-snapping in setView.
+    expect(real.getSouth()).toBeCloseTo(derived.latMin, 3);
+    expect(real.getNorth()).toBeCloseTo(derived.latMax, 3);
+    expect(real.getWest()).toBeCloseTo(derived.lonMin, 3);
+    expect(real.getEast()).toBeCloseTo(derived.lonMax, 3);
+
+    map.remove();
   });
 });
