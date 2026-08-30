@@ -66,6 +66,54 @@ function LineBadge({ line }: { line: string }) {
   );
 }
 
+// Mobile (<600px) photo sizing for the compactMobile layout. Must render
+// identically at both SwipeCard call sites (the invisible layoutOnly ghost
+// that establishes the deck's height, and the real card) or the deck slot
+// and the card disagree on their own height — kept as one constant for
+// exactly that reason, the same fix CompactSubwayRow above got after a
+// verify pass caught the two call sites silently drifting apart.
+//
+// This used to be a `clamp()` fitted to two measured viewport-height points
+// (a linear function of `dvh` only). Reverted after review because a pure
+// function of viewport height can't be right for every listing: StreetEasy-
+// and Craigslist-format cards measured a 28px difference in how much
+// overflow they produced at the SAME viewport (see the implementer report),
+// so a single height(vh) formula either shrinks StreetEasy more than it
+// needs (wasting photo space) or leaves Craigslist a few px from clipping —
+// exactly what was measured (a 3.55px margin). It's also fitted to `dvh`,
+// which tracks Safari's collapsing address bar, so the photo would visibly
+// resize mid-scroll on a real phone — never verified, since headless
+// Chromium doesn't have a collapsing chrome to test against.
+//
+// This version does no arithmetic at all: on mobile widths the photo is a
+// genuinely shrinkable flex item (default flex-shrink:1, no flex-shrink-0)
+// with a `h-[184px]` PREFERRED size (used as flex-basis, since flex-basis:
+// auto resolves to the item's specified height) and a `min-h-[90px]` FLOOR.
+// Its flex container (`panelRef` below, and the layoutOnly ghost's own root
+// div, which was already `flex flex-col`) also marks the sibling text-content
+// block `flex-shrink-0` so 100% of any shrink lands on the photo, never on
+// the text. The browser then does the per-listing arithmetic itself: full
+// 184px whenever the card's available height (itself viewport-height-driven
+// via the deck's `max-h-full`, see SwipeView.tsx) leaves room, less exactly
+// when it doesn't — Craigslist and StreetEasy each shrink by exactly what
+// THEIR OWN content needs, not a shared fitted guess. See the implementer
+// report for the re-measured per-listing margins.
+//
+// 90px floor: same empirical basis as before — at 375x667 the Craigslist
+// card variant (extra "Listed <date>" line StreetEasy doesn't render)
+// measured the compact-subway-row's bottom edge 90.45px below the card's
+// clip boundary; 90px leaves the shrink algorithm a hair of margin past
+// canceling that overflow exactly. If a future content addition needs more
+// margin, raise this number — there is no formula to re-derive, just this
+// one hard floor.
+//
+// `min-[600px]:flex-shrink-0` makes "desktop never shrinks" a hard rule
+// enforced by the browser, not just an assumption that desktop happens to
+// have enough room — matching the same explicit intent as `min-[600px]:h-
+// [226px]` for the height itself.
+const MOBILE_PHOTO_HEIGHT_CLASS =
+  'h-[184px] min-h-[90px] min-[600px]:h-[226px] min-[600px]:flex-shrink-0';
+
 const SOURCE_LABELS: Record<string, string> = {
   craigslist: 'Craigslist',
   streeteasy: 'StreetEasy',
@@ -564,11 +612,34 @@ export default function SwipeCard({
   if (layoutOnly) {
     return (
       <div className={`overflow-hidden flex flex-col ${compactMobile ? 'rounded-3xl min-[600px]:rounded-2xl' : 'rounded-2xl'}`} style={{ backgroundColor: 'rgba(28, 32, 40, 0.97)', border: '1px solid #2d333b', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+        {/* Must-fit wrapper — mirrors the real card's panelRef structure
+            below (same max-h-full / overflow-y-auto reasoning) purely for
+            structural consistency between the two call sites. It never
+            actually clamps here in practice: this ghost's own outer div has
+            no height/max-height of its own (renders in normal flow to
+            measure natural content height for the deck), so `max-h-full`
+            here resolves against an equally-unconstrained ancestor and
+            never engages. Keeping the two call sites' STRUCTURE identical
+            (not just the photo's class string) is what stops them from
+            silently drifting apart again — see CompactSubwayRow's comment
+            above for the prior incident that motivated this. */}
+        <div data-testid="swipe-card-must-fit-wrapper" className="flex flex-col max-h-full overflow-y-auto flex-shrink-0">
         <div
-          className={`w-full flex-shrink-0 ${compactMobile ? 'h-[184px] min-[600px]:h-[226px]' : 'h-[226px]'}`}
+          data-testid="swipe-card-photo-block"
+          // `flex-shrink-0` moved INTO MOBILE_PHOTO_HEIGHT_CLASS (as a
+          // >=600px-only override) so mobile widths get the default
+          // flex-shrink:1 and can actually give up height under pressure —
+          // see that constant's comment. The non-compactMobile path is out
+          // of scope for this fix and keeps its old always-fixed behavior.
+          className={`w-full ${compactMobile ? MOBILE_PHOTO_HEIGHT_CLASS : 'h-[226px] flex-shrink-0'}`}
           style={{ backgroundColor: '#0d1117' }}
         />
-        <div className="px-5 py-4 flex flex-col gap-3">
+        {/* flex-shrink-0: the photo above is the ONLY item allowed to give up
+            height when this flex column is squeezed — this block (address,
+            price, stats, subway row) must render at its full natural height
+            or its own content (specifically CompactSubwayRow) clips instead
+            of the photo absorbing the squeeze. See MOBILE_PHOTO_HEIGHT_CLASS. */}
+        <div className="px-5 py-4 flex flex-col gap-3 flex-shrink-0">
           <div>
             <div className="text-base font-semibold leading-snug" style={{ color: '#c9d1d9' }}>{listing.address}</div>
             <div className="text-sm mt-0.5" style={{ color: '#8b949e' }}>{listing.area}</div>
@@ -655,6 +726,13 @@ export default function SwipeCard({
           {compactMobile && listing.lat != null && listing.lon != null && (
             <CompactSubwayRow lines={getClosestDistinctLines(listing.lat as number, listing.lon as number, 2)} />
           )}
+        </div>
+        {/* /must-fit content */}
+        </div>
+        {/* /must-fit wrapper */}
+        {/* Footer — deliberately OUTSIDE the must-fit wrapper, mirroring the
+            real card. See the real card's footer comment below. */}
+        <div data-testid="swipe-card-footer" className="px-5 mt-3 flex-shrink-0">
           <div className="flex items-center justify-end pt-1 pb-2">
             <span className="text-sm font-medium" style={{ color: '#58a6ff' }}>View details &rarr;</span>
           </div>
@@ -746,16 +824,59 @@ export default function SwipeCard({
           </div>
         </motion.div>
 
-        {/* Scrollable content — z-[2] so it's above tints/stamps visually but below stamps */}
+        {/* Scrollable content — z-[2] so it's above tints/stamps visually but
+            below stamps. `flex flex-col` turns its two top-level children
+            (the must-fit wrapper below, and the trailing footer) into flex
+            items. This container's OWN size is unaffected by that: it's
+            still `flex-1` of the motion.div above (a separate, outer flex
+            context), and `overflow-y-auto` already gives it CSS's
+            "automatic minimum size: 0" for THAT role. */}
         <div
           ref={panelRef}
-          className="relative z-[2] flex-1 overflow-y-auto dark-scrollbar"
+          className="relative z-[2] flex-1 overflow-y-auto dark-scrollbar flex flex-col"
           style={{ touchAction: 'pan-y' }}
         >
-          {/* Photo carousel */}
+          {/* MUST-FIT WRAPPER — everything the user needs to see without
+              scrolling: the photo and all detail-content THROUGH the compact
+              subway row. Only content in here is allowed to make the photo
+              give up height; the footer link after this wrapper is
+              deliberately OUTSIDE it (see the comment on that footer div).
+              `max-h-full` caps this wrapper at exactly panelRef's own
+              resolved height — a hard, content-independent bound, so the
+              footer's size can never leak into "how much room is there" the
+              way it would if wrapper and footer were plain shrinkable
+              siblings sharing one shrink budget (flexbox shrink is computed
+              over ALL flex-shrinkable siblings' combined natural size, so a
+              flat sibling list can't exclude one item's footprint — nesting
+              is what achieves that here).
+              `overflow-y-auto`, NOT `overflow-hidden`: even after the photo
+              hits its MOBILE_PHOTO_HEIGHT_CLASS floor, a viewport short
+              enough (measured: 320x568) can still have must-fit content
+              taller than this wrapper's clamped box. `overflow-hidden` would
+              silently discard that remainder — permanently, unreachable by
+              any amount of scrolling, since the clip is a hard property of
+              THIS box, not of panelRef's scroll position — which is exactly
+              the invisible-content failure mode this whole fix exists to
+              prevent. `overflow-y-auto` gives that residual its own nested
+              scrollbar instead, so it's still reachable (confirmed via
+              Playwright: scrolling this wrapper's own scrollTop, in addition
+              to panelRef's, brings the rest of the row into view — see the
+              implementer report). Native scroll-chaining should make a
+              normal drag feel like one continuous scroll: it exhausts this
+              inner scroll first, then chains to panelRef for the footer.
+              `flex-shrink-0` at the OUTER (panelRef) level keeps this
+              wrapper's box governed purely by its own content + max-height,
+              not further squeezed to make room for the footer — that's the
+              footer's own job (see below), not this wrapper's. */}
+          <div data-testid="swipe-card-must-fit-wrapper" className="flex flex-col max-h-full overflow-y-auto flex-shrink-0">
+          {/* Photo carousel. `flex-shrink-0` moved into MOBILE_PHOTO_HEIGHT_
+              CLASS's own >=600px override — mobile widths need the default
+              flex-shrink:1 so this can give up height when the card is
+              squeezed; see that constant's comment for why and by how much. */}
           <div
             ref={photoAreaRef}
-            className={`relative w-full overflow-hidden flex-shrink-0 ${compactMobile ? 'h-[184px] min-[600px]:h-[226px]' : 'h-[226px]'}`}
+            data-testid="swipe-card-photo-block"
+            className={`relative w-full overflow-hidden ${compactMobile ? MOBILE_PHOTO_HEIGHT_CLASS : 'h-[226px] flex-shrink-0'}`}
             style={{
               outline: photoFocused ? '2px solid rgba(88,166,255,0.7)' : 'none',
               outlineOffset: '-2px',
@@ -1002,8 +1123,12 @@ export default function SwipeCard({
             )}
           </div>
 
-          {/* Detail content */}
-          <div className="px-5 py-4 flex flex-col gap-3">
+          {/* Detail content. flex-shrink-0: this is `panelRef`'s other flex
+              child alongside the photo above — pinning this to its natural
+              height means 100% of any squeeze lands on the photo instead of
+              here (where it would clip CompactSubwayRow or other rows). See
+              MOBILE_PHOTO_HEIGHT_CLASS. */}
+          <div className="px-5 py-4 flex flex-col gap-3 flex-shrink-0">
             {/* Address + area — shown on both mobile and desktop */}
             <div>
               <div className="text-base font-semibold leading-snug" style={{ color: '#c9d1d9' }}>
@@ -1179,10 +1304,33 @@ export default function SwipeCard({
             {/* Compact subway indicator — mobile compactMobile only.
                 Shows the two closest lines + walking time inline so the
                 information is visible on the mobile swipe card where the
-                full "Nearest Subway" section is hidden. */}
+                full "Nearest Subway" section is hidden. This is the LAST
+                must-fit row — everything after this point in the JSX is the
+                trailing footer, deliberately moved OUTSIDE this div (and its
+                max-h-full wrapper above) so its size can never make the
+                photo shrink further than the subway row alone requires. */}
             {compactMobile && <CompactSubwayRow lines={nearbyLines} />}
+          </div>
+          {/* /must-fit content */}
+          </div>
+          {/* /must-fit wrapper (max-h-full + overflow-y-auto, see above) */}
 
-            {/* External link + optional leading slot (e.g. mobile "Save to" control) */}
+          {/* Footer: external link + optional leading slot (e.g. mobile
+              "Save to" control). Deliberately a SEPARATE flex child of
+              panelRef, not nested inside the must-fit wrapper above — this
+              is the "anything else below the subway row" the fix is scoped
+              to exclude from the squeeze calculation. When the must-fit
+              wrapper is clamped to its max-h-full (short viewport, photo
+              already at its floor), this footer simply renders below the
+              wrapper's bottom edge and is reachable via panelRef's own
+              overflow-y-auto scroll, exactly as it already was — invisibly —
+              before any of this shrink logic existed (see the implementer
+              report: even stock code has a small pre-existing scroll-only
+              overflow here at 390x844 for some listings). `px-5 mt-3`
+              replaces the horizontal padding and the `gap-3` vertical
+              spacing this div used to get for free from the now-closed
+              parent flex column. */}
+          <div data-testid="swipe-card-footer" className="px-5 mt-3 flex-shrink-0">
             <div
               className={`flex items-center ${footerLeadingSlot ? 'justify-between gap-3' : 'justify-end'} pt-1 pb-2`}
             >
