@@ -5,7 +5,11 @@
  * SearchModal. Visually distinct from listing markers (a solid orange
  * teardrop vs. the app's listing dots/hearts), and persists across pans
  * and zooms until explicitly cleared via the small × in its popup, or
- * replaced by a new search.
+ * replaced by a new search. The label popup itself is more transient: it
+ * opens automatically on selection, auto-hides after POPUP_AUTO_HIDE_MS so
+ * it doesn't sit on the map forever, and reopens (with its × still live) on
+ * a marker click/tap — the marker is always the persistent, clickable
+ * affordance; the popup is a temporary label on top of it.
  *
  * Mounted once, at the HomeClient level, rather than inside Map/SwipeView's
  * own subtree — `useLeafletMap()` always resolves to whichever Leaflet map
@@ -33,6 +37,12 @@ export interface SearchPin {
   label: string;
 }
 
+// "a couple seconds" per the product ask — long enough to actually read a
+// short street-name label, short enough that the popup reads as an automatic
+// dismiss rather than something the user has to notice and close themselves.
+// No A/B data behind this; 2.5s is a judgement call, not a measurement.
+const POPUP_AUTO_HIDE_MS = 2500;
+
 export default function SearchPinLayer({
   pin,
   onClear,
@@ -51,6 +61,12 @@ export default function SearchPinLayer({
   useEffect(() => {
     if (!map || !pin) return;
     let cancelled = false;
+    // Scoped to this effect run (one per selected pin), not a component-level
+    // ref: the effect's own cleanup below tears down the marker and this
+    // timer together whenever `pin` changes or the layer unmounts, so a
+    // stale timer from pin A can never fire after pin B's marker replaces
+    // it — there is no shared state across effect runs for it to leak into.
+    let hideTimer: ReturnType<typeof setTimeout> | undefined;
 
     import('leaflet').then((mod) => {
       if (cancelled) return;
@@ -104,6 +120,31 @@ export default function SearchPinLayer({
         autoClose: false,
         autoPan: false,
       });
+      // `bindPopup` above already wires the marker's own 'click' handler to
+      // toggle this same bound popup open/closed (Leaflet's
+      // `Layer.include({ click: this._openPopup, ... })` in
+      // node_modules/leaflet/src/layer/Popup.js) — using whatever options
+      // were passed to bindPopup, `autoPan: false` included. So clicking the
+      // marker after auto-hide already reopens the popup for free; no
+      // separate click handler or reopen path is needed here, and there is
+      // no way for a reopen to accidentally drop `autoPan: false`.
+      //
+      // What we do need: restarting the auto-hide timer every time the
+      // popup opens, not just the first time. Leaflet fires 'popupopen' on
+      // the marker synchronously on every open — both this initial
+      // `openPopup()` call and any later click-driven reopen — so hooking
+      // that one event covers both cases uniformly.
+      marker.on('popupopen', () => {
+        if (hideTimer !== undefined) clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => {
+          // Close the popup only — never call onClearRef here. onClear
+          // drops the pin itself (see the × handler above); auto-hide must
+          // leave the orange marker in place, otherwise a hidden popup with
+          // no way to bring it back would make the pin permanently stuck
+          // (see this file's header comment on why the × exists at all).
+          marker.closePopup();
+        }, POPUP_AUTO_HIDE_MS);
+      });
       marker.openPopup();
 
       markerRef.current = marker;
@@ -111,6 +152,7 @@ export default function SearchPinLayer({
 
     return () => {
       cancelled = true;
+      if (hideTimer !== undefined) clearTimeout(hideTimer);
       if (markerRef.current) {
         markerRef.current.remove();
         markerRef.current = null;
