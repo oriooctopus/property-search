@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { useSwipeable, type SwipeEventData } from 'react-swipeable';
 import SUBWAY_STATIONS from '@/lib/isochrone/subway-stations';
-import { getClosestDistinctLines } from '@/lib/isochrone/nearest-lines';
+import { getClosestDistinctLines, type ClosestLineEntry } from '@/lib/isochrone/nearest-lines';
 import { CompactStats } from '@/components/ui';
 import { formatAvailabilityDate, formatAvailabilityCompact } from '@/lib/format-date';
 import DestinationChip from '@/components/DestinationChip';
@@ -112,6 +112,41 @@ export interface HoveredStation {
 // Walking-speed conversion: 3 mph → 20 min per mile.
 export function walkMinFromMiles(distMi: number): number {
   return Math.max(1, Math.round(distMi * 20));
+}
+
+/**
+ * Mobile-only "compact subway indicator" row: the two closest lines + walking
+ * time inline, e.g. "[L] 6 min · Graham Av". Shown when the full "Nearest
+ * Subway" section is hidden (compactMobile).
+ *
+ * Was previously duplicated verbatim at both SwipeCard render paths
+ * (layoutOnly probe render + the real motion.div render) — a verify pass
+ * found that duplication let one copy silently drop the station-name span
+ * while the other still had it, undetected because the regression test only
+ * rendered one of the two paths. Both call sites now render this single
+ * component so a future prop/JSX change can't diverge between them again.
+ */
+function CompactSubwayRow({ lines }: { lines: ClosestLineEntry[] }) {
+  if (lines.length === 0) return null;
+  return (
+    <div
+      className="min-[600px]:hidden flex items-center gap-3 text-[12px]"
+      style={{ color: '#c9d1d9' }}
+      data-testid="compact-subway-row"
+    >
+      {lines.map(({ line, distMi, station }) => (
+        <div
+          key={`${station.stopId}-${line}`}
+          className="flex items-center gap-1 min-w-0"
+          title={`${station.name} — ${walkMinFromMiles(distMi)} min walk`}
+        >
+          <LineBadge line={line} />
+          <span className="flex-shrink-0" style={{ color: '#8b949e' }}>{walkMinFromMiles(distMi)} min</span>
+          <span className="truncate" style={{ color: '#8b949e' }}>&middot; {station.name}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 interface SwipeCardProps {
@@ -613,24 +648,9 @@ export default function SwipeCard({
               </div>
             );
           })()}
-          {compactMobile && listing.lat != null && listing.lon != null && (() => {
-            const lines = getClosestDistinctLines(listing.lat as number, listing.lon as number, 2);
-            if (lines.length === 0) return null;
-            return (
-              <div
-                className="min-[600px]:hidden flex items-center gap-3 text-[12px]"
-                style={{ color: '#c9d1d9' }}
-                data-testid="compact-subway-row"
-              >
-                {lines.map(({ line, distMi, station }) => (
-                  <div key={`${station.stopId}-${line}`} className="flex items-center gap-1">
-                    <LineBadge line={line} />
-                    <span style={{ color: '#8b949e' }}>{walkMinFromMiles(distMi)} min</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
+          {compactMobile && listing.lat != null && listing.lon != null && (
+            <CompactSubwayRow lines={getClosestDistinctLines(listing.lat as number, listing.lon as number, 2)} />
+          )}
           <div className="flex items-center justify-end pt-1 pb-2">
             <span className="text-sm font-medium" style={{ color: '#58a6ff' }}>View details &rarr;</span>
           </div>
@@ -1156,20 +1176,7 @@ export default function SwipeCard({
                 Shows the two closest lines + walking time inline so the
                 information is visible on the mobile swipe card where the
                 full "Nearest Subway" section is hidden. */}
-            {compactMobile && nearbyLines.length > 0 && (
-              <div
-                className="min-[600px]:hidden flex items-center gap-3 text-[12px]"
-                style={{ color: '#c9d1d9' }}
-                data-testid="compact-subway-row"
-              >
-                {nearbyLines.map(({ line, distMi, station }) => (
-                  <div key={`${station.stopId}-${line}`} className="flex items-center gap-1" title={`${station.name} — ${walkMinFromMiles(distMi)} min walk`}>
-                    <LineBadge line={line} />
-                    <span style={{ color: '#8b949e' }}>{walkMinFromMiles(distMi)} min</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            {compactMobile && <CompactSubwayRow lines={nearbyLines} />}
 
             {/* External link + optional leading slot (e.g. mobile "Save to" control) */}
             <div
