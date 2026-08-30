@@ -115,9 +115,13 @@ export function walkMinFromMiles(distMi: number): number {
 }
 
 /**
- * Mobile-only "compact subway indicator" row: the two closest lines + walking
- * time inline, e.g. "[L] 6 min · Graham Av". Shown when the full "Nearest
+ * Mobile-only "compact subway indicator": the two closest lines + walking time
+ * and station name, e.g. "[L] 6 min · Graham Av". Shown when the full "Nearest
  * Subway" section is hidden (compactMobile).
+ *
+ * One station per line. Side by side they read as crowded on a ~360px card,
+ * and two station names competing for the same row meant both truncated;
+ * stacked, each name gets the full card width and rarely truncates at all.
  *
  * Was previously duplicated verbatim at both SwipeCard render paths
  * (layoutOnly probe render + the real motion.div render) — a verify pass
@@ -130,14 +134,14 @@ function CompactSubwayRow({ lines }: { lines: ClosestLineEntry[] }) {
   if (lines.length === 0) return null;
   return (
     <div
-      className="min-[600px]:hidden flex items-center gap-3 text-[12px]"
+      className="min-[600px]:hidden flex flex-col items-start gap-1 text-[12px]"
       style={{ color: '#c9d1d9' }}
       data-testid="compact-subway-row"
     >
       {lines.map(({ line, distMi, station }) => (
         <div
           key={`${station.stopId}-${line}`}
-          className="flex items-center gap-1 min-w-0"
+          className="flex items-center gap-1 min-w-0 max-w-full"
           title={`${station.name} — ${walkMinFromMiles(distMi)} min walk`}
         >
           <LineBadge line={line} />
@@ -561,7 +565,7 @@ export default function SwipeCard({
     return (
       <div className={`overflow-hidden flex flex-col ${compactMobile ? 'rounded-3xl min-[600px]:rounded-2xl' : 'rounded-2xl'}`} style={{ backgroundColor: 'rgba(28, 32, 40, 0.97)', border: '1px solid #2d333b', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
         <div
-          className={`w-full flex-shrink-0 ${compactMobile ? 'h-[179px] min-[600px]:h-[226px]' : 'h-[226px]'}`}
+          className={`w-full flex-shrink-0 ${compactMobile ? 'h-[184px] min-[600px]:h-[226px]' : 'h-[226px]'}`}
           style={{ backgroundColor: '#0d1117' }}
         />
         <div className="px-5 py-4 flex flex-col gap-3">
@@ -751,7 +755,7 @@ export default function SwipeCard({
           {/* Photo carousel */}
           <div
             ref={photoAreaRef}
-            className={`relative w-full overflow-hidden flex-shrink-0 ${compactMobile ? 'h-[179px] min-[600px]:h-[226px]' : 'h-[226px]'}`}
+            className={`relative w-full overflow-hidden flex-shrink-0 ${compactMobile ? 'h-[184px] min-[600px]:h-[226px]' : 'h-[226px]'}`}
             style={{
               outline: photoFocused ? '2px solid rgba(88,166,255,0.7)' : 'none',
               outlineOffset: '-2px',
