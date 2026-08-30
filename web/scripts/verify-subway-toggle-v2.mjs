@@ -9,8 +9,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(os.homedir(), 'Documents/coding/screenshots/property-search/subway-toggle-v2');
 mkdirSync(OUT_DIR, { recursive: true });
 
-const TEST_EMAIL = 'oliverullman@gmail.com';
-const TEST_PASSWORD = '***REMOVED-CREDENTIAL***';
+// Credentials come from the environment (web/.env.local, gitignored).
+// Never hardcode a real account password here.
+const TEST_EMAIL = process.env.TEST_USER_EMAIL;
+const TEST_PASSWORD = process.env.TEST_USER_PASSWORD;
 const BASE = 'http://localhost:8000';
 
 async function login(page) {

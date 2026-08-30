@@ -3,8 +3,10 @@ import { waitForListingsLoaded } from "./auth.helper";
 import fs from "node:fs";
 import path from "node:path";
 
-const TEST_EMAIL = "oliverullman@gmail.com";
-const TEST_PASSWORD = "***REMOVED-CREDENTIAL***";
+// Credentials come from the environment (web/.env.local, gitignored).
+// Never hardcode a real account password here.
+const TEST_EMAIL = process.env.TEST_USER_EMAIL;
+const TEST_PASSWORD = process.env.TEST_USER_PASSWORD;
 
 async function login(page: Page) {
   await page.goto("/auth/login");
