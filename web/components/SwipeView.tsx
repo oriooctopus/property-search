@@ -1408,6 +1408,20 @@ export default function SwipeView({
                     zIndex: 1,
                     transform: 'scale(0.97)',
                     pointerEvents: 'none',
+                    // Belt-and-suspenders: don't rely solely on the top
+                    // card's opaque background (rgba(28,32,40,0.97), itself
+                    // only ~97% opaque) to hide this always-mounted card.
+                    // If `isDragging` ever gets stuck true while the top
+                    // card is actually idle (e.g. a real-device touchcancel
+                    // that react-swipeable never surfaces as a release —
+                    // see SwipeCard's forceEndDrag), the top card's
+                    // background goes transparent and this card would
+                    // otherwise bleed through as ghosted, overlapping text.
+                    // `visibility: hidden` keeps it mounted (no fade-in lag
+                    // when it's promoted) but guarantees it paints nothing
+                    // whenever we're not actually dragging, independent of
+                    // the top card's own state.
+                    visibility: isDragging ? 'visible' : 'hidden',
                   }}
                 >
                   {/* Dark overlay to show depth — only while dragging.

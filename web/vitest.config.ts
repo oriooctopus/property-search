@@ -13,4 +13,16 @@ export default defineConfig({
       "@": path.resolve(__dirname, "."),
     },
   },
+  // tsconfig.json sets "jsx": "preserve" (Next.js's own SWC pipeline does
+  // the JSX transform at build time). Vitest 4 transforms .tsx via oxc,
+  // which by default inherits that "preserve" setting from tsconfig and
+  // leaves JSX syntax untouched, producing invalid JS the import-analysis
+  // step can't parse. Every existing test that imports a real .tsx
+  // component (e.g. search-pin-layer.test.ts's SearchPinLayer) happens to
+  // import one with no actual JSX in it, so this never surfaced before.
+  // Override just for Vitest's own transform; tsconfig.json / Next's build
+  // are untouched.
+  oxc: {
+    jsx: { runtime: "automatic" },
+  },
 });

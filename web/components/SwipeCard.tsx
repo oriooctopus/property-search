@@ -204,6 +204,30 @@ export default function SwipeCard({
   const touchInPhoto = useRef(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // react-swipeable only listens for touchstart/touchmove/touchend (see
+  // node_modules/react-swipeable/src/index.ts) — it has no touchcancel
+  // handler. On a real device, a downward drag that ends near the OS UI
+  // (e.g. the home-indicator area) is exactly where iOS steals the gesture
+  // and fires touchcancel/pointercancel instead of touchend, so `onSwiped`
+  // never runs: `notifiedDragging` stays true and `onDragStateChange(false)`
+  // is never called. SwipeView's top-card background/overflow are gated on
+  // that dragging flag (transparent + visible while "dragging" so the user
+  // can peek at the card behind) — stuck true means the top card silently
+  // stays transparent, and the always-mounted next card bleeds through as
+  // ghosted, overlapping text. `forceEndDrag` is the same release cleanup
+  // as a normal `onSwiped`, invoked from listeners below that catch the
+  // cases react-swipeable's touchend-only tracking misses.
+  const forceEndDrag = useCallback(() => {
+    touchInPhoto.current = false;
+    if (!notifiedDragging.current) return;
+    notifiedDragging.current = false;
+    dragRecentlyFired.current = false;
+    const springBack = { type: 'spring' as const, stiffness: 500, damping: 30 };
+    animate(x, 0, springBack);
+    animate(y, 0, springBack);
+    onDragStateChange?.(false);
+  }, [onDragStateChange, x, y]);
+
   // Photo-focus mode: arrow keys cycle photos instead of triggering swipe actions
   const enterPhotoFocus = useCallback(() => {
     if (!isTop || totalPhotos < 1) return;
@@ -259,6 +283,26 @@ export default function SwipeCard({
     document.addEventListener('mousedown', handleMouseDown);
     return () => document.removeEventListener('mousedown', handleMouseDown);
   }, [photoFocused, exitPhotoFocus]);
+
+  // Safety net for drags that never get a `touchend`/mouseup — see
+  // forceEndDrag above. Only wired for the top card, matching
+  // react-swipeable's own `isTop` guard on its handlers. Capture phase so
+  // this still runs even if some other handler stops propagation.
+  useEffect(() => {
+    if (!isTop) return;
+    const handleCancel = () => forceEndDrag();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden') forceEndDrag();
+    };
+    window.addEventListener('touchcancel', handleCancel, true);
+    window.addEventListener('pointercancel', handleCancel, true);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.removeEventListener('touchcancel', handleCancel, true);
+      window.removeEventListener('pointercancel', handleCancel, true);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [isTop, forceEndDrag]);
 
   // Reset scroll position and photo index when listing changes
   useEffect(() => {
